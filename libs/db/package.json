@@ -1,0 +1,23 @@
+{
+  "name": "@oasis/db",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "generate": "prisma generate",
+    "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "studio": "prisma studio"
+  },
+  "dependencies": {
+    "@nestjs/common": "10.3.0",
+    "@nestjs/config": "3.1.1",
+    "@prisma/client": "5.8.0",
+    "prisma": "5.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.10.6",
+    "typescript": "5.3.3"
+  }
+}

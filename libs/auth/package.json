@@ -1,0 +1,21 @@
+{
+  "name": "@oasis/auth",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@nestjs/common": "10.3.0",
+    "@nestjs/core": "10.3.0",
+    "@nestjs/passport": "10.0.3",
+    "passport": "0.7.0",
+    "passport-jwt": "4.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.10.6",
+    "@types/passport-jwt": "4.0.0",
+    "typescript": "5.3.3"
+  }
+}

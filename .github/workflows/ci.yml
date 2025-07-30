@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: oasis_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 9.13.1
+        
+    - name: Get pnpm store directory
+      id: pnpm-cache
+      shell: bash
+      run: |
+        echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+    - uses: actions/cache@v3
+      name: Setup pnpm cache
+      with:
+        path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+      
+    - name: Generate Prisma Client
+      run: pnpm --filter @oasis/db prisma generate
+      
+    - name: Run Migrations
+      run: pnpm --filter @oasis/db prisma migrate deploy
+      env:
+        DATABASE_URL: postgresql://test:test@localhost:5432/oasis_test
+        
+    - name: Build
+      run: pnpm turbo run build
+      
+    - name: Lint
+      run: pnpm turbo run lint
+      
+    - name: Unit Tests
+      run: pnpm turbo run test
+      
+    - name: E2E Tests
+      run: pnpm --filter @oasis/api test:e2e
+      env:
+        DATABASE_URL: postgresql://test:test@localhost:5432/oasis_test
+        JWT_SECRET: test-secret-key-for-oasis-testing-only
+        TESTCONTAINERS_RYUK_DISABLED: true
+        
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      if: always()
+      with:
+        directory: ./apps/api/coverage
+        fail_ci_if_error: true

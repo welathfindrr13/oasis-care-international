@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oasis Activity Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <main class="flex flex-col items-center gap-8 p-10">
+        <h1 class="text-3xl font-semibold">Today's Activity</h1>
+        <div id="stats-container" class="grid gap-6 grid-cols-1 md:grid-cols-2">
+            <div class="rounded-lg bg-gray-100 p-8 text-center shadow-md min-w-[200px]">
+                <div class="text-5xl font-bold text-gray-800" id="booked">--</div>
+                <div class="mt-2 text-gray-600">Visits booked today</div>
+            </div>
+            <div class="rounded-lg bg-gray-100 p-8 text-center shadow-md min-w-[200px]">
+                <div class="text-5xl font-bold text-gray-800" id="finished">--</div>
+                <div class="mt-2 text-gray-600">Visits finished today</div>
+            </div>
+        </div>
+        <div class="text-sm text-gray-500 mt-4">
+            Auto-refreshes every 30 seconds
+        </div>
+    </main>
+
+    <script>
+        // Mock API function
+        async function fetchStats() {
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Generate random stats
+            return {
+                booked: Math.floor(Math.random() * 20) + 5,
+                finished: Math.floor(Math.random() * 15) + 3,
+            };
+        }
+
+        // Update the UI with new stats
+        async function updateStats() {
+            try {
+                const stats = await fetchStats();
+                document.getElementById('booked').textContent = stats.booked;
+                document.getElementById('finished').textContent = stats.finished;
+                
+                // Add a fade effect
+                document.getElementById('stats-container').style.opacity = '0.7';
+                setTimeout(() => {
+                    document.getElementById('stats-container').style.opacity = '1';
+                }, 100);
+            } catch (error) {
+                console.error('Failed to fetch stats:', error);
+            }
+        }
+
+        // Initial load
+        updateStats();
+
+        // Refresh every 30 seconds
+        setInterval(updateStats, 30000);
+    </script>
+</body>
+</html>
