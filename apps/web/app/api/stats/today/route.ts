@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
+// Next.js build: mark as dynamic so /api/stats/today isn't prerendered
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';

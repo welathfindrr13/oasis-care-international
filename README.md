@@ -115,6 +115,12 @@ Run tests with:
 pnpm turbo run test
 ```
 
+### Logging & Redaction
+* **Dev**: colourised pretty logs.  
+* **Prod**: one-line JSON suitable for Stackdriver / Loki.  
+* Redacts auth headers, cookies, e-mails, UK mobile numbers, and runs every message through `Masker` for belt-and-braces PII stripping.  
+* Every line carries `reqId` so traces can be correlated across services.
+
 ## License
 
 Private - All rights reserved

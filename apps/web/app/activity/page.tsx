@@ -13,9 +13,9 @@ export default function ActivityPage() {
   if (error) {
     return (
       <main className="flex flex-col items-center gap-8 p-10">
-        <h1 className="text-3xl font-semibold">Today's Activity</h1>
+        <h1 className="text-3xl font-semibold">Today&apos;s Activity</h1>
         <div className="rounded-lg bg-red-100 p-6 text-red-800">
-          <p className="text-lg">Error loading stats. Please ensure you're logged in as an admin.</p>
+          <p className="text-lg">Error loading stats. Please ensure you&apos;re logged in as an admin.</p>
         </div>
       </main>
     );
@@ -24,7 +24,7 @@ export default function ActivityPage() {
   if (!data) {
     return (
       <main className="flex flex-col items-center gap-8 p-10">
-        <h1 className="text-3xl font-semibold">Today's Activity</h1>
+        <h1 className="text-3xl font-semibold">Today&apos;s Activity</h1>
         <p className="text-lg text-gray-600">Loading...</p>
       </main>
     );
@@ -32,7 +32,7 @@ export default function ActivityPage() {
 
   return (
     <main className="flex flex-col items-center gap-8 p-10">
-      <h1 className="text-3xl font-semibold">Today's Activity</h1>
+      <h1 className="text-3xl font-semibold">Today&apos;s Activity</h1>
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
         <StatCard label="Visits booked today" value={data.booked} />
         <StatCard label="Visits finished today" value={data.finished} />

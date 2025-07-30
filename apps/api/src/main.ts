@@ -35,8 +35,8 @@ async function bootstrap() {
 
   const port = process.env.PORT || 4000;
   await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}`);
-  console.log(`GraphQL Playground available at: http://localhost:${port}/graphql`);
-  console.log(`REST endpoint available at: http://localhost:${port}/stats/today`);
+  // console.log removed – use logger
+  // console.log removed – use logger
+  // console.log removed – use logger
 }
 bootstrap();

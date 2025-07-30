@@ -7,12 +7,14 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from '@oasis/auth';
 import { PrismaService } from '@oasis/db';
+import { LoggerModule } from './logger/logger.module';
 import { VisitModule } from './visit/visit.module';
 import { StatsModule } from './stats/stats.module';
 import { formatGraphQLError } from './common/filters/graphql-error.filter';
 
 @Module({
   imports: [
+    LoggerModule,
     ConfigModule.forRoot({ isGlobal: true }),
     ClsModule.forRoot({
       global: true,
