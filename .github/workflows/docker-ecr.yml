@@ -1,0 +1,41 @@
+name: Build & push API image to ECR
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'eu-west-2' }}
+
+      - name: Log in to Amazon ECR
+        env:
+          REGISTRY: 721689331449.dkr.ecr.eu-west-2.amazonaws.com
+        run: |
+          aws ecr get-login-password --region eu-west-2 | \
+            docker login --username AWS --password-stdin $REGISTRY
+
+      - name: Build, tag, push
+        env:
+          REGISTRY: 721689331449.dkr.ecr.eu-west-2.amazonaws.com
+          REPO: oasis-api
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REPO:$TAG apps/api
+          docker tag  $REPO:$TAG $REGISTRY/$REPO:$TAG
+          docker push $REGISTRY/$REPO:$TAG
+          # update 'latest' on main
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            docker tag $REGISTRY/$REPO:$TAG $REGISTRY/$REPO:latest
+            docker push $REGISTRY/$REPO:latest
+          fi

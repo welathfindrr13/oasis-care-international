@@ -51,3 +51,7 @@ prisma/*.db-journal
 
 # Generated files
 test-schema.gql
+
+# Prevent accidental commit of local AWS credentials
+**/.aws/credentials
+**/.aws/config
