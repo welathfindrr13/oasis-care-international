@@ -55,7 +55,7 @@ jobs:
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
       
-    - name: Generate Prisma Client
+    - name: Generate Prisma client
       run: pnpm --filter @oasis/db prisma generate
       
     - name: Run Migrations
@@ -79,9 +79,9 @@ jobs:
         JWT_SECRET: test-secret-key-for-oasis-testing-only
         TESTCONTAINERS_RYUK_DISABLED: true
         
-    - name: Upload coverage
-      uses: codecov/codecov-action@v3
-      if: always()
-      with:
-        directory: ./apps/api/coverage
-        fail_ci_if_error: true
+    # - name: Upload coverage
+    #   uses: codecov/codecov-action@v3
+    #   if: always()
+    #   with:
+    #     directory: ./apps/api/coverage
+    #     fail_ci_if_error: true
