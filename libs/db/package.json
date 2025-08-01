@@ -4,6 +4,7 @@
   "private": true,
   "main": "src/index.ts",
   "scripts": {
+    "prebuild": "pnpm prisma generate",
     "build": "tsc",
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",

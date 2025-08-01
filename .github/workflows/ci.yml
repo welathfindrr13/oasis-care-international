@@ -56,7 +56,7 @@ jobs:
       run: pnpm install --frozen-lockfile
       
     - name: Generate Prisma client
-      run: pnpm --filter @oasis/db prisma generate
+      run: pnpm prisma generate --recursive
       
     - name: Run Migrations
       run: pnpm --filter @oasis/db prisma migrate deploy
