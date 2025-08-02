@@ -6,36 +6,23 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'eu-west-2' }}
 
-      - name: Log in to Amazon ECR
-        env:
-          REGISTRY: 721689331449.dkr.ecr.eu-west-2.amazonaws.com
-        run: |
-          aws ecr get-login-password --region eu-west-2 | \
-            docker login --username AWS --password-stdin $REGISTRY
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag, push
-        env:
-          REGISTRY: 721689331449.dkr.ecr.eu-west-2.amazonaws.com
-          REPO: oasis-api
-          TAG: ${{ github.sha }}
+      - name: Build and push image
         run: |
-          docker build -t $REPO:$TAG apps/api
-          docker tag  $REPO:$TAG $REGISTRY/$REPO:$TAG
-          docker push $REGISTRY/$REPO:$TAG
-          # update 'latest' on main
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            docker tag $REGISTRY/$REPO:$TAG $REGISTRY/$REPO:latest
-            docker push $REGISTRY/$REPO:latest
-          fi
+          IMAGE=721689331449.dkr.ecr.eu-west-2.amazonaws.com/oasis-api
+          docker build -t $IMAGE:latest apps/api
+          docker push $IMAGE:latest
