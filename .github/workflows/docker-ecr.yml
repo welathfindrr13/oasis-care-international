@@ -23,6 +23,6 @@ jobs:
 
       - name: Build and push image
         run: |
-          IMAGE=721689331449.dkr.ecr.eu-west-2.amazonaws.com/oasis-api
+          IMAGE=721689331449.dkr.ecr.eu-west-2.amazonaws.com/oasis-backend
           docker build -t $IMAGE:latest apps/api
           docker push $IMAGE:latest

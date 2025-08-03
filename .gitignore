@@ -55,3 +55,10 @@ test-schema.gql
 # Prevent accidental commit of local AWS credentials
 **/.aws/credentials
 **/.aws/config
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+*.tfvars
