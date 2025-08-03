@@ -121,6 +121,57 @@ pnpm turbo run test
 * Redacts auth headers, cookies, e-mails, UK mobile numbers, and runs every message through `Masker` for belt-and-braces PII stripping.  
 * Every line carries `reqId` so traces can be correlated across services.
 
+### Prometheus metrics
+* `/metrics` (admin-only) exposes default Node/HTTP metrics plus domain counters:
+      * `visit_overlap_total`
+      * `visits_created_total`
+
+## Deployment
+
+### Staging Environment
+
+A complete AWS staging environment is available in `infrastructure/staging/` with:
+- **VPC** with public/private subnets in eu-west-2
+- **RDS PostgreSQL** (t3.micro) with encryption
+- **ECS Fargate** service with auto-scaling
+- **Application Load Balancer** with HTTPS
+- **Route53** DNS and ACM certificates
+- **Secrets Manager** for database credentials
+- **CloudWatch** logging and monitoring
+
+#### Deploy to AWS Staging
+
+```bash
+# One-time setup
+cd infrastructure
+./scripts/setup-backend.sh
+
+# Deploy infrastructure
+./scripts/deploy-staging.sh
+
+# Run database migrations
+./scripts/run-migration.sh
+
+# Verify deployment
+./scripts/smoke-test.sh
+```
+
+**Prerequisites:**
+- AWS CLI configured with appropriate permissions
+- Terraform 1.6+
+- Route53 hosted zone for `oasis-care.com`
+
+The staging API will be available at: `https://staging-api.oasis-care.com/graphql`
+
+#### Health Check
+
+The API includes a health check endpoint at `/healthz` that returns:
+```json
+{ "status": "ok" }
+```
+
+This endpoint is used by the ALB health checks and monitoring systems.
+
 ## License
 
 Private - All rights reserved

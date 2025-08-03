@@ -8,13 +8,17 @@ import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from '@oasis/auth';
 import { PrismaService } from '@oasis/db';
 import { LoggerModule } from './logger/logger.module';
+import { HealthModule } from './health/health.module';
+import { MetricsModule } from './metrics/metrics.module';
 import { VisitModule } from './visit/visit.module';
 import { StatsModule } from './stats/stats.module';
 import { formatGraphQLError } from './common/filters/graphql-error.filter';
 
 @Module({
   imports: [
+    MetricsModule,
     LoggerModule,
+    HealthModule,
     ConfigModule.forRoot({ isGlobal: true }),
     ClsModule.forRoot({
       global: true,

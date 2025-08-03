@@ -15,7 +15,7 @@ COPY apps/api/package.json ./apps/api/
 COPY libs/*/package.json ./libs/*/
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm install
 
 # Copy source code
 COPY . .
@@ -44,7 +44,7 @@ COPY apps/api/package.json ./apps/api/
 COPY libs/*/package.json ./libs/*/
 
 # Install only production dependencies
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --prod
 
 # Copy built application
 COPY --from=build /app/apps/api/dist ./apps/api/dist
@@ -52,7 +52,6 @@ COPY --from=build /app/libs ./libs
 
 # Copy Prisma schema and generated client
 COPY --from=build /app/libs/db/prisma ./libs/db/prisma
-COPY --from=build /app/node_modules/.pnpm/registry.npmjs.org/@prisma ./node_modules/.pnpm/registry.npmjs.org/@prisma
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001

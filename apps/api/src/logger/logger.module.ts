@@ -3,13 +3,23 @@ import { pinoHttp } from 'pino-http';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { Masker } from '../common/utils/masker';
+import { RequestIdMiddleware } from './request-id.middleware';
 
 @Module({})
 export class LoggerModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
+      .apply(RequestIdMiddleware)
+      .forRoutes('*');
+
+    consumer
       .apply(
         pinoHttp({
+          serializers: { 
+            req(req: any) { 
+              return { id: req.headers['x-request-id'] }; 
+            } 
+          },
           genReqId: () => randomUUID(),
           redact: {
             paths: [

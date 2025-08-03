@@ -4,6 +4,10 @@ import request from 'supertest';
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { PrismaService } from '@oasis/db';
 import { VisitModule } from '../src/visit/visit.module';
+import { VisitService } from '../src/visit/visit.service';
+import { VisitResolver } from '../src/visit/visit.resolver';
+import { VisitRepository } from '../src/visit/visit.repository';
+import { MetricsModule } from '../src/metrics/metrics.module';
 import { ClsModule } from 'nestjs-cls';
 import { execSync } from 'child_process';
 import { getBearerToken, getTestJwtSecret, TEST_USERS } from './jwt.mock';
@@ -79,10 +83,16 @@ describe('Visit E2E Tests', () => {
           secret: getTestJwtSecret(),
           signOptions: { expiresIn: '1h' },
         }),
-        VisitModule,
       ],
       providers: [
         JwtStrategy,
+        VisitService,
+        VisitResolver,
+        VisitRepository,
+        PrismaService,
+        // Stub the Prometheus counters for testing
+        { provide: 'visit_overlap_total', useValue: { inc: jest.fn() } },
+        { provide: 'visits_created_total', useValue: { inc: jest.fn() } },
       ],
     })
       .overrideGuard(AuthGuard('jwt'))

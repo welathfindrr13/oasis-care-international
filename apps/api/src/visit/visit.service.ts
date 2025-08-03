@@ -7,6 +7,8 @@ import { Visit, VisitTask, VisitStatus } from '@oasis/db';
 import { ClsService } from 'nestjs-cls';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import { Inject } from '@nestjs/common';
+import { Counter } from 'prom-client';
 
 @Injectable()
 export class VisitService {
@@ -15,6 +17,8 @@ export class VisitService {
   constructor(
     private readonly visitRepository: VisitRepository,
     private readonly cls: ClsService,
+    @Inject('visit_overlap_total') private readonly overlapCounter: Counter,
+    @Inject('visits_created_total') private readonly createCounter: Counter,
   ) {}
 
   async createVisit(
@@ -37,6 +41,7 @@ export class VisitService {
         `Overlapping visit found for carer ${data.carerId}`,
         { requestId, overlappingVisits: overlappingVisits.map(v => v.id) }
       );
+      this.overlapCounter.inc();
       throw new BaseHttpException(
         ErrorCode.VISIT_OVERLAP,
         'Carer already has a visit scheduled during this time period',
@@ -66,6 +71,7 @@ export class VisitService {
       return this.visitRepository.findById(visit.id) as Promise<Visit>;
     }
 
+    this.createCounter.inc();
     this.logger.log(`Visit ${visit.id} created successfully`, { requestId });
     return visit;
   }

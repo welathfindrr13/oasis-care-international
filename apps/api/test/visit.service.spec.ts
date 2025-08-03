@@ -27,6 +27,10 @@ describe('VisitService', () => {
     get: jest.fn().mockReturnValue('test-request-id'),
   };
 
+  const mockCounter = {
+    inc: jest.fn(),
+  };
+
   const mockVisit = {
     id: 'visit-123',
     carer_id: 'carer-123',
@@ -64,6 +68,14 @@ describe('VisitService', () => {
         {
           provide: ClsService,
           useValue: mockClsService,
+        },
+        {
+          provide: 'visit_overlap_total',
+          useValue: mockCounter,
+        },
+        {
+          provide: 'visits_created_total',
+          useValue: mockCounter,
         },
       ],
     }).compile();

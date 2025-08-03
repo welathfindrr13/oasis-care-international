@@ -4,9 +4,10 @@ import { VisitService } from './visit.service';
 import { VisitResolver } from './visit.resolver';
 import { VisitRepository } from './visit.repository';
 import { PrismaService } from '@oasis/db';
+import { MetricsModule } from '../metrics/metrics.module';
 
 @Module({
-  imports: [ClsModule],
+  imports: [ClsModule, MetricsModule],
   providers: [
     VisitService,
     VisitResolver,

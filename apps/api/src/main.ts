@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe, HttpStatus } from '@nestjs/common';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { GraphqlExceptionFilter } from './common/filters/gql-exception.filter';
+import { GqlErrorFilter } from './common/filters/gql-error.filter';
 import { BaseHttpException } from './common/errors/base-http.exception';
 import { ErrorCode } from './common/errors/error-codes';
 
@@ -19,6 +20,7 @@ async function bootstrap() {
   app.useGlobalFilters(
     new HttpExceptionFilter(),
     new GraphqlExceptionFilter(),
+    new GqlErrorFilter(),
   );
 
   // Global validation pipe with custom error factory
