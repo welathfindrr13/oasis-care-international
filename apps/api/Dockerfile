@@ -1,6 +1,9 @@
 # ---- build stage ----
 FROM node:20-alpine AS build
 
+# Install native build dependencies for node-gyp packages
+RUN apk add --no-cache python3 make g++
+
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
@@ -20,8 +23,9 @@ RUN pnpm install --no-frozen-lockfile
 # Copy source code
 COPY . .
 
-# Generate Prisma client first
-RUN pnpm --filter @oasis/db prisma generate
+# Set Prisma schema path and generate client
+ENV PRISMA_SCHEMA=libs/db/prisma/schema.prisma
+RUN pnpm --filter @oasis/db exec prisma generate
 
 # Build the application (libraries will be built as dependencies)
 RUN pnpm --filter @oasis/api build
