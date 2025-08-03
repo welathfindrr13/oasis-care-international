@@ -25,7 +25,7 @@ COPY . .
 
 # Set Prisma schema path and generate client
 ENV PRISMA_SCHEMA=libs/db/prisma/schema.prisma
-RUN pnpm --filter @oasis/db exec prisma generate
+RUN pnpm --filter @oasis/db run generate
 
 # Build the application (libraries will be built as dependencies)
 RUN pnpm --filter @oasis/api build
