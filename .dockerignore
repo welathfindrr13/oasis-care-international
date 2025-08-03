@@ -1,0 +1,52 @@
+# Dependencies
+node_modules
+**/node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+**/dist
+**/build
+**/.next
+**/out
+
+# Development files
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile*
+.dockerignore
+
+# Documentation
+README.md
+docs/
+
+# CI/CD (except for source code)
+.github/
+
+# Temporary files
+*.tmp
+*.temp
+coverage/
+**/.nyc_output
+
+# Large infrastructure files
+AWSCLIV2.pkg
