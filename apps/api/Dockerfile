@@ -14,16 +14,16 @@ COPY turbo.json ./
 COPY apps/api/package.json ./apps/api/
 COPY libs/*/package.json ./libs/*/
 
-# Install dependencies
-RUN pnpm install
+# Install dependencies for all workspaces
+RUN pnpm install --no-frozen-lockfile
 
 # Copy source code
 COPY . .
 
-# Generate Prisma client
+# Generate Prisma client first
 RUN pnpm --filter @oasis/db prisma generate
 
-# Build the application
+# Build the application (libraries will be built as dependencies)
 RUN pnpm --filter @oasis/api build
 
 # ---- production image ----
