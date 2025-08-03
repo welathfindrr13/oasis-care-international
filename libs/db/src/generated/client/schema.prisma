@@ -1,0 +1,90 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../src/generated/client"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+model Carer {
+  id            String    @id @default(uuid())
+  first_name    String
+  last_name     String
+  email         String    @unique
+  phone         String?
+  hire_date     DateTime  @default(now())
+  is_active     Boolean   @default(true)
+  visits        Visit[]
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  @@map("carer")
+}
+
+model Client {
+  id            String    @id @default(uuid())
+  full_name     String
+  address_line1 String
+  address_line2 String?
+  city          String
+  postcode      String
+  date_of_birth DateTime?
+  visits        Visit[]
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  @@map("client")
+}
+
+model Visit {
+  id              String      @id @default(uuid())
+  carer_id        String
+  client_id       String
+  scheduled_start DateTime
+  scheduled_end   DateTime
+  actual_start    DateTime?
+  actual_end      DateTime?
+  status          VisitStatus @default(SCHEDULED)
+  notes           String?
+  carer           Carer       @relation(fields: [carer_id], references: [id])
+  client          Client      @relation(fields: [client_id], references: [id])
+  tasks           VisitTask[]
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+  deleted_at      DateTime?
+
+  @@index([carer_id])
+  @@index([client_id])
+  @@index([scheduled_start, scheduled_end])
+  @@index([carer_id, scheduled_start, scheduled_end])
+  @@map("visit")
+}
+
+model VisitTask {
+  id           String    @id @default(uuid())
+  visit_id     String
+  task_name    String
+  description  String?
+  is_completed Boolean   @default(false)
+  completed_at DateTime?
+  notes        String?
+  visit        Visit     @relation(fields: [visit_id], references: [id])
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  deleted_at   DateTime?
+
+  @@index([visit_id])
+  @@map("visit_task")
+}
+
+enum VisitStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
