@@ -52,6 +52,10 @@ prisma/*.db-journal
 # Generated files
 test-schema.gql
 
+# Build artifacts in libs
+libs/**/src/*.js
+libs/**/src/*.js.map
+
 # Prevent accidental commit of local AWS credentials
 **/.aws/credentials
 **/.aws/config

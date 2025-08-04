@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { VisitResolver } from '../src/visit/visit.resolver';
 import { VisitService } from '../src/visit/visit.service';
-import { VisitStatus } from '@prisma/client';
+import { VisitStatus } from '@oasis/db';
 import { ForbiddenException } from '@nestjs/common';
 
 describe('VisitResolver', () => {
