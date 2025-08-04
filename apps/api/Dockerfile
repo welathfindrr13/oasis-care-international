@@ -15,7 +15,8 @@ COPY turbo.json ./
 
 # Copy package.json files for all workspaces
 COPY apps/api/package.json ./apps/api/
-COPY libs/*/package.json ./libs/*/
+COPY libs/auth/package.json ./libs/auth/
+COPY libs/db/package.json ./libs/db/
 
 # Install dependencies for all workspaces
 RUN pnpm install --no-frozen-lockfile
@@ -53,7 +54,8 @@ COPY turbo.json ./
 
 # Copy package.json files
 COPY apps/api/package.json ./apps/api/
-COPY libs/*/package.json ./libs/*/
+COPY libs/auth/package.json ./libs/auth/
+COPY libs/db/package.json ./libs/db/
 
 # Install only production dependencies
 RUN pnpm install --prod
