@@ -1,4 +1,4 @@
-import { PrismaClient, VisitStatus } from '@prisma/client';
+import { PrismaClient, VisitStatus } from '@oasis/db';
 import { TEST_USERS } from './jwt.mock';
 
 export async function createTestFixtures(prisma: PrismaClient) {
