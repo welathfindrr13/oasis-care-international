@@ -20,6 +20,14 @@ COPY libs/*/package.json ./libs/*/
 # Install dependencies for all workspaces
 RUN pnpm install --no-frozen-lockfile
 
+# ─── Diagnostic: list all workspaces Turbo detects ─────────────────────────────
+# This prints a JSON array of unique workspace names.  You should see each name
+# only once; if "@oasis/db" (or any other) appears twice, we know duplication is
+# happening after the COPY steps.
+RUN pnpm dlx turbo list --json \
+    | jq '.packages | map(.name) | unique' \
+    || true
+
 # Copy source code
 COPY . .
 
@@ -27,8 +35,8 @@ COPY . .
 ENV PRISMA_SCHEMA=libs/db/prisma/schema.prisma
 # RUN pnpm exec prisma generate --schema=libs/db/prisma/schema.prisma
 
-# Build the application (libraries will be built as dependencies)
-RUN pnpm --filter @oasis/api build
+# Build the application (Turbo first builds dependent libs)
+RUN pnpm turbo run build --filter=@oasis/api
 
 # ---- production image ----
 FROM node:20-alpine AS production
