@@ -25,7 +25,18 @@ export class MockAuthGuard implements CanActivate {
     }
 
     try {
-      const user = JSON.parse(Buffer.from(payload, 'base64').toString());
+      const payload_data = JSON.parse(Buffer.from(payload, 'base64').toString());
+      
+      // Transform the user object to match what JWT strategy returns
+      const user = {
+        id: payload_data.sub,  // Map sub to id for resolver compatibility
+        sub: payload_data.sub,
+        username: payload_data.preferred_username,
+        role: payload_data.realm_access?.roles?.[0] || 'user',  // Extract role for resolver compatibility
+        realm_access: payload_data.realm_access,
+        resource_access: payload_data.resource_access,
+      };
+      
       request.user = user;
       
       // Check roles if required

@@ -48,6 +48,9 @@ importers:
       prettier:
         specifier: ^3.2.0
         version: 3.6.2
+      testcontainers:
+        specifier: 10.4.0
+        version: 10.4.0
       turbo:
         specifier: ^2.1.0
         version: 2.5.5

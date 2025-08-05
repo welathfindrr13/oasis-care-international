@@ -12,6 +12,7 @@ import { HealthModule } from './health/health.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { VisitModule } from './visit/visit.module';
 import { StatsModule } from './stats/stats.module';
+import { MedicationModule } from './medication/medication.module';
 import { formatGraphQLError } from './common/filters/graphql-error.filter';
 
 @Module({
@@ -43,6 +44,7 @@ import { formatGraphQLError } from './common/filters/graphql-error.filter';
     }),
     VisitModule,
     StatsModule,
+    MedicationModule,
     // Add other feature modules here
   ],
   providers: [

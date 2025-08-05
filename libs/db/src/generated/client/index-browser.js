@@ -161,6 +161,58 @@ exports.Prisma.VisitTaskScalarFieldEnum = {
   deleted_at: 'deleted_at'
 };
 
+exports.Prisma.MedicationScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  dosage: 'dosage',
+  unit: 'unit',
+  instructions: 'instructions',
+  created_at: 'created_at',
+  updated_at: 'updated_at',
+  deleted_at: 'deleted_at'
+};
+
+exports.Prisma.PrescriptionScalarFieldEnum = {
+  id: 'id',
+  client_id: 'client_id',
+  medication_id: 'medication_id',
+  start_date: 'start_date',
+  end_date: 'end_date',
+  frequency_per_day: 'frequency_per_day',
+  frequency_interval_hours: 'frequency_interval_hours',
+  administration_times: 'administration_times',
+  special_instructions: 'special_instructions',
+  is_active: 'is_active',
+  created_at: 'created_at',
+  updated_at: 'updated_at',
+  deleted_at: 'deleted_at'
+};
+
+exports.Prisma.MedicationAdministrationScalarFieldEnum = {
+  id: 'id',
+  prescription_id: 'prescription_id',
+  visit_id: 'visit_id',
+  scheduled_time: 'scheduled_time',
+  administered_time: 'administered_time',
+  administered_by: 'administered_by',
+  status: 'status',
+  notes: 'notes',
+  created_at: 'created_at',
+  updated_at: 'updated_at',
+  deleted_at: 'deleted_at'
+};
+
+exports.Prisma.MedicationAuditScalarFieldEnum = {
+  id: 'id',
+  prescription_id: 'prescription_id',
+  medication_administration_id: 'medication_administration_id',
+  action: 'action',
+  actor_id: 'actor_id',
+  actor_role: 'actor_role',
+  changes: 'changes',
+  timestamp: 'timestamp'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -182,11 +234,34 @@ exports.VisitStatus = exports.$Enums.VisitStatus = {
   CANCELLED: 'CANCELLED'
 };
 
+exports.MedicationStatus = exports.$Enums.MedicationStatus = {
+  SCHEDULED: 'SCHEDULED',
+  ADMINISTERED: 'ADMINISTERED',
+  MISSED: 'MISSED',
+  REFUSED: 'REFUSED',
+  CANCELLED: 'CANCELLED'
+};
+
+exports.MedicationAuditAction = exports.$Enums.MedicationAuditAction = {
+  PRESCRIPTION_CREATED: 'PRESCRIPTION_CREATED',
+  PRESCRIPTION_UPDATED: 'PRESCRIPTION_UPDATED',
+  PRESCRIPTION_DELETED: 'PRESCRIPTION_DELETED',
+  MEDICATION_SCHEDULED: 'MEDICATION_SCHEDULED',
+  MEDICATION_ADMINISTERED: 'MEDICATION_ADMINISTERED',
+  MEDICATION_MISSED: 'MEDICATION_MISSED',
+  MEDICATION_REFUSED: 'MEDICATION_REFUSED',
+  MEDICATION_CANCELLED: 'MEDICATION_CANCELLED'
+};
+
 exports.Prisma.ModelName = {
   Carer: 'Carer',
   Client: 'Client',
   Visit: 'Visit',
-  VisitTask: 'VisitTask'
+  VisitTask: 'VisitTask',
+  Medication: 'Medication',
+  Prescription: 'Prescription',
+  MedicationAdministration: 'MedicationAdministration',
+  MedicationAudit: 'MedicationAudit'
 };
 
 /**

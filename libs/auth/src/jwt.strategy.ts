@@ -23,7 +23,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const options: StrategyOptions = {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'your-secret-key',
+      secretOrKey: process.env.JWT_SECRET || (process.env.NODE_ENV === 'test' ? 'test-secret-key-for-oasis-testing-only' : 'your-secret-key'),
       // For Keycloak, you might want to use RS256 with public key
       // secretOrKeyProvider: (request, rawJwtToken, done) => {
       //   // Fetch public key from Keycloak
@@ -34,9 +34,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload): Promise<any> {
+    // Extract the first role from realm_access for simplicity
+    const role = payload.realm_access?.roles?.[0] || 'user';
+    
     return {
+      id: payload.sub,  // Map sub to id for resolver compatibility
       sub: payload.sub,
       username: payload.preferred_username,
+      role,  // Extract role for resolver compatibility
       realm_access: payload.realm_access,
       resource_access: payload.resource_access,
     };

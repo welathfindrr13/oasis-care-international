@@ -26,7 +26,7 @@ model Carer {
 }
 
 model Client {
-  id            String    @id @default(uuid())
+  id            String         @id @default(uuid())
   full_name     String
   address_line1 String
   address_line2 String?
@@ -34,29 +34,31 @@ model Client {
   postcode      String
   date_of_birth DateTime?
   visits        Visit[]
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
+  prescriptions Prescription[]
+  created_at    DateTime       @default(now())
+  updated_at    DateTime       @updatedAt
   deleted_at    DateTime?
 
   @@map("client")
 }
 
 model Visit {
-  id              String      @id @default(uuid())
-  carer_id        String
-  client_id       String
-  scheduled_start DateTime
-  scheduled_end   DateTime
-  actual_start    DateTime?
-  actual_end      DateTime?
-  status          VisitStatus @default(SCHEDULED)
-  notes           String?
-  carer           Carer       @relation(fields: [carer_id], references: [id])
-  client          Client      @relation(fields: [client_id], references: [id])
-  tasks           VisitTask[]
-  created_at      DateTime    @default(now())
-  updated_at      DateTime    @updatedAt
-  deleted_at      DateTime?
+  id                       String                     @id @default(uuid())
+  carer_id                 String
+  client_id                String
+  scheduled_start          DateTime
+  scheduled_end            DateTime
+  actual_start             DateTime?
+  actual_end               DateTime?
+  status                   VisitStatus                @default(SCHEDULED)
+  notes                    String?
+  carer                    Carer                      @relation(fields: [carer_id], references: [id])
+  client                   Client                     @relation(fields: [client_id], references: [id])
+  tasks                    VisitTask[]
+  medication_administrations MedicationAdministration[]
+  created_at               DateTime                   @default(now())
+  updated_at               DateTime                   @updatedAt
+  deleted_at               DateTime?
 
   @@index([carer_id])
   @@index([client_id])
@@ -87,4 +89,103 @@ enum VisitStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+}
+
+model Medication {
+  id            String        @id @default(uuid())
+  name          String
+  dosage        String
+  unit          String
+  instructions  String?
+  prescriptions Prescription[]
+  created_at    DateTime      @default(now())
+  updated_at    DateTime      @updatedAt
+  deleted_at    DateTime?
+
+  @@map("medication")
+}
+
+model Prescription {
+  id                        String                     @id @default(uuid())
+  client_id                 String
+  medication_id             String
+  start_date                DateTime
+  end_date                  DateTime?
+  frequency_per_day         Int
+  frequency_interval_hours  Int?
+  administration_times      String[] // JSON array of times like ["08:00", "20:00"]
+  special_instructions      String?
+  is_active                 Boolean                    @default(true)
+  client                    Client                     @relation(fields: [client_id], references: [id])
+  medication                Medication                 @relation(fields: [medication_id], references: [id])
+  administrations           MedicationAdministration[]
+  audits                    MedicationAudit[]
+  created_at                DateTime                   @default(now())
+  updated_at                DateTime                   @updatedAt
+  deleted_at                DateTime?
+
+  @@index([client_id])
+  @@index([medication_id])
+  @@index([start_date, end_date])
+  @@map("prescription")
+}
+
+model MedicationAdministration {
+  id                String              @id @default(uuid())
+  prescription_id   String
+  visit_id          String?
+  scheduled_time    DateTime
+  administered_time DateTime?
+  administered_by   String?
+  status            MedicationStatus    @default(SCHEDULED)
+  notes             String?
+  prescription      Prescription        @relation(fields: [prescription_id], references: [id])
+  visit             Visit?              @relation(fields: [visit_id], references: [id])
+  audits            MedicationAudit[]
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @updatedAt
+  deleted_at        DateTime?
+
+  @@index([prescription_id])
+  @@index([visit_id])
+  @@index([scheduled_time])
+  @@index([status, scheduled_time])
+  @@map("medication_administration")
+}
+
+model MedicationAudit {
+  id                           String                    @id @default(uuid())
+  prescription_id              String?
+  medication_administration_id String?
+  action                       MedicationAuditAction
+  actor_id                     String
+  actor_role                   String
+  changes                      String // JSON object of what changed
+  timestamp                    DateTime                  @default(now())
+  prescription                 Prescription?             @relation(fields: [prescription_id], references: [id])
+  medication_administration    MedicationAdministration? @relation(fields: [medication_administration_id], references: [id])
+
+  @@index([prescription_id])
+  @@index([medication_administration_id])
+  @@index([timestamp])
+  @@map("medication_audit")
+}
+
+enum MedicationStatus {
+  SCHEDULED
+  ADMINISTERED
+  MISSED
+  REFUSED
+  CANCELLED
+}
+
+enum MedicationAuditAction {
+  PRESCRIPTION_CREATED
+  PRESCRIPTION_UPDATED
+  PRESCRIPTION_DELETED
+  MEDICATION_SCHEDULED
+  MEDICATION_ADMINISTERED
+  MEDICATION_MISSED
+  MEDICATION_REFUSED
+  MEDICATION_CANCELLED
 }
