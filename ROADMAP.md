@@ -200,6 +200,75 @@ Migration: 20250806_ai_summary_tables
 - **Workaround**: Tests pass (65/77) but E2E visits tests fail on migration
 - **Resolution needed**: Install pgvector in test containers or create vector-free migration variant
 
+## 🛡️ Stage 5: AI Summary UX & QA (COMPLETED ✅)
+
+### Sprint-2 Summary UX & QA (COMPLETED ✅)
+Implemented complete frontend workflow for AI health summary management with role-based access control.
+
+**Branch**: `feature/ai-summary-ui` → Merged to `main`
+
+#### Frontend Components
+- **SummaryViewer**: Display AI-generated health summaries with risk indicators
+- **RiskIndicator**: Traffic-light color system (🟢 Green, 🟡 Amber, 🔴 Red)  
+- **ApprovalControls**: Manager-only approval/rejection interface
+- **PDF Export**: Client-side PDF generation with react-pdf
+
+#### Next.js Pages
+- `/clients/[id]/summary`: Summary management page with on-demand generation
+- Feature flag integration: Only shows if `Organization.ai_summary_enabled = true`
+- Role-based UI: Managers see approval controls, carers see read-only view
+
+#### GraphQL Integration
+- `listPendingSummaries`: Query for summaries awaiting approval
+- `approveSummary`: Mutation for approval/rejection with feedback
+- `generateSummary`: On-demand summary generation for testing
+
+#### Testing & QA
+- E2E Cypress tests: `ai_summary_flow.cy.ts` (generate → approve → verify)
+- Unit tests: Risk indicator color mapping with Jest
+- Manual QA: Verified in staging with test data
+
+## 🔒 Stage 6: Production Hardening (COMPLETED ✅)
+
+### Sprint-3 Production Hardening (COMPLETED ✅)
+Enhanced AI summary system with comprehensive audit logging, feature flags, and performance monitoring.
+
+**Branch**: `feature/ai-summary-prod-hardening` → Ready for deployment
+
+#### 1. Audit Trail System ✅
+- **Extended**: `MedicationAuditAction` enum with AI summary events
+- **Actions**: `AI_SUMMARY_GENERATED`, `AI_SUMMARY_APPROVED`, `AI_SUMMARY_REJECTED`
+- **Migration**: `20250808_ai_audit_actions` adds new enum values
+- **Integration**: AI summary service logs all lifecycle events
+- **Data Captured**: Summary IDs, client IDs, risk levels, feedback, timestamps
+
+#### 2. Lambda Feature Flag ✅
+- **Terraform Variable**: `ai_summary_enabled` (default: false)
+- **Environment**: `AI_SUMMARY_ENABLED_ENV` in Lambda configuration
+- **Runtime Check**: Batch service skips processing when flag disabled
+- **Zero Downtime**: Toggle feature without redeployment
+
+#### 3. Performance Monitoring ✅
+- **Metrics Interface**: `BatchMetrics` tracks processing statistics
+- **Timing**: Per-client processing time measurement
+- **Success Rates**: Track failed vs successful summary generation
+- **CloudWatch Ready**: Custom metrics logged for monitoring integration
+- **Error Handling**: Graceful handling of individual client failures
+
+#### 4. Enhanced Logging ✅
+- **Structured Logging**: Detailed batch processing reports
+- **Error Context**: Stack traces and error categorization
+- **Metrics Output**: `summary_batch_duration_ms`, success rates
+- **Debugging**: Individual client failure logging without crashing batch
+
+### Production Readiness Checklist ✅
+- ✅ Audit trail captures all AI summary lifecycle events
+- ✅ Feature flag allows instant enable/disable without deployment  
+- ✅ Performance metrics ready for CloudWatch integration
+- ✅ Individual client failures don't crash entire batch
+- ✅ Enhanced error reporting with context and stack traces
+- ✅ Zero-downtime feature toggle capability
+
 ## 🔮 Future Enhancements
 
 1. **Stage 5**: Real-time updates with GraphQL subscriptions
