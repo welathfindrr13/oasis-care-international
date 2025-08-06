@@ -191,13 +191,13 @@ export class EmbeddingBatchService {
         // Generate embedding using Bedrock
         const embedding = await this.generateEmbedding(logText);
         
-        // Store in database (embedding field is optional)
+        // Store in database (omit embedding field due to Prisma vector type limitation)
         await this.prisma.logEmbedding.create({
           data: {
             visit_id: log.visitId,
             log_type: log.logType,
             log_timestamp: log.timestamp,
-            embedding: `[${embedding.join(',')}]` as any, // PostgreSQL vector format
+            // embedding: `[${embedding.join(',')}]` as any, // TODO: Fix vector type support
             raw_data: log.data,
           },
         });
