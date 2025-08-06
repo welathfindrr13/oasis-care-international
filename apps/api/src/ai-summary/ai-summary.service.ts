@@ -1,9 +1,10 @@
 import { Injectable, HttpStatus, Logger } from '@nestjs/common';
 import { AiSummaryRepository } from './ai-summary.repository';
+import { MedicationRepository } from '../medication/medication.repository';
 import { GenerateSummaryInput } from './dto/generate-summary.input';
 import { ApproveSummaryInput } from './dto/approve-summary.input';
 import { HealthSummaryFilterArgs } from './dto/health-summary-filter.args';
-import { HealthSummary } from '@oasis/db';
+import { HealthSummary, MedicationAuditAction } from '@oasis/db';
 import { ClsService } from 'nestjs-cls';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
@@ -14,6 +15,7 @@ export class AiSummaryService {
 
   constructor(
     private readonly aiSummaryRepository: AiSummaryRepository,
+    private readonly medicationRepository: MedicationRepository,
     private readonly cls: ClsService,
   ) {}
 
@@ -63,6 +65,20 @@ export class AiSummaryService {
       generated_at: new Date(),
       generated_by: 'ai',
       expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+    });
+
+    // Audit: Log AI summary generation
+    await this.medicationRepository.createMedicationAudit({
+      action: MedicationAuditAction.AI_SUMMARY_GENERATED,
+      actorId: 'system',
+      actorRole: 'ai',
+      changes: {
+        summaryId: summary.id,
+        clientId: data.clientId,
+        periodStart: data.periodStart,
+        periodEnd: data.periodEnd,
+        riskLevels: mockRiskLevels,
+      },
     });
 
     this.logger.log(`AI summary ${summary.id} generated successfully`, { requestId });
@@ -228,7 +244,26 @@ export class AiSummaryService {
       approverId: userId 
     });
 
-    return this.aiSummaryRepository.approve(data.summaryId, userId, data.feedback);
+    const approvedSummary = await this.aiSummaryRepository.approve(data.summaryId, userId, data.feedback);
+
+    // Audit: Log AI summary approval/rejection
+    const auditAction = data.feedback === 'rejected' 
+      ? MedicationAuditAction.AI_SUMMARY_REJECTED 
+      : MedicationAuditAction.AI_SUMMARY_APPROVED;
+
+    await this.medicationRepository.createMedicationAudit({
+      action: auditAction,
+      actorId: userId,
+      actorRole: userRole,
+      changes: {
+        summaryId: data.summaryId,
+        clientId: summary.client_id,
+        feedback: data.feedback,
+        approvedAt: new Date().toISOString(),
+      },
+    });
+
+    return approvedSummary;
   }
 
   async getCurrentWeekSummary(
