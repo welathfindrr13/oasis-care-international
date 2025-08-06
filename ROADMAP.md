@@ -192,6 +192,14 @@ Migration: 20250806_ai_summary_tables
 3. **Frontend Components** - React components for summary approval workflow
 4. **End-to-End Testing** - Verify pgvector works in CI environment
 
+### 🔴 BLOCKING ISSUE - Test Environment
+
+**PostgreSQL Vector Extension Missing:**
+- Tests failing due to `CREATE EXTENSION vector` in migration 20250806_ai_summary_tables
+- Error: `extension "vector" is not available` in test containers
+- **Workaround**: Tests pass (65/77) but E2E visits tests fail on migration
+- **Resolution needed**: Install pgvector in test containers or create vector-free migration variant
+
 ## 🔮 Future Enhancements
 
 1. **Stage 5**: Real-time updates with GraphQL subscriptions
