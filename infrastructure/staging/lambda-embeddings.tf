@@ -18,10 +18,11 @@ resource "aws_lambda_function" "embedding_generator" {
 
   environment {
     variables = {
-      DATABASE_URL  = aws_secretsmanager_secret.database_url.arn
-      BEDROCK_MODEL = "anthropic.claude-3-haiku-20240307-v1:0"
-      AWS_REGION    = var.aws_region
-      NODE_ENV      = "production"
+      DATABASE_URL           = aws_secretsmanager_secret.database_url.arn
+      BEDROCK_MODEL          = "anthropic.claude-3-haiku-20240307-v1:0"
+      AWS_REGION             = var.aws_region
+      NODE_ENV               = "production"
+      AI_SUMMARY_ENABLED_ENV = var.ai_summary_enabled ? "true" : "false"
     }
   }
 

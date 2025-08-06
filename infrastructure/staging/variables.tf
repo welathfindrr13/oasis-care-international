@@ -8,6 +8,11 @@ variable "private_subnet_cidrs" { default = ["10.1.10.0/24", "10.1.11.0/24"] }
 variable "db_username"      { default = "oasis_app" }
 variable "db_instance_class" { default = "db.t3.micro" }
 variable "frontend_url"     { default = "https://staging.oasis-care.com,http://localhost:3000" }
+variable "ai_summary_enabled" { 
+  default     = false
+  description = "Enable AI summary feature in staging environment"
+  type        = bool
+}
 
 variable "default_tags" {
   default = {

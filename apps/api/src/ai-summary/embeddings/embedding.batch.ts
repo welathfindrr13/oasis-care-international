@@ -5,6 +5,16 @@ import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedroc
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
+interface BatchMetrics {
+  startTime: DateTime;
+  clientsProcessed: number;
+  clientsFailed: number;
+  totalLogs: number;
+  embeddingsGenerated: number;
+  summariesCreated: number;
+  errors: Error[];
+}
+
 @Injectable()
 export class EmbeddingBatchService {
   private readonly logger = new Logger(EmbeddingBatchService.name);
@@ -33,37 +43,72 @@ export class EmbeddingBatchService {
    * Runs every Friday 02:00 AM for previous week (Fri-Thu)
    */
   async generateWeeklySummaries(): Promise<void> {
-    this.logger.log('Starting weekly health summary generation');
-    
-    const { periodStart, periodEnd } = this.calculateWeeklyPeriod();
-    this.logger.log(`Generating summaries for period: ${periodStart.toISODate()} to ${periodEnd.toISODate()}`);
+    const metrics: BatchMetrics = {
+      startTime: DateTime.now(),
+      clientsProcessed: 0,
+      clientsFailed: 0,
+      totalLogs: 0,
+      embeddingsGenerated: 0,
+      summariesCreated: 0,
+      errors: [],
+    };
 
-    // Get all clients with AI summary enabled  
-    const clients = await this.prisma.client.findMany({
-      where: {
-        organization_id: {
-          not: null,
-        },
-        organization: {
-          ai_summary_enabled: true,
-        },
-      },
-      include: {
-        organization: true,
-      },
-    });
-
-    this.logger.log(`Found ${clients.length} clients with AI summarization enabled`);
-
-    for (const client of clients) {
-      try {
-        await this.generateClientSummary(client.id, periodStart, periodEnd);
-      } catch (error) {
-        this.logger.error(`Failed to generate summary for client ${client.id}`, error);
+    try {
+      this.logger.log('Starting weekly health summary generation');
+      
+      // Check if AI summary feature is enabled globally
+      const aiEnabled = process.env.AI_SUMMARY_ENABLED_ENV === 'true';
+      if (!aiEnabled) {
+        this.logger.warn('AI summary generation skipped - feature disabled via environment variable');
+        return;
       }
-    }
 
-    this.logger.log('Weekly health summary generation completed');
+      const { periodStart, periodEnd } = this.calculateWeeklyPeriod();
+      this.logger.log(`Generating summaries for period: ${periodStart.toISODate()} to ${periodEnd.toISODate()}`);
+
+      // Get all clients with AI summary enabled  
+      const clients = await this.prisma.client.findMany({
+        where: {
+          organization_id: {
+            not: null,
+          },
+          organization: {
+            ai_summary_enabled: true,
+          },
+        },
+        include: {
+          organization: true,
+        },
+      });
+
+      this.logger.log(`Found ${clients.length} clients with AI summarization enabled`);
+
+      for (const client of clients) {
+        try {
+          const clientStartTime = DateTime.now();
+          await this.generateClientSummary(client.id, periodStart, periodEnd);
+          
+          const processingTime = DateTime.now().diff(clientStartTime).milliseconds;
+          this.logger.log(`Client ${client.id} processed in ${processingTime}ms`);
+          
+          metrics.clientsProcessed++;
+          metrics.summariesCreated++;
+        } catch (error) {
+          metrics.clientsFailed++;
+          metrics.errors.push(error as Error);
+          this.logger.error(`Failed to generate summary for client ${client.id}`, error);
+        }
+      }
+
+      await this.logBatchMetrics(metrics);
+      this.logger.log('Weekly health summary generation completed');
+      
+    } catch (error) {
+      metrics.errors.push(error as Error);
+      this.logger.error('Failed to complete weekly health summary generation', error);
+      await this.logBatchMetrics(metrics);
+      throw error;
+    }
   }
 
   /**
@@ -346,5 +391,48 @@ Please analyze this week's care logs and generate the health summary in the spec
     if (risks.includes('red')) return 'red';
     if (risks.includes('amber')) return 'amber';
     return 'green';
+  }
+
+  /**
+   * Log batch processing metrics for monitoring and alerting
+   */
+  private async logBatchMetrics(metrics: BatchMetrics): Promise<void> {
+    const duration = DateTime.now().diff(metrics.startTime);
+    const durationMs = duration.milliseconds;
+    
+    const summary = {
+      duration_ms: durationMs,
+      clients_processed: metrics.clientsProcessed,
+      clients_failed: metrics.clientsFailed,
+      total_logs: metrics.totalLogs,
+      embeddings_generated: metrics.embeddingsGenerated,
+      summaries_created: metrics.summariesCreated,
+      error_count: metrics.errors.length,
+      success_rate: metrics.clientsProcessed + metrics.clientsFailed > 0 
+        ? (metrics.clientsProcessed / (metrics.clientsProcessed + metrics.clientsFailed) * 100).toFixed(2) + '%'
+        : '0%'
+    };
+
+    this.logger.log('Batch processing metrics:', summary);
+
+    // Log individual errors for debugging
+    if (metrics.errors.length > 0) {
+      this.logger.error(`Batch completed with ${metrics.errors.length} errors:`);
+      metrics.errors.forEach((error, index) => {
+        this.logger.error(`Error ${index + 1}: ${error.message}`, error.stack);
+      });
+    }
+
+    // In a production environment, you would send these metrics to CloudWatch
+    // using the CloudWatch client. For now, we'll just log them.
+    try {
+      // Custom metric logging - would integrate with CloudWatch in production
+      console.log(`METRIC: summary_batch_duration_ms=${durationMs}`);
+      console.log(`METRIC: summary_batch_success_rate=${summary.success_rate}`);
+      console.log(`METRIC: summary_batch_clients_processed=${metrics.clientsProcessed}`);
+      console.log(`METRIC: summary_batch_clients_failed=${metrics.clientsFailed}`);
+    } catch (error) {
+      this.logger.warn('Failed to send custom metrics', error);
+    }
   }
 }
