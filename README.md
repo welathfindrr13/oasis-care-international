@@ -172,6 +172,51 @@ The API includes a health check endpoint at `/healthz` that returns:
 
 This endpoint is used by the ALB health checks and monitoring systems.
 
+## AI Health Summaries
+
+The platform includes AI-powered health summary generation for clients based on their care visit data.
+
+### Features
+
+- **Automated Generation**: AI analyzes recent care visit data to generate comprehensive health summaries
+- **Risk Assessment**: Traffic-light system (green/amber/red) for different health domains
+- **Manager Approval Workflow**: All AI-generated summaries require manager approval before sharing
+- **PDF Export**: Export approved summaries for external sharing
+- **Feature Flag Control**: Can be enabled/disabled per organization
+
+### Usage
+
+To trigger AI summary generation locally:
+
+```bash
+# Generate summary for a specific client and date range
+pnpm nx run api:summary:dev --client-id=<client-id> --start-date=2025-01-01 --end-date=2025-01-07
+```
+
+### Architecture
+
+- **Frontend**: React components in `apps/web/components/HealthSummary/`
+  - `SummaryViewer.tsx` - Displays generated summaries with risk indicators
+  - `RiskIndicator.tsx` - Traffic-light risk level badges  
+  - `ApprovalControls.tsx` - Manager approval workflow UI
+- **Backend**: GraphQL API with resolvers in `apps/api/src/ai-summary/`
+  - `generateSummary` - Creates new AI summary for client and date range
+  - `listPendingSummaries` - Lists summaries awaiting approval
+  - `approveSummary` - Manager approval/rejection workflow
+- **Database**: Summary data stored in `health_summary` table with JSON content
+- **AI Processing**: Lambda function processes visit embeddings for summary generation
+
+### Monitoring
+
+CloudWatch metrics available for AI summary operations:
+- `summary_batch_duration_ms` - Time taken for summary generation
+
+### Access Control
+
+- **Carers**: Read-only access to approved summaries
+- **Managers**: Full access including approval workflow and PDF export
+- **Organization Setting**: `ai_summary_enabled` flag controls feature availability
+
 ## License
 
 Private - All rights reserved
