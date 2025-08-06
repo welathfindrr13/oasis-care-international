@@ -141,13 +141,64 @@ pnpm --filter @oasis/web dev
 4. PII masking in errors/logs
 5. Soft deletes for audit trails
 
+## 🤖 Stage 4: AI Health-Log Summarizer - Database Foundation (IN PROGRESS)
+
+### Overview
+Building the database foundation for AI-powered health log summarization using pgvector for semantic search and AWS Bedrock (Claude-3 Haiku) for natural language processing.
+
+### Database Schema Updates (COMPLETED ✅)
+Added 3 new models with proper relationships and pgvector support:
+
+1. **Organization Model**
+   - Feature flag: `ai_summary_enabled` for gradual rollout
+   - Enables multi-tenant AI capabilities
+
+2. **LogEmbedding Model** 
+   - Vector storage: `embedding vector(768)` for semantic search
+   - Supports embeddings for vitals, toilet visits, medication, and task logs
+   - Includes dimension constraint validation (768-dimensional vectors)
+
+3. **HealthSummary Model**
+   - AI-generated health summaries with approval workflow
+   - Risk level categorization (green/amber/red)
+   - Expiration logic (24-hour default) for data freshness
+   - Feedback tracking for model improvement
+
+### Migration Details
+```
+Migration: 20250806_ai_summary_tables
+- ✅ Enabled pgvector extension
+- ✅ Created organization, log_embedding, health_summary tables
+- ✅ Added organization_id FK to client table
+- ✅ Proper indexes for performance
+- ✅ Vector dimension constraints
+- ✅ All @@map() directives for consistent table naming
+```
+
+### Technical Implementation
+- **Vector Storage**: pgvector with 768-dimensional embeddings (Claude-3 Haiku compatible)
+- **Type Safety**: Prisma `Unsupported("vector(768)")` type for pgvector fields
+- **Relationships**: Client → Organization, Visit → LogEmbedding, Carer → HealthSummary approvals
+- **Constraints**: Vector dimension validation, proper foreign key relationships
+
+### Branch Status
+- **Feature Branch**: `feature/ai-summary-foundations` 
+- **PR Status**: Ready for review ([GitHub PR](https://github.com/welathfindrr13/oasis-care-international/pull/new/feature/ai-summary-foundations))
+- **CI Status**: Pending - will test pgvector in Testcontainers
+
+### Next Steps
+1. **Bedrock IAM/Lambda Infrastructure** - Add AWS permissions and nightly embedding job
+2. **AI Summary Module** - NestJS service/resolver for summary generation
+3. **Frontend Components** - React components for summary approval workflow
+4. **End-to-End Testing** - Verify pgvector works in CI environment
+
 ## 🔮 Future Enhancements
 
-1. **Stage 4**: Real-time updates with GraphQL subscriptions
-2. **Stage 5**: Geolocation tracking for visit verification
-3. **Stage 6**: Push notifications for upcoming visits
-4. **Stage 7**: Analytics dashboard with care metrics
-5. **Stage 8**: React Native mobile app
+1. **Stage 5**: Real-time updates with GraphQL subscriptions
+2. **Stage 6**: Geolocation tracking for visit verification
+3. **Stage 7**: Push notifications for upcoming visits
+4. **Stage 8**: Analytics dashboard with care metrics
+5. **Stage 9**: React Native mobile app
 
 ## 📝 Key Learnings
 
@@ -156,7 +207,9 @@ pnpm --filter @oasis/web dev
 - **Testing Strategy**: Mock guards properly in E2E tests
 - **Clean Architecture**: Clear separation (resolver → service → repository)
 - **Type Safety**: End-to-end types with TypeScript + Prisma + GraphQL
+- **Vector Databases**: pgvector integration with Prisma requires `Unsupported` type handling
+- **AI Infrastructure**: Proper feature flagging essential for AI rollout strategy
 
 ---
 
-Last Updated: 30/07/2025 - Stage 3 Error Handling Complete
+Last Updated: 06/08/2025 - Stage 4 AI Health-Log Summarizer Database Foundation

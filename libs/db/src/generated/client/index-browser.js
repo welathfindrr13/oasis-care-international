@@ -128,6 +128,7 @@ exports.Prisma.ClientScalarFieldEnum = {
   city: 'city',
   postcode: 'postcode',
   date_of_birth: 'date_of_birth',
+  organization_id: 'organization_id',
   created_at: 'created_at',
   updated_at: 'updated_at',
   deleted_at: 'deleted_at'
@@ -213,9 +214,48 @@ exports.Prisma.MedicationAuditScalarFieldEnum = {
   timestamp: 'timestamp'
 };
 
+exports.Prisma.OrganizationScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  ai_summary_enabled: 'ai_summary_enabled',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+};
+
+exports.Prisma.LogEmbeddingScalarFieldEnum = {
+  id: 'id',
+  visit_id: 'visit_id',
+  log_type: 'log_type',
+  log_timestamp: 'log_timestamp',
+  raw_data: 'raw_data',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+};
+
+exports.Prisma.HealthSummaryScalarFieldEnum = {
+  id: 'id',
+  client_id: 'client_id',
+  period_start: 'period_start',
+  period_end: 'period_end',
+  summary_json: 'summary_json',
+  risk_levels: 'risk_levels',
+  generated_at: 'generated_at',
+  generated_by: 'generated_by',
+  approved_by: 'approved_by',
+  approved_at: 'approved_at',
+  feedback: 'feedback',
+  expires_at: 'expires_at',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
+};
+
+exports.Prisma.JsonNullValueInput = {
+  JsonNull: Prisma.JsonNull
 };
 
 exports.Prisma.QueryMode = {
@@ -226,6 +266,12 @@ exports.Prisma.QueryMode = {
 exports.Prisma.NullsOrder = {
   first: 'first',
   last: 'last'
+};
+
+exports.Prisma.JsonNullValueFilter = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull,
+  AnyNull: Prisma.AnyNull
 };
 exports.VisitStatus = exports.$Enums.VisitStatus = {
   SCHEDULED: 'SCHEDULED',
@@ -261,7 +307,10 @@ exports.Prisma.ModelName = {
   Medication: 'Medication',
   Prescription: 'Prescription',
   MedicationAdministration: 'MedicationAdministration',
-  MedicationAudit: 'MedicationAudit'
+  MedicationAudit: 'MedicationAudit',
+  Organization: 'Organization',
+  LogEmbedding: 'LogEmbedding',
+  HealthSummary: 'HealthSummary'
 };
 
 /**

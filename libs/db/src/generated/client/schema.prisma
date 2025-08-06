@@ -10,34 +10,38 @@ generator client {
 }
 
 model Carer {
-  id            String    @id @default(uuid())
-  first_name    String
-  last_name     String
-  email         String    @unique
-  phone         String?
-  hire_date     DateTime  @default(now())
-  is_active     Boolean   @default(true)
-  visits        Visit[]
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
-  deleted_at    DateTime?
+  id                 String          @id @default(uuid())
+  first_name         String
+  last_name          String
+  email              String          @unique
+  phone              String?
+  hire_date          DateTime        @default(now())
+  is_active          Boolean         @default(true)
+  visits             Visit[]
+  approved_summaries HealthSummary[]
+  created_at         DateTime        @default(now())
+  updated_at         DateTime        @updatedAt
+  deleted_at         DateTime?
 
   @@map("carer")
 }
 
 model Client {
-  id            String         @id @default(uuid())
-  full_name     String
-  address_line1 String
-  address_line2 String?
-  city          String
-  postcode      String
-  date_of_birth DateTime?
-  visits        Visit[]
-  prescriptions Prescription[]
-  created_at    DateTime       @default(now())
-  updated_at    DateTime       @updatedAt
-  deleted_at    DateTime?
+  id               String          @id @default(uuid())
+  full_name        String
+  address_line1    String
+  address_line2    String?
+  city             String
+  postcode         String
+  date_of_birth    DateTime?
+  organization_id  String?
+  visits           Visit[]
+  prescriptions    Prescription[]
+  organization     Organization?   @relation(fields: [organization_id], references: [id])
+  health_summaries HealthSummary[]
+  created_at       DateTime        @default(now())
+  updated_at       DateTime        @updatedAt
+  deleted_at       DateTime?
 
   @@map("client")
 }
@@ -56,6 +60,7 @@ model Visit {
   client                   Client                     @relation(fields: [client_id], references: [id])
   tasks                    VisitTask[]
   medication_administrations MedicationAdministration[]
+  log_embeddings           LogEmbedding[]
   created_at               DateTime                   @default(now())
   updated_at               DateTime                   @updatedAt
   deleted_at               DateTime?
@@ -188,4 +193,54 @@ enum MedicationAuditAction {
   MEDICATION_MISSED
   MEDICATION_REFUSED
   MEDICATION_CANCELLED
+}
+
+model Organization {
+  id                 String   @id @default(uuid())
+  name               String
+  ai_summary_enabled Boolean  @default(false)
+  clients            Client[]
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  @@map("organization")
+}
+
+model LogEmbedding {
+  id            String                     @id @default(uuid())
+  visit_id      String
+  log_type      String                     @db.VarChar(50)
+  log_timestamp DateTime
+  embedding     Unsupported("vector(768)")?
+  raw_data      Json
+  visit         Visit                      @relation(fields: [visit_id], references: [id])
+  created_at    DateTime                   @default(now())
+  updated_at    DateTime                   @updatedAt
+
+  @@index([visit_id])
+  @@index([log_timestamp])
+  @@map("log_embedding")
+}
+
+model HealthSummary {
+  id            String    @id @default(uuid())
+  client_id     String
+  period_start  DateTime  @db.Date
+  period_end    DateTime  @db.Date
+  summary_json  Json
+  risk_levels   Json
+  generated_at  DateTime
+  generated_by  String    @default("ai") @db.VarChar(50)
+  approved_by   String?
+  approved_at   DateTime?
+  feedback      String?   @db.VarChar(10)
+  expires_at    DateTime  @default(dbgenerated("NOW() + INTERVAL '24 hours'"))
+  client        Client    @relation(fields: [client_id], references: [id])
+  approver      Carer?    @relation(fields: [approved_by], references: [id])
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  @@index([client_id])
+  @@index([period_start, period_end])
+  @@map("health_summary")
 }

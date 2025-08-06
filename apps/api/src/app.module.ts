@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule } from './config/config.module';
+import { ConfigService } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { ClsModule } from 'nestjs-cls';
@@ -20,7 +21,7 @@ import { formatGraphQLError } from './common/filters/graphql-error.filter';
     MetricsModule,
     LoggerModule,
     HealthModule,
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule,
     ClsModule.forRoot({
       global: true,
       middleware: {
@@ -38,9 +39,12 @@ import { formatGraphQLError } from './common/filters/graphql-error.filter';
       formatError: formatGraphQLError,
     }),
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key',
-      signOptions: { expiresIn: '24h' },
+    JwtModule.registerAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '24h' },
+      }),
     }),
     VisitModule,
     StatsModule,

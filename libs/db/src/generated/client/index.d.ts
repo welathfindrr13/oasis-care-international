@@ -53,6 +53,21 @@ export type MedicationAdministration = $Result.DefaultSelection<Prisma.$Medicati
  * 
  */
 export type MedicationAudit = $Result.DefaultSelection<Prisma.$MedicationAuditPayload>
+/**
+ * Model Organization
+ * 
+ */
+export type Organization = $Result.DefaultSelection<Prisma.$OrganizationPayload>
+/**
+ * Model LogEmbedding
+ * 
+ */
+export type LogEmbedding = $Result.DefaultSelection<Prisma.$LogEmbeddingPayload>
+/**
+ * Model HealthSummary
+ * 
+ */
+export type HealthSummary = $Result.DefaultSelection<Prisma.$HealthSummaryPayload>
 
 /**
  * Enums
@@ -307,6 +322,36 @@ export class PrismaClient<
     * ```
     */
   get medicationAudit(): Prisma.MedicationAuditDelegate<ExtArgs>;
+
+  /**
+   * `prisma.organization`: Exposes CRUD operations for the **Organization** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Organizations
+    * const organizations = await prisma.organization.findMany()
+    * ```
+    */
+  get organization(): Prisma.OrganizationDelegate<ExtArgs>;
+
+  /**
+   * `prisma.logEmbedding`: Exposes CRUD operations for the **LogEmbedding** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more LogEmbeddings
+    * const logEmbeddings = await prisma.logEmbedding.findMany()
+    * ```
+    */
+  get logEmbedding(): Prisma.LogEmbeddingDelegate<ExtArgs>;
+
+  /**
+   * `prisma.healthSummary`: Exposes CRUD operations for the **HealthSummary** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more HealthSummaries
+    * const healthSummaries = await prisma.healthSummary.findMany()
+    * ```
+    */
+  get healthSummary(): Prisma.HealthSummaryDelegate<ExtArgs>;
 }
 
 export namespace Prisma {
@@ -784,7 +829,10 @@ export namespace Prisma {
     Medication: 'Medication',
     Prescription: 'Prescription',
     MedicationAdministration: 'MedicationAdministration',
-    MedicationAudit: 'MedicationAudit'
+    MedicationAudit: 'MedicationAudit',
+    Organization: 'Organization',
+    LogEmbedding: 'LogEmbedding',
+    HealthSummary: 'HealthSummary'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -801,7 +849,7 @@ export namespace Prisma {
 
   export type TypeMap<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     meta: {
-      modelProps: 'carer' | 'client' | 'visit' | 'visitTask' | 'medication' | 'prescription' | 'medicationAdministration' | 'medicationAudit'
+      modelProps: 'carer' | 'client' | 'visit' | 'visitTask' | 'medication' | 'prescription' | 'medicationAdministration' | 'medicationAudit' | 'organization' | 'logEmbedding' | 'healthSummary'
       txIsolationLevel: Prisma.TransactionIsolationLevel
     },
     model: {
@@ -1333,6 +1381,204 @@ export namespace Prisma {
           }
         }
       }
+      Organization: {
+        payload: Prisma.$OrganizationPayload<ExtArgs>
+        fields: Prisma.OrganizationFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.OrganizationFindUniqueArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.OrganizationFindUniqueOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationPayload>
+          }
+          findFirst: {
+            args: Prisma.OrganizationFindFirstArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.OrganizationFindFirstOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationPayload>
+          }
+          findMany: {
+            args: Prisma.OrganizationFindManyArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationPayload>[]
+          }
+          create: {
+            args: Prisma.OrganizationCreateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationPayload>
+          }
+          createMany: {
+            args: Prisma.OrganizationCreateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          delete: {
+            args: Prisma.OrganizationDeleteArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationPayload>
+          }
+          update: {
+            args: Prisma.OrganizationUpdateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationPayload>
+          }
+          deleteMany: {
+            args: Prisma.OrganizationDeleteManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          updateMany: {
+            args: Prisma.OrganizationUpdateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          upsert: {
+            args: Prisma.OrganizationUpsertArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationPayload>
+          }
+          aggregate: {
+            args: Prisma.OrganizationAggregateArgs<ExtArgs>,
+            result: $Utils.Optional<AggregateOrganization>
+          }
+          groupBy: {
+            args: Prisma.OrganizationGroupByArgs<ExtArgs>,
+            result: $Utils.Optional<OrganizationGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.OrganizationCountArgs<ExtArgs>,
+            result: $Utils.Optional<OrganizationCountAggregateOutputType> | number
+          }
+        }
+      }
+      LogEmbedding: {
+        payload: Prisma.$LogEmbeddingPayload<ExtArgs>
+        fields: Prisma.LogEmbeddingFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.LogEmbeddingFindUniqueArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$LogEmbeddingPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.LogEmbeddingFindUniqueOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$LogEmbeddingPayload>
+          }
+          findFirst: {
+            args: Prisma.LogEmbeddingFindFirstArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$LogEmbeddingPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.LogEmbeddingFindFirstOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$LogEmbeddingPayload>
+          }
+          findMany: {
+            args: Prisma.LogEmbeddingFindManyArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$LogEmbeddingPayload>[]
+          }
+          create: {
+            args: Prisma.LogEmbeddingCreateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$LogEmbeddingPayload>
+          }
+          createMany: {
+            args: Prisma.LogEmbeddingCreateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          delete: {
+            args: Prisma.LogEmbeddingDeleteArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$LogEmbeddingPayload>
+          }
+          update: {
+            args: Prisma.LogEmbeddingUpdateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$LogEmbeddingPayload>
+          }
+          deleteMany: {
+            args: Prisma.LogEmbeddingDeleteManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          updateMany: {
+            args: Prisma.LogEmbeddingUpdateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          upsert: {
+            args: Prisma.LogEmbeddingUpsertArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$LogEmbeddingPayload>
+          }
+          aggregate: {
+            args: Prisma.LogEmbeddingAggregateArgs<ExtArgs>,
+            result: $Utils.Optional<AggregateLogEmbedding>
+          }
+          groupBy: {
+            args: Prisma.LogEmbeddingGroupByArgs<ExtArgs>,
+            result: $Utils.Optional<LogEmbeddingGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.LogEmbeddingCountArgs<ExtArgs>,
+            result: $Utils.Optional<LogEmbeddingCountAggregateOutputType> | number
+          }
+        }
+      }
+      HealthSummary: {
+        payload: Prisma.$HealthSummaryPayload<ExtArgs>
+        fields: Prisma.HealthSummaryFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.HealthSummaryFindUniqueArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$HealthSummaryPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.HealthSummaryFindUniqueOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$HealthSummaryPayload>
+          }
+          findFirst: {
+            args: Prisma.HealthSummaryFindFirstArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$HealthSummaryPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.HealthSummaryFindFirstOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$HealthSummaryPayload>
+          }
+          findMany: {
+            args: Prisma.HealthSummaryFindManyArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$HealthSummaryPayload>[]
+          }
+          create: {
+            args: Prisma.HealthSummaryCreateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$HealthSummaryPayload>
+          }
+          createMany: {
+            args: Prisma.HealthSummaryCreateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          delete: {
+            args: Prisma.HealthSummaryDeleteArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$HealthSummaryPayload>
+          }
+          update: {
+            args: Prisma.HealthSummaryUpdateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$HealthSummaryPayload>
+          }
+          deleteMany: {
+            args: Prisma.HealthSummaryDeleteManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          updateMany: {
+            args: Prisma.HealthSummaryUpdateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          upsert: {
+            args: Prisma.HealthSummaryUpsertArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$HealthSummaryPayload>
+          }
+          aggregate: {
+            args: Prisma.HealthSummaryAggregateArgs<ExtArgs>,
+            result: $Utils.Optional<AggregateHealthSummary>
+          }
+          groupBy: {
+            args: Prisma.HealthSummaryGroupByArgs<ExtArgs>,
+            result: $Utils.Optional<HealthSummaryGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.HealthSummaryCountArgs<ExtArgs>,
+            result: $Utils.Optional<HealthSummaryCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -1483,10 +1729,12 @@ export namespace Prisma {
 
   export type CarerCountOutputType = {
     visits: number
+    approved_summaries: number
   }
 
   export type CarerCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     visits?: boolean | CarerCountOutputTypeCountVisitsArgs
+    approved_summaries?: boolean | CarerCountOutputTypeCountApproved_summariesArgs
   }
 
   // Custom InputTypes
@@ -1510,6 +1758,14 @@ export namespace Prisma {
   }
 
 
+  /**
+   * CarerCountOutputType without action
+   */
+  export type CarerCountOutputTypeCountApproved_summariesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: HealthSummaryWhereInput
+  }
+
+
 
   /**
    * Count Type ClientCountOutputType
@@ -1518,11 +1774,13 @@ export namespace Prisma {
   export type ClientCountOutputType = {
     visits: number
     prescriptions: number
+    health_summaries: number
   }
 
   export type ClientCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     visits?: boolean | ClientCountOutputTypeCountVisitsArgs
     prescriptions?: boolean | ClientCountOutputTypeCountPrescriptionsArgs
+    health_summaries?: boolean | ClientCountOutputTypeCountHealth_summariesArgs
   }
 
   // Custom InputTypes
@@ -1554,6 +1812,14 @@ export namespace Prisma {
   }
 
 
+  /**
+   * ClientCountOutputType without action
+   */
+  export type ClientCountOutputTypeCountHealth_summariesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: HealthSummaryWhereInput
+  }
+
+
 
   /**
    * Count Type VisitCountOutputType
@@ -1562,11 +1828,13 @@ export namespace Prisma {
   export type VisitCountOutputType = {
     tasks: number
     medication_administrations: number
+    log_embeddings: number
   }
 
   export type VisitCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     tasks?: boolean | VisitCountOutputTypeCountTasksArgs
     medication_administrations?: boolean | VisitCountOutputTypeCountMedication_administrationsArgs
+    log_embeddings?: boolean | VisitCountOutputTypeCountLog_embeddingsArgs
   }
 
   // Custom InputTypes
@@ -1595,6 +1863,14 @@ export namespace Prisma {
    */
   export type VisitCountOutputTypeCountMedication_administrationsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: MedicationAdministrationWhereInput
+  }
+
+
+  /**
+   * VisitCountOutputType without action
+   */
+  export type VisitCountOutputTypeCountLog_embeddingsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: LogEmbeddingWhereInput
   }
 
 
@@ -1707,6 +1983,40 @@ export namespace Prisma {
    */
   export type MedicationAdministrationCountOutputTypeCountAuditsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: MedicationAuditWhereInput
+  }
+
+
+
+  /**
+   * Count Type OrganizationCountOutputType
+   */
+
+  export type OrganizationCountOutputType = {
+    clients: number
+  }
+
+  export type OrganizationCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    clients?: boolean | OrganizationCountOutputTypeCountClientsArgs
+  }
+
+  // Custom InputTypes
+
+  /**
+   * OrganizationCountOutputType without action
+   */
+  export type OrganizationCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the OrganizationCountOutputType
+     */
+    select?: OrganizationCountOutputTypeSelect<ExtArgs> | null
+  }
+
+
+  /**
+   * OrganizationCountOutputType without action
+   */
+  export type OrganizationCountOutputTypeCountClientsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ClientWhereInput
   }
 
 
@@ -1920,6 +2230,7 @@ export namespace Prisma {
     updated_at?: boolean
     deleted_at?: boolean
     visits?: boolean | Carer$visitsArgs<ExtArgs>
+    approved_summaries?: boolean | Carer$approved_summariesArgs<ExtArgs>
     _count?: boolean | CarerCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["carer"]>
 
@@ -1938,6 +2249,7 @@ export namespace Prisma {
 
   export type CarerInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     visits?: boolean | Carer$visitsArgs<ExtArgs>
+    approved_summaries?: boolean | Carer$approved_summariesArgs<ExtArgs>
     _count?: boolean | CarerCountOutputTypeDefaultArgs<ExtArgs>
   }
 
@@ -1946,6 +2258,7 @@ export namespace Prisma {
     name: "Carer"
     objects: {
       visits: Prisma.$VisitPayload<ExtArgs>[]
+      approved_summaries: Prisma.$HealthSummaryPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -2325,6 +2638,8 @@ export namespace Prisma {
 
     visits<T extends Carer$visitsArgs<ExtArgs> = {}>(args?: Subset<T, Carer$visitsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$VisitPayload<ExtArgs>, T, 'findMany'> | Null>;
 
+    approved_summaries<T extends Carer$approved_summariesArgs<ExtArgs> = {}>(args?: Subset<T, Carer$approved_summariesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$HealthSummaryPayload<ExtArgs>, T, 'findMany'> | Null>;
+
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2696,6 +3011,27 @@ export namespace Prisma {
 
 
   /**
+   * Carer.approved_summaries
+   */
+  export type Carer$approved_summariesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HealthSummary
+     */
+    select?: HealthSummarySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: HealthSummaryInclude<ExtArgs> | null
+    where?: HealthSummaryWhereInput
+    orderBy?: HealthSummaryOrderByWithRelationInput | HealthSummaryOrderByWithRelationInput[]
+    cursor?: HealthSummaryWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: HealthSummaryScalarFieldEnum | HealthSummaryScalarFieldEnum[]
+  }
+
+
+  /**
    * Carer without action
    */
   export type CarerDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -2729,6 +3065,7 @@ export namespace Prisma {
     city: string | null
     postcode: string | null
     date_of_birth: Date | null
+    organization_id: string | null
     created_at: Date | null
     updated_at: Date | null
     deleted_at: Date | null
@@ -2742,6 +3079,7 @@ export namespace Prisma {
     city: string | null
     postcode: string | null
     date_of_birth: Date | null
+    organization_id: string | null
     created_at: Date | null
     updated_at: Date | null
     deleted_at: Date | null
@@ -2755,6 +3093,7 @@ export namespace Prisma {
     city: number
     postcode: number
     date_of_birth: number
+    organization_id: number
     created_at: number
     updated_at: number
     deleted_at: number
@@ -2770,6 +3109,7 @@ export namespace Prisma {
     city?: true
     postcode?: true
     date_of_birth?: true
+    organization_id?: true
     created_at?: true
     updated_at?: true
     deleted_at?: true
@@ -2783,6 +3123,7 @@ export namespace Prisma {
     city?: true
     postcode?: true
     date_of_birth?: true
+    organization_id?: true
     created_at?: true
     updated_at?: true
     deleted_at?: true
@@ -2796,6 +3137,7 @@ export namespace Prisma {
     city?: true
     postcode?: true
     date_of_birth?: true
+    organization_id?: true
     created_at?: true
     updated_at?: true
     deleted_at?: true
@@ -2882,6 +3224,7 @@ export namespace Prisma {
     city: string
     postcode: string
     date_of_birth: Date | null
+    organization_id: string | null
     created_at: Date
     updated_at: Date
     deleted_at: Date | null
@@ -2912,11 +3255,14 @@ export namespace Prisma {
     city?: boolean
     postcode?: boolean
     date_of_birth?: boolean
+    organization_id?: boolean
     created_at?: boolean
     updated_at?: boolean
     deleted_at?: boolean
     visits?: boolean | Client$visitsArgs<ExtArgs>
     prescriptions?: boolean | Client$prescriptionsArgs<ExtArgs>
+    organization?: boolean | Client$organizationArgs<ExtArgs>
+    health_summaries?: boolean | Client$health_summariesArgs<ExtArgs>
     _count?: boolean | ClientCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["client"]>
 
@@ -2928,6 +3274,7 @@ export namespace Prisma {
     city?: boolean
     postcode?: boolean
     date_of_birth?: boolean
+    organization_id?: boolean
     created_at?: boolean
     updated_at?: boolean
     deleted_at?: boolean
@@ -2936,6 +3283,8 @@ export namespace Prisma {
   export type ClientInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     visits?: boolean | Client$visitsArgs<ExtArgs>
     prescriptions?: boolean | Client$prescriptionsArgs<ExtArgs>
+    organization?: boolean | Client$organizationArgs<ExtArgs>
+    health_summaries?: boolean | Client$health_summariesArgs<ExtArgs>
     _count?: boolean | ClientCountOutputTypeDefaultArgs<ExtArgs>
   }
 
@@ -2945,6 +3294,8 @@ export namespace Prisma {
     objects: {
       visits: Prisma.$VisitPayload<ExtArgs>[]
       prescriptions: Prisma.$PrescriptionPayload<ExtArgs>[]
+      organization: Prisma.$OrganizationPayload<ExtArgs> | null
+      health_summaries: Prisma.$HealthSummaryPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -2954,6 +3305,7 @@ export namespace Prisma {
       city: string
       postcode: string
       date_of_birth: Date | null
+      organization_id: string | null
       created_at: Date
       updated_at: Date
       deleted_at: Date | null
@@ -3326,6 +3678,10 @@ export namespace Prisma {
 
     prescriptions<T extends Client$prescriptionsArgs<ExtArgs> = {}>(args?: Subset<T, Client$prescriptionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PrescriptionPayload<ExtArgs>, T, 'findMany'> | Null>;
 
+    organization<T extends Client$organizationArgs<ExtArgs> = {}>(args?: Subset<T, Client$organizationArgs<ExtArgs>>): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'findUniqueOrThrow'> | null, null, ExtArgs>;
+
+    health_summaries<T extends Client$health_summariesArgs<ExtArgs> = {}>(args?: Subset<T, Client$health_summariesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$HealthSummaryPayload<ExtArgs>, T, 'findMany'> | Null>;
+
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3361,6 +3717,7 @@ export namespace Prisma {
     readonly city: FieldRef<"Client", 'String'>
     readonly postcode: FieldRef<"Client", 'String'>
     readonly date_of_birth: FieldRef<"Client", 'DateTime'>
+    readonly organization_id: FieldRef<"Client", 'String'>
     readonly created_at: FieldRef<"Client", 'DateTime'>
     readonly updated_at: FieldRef<"Client", 'DateTime'>
     readonly deleted_at: FieldRef<"Client", 'DateTime'>
@@ -3718,6 +4075,43 @@ export namespace Prisma {
 
 
   /**
+   * Client.organization
+   */
+  export type Client$organizationArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Organization
+     */
+    select?: OrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationInclude<ExtArgs> | null
+    where?: OrganizationWhereInput
+  }
+
+
+  /**
+   * Client.health_summaries
+   */
+  export type Client$health_summariesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HealthSummary
+     */
+    select?: HealthSummarySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: HealthSummaryInclude<ExtArgs> | null
+    where?: HealthSummaryWhereInput
+    orderBy?: HealthSummaryOrderByWithRelationInput | HealthSummaryOrderByWithRelationInput[]
+    cursor?: HealthSummaryWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: HealthSummaryScalarFieldEnum | HealthSummaryScalarFieldEnum[]
+  }
+
+
+  /**
    * Client without action
    */
   export type ClientDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -3957,6 +4351,7 @@ export namespace Prisma {
     client?: boolean | ClientDefaultArgs<ExtArgs>
     tasks?: boolean | Visit$tasksArgs<ExtArgs>
     medication_administrations?: boolean | Visit$medication_administrationsArgs<ExtArgs>
+    log_embeddings?: boolean | Visit$log_embeddingsArgs<ExtArgs>
     _count?: boolean | VisitCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["visit"]>
 
@@ -3980,6 +4375,7 @@ export namespace Prisma {
     client?: boolean | ClientDefaultArgs<ExtArgs>
     tasks?: boolean | Visit$tasksArgs<ExtArgs>
     medication_administrations?: boolean | Visit$medication_administrationsArgs<ExtArgs>
+    log_embeddings?: boolean | Visit$log_embeddingsArgs<ExtArgs>
     _count?: boolean | VisitCountOutputTypeDefaultArgs<ExtArgs>
   }
 
@@ -3991,6 +4387,7 @@ export namespace Prisma {
       client: Prisma.$ClientPayload<ExtArgs>
       tasks: Prisma.$VisitTaskPayload<ExtArgs>[]
       medication_administrations: Prisma.$MedicationAdministrationPayload<ExtArgs>[]
+      log_embeddings: Prisma.$LogEmbeddingPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -4377,6 +4774,8 @@ export namespace Prisma {
     tasks<T extends Visit$tasksArgs<ExtArgs> = {}>(args?: Subset<T, Visit$tasksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$VisitTaskPayload<ExtArgs>, T, 'findMany'> | Null>;
 
     medication_administrations<T extends Visit$medication_administrationsArgs<ExtArgs> = {}>(args?: Subset<T, Visit$medication_administrationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MedicationAdministrationPayload<ExtArgs>, T, 'findMany'> | Null>;
+
+    log_embeddings<T extends Visit$log_embeddingsArgs<ExtArgs> = {}>(args?: Subset<T, Visit$log_embeddingsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$LogEmbeddingPayload<ExtArgs>, T, 'findMany'> | Null>;
 
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -4768,6 +5167,27 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: MedicationAdministrationScalarFieldEnum | MedicationAdministrationScalarFieldEnum[]
+  }
+
+
+  /**
+   * Visit.log_embeddings
+   */
+  export type Visit$log_embeddingsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the LogEmbedding
+     */
+    select?: LogEmbeddingSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: LogEmbeddingInclude<ExtArgs> | null
+    where?: LogEmbeddingWhereInput
+    orderBy?: LogEmbeddingOrderByWithRelationInput | LogEmbeddingOrderByWithRelationInput[]
+    cursor?: LogEmbeddingWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: LogEmbeddingScalarFieldEnum | LogEmbeddingScalarFieldEnum[]
   }
 
 
@@ -9855,6 +10275,2913 @@ export namespace Prisma {
 
 
   /**
+   * Model Organization
+   */
+
+  export type AggregateOrganization = {
+    _count: OrganizationCountAggregateOutputType | null
+    _min: OrganizationMinAggregateOutputType | null
+    _max: OrganizationMaxAggregateOutputType | null
+  }
+
+  export type OrganizationMinAggregateOutputType = {
+    id: string | null
+    name: string | null
+    ai_summary_enabled: boolean | null
+    created_at: Date | null
+    updated_at: Date | null
+  }
+
+  export type OrganizationMaxAggregateOutputType = {
+    id: string | null
+    name: string | null
+    ai_summary_enabled: boolean | null
+    created_at: Date | null
+    updated_at: Date | null
+  }
+
+  export type OrganizationCountAggregateOutputType = {
+    id: number
+    name: number
+    ai_summary_enabled: number
+    created_at: number
+    updated_at: number
+    _all: number
+  }
+
+
+  export type OrganizationMinAggregateInputType = {
+    id?: true
+    name?: true
+    ai_summary_enabled?: true
+    created_at?: true
+    updated_at?: true
+  }
+
+  export type OrganizationMaxAggregateInputType = {
+    id?: true
+    name?: true
+    ai_summary_enabled?: true
+    created_at?: true
+    updated_at?: true
+  }
+
+  export type OrganizationCountAggregateInputType = {
+    id?: true
+    name?: true
+    ai_summary_enabled?: true
+    created_at?: true
+    updated_at?: true
+    _all?: true
+  }
+
+  export type OrganizationAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Organization to aggregate.
+     */
+    where?: OrganizationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Organizations to fetch.
+     */
+    orderBy?: OrganizationOrderByWithRelationInput | OrganizationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: OrganizationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Organizations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Organizations.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Organizations
+    **/
+    _count?: true | OrganizationCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: OrganizationMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: OrganizationMaxAggregateInputType
+  }
+
+  export type GetOrganizationAggregateType<T extends OrganizationAggregateArgs> = {
+        [P in keyof T & keyof AggregateOrganization]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateOrganization[P]>
+      : GetScalarType<T[P], AggregateOrganization[P]>
+  }
+
+
+
+
+  export type OrganizationGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: OrganizationWhereInput
+    orderBy?: OrganizationOrderByWithAggregationInput | OrganizationOrderByWithAggregationInput[]
+    by: OrganizationScalarFieldEnum[] | OrganizationScalarFieldEnum
+    having?: OrganizationScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: OrganizationCountAggregateInputType | true
+    _min?: OrganizationMinAggregateInputType
+    _max?: OrganizationMaxAggregateInputType
+  }
+
+  export type OrganizationGroupByOutputType = {
+    id: string
+    name: string
+    ai_summary_enabled: boolean
+    created_at: Date
+    updated_at: Date
+    _count: OrganizationCountAggregateOutputType | null
+    _min: OrganizationMinAggregateOutputType | null
+    _max: OrganizationMaxAggregateOutputType | null
+  }
+
+  type GetOrganizationGroupByPayload<T extends OrganizationGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<OrganizationGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof OrganizationGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], OrganizationGroupByOutputType[P]>
+            : GetScalarType<T[P], OrganizationGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type OrganizationSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    ai_summary_enabled?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+    clients?: boolean | Organization$clientsArgs<ExtArgs>
+    _count?: boolean | OrganizationCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["organization"]>
+
+  export type OrganizationSelectScalar = {
+    id?: boolean
+    name?: boolean
+    ai_summary_enabled?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+  }
+
+  export type OrganizationInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    clients?: boolean | Organization$clientsArgs<ExtArgs>
+    _count?: boolean | OrganizationCountOutputTypeDefaultArgs<ExtArgs>
+  }
+
+
+  export type $OrganizationPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Organization"
+    objects: {
+      clients: Prisma.$ClientPayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      name: string
+      ai_summary_enabled: boolean
+      created_at: Date
+      updated_at: Date
+    }, ExtArgs["result"]["organization"]>
+    composites: {}
+  }
+
+
+  type OrganizationGetPayload<S extends boolean | null | undefined | OrganizationDefaultArgs> = $Result.GetResult<Prisma.$OrganizationPayload, S>
+
+  type OrganizationCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<OrganizationFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: OrganizationCountAggregateInputType | true
+    }
+
+  export interface OrganizationDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Organization'], meta: { name: 'Organization' } }
+    /**
+     * Find zero or one Organization that matches the filter.
+     * @param {OrganizationFindUniqueArgs} args - Arguments to find a Organization
+     * @example
+     * // Get one Organization
+     * const organization = await prisma.organization.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUnique<T extends OrganizationFindUniqueArgs<ExtArgs>>(
+      args: SelectSubset<T, OrganizationFindUniqueArgs<ExtArgs>>
+    ): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'findUnique'> | null, null, ExtArgs>
+
+    /**
+     * Find one Organization that matches the filter or throw an error  with `error.code='P2025'` 
+     *     if no matches were found.
+     * @param {OrganizationFindUniqueOrThrowArgs} args - Arguments to find a Organization
+     * @example
+     * // Get one Organization
+     * const organization = await prisma.organization.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUniqueOrThrow<T extends OrganizationFindUniqueOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, OrganizationFindUniqueOrThrowArgs<ExtArgs>>
+    ): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'findUniqueOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find the first Organization that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {OrganizationFindFirstArgs} args - Arguments to find a Organization
+     * @example
+     * // Get one Organization
+     * const organization = await prisma.organization.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirst<T extends OrganizationFindFirstArgs<ExtArgs>>(
+      args?: SelectSubset<T, OrganizationFindFirstArgs<ExtArgs>>
+    ): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'findFirst'> | null, null, ExtArgs>
+
+    /**
+     * Find the first Organization that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {OrganizationFindFirstOrThrowArgs} args - Arguments to find a Organization
+     * @example
+     * // Get one Organization
+     * const organization = await prisma.organization.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirstOrThrow<T extends OrganizationFindFirstOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, OrganizationFindFirstOrThrowArgs<ExtArgs>>
+    ): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'findFirstOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find zero or more Organizations that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {OrganizationFindManyArgs=} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Organizations
+     * const organizations = await prisma.organization.findMany()
+     * 
+     * // Get first 10 Organizations
+     * const organizations = await prisma.organization.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const organizationWithIdOnly = await prisma.organization.findMany({ select: { id: true } })
+     * 
+    **/
+    findMany<T extends OrganizationFindManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, OrganizationFindManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'findMany'>>
+
+    /**
+     * Create a Organization.
+     * @param {OrganizationCreateArgs} args - Arguments to create a Organization.
+     * @example
+     * // Create one Organization
+     * const Organization = await prisma.organization.create({
+     *   data: {
+     *     // ... data to create a Organization
+     *   }
+     * })
+     * 
+    **/
+    create<T extends OrganizationCreateArgs<ExtArgs>>(
+      args: SelectSubset<T, OrganizationCreateArgs<ExtArgs>>
+    ): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'create'>, never, ExtArgs>
+
+    /**
+     * Create many Organizations.
+     *     @param {OrganizationCreateManyArgs} args - Arguments to create many Organizations.
+     *     @example
+     *     // Create many Organizations
+     *     const organization = await prisma.organization.createMany({
+     *       data: {
+     *         // ... provide data here
+     *       }
+     *     })
+     *     
+    **/
+    createMany<T extends OrganizationCreateManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, OrganizationCreateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Delete a Organization.
+     * @param {OrganizationDeleteArgs} args - Arguments to delete one Organization.
+     * @example
+     * // Delete one Organization
+     * const Organization = await prisma.organization.delete({
+     *   where: {
+     *     // ... filter to delete one Organization
+     *   }
+     * })
+     * 
+    **/
+    delete<T extends OrganizationDeleteArgs<ExtArgs>>(
+      args: SelectSubset<T, OrganizationDeleteArgs<ExtArgs>>
+    ): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'delete'>, never, ExtArgs>
+
+    /**
+     * Update one Organization.
+     * @param {OrganizationUpdateArgs} args - Arguments to update one Organization.
+     * @example
+     * // Update one Organization
+     * const organization = await prisma.organization.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    update<T extends OrganizationUpdateArgs<ExtArgs>>(
+      args: SelectSubset<T, OrganizationUpdateArgs<ExtArgs>>
+    ): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'update'>, never, ExtArgs>
+
+    /**
+     * Delete zero or more Organizations.
+     * @param {OrganizationDeleteManyArgs} args - Arguments to filter Organizations to delete.
+     * @example
+     * // Delete a few Organizations
+     * const { count } = await prisma.organization.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+    **/
+    deleteMany<T extends OrganizationDeleteManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, OrganizationDeleteManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Organizations.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {OrganizationUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Organizations
+     * const organization = await prisma.organization.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    updateMany<T extends OrganizationUpdateManyArgs<ExtArgs>>(
+      args: SelectSubset<T, OrganizationUpdateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one Organization.
+     * @param {OrganizationUpsertArgs} args - Arguments to update or create a Organization.
+     * @example
+     * // Update or create a Organization
+     * const organization = await prisma.organization.upsert({
+     *   create: {
+     *     // ... data to create a Organization
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Organization we want to update
+     *   }
+     * })
+    **/
+    upsert<T extends OrganizationUpsertArgs<ExtArgs>>(
+      args: SelectSubset<T, OrganizationUpsertArgs<ExtArgs>>
+    ): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'upsert'>, never, ExtArgs>
+
+    /**
+     * Count the number of Organizations.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {OrganizationCountArgs} args - Arguments to filter Organizations to count.
+     * @example
+     * // Count the number of Organizations
+     * const count = await prisma.organization.count({
+     *   where: {
+     *     // ... the filter for the Organizations we want to count
+     *   }
+     * })
+    **/
+    count<T extends OrganizationCountArgs>(
+      args?: Subset<T, OrganizationCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], OrganizationCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Organization.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {OrganizationAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends OrganizationAggregateArgs>(args: Subset<T, OrganizationAggregateArgs>): Prisma.PrismaPromise<GetOrganizationAggregateType<T>>
+
+    /**
+     * Group by Organization.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {OrganizationGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends OrganizationGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: OrganizationGroupByArgs['orderBy'] }
+        : { orderBy?: OrganizationGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, OrganizationGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetOrganizationGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Organization model
+   */
+  readonly fields: OrganizationFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Organization.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__OrganizationClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: 'PrismaPromise';
+
+    clients<T extends Organization$clientsArgs<ExtArgs> = {}>(args?: Subset<T, Organization$clientsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ClientPayload<ExtArgs>, T, 'findMany'> | Null>;
+
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>;
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>;
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>;
+  }
+
+
+
+  /**
+   * Fields of the Organization model
+   */ 
+  interface OrganizationFieldRefs {
+    readonly id: FieldRef<"Organization", 'String'>
+    readonly name: FieldRef<"Organization", 'String'>
+    readonly ai_summary_enabled: FieldRef<"Organization", 'Boolean'>
+    readonly created_at: FieldRef<"Organization", 'DateTime'>
+    readonly updated_at: FieldRef<"Organization", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+
+  /**
+   * Organization findUnique
+   */
+  export type OrganizationFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Organization
+     */
+    select?: OrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationInclude<ExtArgs> | null
+    /**
+     * Filter, which Organization to fetch.
+     */
+    where: OrganizationWhereUniqueInput
+  }
+
+
+  /**
+   * Organization findUniqueOrThrow
+   */
+  export type OrganizationFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Organization
+     */
+    select?: OrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationInclude<ExtArgs> | null
+    /**
+     * Filter, which Organization to fetch.
+     */
+    where: OrganizationWhereUniqueInput
+  }
+
+
+  /**
+   * Organization findFirst
+   */
+  export type OrganizationFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Organization
+     */
+    select?: OrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationInclude<ExtArgs> | null
+    /**
+     * Filter, which Organization to fetch.
+     */
+    where?: OrganizationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Organizations to fetch.
+     */
+    orderBy?: OrganizationOrderByWithRelationInput | OrganizationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Organizations.
+     */
+    cursor?: OrganizationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Organizations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Organizations.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Organizations.
+     */
+    distinct?: OrganizationScalarFieldEnum | OrganizationScalarFieldEnum[]
+  }
+
+
+  /**
+   * Organization findFirstOrThrow
+   */
+  export type OrganizationFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Organization
+     */
+    select?: OrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationInclude<ExtArgs> | null
+    /**
+     * Filter, which Organization to fetch.
+     */
+    where?: OrganizationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Organizations to fetch.
+     */
+    orderBy?: OrganizationOrderByWithRelationInput | OrganizationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Organizations.
+     */
+    cursor?: OrganizationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Organizations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Organizations.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Organizations.
+     */
+    distinct?: OrganizationScalarFieldEnum | OrganizationScalarFieldEnum[]
+  }
+
+
+  /**
+   * Organization findMany
+   */
+  export type OrganizationFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Organization
+     */
+    select?: OrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationInclude<ExtArgs> | null
+    /**
+     * Filter, which Organizations to fetch.
+     */
+    where?: OrganizationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Organizations to fetch.
+     */
+    orderBy?: OrganizationOrderByWithRelationInput | OrganizationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Organizations.
+     */
+    cursor?: OrganizationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Organizations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Organizations.
+     */
+    skip?: number
+    distinct?: OrganizationScalarFieldEnum | OrganizationScalarFieldEnum[]
+  }
+
+
+  /**
+   * Organization create
+   */
+  export type OrganizationCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Organization
+     */
+    select?: OrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationInclude<ExtArgs> | null
+    /**
+     * The data needed to create a Organization.
+     */
+    data: XOR<OrganizationCreateInput, OrganizationUncheckedCreateInput>
+  }
+
+
+  /**
+   * Organization createMany
+   */
+  export type OrganizationCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Organizations.
+     */
+    data: OrganizationCreateManyInput | OrganizationCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+
+  /**
+   * Organization update
+   */
+  export type OrganizationUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Organization
+     */
+    select?: OrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationInclude<ExtArgs> | null
+    /**
+     * The data needed to update a Organization.
+     */
+    data: XOR<OrganizationUpdateInput, OrganizationUncheckedUpdateInput>
+    /**
+     * Choose, which Organization to update.
+     */
+    where: OrganizationWhereUniqueInput
+  }
+
+
+  /**
+   * Organization updateMany
+   */
+  export type OrganizationUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Organizations.
+     */
+    data: XOR<OrganizationUpdateManyMutationInput, OrganizationUncheckedUpdateManyInput>
+    /**
+     * Filter which Organizations to update
+     */
+    where?: OrganizationWhereInput
+  }
+
+
+  /**
+   * Organization upsert
+   */
+  export type OrganizationUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Organization
+     */
+    select?: OrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationInclude<ExtArgs> | null
+    /**
+     * The filter to search for the Organization to update in case it exists.
+     */
+    where: OrganizationWhereUniqueInput
+    /**
+     * In case the Organization found by the `where` argument doesn't exist, create a new Organization with this data.
+     */
+    create: XOR<OrganizationCreateInput, OrganizationUncheckedCreateInput>
+    /**
+     * In case the Organization was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<OrganizationUpdateInput, OrganizationUncheckedUpdateInput>
+  }
+
+
+  /**
+   * Organization delete
+   */
+  export type OrganizationDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Organization
+     */
+    select?: OrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationInclude<ExtArgs> | null
+    /**
+     * Filter which Organization to delete.
+     */
+    where: OrganizationWhereUniqueInput
+  }
+
+
+  /**
+   * Organization deleteMany
+   */
+  export type OrganizationDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Organizations to delete
+     */
+    where?: OrganizationWhereInput
+  }
+
+
+  /**
+   * Organization.clients
+   */
+  export type Organization$clientsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Client
+     */
+    select?: ClientSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ClientInclude<ExtArgs> | null
+    where?: ClientWhereInput
+    orderBy?: ClientOrderByWithRelationInput | ClientOrderByWithRelationInput[]
+    cursor?: ClientWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ClientScalarFieldEnum | ClientScalarFieldEnum[]
+  }
+
+
+  /**
+   * Organization without action
+   */
+  export type OrganizationDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Organization
+     */
+    select?: OrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationInclude<ExtArgs> | null
+  }
+
+
+
+  /**
+   * Model LogEmbedding
+   */
+
+  export type AggregateLogEmbedding = {
+    _count: LogEmbeddingCountAggregateOutputType | null
+    _min: LogEmbeddingMinAggregateOutputType | null
+    _max: LogEmbeddingMaxAggregateOutputType | null
+  }
+
+  export type LogEmbeddingMinAggregateOutputType = {
+    id: string | null
+    visit_id: string | null
+    log_type: string | null
+    log_timestamp: Date | null
+    created_at: Date | null
+    updated_at: Date | null
+  }
+
+  export type LogEmbeddingMaxAggregateOutputType = {
+    id: string | null
+    visit_id: string | null
+    log_type: string | null
+    log_timestamp: Date | null
+    created_at: Date | null
+    updated_at: Date | null
+  }
+
+  export type LogEmbeddingCountAggregateOutputType = {
+    id: number
+    visit_id: number
+    log_type: number
+    log_timestamp: number
+    raw_data: number
+    created_at: number
+    updated_at: number
+    _all: number
+  }
+
+
+  export type LogEmbeddingMinAggregateInputType = {
+    id?: true
+    visit_id?: true
+    log_type?: true
+    log_timestamp?: true
+    created_at?: true
+    updated_at?: true
+  }
+
+  export type LogEmbeddingMaxAggregateInputType = {
+    id?: true
+    visit_id?: true
+    log_type?: true
+    log_timestamp?: true
+    created_at?: true
+    updated_at?: true
+  }
+
+  export type LogEmbeddingCountAggregateInputType = {
+    id?: true
+    visit_id?: true
+    log_type?: true
+    log_timestamp?: true
+    raw_data?: true
+    created_at?: true
+    updated_at?: true
+    _all?: true
+  }
+
+  export type LogEmbeddingAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which LogEmbedding to aggregate.
+     */
+    where?: LogEmbeddingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of LogEmbeddings to fetch.
+     */
+    orderBy?: LogEmbeddingOrderByWithRelationInput | LogEmbeddingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: LogEmbeddingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` LogEmbeddings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` LogEmbeddings.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned LogEmbeddings
+    **/
+    _count?: true | LogEmbeddingCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: LogEmbeddingMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: LogEmbeddingMaxAggregateInputType
+  }
+
+  export type GetLogEmbeddingAggregateType<T extends LogEmbeddingAggregateArgs> = {
+        [P in keyof T & keyof AggregateLogEmbedding]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateLogEmbedding[P]>
+      : GetScalarType<T[P], AggregateLogEmbedding[P]>
+  }
+
+
+
+
+  export type LogEmbeddingGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: LogEmbeddingWhereInput
+    orderBy?: LogEmbeddingOrderByWithAggregationInput | LogEmbeddingOrderByWithAggregationInput[]
+    by: LogEmbeddingScalarFieldEnum[] | LogEmbeddingScalarFieldEnum
+    having?: LogEmbeddingScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: LogEmbeddingCountAggregateInputType | true
+    _min?: LogEmbeddingMinAggregateInputType
+    _max?: LogEmbeddingMaxAggregateInputType
+  }
+
+  export type LogEmbeddingGroupByOutputType = {
+    id: string
+    visit_id: string
+    log_type: string
+    log_timestamp: Date
+    raw_data: JsonValue
+    created_at: Date
+    updated_at: Date
+    _count: LogEmbeddingCountAggregateOutputType | null
+    _min: LogEmbeddingMinAggregateOutputType | null
+    _max: LogEmbeddingMaxAggregateOutputType | null
+  }
+
+  type GetLogEmbeddingGroupByPayload<T extends LogEmbeddingGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<LogEmbeddingGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof LogEmbeddingGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], LogEmbeddingGroupByOutputType[P]>
+            : GetScalarType<T[P], LogEmbeddingGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type LogEmbeddingSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    visit_id?: boolean
+    log_type?: boolean
+    log_timestamp?: boolean
+    raw_data?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+    visit?: boolean | VisitDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["logEmbedding"]>
+
+  export type LogEmbeddingSelectScalar = {
+    id?: boolean
+    visit_id?: boolean
+    log_type?: boolean
+    log_timestamp?: boolean
+    raw_data?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+  }
+
+  export type LogEmbeddingInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    visit?: boolean | VisitDefaultArgs<ExtArgs>
+  }
+
+
+  export type $LogEmbeddingPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "LogEmbedding"
+    objects: {
+      visit: Prisma.$VisitPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      visit_id: string
+      log_type: string
+      log_timestamp: Date
+      raw_data: Prisma.JsonValue
+      created_at: Date
+      updated_at: Date
+    }, ExtArgs["result"]["logEmbedding"]>
+    composites: {}
+  }
+
+
+  type LogEmbeddingGetPayload<S extends boolean | null | undefined | LogEmbeddingDefaultArgs> = $Result.GetResult<Prisma.$LogEmbeddingPayload, S>
+
+  type LogEmbeddingCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<LogEmbeddingFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: LogEmbeddingCountAggregateInputType | true
+    }
+
+  export interface LogEmbeddingDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['LogEmbedding'], meta: { name: 'LogEmbedding' } }
+    /**
+     * Find zero or one LogEmbedding that matches the filter.
+     * @param {LogEmbeddingFindUniqueArgs} args - Arguments to find a LogEmbedding
+     * @example
+     * // Get one LogEmbedding
+     * const logEmbedding = await prisma.logEmbedding.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUnique<T extends LogEmbeddingFindUniqueArgs<ExtArgs>>(
+      args: SelectSubset<T, LogEmbeddingFindUniqueArgs<ExtArgs>>
+    ): Prisma__LogEmbeddingClient<$Result.GetResult<Prisma.$LogEmbeddingPayload<ExtArgs>, T, 'findUnique'> | null, null, ExtArgs>
+
+    /**
+     * Find one LogEmbedding that matches the filter or throw an error  with `error.code='P2025'` 
+     *     if no matches were found.
+     * @param {LogEmbeddingFindUniqueOrThrowArgs} args - Arguments to find a LogEmbedding
+     * @example
+     * // Get one LogEmbedding
+     * const logEmbedding = await prisma.logEmbedding.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUniqueOrThrow<T extends LogEmbeddingFindUniqueOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, LogEmbeddingFindUniqueOrThrowArgs<ExtArgs>>
+    ): Prisma__LogEmbeddingClient<$Result.GetResult<Prisma.$LogEmbeddingPayload<ExtArgs>, T, 'findUniqueOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find the first LogEmbedding that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {LogEmbeddingFindFirstArgs} args - Arguments to find a LogEmbedding
+     * @example
+     * // Get one LogEmbedding
+     * const logEmbedding = await prisma.logEmbedding.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirst<T extends LogEmbeddingFindFirstArgs<ExtArgs>>(
+      args?: SelectSubset<T, LogEmbeddingFindFirstArgs<ExtArgs>>
+    ): Prisma__LogEmbeddingClient<$Result.GetResult<Prisma.$LogEmbeddingPayload<ExtArgs>, T, 'findFirst'> | null, null, ExtArgs>
+
+    /**
+     * Find the first LogEmbedding that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {LogEmbeddingFindFirstOrThrowArgs} args - Arguments to find a LogEmbedding
+     * @example
+     * // Get one LogEmbedding
+     * const logEmbedding = await prisma.logEmbedding.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirstOrThrow<T extends LogEmbeddingFindFirstOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, LogEmbeddingFindFirstOrThrowArgs<ExtArgs>>
+    ): Prisma__LogEmbeddingClient<$Result.GetResult<Prisma.$LogEmbeddingPayload<ExtArgs>, T, 'findFirstOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find zero or more LogEmbeddings that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {LogEmbeddingFindManyArgs=} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all LogEmbeddings
+     * const logEmbeddings = await prisma.logEmbedding.findMany()
+     * 
+     * // Get first 10 LogEmbeddings
+     * const logEmbeddings = await prisma.logEmbedding.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const logEmbeddingWithIdOnly = await prisma.logEmbedding.findMany({ select: { id: true } })
+     * 
+    **/
+    findMany<T extends LogEmbeddingFindManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, LogEmbeddingFindManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<$Result.GetResult<Prisma.$LogEmbeddingPayload<ExtArgs>, T, 'findMany'>>
+
+    /**
+     * Create a LogEmbedding.
+     * @param {LogEmbeddingCreateArgs} args - Arguments to create a LogEmbedding.
+     * @example
+     * // Create one LogEmbedding
+     * const LogEmbedding = await prisma.logEmbedding.create({
+     *   data: {
+     *     // ... data to create a LogEmbedding
+     *   }
+     * })
+     * 
+    **/
+    create<T extends LogEmbeddingCreateArgs<ExtArgs>>(
+      args: SelectSubset<T, LogEmbeddingCreateArgs<ExtArgs>>
+    ): Prisma__LogEmbeddingClient<$Result.GetResult<Prisma.$LogEmbeddingPayload<ExtArgs>, T, 'create'>, never, ExtArgs>
+
+    /**
+     * Create many LogEmbeddings.
+     *     @param {LogEmbeddingCreateManyArgs} args - Arguments to create many LogEmbeddings.
+     *     @example
+     *     // Create many LogEmbeddings
+     *     const logEmbedding = await prisma.logEmbedding.createMany({
+     *       data: {
+     *         // ... provide data here
+     *       }
+     *     })
+     *     
+    **/
+    createMany<T extends LogEmbeddingCreateManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, LogEmbeddingCreateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Delete a LogEmbedding.
+     * @param {LogEmbeddingDeleteArgs} args - Arguments to delete one LogEmbedding.
+     * @example
+     * // Delete one LogEmbedding
+     * const LogEmbedding = await prisma.logEmbedding.delete({
+     *   where: {
+     *     // ... filter to delete one LogEmbedding
+     *   }
+     * })
+     * 
+    **/
+    delete<T extends LogEmbeddingDeleteArgs<ExtArgs>>(
+      args: SelectSubset<T, LogEmbeddingDeleteArgs<ExtArgs>>
+    ): Prisma__LogEmbeddingClient<$Result.GetResult<Prisma.$LogEmbeddingPayload<ExtArgs>, T, 'delete'>, never, ExtArgs>
+
+    /**
+     * Update one LogEmbedding.
+     * @param {LogEmbeddingUpdateArgs} args - Arguments to update one LogEmbedding.
+     * @example
+     * // Update one LogEmbedding
+     * const logEmbedding = await prisma.logEmbedding.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    update<T extends LogEmbeddingUpdateArgs<ExtArgs>>(
+      args: SelectSubset<T, LogEmbeddingUpdateArgs<ExtArgs>>
+    ): Prisma__LogEmbeddingClient<$Result.GetResult<Prisma.$LogEmbeddingPayload<ExtArgs>, T, 'update'>, never, ExtArgs>
+
+    /**
+     * Delete zero or more LogEmbeddings.
+     * @param {LogEmbeddingDeleteManyArgs} args - Arguments to filter LogEmbeddings to delete.
+     * @example
+     * // Delete a few LogEmbeddings
+     * const { count } = await prisma.logEmbedding.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+    **/
+    deleteMany<T extends LogEmbeddingDeleteManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, LogEmbeddingDeleteManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more LogEmbeddings.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {LogEmbeddingUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many LogEmbeddings
+     * const logEmbedding = await prisma.logEmbedding.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    updateMany<T extends LogEmbeddingUpdateManyArgs<ExtArgs>>(
+      args: SelectSubset<T, LogEmbeddingUpdateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one LogEmbedding.
+     * @param {LogEmbeddingUpsertArgs} args - Arguments to update or create a LogEmbedding.
+     * @example
+     * // Update or create a LogEmbedding
+     * const logEmbedding = await prisma.logEmbedding.upsert({
+     *   create: {
+     *     // ... data to create a LogEmbedding
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the LogEmbedding we want to update
+     *   }
+     * })
+    **/
+    upsert<T extends LogEmbeddingUpsertArgs<ExtArgs>>(
+      args: SelectSubset<T, LogEmbeddingUpsertArgs<ExtArgs>>
+    ): Prisma__LogEmbeddingClient<$Result.GetResult<Prisma.$LogEmbeddingPayload<ExtArgs>, T, 'upsert'>, never, ExtArgs>
+
+    /**
+     * Count the number of LogEmbeddings.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {LogEmbeddingCountArgs} args - Arguments to filter LogEmbeddings to count.
+     * @example
+     * // Count the number of LogEmbeddings
+     * const count = await prisma.logEmbedding.count({
+     *   where: {
+     *     // ... the filter for the LogEmbeddings we want to count
+     *   }
+     * })
+    **/
+    count<T extends LogEmbeddingCountArgs>(
+      args?: Subset<T, LogEmbeddingCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], LogEmbeddingCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a LogEmbedding.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {LogEmbeddingAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends LogEmbeddingAggregateArgs>(args: Subset<T, LogEmbeddingAggregateArgs>): Prisma.PrismaPromise<GetLogEmbeddingAggregateType<T>>
+
+    /**
+     * Group by LogEmbedding.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {LogEmbeddingGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends LogEmbeddingGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: LogEmbeddingGroupByArgs['orderBy'] }
+        : { orderBy?: LogEmbeddingGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, LogEmbeddingGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetLogEmbeddingGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the LogEmbedding model
+   */
+  readonly fields: LogEmbeddingFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for LogEmbedding.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__LogEmbeddingClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: 'PrismaPromise';
+
+    visit<T extends VisitDefaultArgs<ExtArgs> = {}>(args?: Subset<T, VisitDefaultArgs<ExtArgs>>): Prisma__VisitClient<$Result.GetResult<Prisma.$VisitPayload<ExtArgs>, T, 'findUniqueOrThrow'> | Null, Null, ExtArgs>;
+
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>;
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>;
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>;
+  }
+
+
+
+  /**
+   * Fields of the LogEmbedding model
+   */ 
+  interface LogEmbeddingFieldRefs {
+    readonly id: FieldRef<"LogEmbedding", 'String'>
+    readonly visit_id: FieldRef<"LogEmbedding", 'String'>
+    readonly log_type: FieldRef<"LogEmbedding", 'String'>
+    readonly log_timestamp: FieldRef<"LogEmbedding", 'DateTime'>
+    readonly raw_data: FieldRef<"LogEmbedding", 'Json'>
+    readonly created_at: FieldRef<"LogEmbedding", 'DateTime'>
+    readonly updated_at: FieldRef<"LogEmbedding", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+
+  /**
+   * LogEmbedding findUnique
+   */
+  export type LogEmbeddingFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the LogEmbedding
+     */
+    select?: LogEmbeddingSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: LogEmbeddingInclude<ExtArgs> | null
+    /**
+     * Filter, which LogEmbedding to fetch.
+     */
+    where: LogEmbeddingWhereUniqueInput
+  }
+
+
+  /**
+   * LogEmbedding findUniqueOrThrow
+   */
+  export type LogEmbeddingFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the LogEmbedding
+     */
+    select?: LogEmbeddingSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: LogEmbeddingInclude<ExtArgs> | null
+    /**
+     * Filter, which LogEmbedding to fetch.
+     */
+    where: LogEmbeddingWhereUniqueInput
+  }
+
+
+  /**
+   * LogEmbedding findFirst
+   */
+  export type LogEmbeddingFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the LogEmbedding
+     */
+    select?: LogEmbeddingSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: LogEmbeddingInclude<ExtArgs> | null
+    /**
+     * Filter, which LogEmbedding to fetch.
+     */
+    where?: LogEmbeddingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of LogEmbeddings to fetch.
+     */
+    orderBy?: LogEmbeddingOrderByWithRelationInput | LogEmbeddingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for LogEmbeddings.
+     */
+    cursor?: LogEmbeddingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` LogEmbeddings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` LogEmbeddings.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of LogEmbeddings.
+     */
+    distinct?: LogEmbeddingScalarFieldEnum | LogEmbeddingScalarFieldEnum[]
+  }
+
+
+  /**
+   * LogEmbedding findFirstOrThrow
+   */
+  export type LogEmbeddingFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the LogEmbedding
+     */
+    select?: LogEmbeddingSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: LogEmbeddingInclude<ExtArgs> | null
+    /**
+     * Filter, which LogEmbedding to fetch.
+     */
+    where?: LogEmbeddingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of LogEmbeddings to fetch.
+     */
+    orderBy?: LogEmbeddingOrderByWithRelationInput | LogEmbeddingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for LogEmbeddings.
+     */
+    cursor?: LogEmbeddingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` LogEmbeddings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` LogEmbeddings.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of LogEmbeddings.
+     */
+    distinct?: LogEmbeddingScalarFieldEnum | LogEmbeddingScalarFieldEnum[]
+  }
+
+
+  /**
+   * LogEmbedding findMany
+   */
+  export type LogEmbeddingFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the LogEmbedding
+     */
+    select?: LogEmbeddingSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: LogEmbeddingInclude<ExtArgs> | null
+    /**
+     * Filter, which LogEmbeddings to fetch.
+     */
+    where?: LogEmbeddingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of LogEmbeddings to fetch.
+     */
+    orderBy?: LogEmbeddingOrderByWithRelationInput | LogEmbeddingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing LogEmbeddings.
+     */
+    cursor?: LogEmbeddingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` LogEmbeddings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` LogEmbeddings.
+     */
+    skip?: number
+    distinct?: LogEmbeddingScalarFieldEnum | LogEmbeddingScalarFieldEnum[]
+  }
+
+
+  /**
+   * LogEmbedding create
+   */
+  export type LogEmbeddingCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the LogEmbedding
+     */
+    select?: LogEmbeddingSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: LogEmbeddingInclude<ExtArgs> | null
+    /**
+     * The data needed to create a LogEmbedding.
+     */
+    data: XOR<LogEmbeddingCreateInput, LogEmbeddingUncheckedCreateInput>
+  }
+
+
+  /**
+   * LogEmbedding createMany
+   */
+  export type LogEmbeddingCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many LogEmbeddings.
+     */
+    data: LogEmbeddingCreateManyInput | LogEmbeddingCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+
+  /**
+   * LogEmbedding update
+   */
+  export type LogEmbeddingUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the LogEmbedding
+     */
+    select?: LogEmbeddingSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: LogEmbeddingInclude<ExtArgs> | null
+    /**
+     * The data needed to update a LogEmbedding.
+     */
+    data: XOR<LogEmbeddingUpdateInput, LogEmbeddingUncheckedUpdateInput>
+    /**
+     * Choose, which LogEmbedding to update.
+     */
+    where: LogEmbeddingWhereUniqueInput
+  }
+
+
+  /**
+   * LogEmbedding updateMany
+   */
+  export type LogEmbeddingUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update LogEmbeddings.
+     */
+    data: XOR<LogEmbeddingUpdateManyMutationInput, LogEmbeddingUncheckedUpdateManyInput>
+    /**
+     * Filter which LogEmbeddings to update
+     */
+    where?: LogEmbeddingWhereInput
+  }
+
+
+  /**
+   * LogEmbedding upsert
+   */
+  export type LogEmbeddingUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the LogEmbedding
+     */
+    select?: LogEmbeddingSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: LogEmbeddingInclude<ExtArgs> | null
+    /**
+     * The filter to search for the LogEmbedding to update in case it exists.
+     */
+    where: LogEmbeddingWhereUniqueInput
+    /**
+     * In case the LogEmbedding found by the `where` argument doesn't exist, create a new LogEmbedding with this data.
+     */
+    create: XOR<LogEmbeddingCreateInput, LogEmbeddingUncheckedCreateInput>
+    /**
+     * In case the LogEmbedding was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<LogEmbeddingUpdateInput, LogEmbeddingUncheckedUpdateInput>
+  }
+
+
+  /**
+   * LogEmbedding delete
+   */
+  export type LogEmbeddingDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the LogEmbedding
+     */
+    select?: LogEmbeddingSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: LogEmbeddingInclude<ExtArgs> | null
+    /**
+     * Filter which LogEmbedding to delete.
+     */
+    where: LogEmbeddingWhereUniqueInput
+  }
+
+
+  /**
+   * LogEmbedding deleteMany
+   */
+  export type LogEmbeddingDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which LogEmbeddings to delete
+     */
+    where?: LogEmbeddingWhereInput
+  }
+
+
+  /**
+   * LogEmbedding without action
+   */
+  export type LogEmbeddingDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the LogEmbedding
+     */
+    select?: LogEmbeddingSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: LogEmbeddingInclude<ExtArgs> | null
+  }
+
+
+
+  /**
+   * Model HealthSummary
+   */
+
+  export type AggregateHealthSummary = {
+    _count: HealthSummaryCountAggregateOutputType | null
+    _min: HealthSummaryMinAggregateOutputType | null
+    _max: HealthSummaryMaxAggregateOutputType | null
+  }
+
+  export type HealthSummaryMinAggregateOutputType = {
+    id: string | null
+    client_id: string | null
+    period_start: Date | null
+    period_end: Date | null
+    generated_at: Date | null
+    generated_by: string | null
+    approved_by: string | null
+    approved_at: Date | null
+    feedback: string | null
+    expires_at: Date | null
+    created_at: Date | null
+    updated_at: Date | null
+  }
+
+  export type HealthSummaryMaxAggregateOutputType = {
+    id: string | null
+    client_id: string | null
+    period_start: Date | null
+    period_end: Date | null
+    generated_at: Date | null
+    generated_by: string | null
+    approved_by: string | null
+    approved_at: Date | null
+    feedback: string | null
+    expires_at: Date | null
+    created_at: Date | null
+    updated_at: Date | null
+  }
+
+  export type HealthSummaryCountAggregateOutputType = {
+    id: number
+    client_id: number
+    period_start: number
+    period_end: number
+    summary_json: number
+    risk_levels: number
+    generated_at: number
+    generated_by: number
+    approved_by: number
+    approved_at: number
+    feedback: number
+    expires_at: number
+    created_at: number
+    updated_at: number
+    _all: number
+  }
+
+
+  export type HealthSummaryMinAggregateInputType = {
+    id?: true
+    client_id?: true
+    period_start?: true
+    period_end?: true
+    generated_at?: true
+    generated_by?: true
+    approved_by?: true
+    approved_at?: true
+    feedback?: true
+    expires_at?: true
+    created_at?: true
+    updated_at?: true
+  }
+
+  export type HealthSummaryMaxAggregateInputType = {
+    id?: true
+    client_id?: true
+    period_start?: true
+    period_end?: true
+    generated_at?: true
+    generated_by?: true
+    approved_by?: true
+    approved_at?: true
+    feedback?: true
+    expires_at?: true
+    created_at?: true
+    updated_at?: true
+  }
+
+  export type HealthSummaryCountAggregateInputType = {
+    id?: true
+    client_id?: true
+    period_start?: true
+    period_end?: true
+    summary_json?: true
+    risk_levels?: true
+    generated_at?: true
+    generated_by?: true
+    approved_by?: true
+    approved_at?: true
+    feedback?: true
+    expires_at?: true
+    created_at?: true
+    updated_at?: true
+    _all?: true
+  }
+
+  export type HealthSummaryAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which HealthSummary to aggregate.
+     */
+    where?: HealthSummaryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of HealthSummaries to fetch.
+     */
+    orderBy?: HealthSummaryOrderByWithRelationInput | HealthSummaryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: HealthSummaryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` HealthSummaries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` HealthSummaries.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned HealthSummaries
+    **/
+    _count?: true | HealthSummaryCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: HealthSummaryMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: HealthSummaryMaxAggregateInputType
+  }
+
+  export type GetHealthSummaryAggregateType<T extends HealthSummaryAggregateArgs> = {
+        [P in keyof T & keyof AggregateHealthSummary]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateHealthSummary[P]>
+      : GetScalarType<T[P], AggregateHealthSummary[P]>
+  }
+
+
+
+
+  export type HealthSummaryGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: HealthSummaryWhereInput
+    orderBy?: HealthSummaryOrderByWithAggregationInput | HealthSummaryOrderByWithAggregationInput[]
+    by: HealthSummaryScalarFieldEnum[] | HealthSummaryScalarFieldEnum
+    having?: HealthSummaryScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: HealthSummaryCountAggregateInputType | true
+    _min?: HealthSummaryMinAggregateInputType
+    _max?: HealthSummaryMaxAggregateInputType
+  }
+
+  export type HealthSummaryGroupByOutputType = {
+    id: string
+    client_id: string
+    period_start: Date
+    period_end: Date
+    summary_json: JsonValue
+    risk_levels: JsonValue
+    generated_at: Date
+    generated_by: string
+    approved_by: string | null
+    approved_at: Date | null
+    feedback: string | null
+    expires_at: Date
+    created_at: Date
+    updated_at: Date
+    _count: HealthSummaryCountAggregateOutputType | null
+    _min: HealthSummaryMinAggregateOutputType | null
+    _max: HealthSummaryMaxAggregateOutputType | null
+  }
+
+  type GetHealthSummaryGroupByPayload<T extends HealthSummaryGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<HealthSummaryGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof HealthSummaryGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], HealthSummaryGroupByOutputType[P]>
+            : GetScalarType<T[P], HealthSummaryGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type HealthSummarySelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    client_id?: boolean
+    period_start?: boolean
+    period_end?: boolean
+    summary_json?: boolean
+    risk_levels?: boolean
+    generated_at?: boolean
+    generated_by?: boolean
+    approved_by?: boolean
+    approved_at?: boolean
+    feedback?: boolean
+    expires_at?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+    client?: boolean | ClientDefaultArgs<ExtArgs>
+    approver?: boolean | HealthSummary$approverArgs<ExtArgs>
+  }, ExtArgs["result"]["healthSummary"]>
+
+  export type HealthSummarySelectScalar = {
+    id?: boolean
+    client_id?: boolean
+    period_start?: boolean
+    period_end?: boolean
+    summary_json?: boolean
+    risk_levels?: boolean
+    generated_at?: boolean
+    generated_by?: boolean
+    approved_by?: boolean
+    approved_at?: boolean
+    feedback?: boolean
+    expires_at?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+  }
+
+  export type HealthSummaryInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    client?: boolean | ClientDefaultArgs<ExtArgs>
+    approver?: boolean | HealthSummary$approverArgs<ExtArgs>
+  }
+
+
+  export type $HealthSummaryPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "HealthSummary"
+    objects: {
+      client: Prisma.$ClientPayload<ExtArgs>
+      approver: Prisma.$CarerPayload<ExtArgs> | null
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      client_id: string
+      period_start: Date
+      period_end: Date
+      summary_json: Prisma.JsonValue
+      risk_levels: Prisma.JsonValue
+      generated_at: Date
+      generated_by: string
+      approved_by: string | null
+      approved_at: Date | null
+      feedback: string | null
+      expires_at: Date
+      created_at: Date
+      updated_at: Date
+    }, ExtArgs["result"]["healthSummary"]>
+    composites: {}
+  }
+
+
+  type HealthSummaryGetPayload<S extends boolean | null | undefined | HealthSummaryDefaultArgs> = $Result.GetResult<Prisma.$HealthSummaryPayload, S>
+
+  type HealthSummaryCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<HealthSummaryFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: HealthSummaryCountAggregateInputType | true
+    }
+
+  export interface HealthSummaryDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['HealthSummary'], meta: { name: 'HealthSummary' } }
+    /**
+     * Find zero or one HealthSummary that matches the filter.
+     * @param {HealthSummaryFindUniqueArgs} args - Arguments to find a HealthSummary
+     * @example
+     * // Get one HealthSummary
+     * const healthSummary = await prisma.healthSummary.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUnique<T extends HealthSummaryFindUniqueArgs<ExtArgs>>(
+      args: SelectSubset<T, HealthSummaryFindUniqueArgs<ExtArgs>>
+    ): Prisma__HealthSummaryClient<$Result.GetResult<Prisma.$HealthSummaryPayload<ExtArgs>, T, 'findUnique'> | null, null, ExtArgs>
+
+    /**
+     * Find one HealthSummary that matches the filter or throw an error  with `error.code='P2025'` 
+     *     if no matches were found.
+     * @param {HealthSummaryFindUniqueOrThrowArgs} args - Arguments to find a HealthSummary
+     * @example
+     * // Get one HealthSummary
+     * const healthSummary = await prisma.healthSummary.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUniqueOrThrow<T extends HealthSummaryFindUniqueOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, HealthSummaryFindUniqueOrThrowArgs<ExtArgs>>
+    ): Prisma__HealthSummaryClient<$Result.GetResult<Prisma.$HealthSummaryPayload<ExtArgs>, T, 'findUniqueOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find the first HealthSummary that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {HealthSummaryFindFirstArgs} args - Arguments to find a HealthSummary
+     * @example
+     * // Get one HealthSummary
+     * const healthSummary = await prisma.healthSummary.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirst<T extends HealthSummaryFindFirstArgs<ExtArgs>>(
+      args?: SelectSubset<T, HealthSummaryFindFirstArgs<ExtArgs>>
+    ): Prisma__HealthSummaryClient<$Result.GetResult<Prisma.$HealthSummaryPayload<ExtArgs>, T, 'findFirst'> | null, null, ExtArgs>
+
+    /**
+     * Find the first HealthSummary that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {HealthSummaryFindFirstOrThrowArgs} args - Arguments to find a HealthSummary
+     * @example
+     * // Get one HealthSummary
+     * const healthSummary = await prisma.healthSummary.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirstOrThrow<T extends HealthSummaryFindFirstOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, HealthSummaryFindFirstOrThrowArgs<ExtArgs>>
+    ): Prisma__HealthSummaryClient<$Result.GetResult<Prisma.$HealthSummaryPayload<ExtArgs>, T, 'findFirstOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find zero or more HealthSummaries that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {HealthSummaryFindManyArgs=} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all HealthSummaries
+     * const healthSummaries = await prisma.healthSummary.findMany()
+     * 
+     * // Get first 10 HealthSummaries
+     * const healthSummaries = await prisma.healthSummary.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const healthSummaryWithIdOnly = await prisma.healthSummary.findMany({ select: { id: true } })
+     * 
+    **/
+    findMany<T extends HealthSummaryFindManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, HealthSummaryFindManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<$Result.GetResult<Prisma.$HealthSummaryPayload<ExtArgs>, T, 'findMany'>>
+
+    /**
+     * Create a HealthSummary.
+     * @param {HealthSummaryCreateArgs} args - Arguments to create a HealthSummary.
+     * @example
+     * // Create one HealthSummary
+     * const HealthSummary = await prisma.healthSummary.create({
+     *   data: {
+     *     // ... data to create a HealthSummary
+     *   }
+     * })
+     * 
+    **/
+    create<T extends HealthSummaryCreateArgs<ExtArgs>>(
+      args: SelectSubset<T, HealthSummaryCreateArgs<ExtArgs>>
+    ): Prisma__HealthSummaryClient<$Result.GetResult<Prisma.$HealthSummaryPayload<ExtArgs>, T, 'create'>, never, ExtArgs>
+
+    /**
+     * Create many HealthSummaries.
+     *     @param {HealthSummaryCreateManyArgs} args - Arguments to create many HealthSummaries.
+     *     @example
+     *     // Create many HealthSummaries
+     *     const healthSummary = await prisma.healthSummary.createMany({
+     *       data: {
+     *         // ... provide data here
+     *       }
+     *     })
+     *     
+    **/
+    createMany<T extends HealthSummaryCreateManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, HealthSummaryCreateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Delete a HealthSummary.
+     * @param {HealthSummaryDeleteArgs} args - Arguments to delete one HealthSummary.
+     * @example
+     * // Delete one HealthSummary
+     * const HealthSummary = await prisma.healthSummary.delete({
+     *   where: {
+     *     // ... filter to delete one HealthSummary
+     *   }
+     * })
+     * 
+    **/
+    delete<T extends HealthSummaryDeleteArgs<ExtArgs>>(
+      args: SelectSubset<T, HealthSummaryDeleteArgs<ExtArgs>>
+    ): Prisma__HealthSummaryClient<$Result.GetResult<Prisma.$HealthSummaryPayload<ExtArgs>, T, 'delete'>, never, ExtArgs>
+
+    /**
+     * Update one HealthSummary.
+     * @param {HealthSummaryUpdateArgs} args - Arguments to update one HealthSummary.
+     * @example
+     * // Update one HealthSummary
+     * const healthSummary = await prisma.healthSummary.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    update<T extends HealthSummaryUpdateArgs<ExtArgs>>(
+      args: SelectSubset<T, HealthSummaryUpdateArgs<ExtArgs>>
+    ): Prisma__HealthSummaryClient<$Result.GetResult<Prisma.$HealthSummaryPayload<ExtArgs>, T, 'update'>, never, ExtArgs>
+
+    /**
+     * Delete zero or more HealthSummaries.
+     * @param {HealthSummaryDeleteManyArgs} args - Arguments to filter HealthSummaries to delete.
+     * @example
+     * // Delete a few HealthSummaries
+     * const { count } = await prisma.healthSummary.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+    **/
+    deleteMany<T extends HealthSummaryDeleteManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, HealthSummaryDeleteManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more HealthSummaries.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {HealthSummaryUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many HealthSummaries
+     * const healthSummary = await prisma.healthSummary.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    updateMany<T extends HealthSummaryUpdateManyArgs<ExtArgs>>(
+      args: SelectSubset<T, HealthSummaryUpdateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one HealthSummary.
+     * @param {HealthSummaryUpsertArgs} args - Arguments to update or create a HealthSummary.
+     * @example
+     * // Update or create a HealthSummary
+     * const healthSummary = await prisma.healthSummary.upsert({
+     *   create: {
+     *     // ... data to create a HealthSummary
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the HealthSummary we want to update
+     *   }
+     * })
+    **/
+    upsert<T extends HealthSummaryUpsertArgs<ExtArgs>>(
+      args: SelectSubset<T, HealthSummaryUpsertArgs<ExtArgs>>
+    ): Prisma__HealthSummaryClient<$Result.GetResult<Prisma.$HealthSummaryPayload<ExtArgs>, T, 'upsert'>, never, ExtArgs>
+
+    /**
+     * Count the number of HealthSummaries.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {HealthSummaryCountArgs} args - Arguments to filter HealthSummaries to count.
+     * @example
+     * // Count the number of HealthSummaries
+     * const count = await prisma.healthSummary.count({
+     *   where: {
+     *     // ... the filter for the HealthSummaries we want to count
+     *   }
+     * })
+    **/
+    count<T extends HealthSummaryCountArgs>(
+      args?: Subset<T, HealthSummaryCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], HealthSummaryCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a HealthSummary.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {HealthSummaryAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends HealthSummaryAggregateArgs>(args: Subset<T, HealthSummaryAggregateArgs>): Prisma.PrismaPromise<GetHealthSummaryAggregateType<T>>
+
+    /**
+     * Group by HealthSummary.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {HealthSummaryGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends HealthSummaryGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: HealthSummaryGroupByArgs['orderBy'] }
+        : { orderBy?: HealthSummaryGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, HealthSummaryGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetHealthSummaryGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the HealthSummary model
+   */
+  readonly fields: HealthSummaryFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for HealthSummary.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__HealthSummaryClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: 'PrismaPromise';
+
+    client<T extends ClientDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ClientDefaultArgs<ExtArgs>>): Prisma__ClientClient<$Result.GetResult<Prisma.$ClientPayload<ExtArgs>, T, 'findUniqueOrThrow'> | Null, Null, ExtArgs>;
+
+    approver<T extends HealthSummary$approverArgs<ExtArgs> = {}>(args?: Subset<T, HealthSummary$approverArgs<ExtArgs>>): Prisma__CarerClient<$Result.GetResult<Prisma.$CarerPayload<ExtArgs>, T, 'findUniqueOrThrow'> | null, null, ExtArgs>;
+
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>;
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>;
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>;
+  }
+
+
+
+  /**
+   * Fields of the HealthSummary model
+   */ 
+  interface HealthSummaryFieldRefs {
+    readonly id: FieldRef<"HealthSummary", 'String'>
+    readonly client_id: FieldRef<"HealthSummary", 'String'>
+    readonly period_start: FieldRef<"HealthSummary", 'DateTime'>
+    readonly period_end: FieldRef<"HealthSummary", 'DateTime'>
+    readonly summary_json: FieldRef<"HealthSummary", 'Json'>
+    readonly risk_levels: FieldRef<"HealthSummary", 'Json'>
+    readonly generated_at: FieldRef<"HealthSummary", 'DateTime'>
+    readonly generated_by: FieldRef<"HealthSummary", 'String'>
+    readonly approved_by: FieldRef<"HealthSummary", 'String'>
+    readonly approved_at: FieldRef<"HealthSummary", 'DateTime'>
+    readonly feedback: FieldRef<"HealthSummary", 'String'>
+    readonly expires_at: FieldRef<"HealthSummary", 'DateTime'>
+    readonly created_at: FieldRef<"HealthSummary", 'DateTime'>
+    readonly updated_at: FieldRef<"HealthSummary", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+
+  /**
+   * HealthSummary findUnique
+   */
+  export type HealthSummaryFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HealthSummary
+     */
+    select?: HealthSummarySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: HealthSummaryInclude<ExtArgs> | null
+    /**
+     * Filter, which HealthSummary to fetch.
+     */
+    where: HealthSummaryWhereUniqueInput
+  }
+
+
+  /**
+   * HealthSummary findUniqueOrThrow
+   */
+  export type HealthSummaryFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HealthSummary
+     */
+    select?: HealthSummarySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: HealthSummaryInclude<ExtArgs> | null
+    /**
+     * Filter, which HealthSummary to fetch.
+     */
+    where: HealthSummaryWhereUniqueInput
+  }
+
+
+  /**
+   * HealthSummary findFirst
+   */
+  export type HealthSummaryFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HealthSummary
+     */
+    select?: HealthSummarySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: HealthSummaryInclude<ExtArgs> | null
+    /**
+     * Filter, which HealthSummary to fetch.
+     */
+    where?: HealthSummaryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of HealthSummaries to fetch.
+     */
+    orderBy?: HealthSummaryOrderByWithRelationInput | HealthSummaryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for HealthSummaries.
+     */
+    cursor?: HealthSummaryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` HealthSummaries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` HealthSummaries.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of HealthSummaries.
+     */
+    distinct?: HealthSummaryScalarFieldEnum | HealthSummaryScalarFieldEnum[]
+  }
+
+
+  /**
+   * HealthSummary findFirstOrThrow
+   */
+  export type HealthSummaryFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HealthSummary
+     */
+    select?: HealthSummarySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: HealthSummaryInclude<ExtArgs> | null
+    /**
+     * Filter, which HealthSummary to fetch.
+     */
+    where?: HealthSummaryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of HealthSummaries to fetch.
+     */
+    orderBy?: HealthSummaryOrderByWithRelationInput | HealthSummaryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for HealthSummaries.
+     */
+    cursor?: HealthSummaryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` HealthSummaries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` HealthSummaries.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of HealthSummaries.
+     */
+    distinct?: HealthSummaryScalarFieldEnum | HealthSummaryScalarFieldEnum[]
+  }
+
+
+  /**
+   * HealthSummary findMany
+   */
+  export type HealthSummaryFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HealthSummary
+     */
+    select?: HealthSummarySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: HealthSummaryInclude<ExtArgs> | null
+    /**
+     * Filter, which HealthSummaries to fetch.
+     */
+    where?: HealthSummaryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of HealthSummaries to fetch.
+     */
+    orderBy?: HealthSummaryOrderByWithRelationInput | HealthSummaryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing HealthSummaries.
+     */
+    cursor?: HealthSummaryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` HealthSummaries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` HealthSummaries.
+     */
+    skip?: number
+    distinct?: HealthSummaryScalarFieldEnum | HealthSummaryScalarFieldEnum[]
+  }
+
+
+  /**
+   * HealthSummary create
+   */
+  export type HealthSummaryCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HealthSummary
+     */
+    select?: HealthSummarySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: HealthSummaryInclude<ExtArgs> | null
+    /**
+     * The data needed to create a HealthSummary.
+     */
+    data: XOR<HealthSummaryCreateInput, HealthSummaryUncheckedCreateInput>
+  }
+
+
+  /**
+   * HealthSummary createMany
+   */
+  export type HealthSummaryCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many HealthSummaries.
+     */
+    data: HealthSummaryCreateManyInput | HealthSummaryCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+
+  /**
+   * HealthSummary update
+   */
+  export type HealthSummaryUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HealthSummary
+     */
+    select?: HealthSummarySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: HealthSummaryInclude<ExtArgs> | null
+    /**
+     * The data needed to update a HealthSummary.
+     */
+    data: XOR<HealthSummaryUpdateInput, HealthSummaryUncheckedUpdateInput>
+    /**
+     * Choose, which HealthSummary to update.
+     */
+    where: HealthSummaryWhereUniqueInput
+  }
+
+
+  /**
+   * HealthSummary updateMany
+   */
+  export type HealthSummaryUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update HealthSummaries.
+     */
+    data: XOR<HealthSummaryUpdateManyMutationInput, HealthSummaryUncheckedUpdateManyInput>
+    /**
+     * Filter which HealthSummaries to update
+     */
+    where?: HealthSummaryWhereInput
+  }
+
+
+  /**
+   * HealthSummary upsert
+   */
+  export type HealthSummaryUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HealthSummary
+     */
+    select?: HealthSummarySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: HealthSummaryInclude<ExtArgs> | null
+    /**
+     * The filter to search for the HealthSummary to update in case it exists.
+     */
+    where: HealthSummaryWhereUniqueInput
+    /**
+     * In case the HealthSummary found by the `where` argument doesn't exist, create a new HealthSummary with this data.
+     */
+    create: XOR<HealthSummaryCreateInput, HealthSummaryUncheckedCreateInput>
+    /**
+     * In case the HealthSummary was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<HealthSummaryUpdateInput, HealthSummaryUncheckedUpdateInput>
+  }
+
+
+  /**
+   * HealthSummary delete
+   */
+  export type HealthSummaryDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HealthSummary
+     */
+    select?: HealthSummarySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: HealthSummaryInclude<ExtArgs> | null
+    /**
+     * Filter which HealthSummary to delete.
+     */
+    where: HealthSummaryWhereUniqueInput
+  }
+
+
+  /**
+   * HealthSummary deleteMany
+   */
+  export type HealthSummaryDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which HealthSummaries to delete
+     */
+    where?: HealthSummaryWhereInput
+  }
+
+
+  /**
+   * HealthSummary.approver
+   */
+  export type HealthSummary$approverArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Carer
+     */
+    select?: CarerSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarerInclude<ExtArgs> | null
+    where?: CarerWhereInput
+  }
+
+
+  /**
+   * HealthSummary without action
+   */
+  export type HealthSummaryDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HealthSummary
+     */
+    select?: HealthSummarySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: HealthSummaryInclude<ExtArgs> | null
+  }
+
+
+
+  /**
    * Enums
    */
 
@@ -9892,6 +13219,7 @@ export namespace Prisma {
     city: 'city',
     postcode: 'postcode',
     date_of_birth: 'date_of_birth',
+    organization_id: 'organization_id',
     created_at: 'created_at',
     updated_at: 'updated_at',
     deleted_at: 'deleted_at'
@@ -9998,12 +13326,63 @@ export namespace Prisma {
   export type MedicationAuditScalarFieldEnum = (typeof MedicationAuditScalarFieldEnum)[keyof typeof MedicationAuditScalarFieldEnum]
 
 
+  export const OrganizationScalarFieldEnum: {
+    id: 'id',
+    name: 'name',
+    ai_summary_enabled: 'ai_summary_enabled',
+    created_at: 'created_at',
+    updated_at: 'updated_at'
+  };
+
+  export type OrganizationScalarFieldEnum = (typeof OrganizationScalarFieldEnum)[keyof typeof OrganizationScalarFieldEnum]
+
+
+  export const LogEmbeddingScalarFieldEnum: {
+    id: 'id',
+    visit_id: 'visit_id',
+    log_type: 'log_type',
+    log_timestamp: 'log_timestamp',
+    raw_data: 'raw_data',
+    created_at: 'created_at',
+    updated_at: 'updated_at'
+  };
+
+  export type LogEmbeddingScalarFieldEnum = (typeof LogEmbeddingScalarFieldEnum)[keyof typeof LogEmbeddingScalarFieldEnum]
+
+
+  export const HealthSummaryScalarFieldEnum: {
+    id: 'id',
+    client_id: 'client_id',
+    period_start: 'period_start',
+    period_end: 'period_end',
+    summary_json: 'summary_json',
+    risk_levels: 'risk_levels',
+    generated_at: 'generated_at',
+    generated_by: 'generated_by',
+    approved_by: 'approved_by',
+    approved_at: 'approved_at',
+    feedback: 'feedback',
+    expires_at: 'expires_at',
+    created_at: 'created_at',
+    updated_at: 'updated_at'
+  };
+
+  export type HealthSummaryScalarFieldEnum = (typeof HealthSummaryScalarFieldEnum)[keyof typeof HealthSummaryScalarFieldEnum]
+
+
   export const SortOrder: {
     asc: 'asc',
     desc: 'desc'
   };
 
   export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
+
+
+  export const JsonNullValueInput: {
+    JsonNull: typeof JsonNull
+  };
+
+  export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
   export const QueryMode: {
@@ -10020,6 +13399,15 @@ export namespace Prisma {
   };
 
   export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+  export const JsonNullValueFilter: {
+    DbNull: typeof DbNull,
+    JsonNull: typeof JsonNull,
+    AnyNull: typeof AnyNull
+  };
+
+  export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
 
 
   /**
@@ -10119,6 +13507,13 @@ export namespace Prisma {
 
 
   /**
+   * Reference to a field of type 'Json'
+   */
+  export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
+    
+
+
+  /**
    * Reference to a field of type 'Float'
    */
   export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -10150,6 +13545,7 @@ export namespace Prisma {
     updated_at?: DateTimeFilter<"Carer"> | Date | string
     deleted_at?: DateTimeNullableFilter<"Carer"> | Date | string | null
     visits?: VisitListRelationFilter
+    approved_summaries?: HealthSummaryListRelationFilter
   }
 
   export type CarerOrderByWithRelationInput = {
@@ -10164,6 +13560,7 @@ export namespace Prisma {
     updated_at?: SortOrder
     deleted_at?: SortOrderInput | SortOrder
     visits?: VisitOrderByRelationAggregateInput
+    approved_summaries?: HealthSummaryOrderByRelationAggregateInput
   }
 
   export type CarerWhereUniqueInput = Prisma.AtLeast<{
@@ -10181,6 +13578,7 @@ export namespace Prisma {
     updated_at?: DateTimeFilter<"Carer"> | Date | string
     deleted_at?: DateTimeNullableFilter<"Carer"> | Date | string | null
     visits?: VisitListRelationFilter
+    approved_summaries?: HealthSummaryListRelationFilter
   }, "id" | "email">
 
   export type CarerOrderByWithAggregationInput = {
@@ -10226,11 +13624,14 @@ export namespace Prisma {
     city?: StringFilter<"Client"> | string
     postcode?: StringFilter<"Client"> | string
     date_of_birth?: DateTimeNullableFilter<"Client"> | Date | string | null
+    organization_id?: StringNullableFilter<"Client"> | string | null
     created_at?: DateTimeFilter<"Client"> | Date | string
     updated_at?: DateTimeFilter<"Client"> | Date | string
     deleted_at?: DateTimeNullableFilter<"Client"> | Date | string | null
     visits?: VisitListRelationFilter
     prescriptions?: PrescriptionListRelationFilter
+    organization?: XOR<OrganizationNullableRelationFilter, OrganizationWhereInput> | null
+    health_summaries?: HealthSummaryListRelationFilter
   }
 
   export type ClientOrderByWithRelationInput = {
@@ -10241,11 +13642,14 @@ export namespace Prisma {
     city?: SortOrder
     postcode?: SortOrder
     date_of_birth?: SortOrderInput | SortOrder
+    organization_id?: SortOrderInput | SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
     deleted_at?: SortOrderInput | SortOrder
     visits?: VisitOrderByRelationAggregateInput
     prescriptions?: PrescriptionOrderByRelationAggregateInput
+    organization?: OrganizationOrderByWithRelationInput
+    health_summaries?: HealthSummaryOrderByRelationAggregateInput
   }
 
   export type ClientWhereUniqueInput = Prisma.AtLeast<{
@@ -10259,11 +13663,14 @@ export namespace Prisma {
     city?: StringFilter<"Client"> | string
     postcode?: StringFilter<"Client"> | string
     date_of_birth?: DateTimeNullableFilter<"Client"> | Date | string | null
+    organization_id?: StringNullableFilter<"Client"> | string | null
     created_at?: DateTimeFilter<"Client"> | Date | string
     updated_at?: DateTimeFilter<"Client"> | Date | string
     deleted_at?: DateTimeNullableFilter<"Client"> | Date | string | null
     visits?: VisitListRelationFilter
     prescriptions?: PrescriptionListRelationFilter
+    organization?: XOR<OrganizationNullableRelationFilter, OrganizationWhereInput> | null
+    health_summaries?: HealthSummaryListRelationFilter
   }, "id">
 
   export type ClientOrderByWithAggregationInput = {
@@ -10274,6 +13681,7 @@ export namespace Prisma {
     city?: SortOrder
     postcode?: SortOrder
     date_of_birth?: SortOrderInput | SortOrder
+    organization_id?: SortOrderInput | SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
     deleted_at?: SortOrderInput | SortOrder
@@ -10293,6 +13701,7 @@ export namespace Prisma {
     city?: StringWithAggregatesFilter<"Client"> | string
     postcode?: StringWithAggregatesFilter<"Client"> | string
     date_of_birth?: DateTimeNullableWithAggregatesFilter<"Client"> | Date | string | null
+    organization_id?: StringNullableWithAggregatesFilter<"Client"> | string | null
     created_at?: DateTimeWithAggregatesFilter<"Client"> | Date | string
     updated_at?: DateTimeWithAggregatesFilter<"Client"> | Date | string
     deleted_at?: DateTimeNullableWithAggregatesFilter<"Client"> | Date | string | null
@@ -10318,6 +13727,7 @@ export namespace Prisma {
     client?: XOR<ClientRelationFilter, ClientWhereInput>
     tasks?: VisitTaskListRelationFilter
     medication_administrations?: MedicationAdministrationListRelationFilter
+    log_embeddings?: LogEmbeddingListRelationFilter
   }
 
   export type VisitOrderByWithRelationInput = {
@@ -10337,6 +13747,7 @@ export namespace Prisma {
     client?: ClientOrderByWithRelationInput
     tasks?: VisitTaskOrderByRelationAggregateInput
     medication_administrations?: MedicationAdministrationOrderByRelationAggregateInput
+    log_embeddings?: LogEmbeddingOrderByRelationAggregateInput
   }
 
   export type VisitWhereUniqueInput = Prisma.AtLeast<{
@@ -10359,6 +13770,7 @@ export namespace Prisma {
     client?: XOR<ClientRelationFilter, ClientWhereInput>
     tasks?: VisitTaskListRelationFilter
     medication_administrations?: MedicationAdministrationListRelationFilter
+    log_embeddings?: LogEmbeddingListRelationFilter
   }, "id">
 
   export type VisitOrderByWithAggregationInput = {
@@ -10817,6 +14229,229 @@ export namespace Prisma {
     timestamp?: DateTimeWithAggregatesFilter<"MedicationAudit"> | Date | string
   }
 
+  export type OrganizationWhereInput = {
+    AND?: OrganizationWhereInput | OrganizationWhereInput[]
+    OR?: OrganizationWhereInput[]
+    NOT?: OrganizationWhereInput | OrganizationWhereInput[]
+    id?: StringFilter<"Organization"> | string
+    name?: StringFilter<"Organization"> | string
+    ai_summary_enabled?: BoolFilter<"Organization"> | boolean
+    created_at?: DateTimeFilter<"Organization"> | Date | string
+    updated_at?: DateTimeFilter<"Organization"> | Date | string
+    clients?: ClientListRelationFilter
+  }
+
+  export type OrganizationOrderByWithRelationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    ai_summary_enabled?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    clients?: ClientOrderByRelationAggregateInput
+  }
+
+  export type OrganizationWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: OrganizationWhereInput | OrganizationWhereInput[]
+    OR?: OrganizationWhereInput[]
+    NOT?: OrganizationWhereInput | OrganizationWhereInput[]
+    name?: StringFilter<"Organization"> | string
+    ai_summary_enabled?: BoolFilter<"Organization"> | boolean
+    created_at?: DateTimeFilter<"Organization"> | Date | string
+    updated_at?: DateTimeFilter<"Organization"> | Date | string
+    clients?: ClientListRelationFilter
+  }, "id">
+
+  export type OrganizationOrderByWithAggregationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    ai_summary_enabled?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    _count?: OrganizationCountOrderByAggregateInput
+    _max?: OrganizationMaxOrderByAggregateInput
+    _min?: OrganizationMinOrderByAggregateInput
+  }
+
+  export type OrganizationScalarWhereWithAggregatesInput = {
+    AND?: OrganizationScalarWhereWithAggregatesInput | OrganizationScalarWhereWithAggregatesInput[]
+    OR?: OrganizationScalarWhereWithAggregatesInput[]
+    NOT?: OrganizationScalarWhereWithAggregatesInput | OrganizationScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"Organization"> | string
+    name?: StringWithAggregatesFilter<"Organization"> | string
+    ai_summary_enabled?: BoolWithAggregatesFilter<"Organization"> | boolean
+    created_at?: DateTimeWithAggregatesFilter<"Organization"> | Date | string
+    updated_at?: DateTimeWithAggregatesFilter<"Organization"> | Date | string
+  }
+
+  export type LogEmbeddingWhereInput = {
+    AND?: LogEmbeddingWhereInput | LogEmbeddingWhereInput[]
+    OR?: LogEmbeddingWhereInput[]
+    NOT?: LogEmbeddingWhereInput | LogEmbeddingWhereInput[]
+    id?: StringFilter<"LogEmbedding"> | string
+    visit_id?: StringFilter<"LogEmbedding"> | string
+    log_type?: StringFilter<"LogEmbedding"> | string
+    log_timestamp?: DateTimeFilter<"LogEmbedding"> | Date | string
+    raw_data?: JsonFilter<"LogEmbedding">
+    created_at?: DateTimeFilter<"LogEmbedding"> | Date | string
+    updated_at?: DateTimeFilter<"LogEmbedding"> | Date | string
+    visit?: XOR<VisitRelationFilter, VisitWhereInput>
+  }
+
+  export type LogEmbeddingOrderByWithRelationInput = {
+    id?: SortOrder
+    visit_id?: SortOrder
+    log_type?: SortOrder
+    log_timestamp?: SortOrder
+    raw_data?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    visit?: VisitOrderByWithRelationInput
+  }
+
+  export type LogEmbeddingWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: LogEmbeddingWhereInput | LogEmbeddingWhereInput[]
+    OR?: LogEmbeddingWhereInput[]
+    NOT?: LogEmbeddingWhereInput | LogEmbeddingWhereInput[]
+    visit_id?: StringFilter<"LogEmbedding"> | string
+    log_type?: StringFilter<"LogEmbedding"> | string
+    log_timestamp?: DateTimeFilter<"LogEmbedding"> | Date | string
+    raw_data?: JsonFilter<"LogEmbedding">
+    created_at?: DateTimeFilter<"LogEmbedding"> | Date | string
+    updated_at?: DateTimeFilter<"LogEmbedding"> | Date | string
+    visit?: XOR<VisitRelationFilter, VisitWhereInput>
+  }, "id">
+
+  export type LogEmbeddingOrderByWithAggregationInput = {
+    id?: SortOrder
+    visit_id?: SortOrder
+    log_type?: SortOrder
+    log_timestamp?: SortOrder
+    raw_data?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    _count?: LogEmbeddingCountOrderByAggregateInput
+    _max?: LogEmbeddingMaxOrderByAggregateInput
+    _min?: LogEmbeddingMinOrderByAggregateInput
+  }
+
+  export type LogEmbeddingScalarWhereWithAggregatesInput = {
+    AND?: LogEmbeddingScalarWhereWithAggregatesInput | LogEmbeddingScalarWhereWithAggregatesInput[]
+    OR?: LogEmbeddingScalarWhereWithAggregatesInput[]
+    NOT?: LogEmbeddingScalarWhereWithAggregatesInput | LogEmbeddingScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"LogEmbedding"> | string
+    visit_id?: StringWithAggregatesFilter<"LogEmbedding"> | string
+    log_type?: StringWithAggregatesFilter<"LogEmbedding"> | string
+    log_timestamp?: DateTimeWithAggregatesFilter<"LogEmbedding"> | Date | string
+    raw_data?: JsonWithAggregatesFilter<"LogEmbedding">
+    created_at?: DateTimeWithAggregatesFilter<"LogEmbedding"> | Date | string
+    updated_at?: DateTimeWithAggregatesFilter<"LogEmbedding"> | Date | string
+  }
+
+  export type HealthSummaryWhereInput = {
+    AND?: HealthSummaryWhereInput | HealthSummaryWhereInput[]
+    OR?: HealthSummaryWhereInput[]
+    NOT?: HealthSummaryWhereInput | HealthSummaryWhereInput[]
+    id?: StringFilter<"HealthSummary"> | string
+    client_id?: StringFilter<"HealthSummary"> | string
+    period_start?: DateTimeFilter<"HealthSummary"> | Date | string
+    period_end?: DateTimeFilter<"HealthSummary"> | Date | string
+    summary_json?: JsonFilter<"HealthSummary">
+    risk_levels?: JsonFilter<"HealthSummary">
+    generated_at?: DateTimeFilter<"HealthSummary"> | Date | string
+    generated_by?: StringFilter<"HealthSummary"> | string
+    approved_by?: StringNullableFilter<"HealthSummary"> | string | null
+    approved_at?: DateTimeNullableFilter<"HealthSummary"> | Date | string | null
+    feedback?: StringNullableFilter<"HealthSummary"> | string | null
+    expires_at?: DateTimeFilter<"HealthSummary"> | Date | string
+    created_at?: DateTimeFilter<"HealthSummary"> | Date | string
+    updated_at?: DateTimeFilter<"HealthSummary"> | Date | string
+    client?: XOR<ClientRelationFilter, ClientWhereInput>
+    approver?: XOR<CarerNullableRelationFilter, CarerWhereInput> | null
+  }
+
+  export type HealthSummaryOrderByWithRelationInput = {
+    id?: SortOrder
+    client_id?: SortOrder
+    period_start?: SortOrder
+    period_end?: SortOrder
+    summary_json?: SortOrder
+    risk_levels?: SortOrder
+    generated_at?: SortOrder
+    generated_by?: SortOrder
+    approved_by?: SortOrderInput | SortOrder
+    approved_at?: SortOrderInput | SortOrder
+    feedback?: SortOrderInput | SortOrder
+    expires_at?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    client?: ClientOrderByWithRelationInput
+    approver?: CarerOrderByWithRelationInput
+  }
+
+  export type HealthSummaryWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: HealthSummaryWhereInput | HealthSummaryWhereInput[]
+    OR?: HealthSummaryWhereInput[]
+    NOT?: HealthSummaryWhereInput | HealthSummaryWhereInput[]
+    client_id?: StringFilter<"HealthSummary"> | string
+    period_start?: DateTimeFilter<"HealthSummary"> | Date | string
+    period_end?: DateTimeFilter<"HealthSummary"> | Date | string
+    summary_json?: JsonFilter<"HealthSummary">
+    risk_levels?: JsonFilter<"HealthSummary">
+    generated_at?: DateTimeFilter<"HealthSummary"> | Date | string
+    generated_by?: StringFilter<"HealthSummary"> | string
+    approved_by?: StringNullableFilter<"HealthSummary"> | string | null
+    approved_at?: DateTimeNullableFilter<"HealthSummary"> | Date | string | null
+    feedback?: StringNullableFilter<"HealthSummary"> | string | null
+    expires_at?: DateTimeFilter<"HealthSummary"> | Date | string
+    created_at?: DateTimeFilter<"HealthSummary"> | Date | string
+    updated_at?: DateTimeFilter<"HealthSummary"> | Date | string
+    client?: XOR<ClientRelationFilter, ClientWhereInput>
+    approver?: XOR<CarerNullableRelationFilter, CarerWhereInput> | null
+  }, "id">
+
+  export type HealthSummaryOrderByWithAggregationInput = {
+    id?: SortOrder
+    client_id?: SortOrder
+    period_start?: SortOrder
+    period_end?: SortOrder
+    summary_json?: SortOrder
+    risk_levels?: SortOrder
+    generated_at?: SortOrder
+    generated_by?: SortOrder
+    approved_by?: SortOrderInput | SortOrder
+    approved_at?: SortOrderInput | SortOrder
+    feedback?: SortOrderInput | SortOrder
+    expires_at?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    _count?: HealthSummaryCountOrderByAggregateInput
+    _max?: HealthSummaryMaxOrderByAggregateInput
+    _min?: HealthSummaryMinOrderByAggregateInput
+  }
+
+  export type HealthSummaryScalarWhereWithAggregatesInput = {
+    AND?: HealthSummaryScalarWhereWithAggregatesInput | HealthSummaryScalarWhereWithAggregatesInput[]
+    OR?: HealthSummaryScalarWhereWithAggregatesInput[]
+    NOT?: HealthSummaryScalarWhereWithAggregatesInput | HealthSummaryScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"HealthSummary"> | string
+    client_id?: StringWithAggregatesFilter<"HealthSummary"> | string
+    period_start?: DateTimeWithAggregatesFilter<"HealthSummary"> | Date | string
+    period_end?: DateTimeWithAggregatesFilter<"HealthSummary"> | Date | string
+    summary_json?: JsonWithAggregatesFilter<"HealthSummary">
+    risk_levels?: JsonWithAggregatesFilter<"HealthSummary">
+    generated_at?: DateTimeWithAggregatesFilter<"HealthSummary"> | Date | string
+    generated_by?: StringWithAggregatesFilter<"HealthSummary"> | string
+    approved_by?: StringNullableWithAggregatesFilter<"HealthSummary"> | string | null
+    approved_at?: DateTimeNullableWithAggregatesFilter<"HealthSummary"> | Date | string | null
+    feedback?: StringNullableWithAggregatesFilter<"HealthSummary"> | string | null
+    expires_at?: DateTimeWithAggregatesFilter<"HealthSummary"> | Date | string
+    created_at?: DateTimeWithAggregatesFilter<"HealthSummary"> | Date | string
+    updated_at?: DateTimeWithAggregatesFilter<"HealthSummary"> | Date | string
+  }
+
   export type CarerCreateInput = {
     id?: string
     first_name: string
@@ -10829,6 +14464,7 @@ export namespace Prisma {
     updated_at?: Date | string
     deleted_at?: Date | string | null
     visits?: VisitCreateNestedManyWithoutCarerInput
+    approved_summaries?: HealthSummaryCreateNestedManyWithoutApproverInput
   }
 
   export type CarerUncheckedCreateInput = {
@@ -10843,6 +14479,7 @@ export namespace Prisma {
     updated_at?: Date | string
     deleted_at?: Date | string | null
     visits?: VisitUncheckedCreateNestedManyWithoutCarerInput
+    approved_summaries?: HealthSummaryUncheckedCreateNestedManyWithoutApproverInput
   }
 
   export type CarerUpdateInput = {
@@ -10857,6 +14494,7 @@ export namespace Prisma {
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     visits?: VisitUpdateManyWithoutCarerNestedInput
+    approved_summaries?: HealthSummaryUpdateManyWithoutApproverNestedInput
   }
 
   export type CarerUncheckedUpdateInput = {
@@ -10871,6 +14509,7 @@ export namespace Prisma {
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     visits?: VisitUncheckedUpdateManyWithoutCarerNestedInput
+    approved_summaries?: HealthSummaryUncheckedUpdateManyWithoutApproverNestedInput
   }
 
   export type CarerCreateManyInput = {
@@ -10925,6 +14564,8 @@ export namespace Prisma {
     deleted_at?: Date | string | null
     visits?: VisitCreateNestedManyWithoutClientInput
     prescriptions?: PrescriptionCreateNestedManyWithoutClientInput
+    organization?: OrganizationCreateNestedOneWithoutClientsInput
+    health_summaries?: HealthSummaryCreateNestedManyWithoutClientInput
   }
 
   export type ClientUncheckedCreateInput = {
@@ -10935,11 +14576,13 @@ export namespace Prisma {
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    organization_id?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
     visits?: VisitUncheckedCreateNestedManyWithoutClientInput
     prescriptions?: PrescriptionUncheckedCreateNestedManyWithoutClientInput
+    health_summaries?: HealthSummaryUncheckedCreateNestedManyWithoutClientInput
   }
 
   export type ClientUpdateInput = {
@@ -10955,6 +14598,8 @@ export namespace Prisma {
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     visits?: VisitUpdateManyWithoutClientNestedInput
     prescriptions?: PrescriptionUpdateManyWithoutClientNestedInput
+    organization?: OrganizationUpdateOneWithoutClientsNestedInput
+    health_summaries?: HealthSummaryUpdateManyWithoutClientNestedInput
   }
 
   export type ClientUncheckedUpdateInput = {
@@ -10965,11 +14610,13 @@ export namespace Prisma {
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     visits?: VisitUncheckedUpdateManyWithoutClientNestedInput
     prescriptions?: PrescriptionUncheckedUpdateManyWithoutClientNestedInput
+    health_summaries?: HealthSummaryUncheckedUpdateManyWithoutClientNestedInput
   }
 
   export type ClientCreateManyInput = {
@@ -10980,6 +14627,7 @@ export namespace Prisma {
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    organization_id?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
@@ -11006,6 +14654,7 @@ export namespace Prisma {
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -11026,6 +14675,7 @@ export namespace Prisma {
     client: ClientCreateNestedOneWithoutVisitsInput
     tasks?: VisitTaskCreateNestedManyWithoutVisitInput
     medication_administrations?: MedicationAdministrationCreateNestedManyWithoutVisitInput
+    log_embeddings?: LogEmbeddingCreateNestedManyWithoutVisitInput
   }
 
   export type VisitUncheckedCreateInput = {
@@ -11043,6 +14693,7 @@ export namespace Prisma {
     deleted_at?: Date | string | null
     tasks?: VisitTaskUncheckedCreateNestedManyWithoutVisitInput
     medication_administrations?: MedicationAdministrationUncheckedCreateNestedManyWithoutVisitInput
+    log_embeddings?: LogEmbeddingUncheckedCreateNestedManyWithoutVisitInput
   }
 
   export type VisitUpdateInput = {
@@ -11060,6 +14711,7 @@ export namespace Prisma {
     client?: ClientUpdateOneRequiredWithoutVisitsNestedInput
     tasks?: VisitTaskUpdateManyWithoutVisitNestedInput
     medication_administrations?: MedicationAdministrationUpdateManyWithoutVisitNestedInput
+    log_embeddings?: LogEmbeddingUpdateManyWithoutVisitNestedInput
   }
 
   export type VisitUncheckedUpdateInput = {
@@ -11077,6 +14729,7 @@ export namespace Prisma {
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     tasks?: VisitTaskUncheckedUpdateManyWithoutVisitNestedInput
     medication_administrations?: MedicationAdministrationUncheckedUpdateManyWithoutVisitNestedInput
+    log_embeddings?: LogEmbeddingUncheckedUpdateManyWithoutVisitNestedInput
   }
 
   export type VisitCreateManyInput = {
@@ -11586,6 +15239,252 @@ export namespace Prisma {
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type OrganizationCreateInput = {
+    id?: string
+    name: string
+    ai_summary_enabled?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+    clients?: ClientCreateNestedManyWithoutOrganizationInput
+  }
+
+  export type OrganizationUncheckedCreateInput = {
+    id?: string
+    name: string
+    ai_summary_enabled?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+    clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
+  }
+
+  export type OrganizationUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    clients?: ClientUpdateManyWithoutOrganizationNestedInput
+  }
+
+  export type OrganizationUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
+  }
+
+  export type OrganizationCreateManyInput = {
+    id?: string
+    name: string
+    ai_summary_enabled?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type OrganizationUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type OrganizationUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type LogEmbeddingCreateInput = {
+    id?: string
+    log_type: string
+    log_timestamp: Date | string
+    raw_data: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+    visit: VisitCreateNestedOneWithoutLog_embeddingsInput
+  }
+
+  export type LogEmbeddingUncheckedCreateInput = {
+    id?: string
+    visit_id: string
+    log_type: string
+    log_timestamp: Date | string
+    raw_data: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type LogEmbeddingUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    log_type?: StringFieldUpdateOperationsInput | string
+    log_timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    raw_data?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    visit?: VisitUpdateOneRequiredWithoutLog_embeddingsNestedInput
+  }
+
+  export type LogEmbeddingUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    visit_id?: StringFieldUpdateOperationsInput | string
+    log_type?: StringFieldUpdateOperationsInput | string
+    log_timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    raw_data?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type LogEmbeddingCreateManyInput = {
+    id?: string
+    visit_id: string
+    log_type: string
+    log_timestamp: Date | string
+    raw_data: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type LogEmbeddingUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    log_type?: StringFieldUpdateOperationsInput | string
+    log_timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    raw_data?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type LogEmbeddingUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    visit_id?: StringFieldUpdateOperationsInput | string
+    log_type?: StringFieldUpdateOperationsInput | string
+    log_timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    raw_data?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type HealthSummaryCreateInput = {
+    id?: string
+    period_start: Date | string
+    period_end: Date | string
+    summary_json: JsonNullValueInput | InputJsonValue
+    risk_levels: JsonNullValueInput | InputJsonValue
+    generated_at: Date | string
+    generated_by?: string
+    approved_at?: Date | string | null
+    feedback?: string | null
+    expires_at?: Date | string
+    created_at?: Date | string
+    updated_at?: Date | string
+    client: ClientCreateNestedOneWithoutHealth_summariesInput
+    approver?: CarerCreateNestedOneWithoutApproved_summariesInput
+  }
+
+  export type HealthSummaryUncheckedCreateInput = {
+    id?: string
+    client_id: string
+    period_start: Date | string
+    period_end: Date | string
+    summary_json: JsonNullValueInput | InputJsonValue
+    risk_levels: JsonNullValueInput | InputJsonValue
+    generated_at: Date | string
+    generated_by?: string
+    approved_by?: string | null
+    approved_at?: Date | string | null
+    feedback?: string | null
+    expires_at?: Date | string
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type HealthSummaryUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    period_start?: DateTimeFieldUpdateOperationsInput | Date | string
+    period_end?: DateTimeFieldUpdateOperationsInput | Date | string
+    summary_json?: JsonNullValueInput | InputJsonValue
+    risk_levels?: JsonNullValueInput | InputJsonValue
+    generated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    generated_by?: StringFieldUpdateOperationsInput | string
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    feedback?: NullableStringFieldUpdateOperationsInput | string | null
+    expires_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    client?: ClientUpdateOneRequiredWithoutHealth_summariesNestedInput
+    approver?: CarerUpdateOneWithoutApproved_summariesNestedInput
+  }
+
+  export type HealthSummaryUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    client_id?: StringFieldUpdateOperationsInput | string
+    period_start?: DateTimeFieldUpdateOperationsInput | Date | string
+    period_end?: DateTimeFieldUpdateOperationsInput | Date | string
+    summary_json?: JsonNullValueInput | InputJsonValue
+    risk_levels?: JsonNullValueInput | InputJsonValue
+    generated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    generated_by?: StringFieldUpdateOperationsInput | string
+    approved_by?: NullableStringFieldUpdateOperationsInput | string | null
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    feedback?: NullableStringFieldUpdateOperationsInput | string | null
+    expires_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type HealthSummaryCreateManyInput = {
+    id?: string
+    client_id: string
+    period_start: Date | string
+    period_end: Date | string
+    summary_json: JsonNullValueInput | InputJsonValue
+    risk_levels: JsonNullValueInput | InputJsonValue
+    generated_at: Date | string
+    generated_by?: string
+    approved_by?: string | null
+    approved_at?: Date | string | null
+    feedback?: string | null
+    expires_at?: Date | string
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type HealthSummaryUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    period_start?: DateTimeFieldUpdateOperationsInput | Date | string
+    period_end?: DateTimeFieldUpdateOperationsInput | Date | string
+    summary_json?: JsonNullValueInput | InputJsonValue
+    risk_levels?: JsonNullValueInput | InputJsonValue
+    generated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    generated_by?: StringFieldUpdateOperationsInput | string
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    feedback?: NullableStringFieldUpdateOperationsInput | string | null
+    expires_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type HealthSummaryUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    client_id?: StringFieldUpdateOperationsInput | string
+    period_start?: DateTimeFieldUpdateOperationsInput | Date | string
+    period_end?: DateTimeFieldUpdateOperationsInput | Date | string
+    summary_json?: JsonNullValueInput | InputJsonValue
+    risk_levels?: JsonNullValueInput | InputJsonValue
+    generated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    generated_by?: StringFieldUpdateOperationsInput | string
+    approved_by?: NullableStringFieldUpdateOperationsInput | string | null
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    feedback?: NullableStringFieldUpdateOperationsInput | string | null
+    expires_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -11649,12 +15548,22 @@ export namespace Prisma {
     none?: VisitWhereInput
   }
 
+  export type HealthSummaryListRelationFilter = {
+    every?: HealthSummaryWhereInput
+    some?: HealthSummaryWhereInput
+    none?: HealthSummaryWhereInput
+  }
+
   export type SortOrderInput = {
     sort: SortOrder
     nulls?: NullsOrder
   }
 
   export type VisitOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type HealthSummaryOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -11775,6 +15684,11 @@ export namespace Prisma {
     none?: PrescriptionWhereInput
   }
 
+  export type OrganizationNullableRelationFilter = {
+    is?: OrganizationWhereInput | null
+    isNot?: OrganizationWhereInput | null
+  }
+
   export type PrescriptionOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
@@ -11787,6 +15701,7 @@ export namespace Prisma {
     city?: SortOrder
     postcode?: SortOrder
     date_of_birth?: SortOrder
+    organization_id?: SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
     deleted_at?: SortOrder
@@ -11800,6 +15715,7 @@ export namespace Prisma {
     city?: SortOrder
     postcode?: SortOrder
     date_of_birth?: SortOrder
+    organization_id?: SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
     deleted_at?: SortOrder
@@ -11813,6 +15729,7 @@ export namespace Prisma {
     city?: SortOrder
     postcode?: SortOrder
     date_of_birth?: SortOrder
+    organization_id?: SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
     deleted_at?: SortOrder
@@ -11847,11 +15764,21 @@ export namespace Prisma {
     none?: MedicationAdministrationWhereInput
   }
 
+  export type LogEmbeddingListRelationFilter = {
+    every?: LogEmbeddingWhereInput
+    some?: LogEmbeddingWhereInput
+    none?: LogEmbeddingWhereInput
+  }
+
   export type VisitTaskOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
   export type MedicationAdministrationOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type LogEmbeddingOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -12249,6 +16176,167 @@ export namespace Prisma {
     _max?: NestedEnumMedicationAuditActionFilter<$PrismaModel>
   }
 
+  export type ClientListRelationFilter = {
+    every?: ClientWhereInput
+    some?: ClientWhereInput
+    none?: ClientWhereInput
+  }
+
+  export type ClientOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type OrganizationCountOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    ai_summary_enabled?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type OrganizationMaxOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    ai_summary_enabled?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type OrganizationMinOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    ai_summary_enabled?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+  export type JsonFilter<$PrismaModel = never> = 
+    | PatchUndefined<
+        Either<Required<JsonFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
+
+  export type LogEmbeddingCountOrderByAggregateInput = {
+    id?: SortOrder
+    visit_id?: SortOrder
+    log_type?: SortOrder
+    log_timestamp?: SortOrder
+    raw_data?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type LogEmbeddingMaxOrderByAggregateInput = {
+    id?: SortOrder
+    visit_id?: SortOrder
+    log_type?: SortOrder
+    log_timestamp?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type LogEmbeddingMinOrderByAggregateInput = {
+    id?: SortOrder
+    visit_id?: SortOrder
+    log_type?: SortOrder
+    log_timestamp?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+  export type JsonWithAggregatesFilter<$PrismaModel = never> = 
+    | PatchUndefined<
+        Either<Required<JsonWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonWithAggregatesFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonWithAggregatesFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedJsonFilter<$PrismaModel>
+    _max?: NestedJsonFilter<$PrismaModel>
+  }
+
+  export type CarerNullableRelationFilter = {
+    is?: CarerWhereInput | null
+    isNot?: CarerWhereInput | null
+  }
+
+  export type HealthSummaryCountOrderByAggregateInput = {
+    id?: SortOrder
+    client_id?: SortOrder
+    period_start?: SortOrder
+    period_end?: SortOrder
+    summary_json?: SortOrder
+    risk_levels?: SortOrder
+    generated_at?: SortOrder
+    generated_by?: SortOrder
+    approved_by?: SortOrder
+    approved_at?: SortOrder
+    feedback?: SortOrder
+    expires_at?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type HealthSummaryMaxOrderByAggregateInput = {
+    id?: SortOrder
+    client_id?: SortOrder
+    period_start?: SortOrder
+    period_end?: SortOrder
+    generated_at?: SortOrder
+    generated_by?: SortOrder
+    approved_by?: SortOrder
+    approved_at?: SortOrder
+    feedback?: SortOrder
+    expires_at?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type HealthSummaryMinOrderByAggregateInput = {
+    id?: SortOrder
+    client_id?: SortOrder
+    period_start?: SortOrder
+    period_end?: SortOrder
+    generated_at?: SortOrder
+    generated_by?: SortOrder
+    approved_by?: SortOrder
+    approved_at?: SortOrder
+    feedback?: SortOrder
+    expires_at?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
   export type VisitCreateNestedManyWithoutCarerInput = {
     create?: XOR<VisitCreateWithoutCarerInput, VisitUncheckedCreateWithoutCarerInput> | VisitCreateWithoutCarerInput[] | VisitUncheckedCreateWithoutCarerInput[]
     connectOrCreate?: VisitCreateOrConnectWithoutCarerInput | VisitCreateOrConnectWithoutCarerInput[]
@@ -12256,11 +16344,25 @@ export namespace Prisma {
     connect?: VisitWhereUniqueInput | VisitWhereUniqueInput[]
   }
 
+  export type HealthSummaryCreateNestedManyWithoutApproverInput = {
+    create?: XOR<HealthSummaryCreateWithoutApproverInput, HealthSummaryUncheckedCreateWithoutApproverInput> | HealthSummaryCreateWithoutApproverInput[] | HealthSummaryUncheckedCreateWithoutApproverInput[]
+    connectOrCreate?: HealthSummaryCreateOrConnectWithoutApproverInput | HealthSummaryCreateOrConnectWithoutApproverInput[]
+    createMany?: HealthSummaryCreateManyApproverInputEnvelope
+    connect?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+  }
+
   export type VisitUncheckedCreateNestedManyWithoutCarerInput = {
     create?: XOR<VisitCreateWithoutCarerInput, VisitUncheckedCreateWithoutCarerInput> | VisitCreateWithoutCarerInput[] | VisitUncheckedCreateWithoutCarerInput[]
     connectOrCreate?: VisitCreateOrConnectWithoutCarerInput | VisitCreateOrConnectWithoutCarerInput[]
     createMany?: VisitCreateManyCarerInputEnvelope
     connect?: VisitWhereUniqueInput | VisitWhereUniqueInput[]
+  }
+
+  export type HealthSummaryUncheckedCreateNestedManyWithoutApproverInput = {
+    create?: XOR<HealthSummaryCreateWithoutApproverInput, HealthSummaryUncheckedCreateWithoutApproverInput> | HealthSummaryCreateWithoutApproverInput[] | HealthSummaryUncheckedCreateWithoutApproverInput[]
+    connectOrCreate?: HealthSummaryCreateOrConnectWithoutApproverInput | HealthSummaryCreateOrConnectWithoutApproverInput[]
+    createMany?: HealthSummaryCreateManyApproverInputEnvelope
+    connect?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -12297,6 +16399,20 @@ export namespace Prisma {
     deleteMany?: VisitScalarWhereInput | VisitScalarWhereInput[]
   }
 
+  export type HealthSummaryUpdateManyWithoutApproverNestedInput = {
+    create?: XOR<HealthSummaryCreateWithoutApproverInput, HealthSummaryUncheckedCreateWithoutApproverInput> | HealthSummaryCreateWithoutApproverInput[] | HealthSummaryUncheckedCreateWithoutApproverInput[]
+    connectOrCreate?: HealthSummaryCreateOrConnectWithoutApproverInput | HealthSummaryCreateOrConnectWithoutApproverInput[]
+    upsert?: HealthSummaryUpsertWithWhereUniqueWithoutApproverInput | HealthSummaryUpsertWithWhereUniqueWithoutApproverInput[]
+    createMany?: HealthSummaryCreateManyApproverInputEnvelope
+    set?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    disconnect?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    delete?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    connect?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    update?: HealthSummaryUpdateWithWhereUniqueWithoutApproverInput | HealthSummaryUpdateWithWhereUniqueWithoutApproverInput[]
+    updateMany?: HealthSummaryUpdateManyWithWhereWithoutApproverInput | HealthSummaryUpdateManyWithWhereWithoutApproverInput[]
+    deleteMany?: HealthSummaryScalarWhereInput | HealthSummaryScalarWhereInput[]
+  }
+
   export type VisitUncheckedUpdateManyWithoutCarerNestedInput = {
     create?: XOR<VisitCreateWithoutCarerInput, VisitUncheckedCreateWithoutCarerInput> | VisitCreateWithoutCarerInput[] | VisitUncheckedCreateWithoutCarerInput[]
     connectOrCreate?: VisitCreateOrConnectWithoutCarerInput | VisitCreateOrConnectWithoutCarerInput[]
@@ -12309,6 +16425,20 @@ export namespace Prisma {
     update?: VisitUpdateWithWhereUniqueWithoutCarerInput | VisitUpdateWithWhereUniqueWithoutCarerInput[]
     updateMany?: VisitUpdateManyWithWhereWithoutCarerInput | VisitUpdateManyWithWhereWithoutCarerInput[]
     deleteMany?: VisitScalarWhereInput | VisitScalarWhereInput[]
+  }
+
+  export type HealthSummaryUncheckedUpdateManyWithoutApproverNestedInput = {
+    create?: XOR<HealthSummaryCreateWithoutApproverInput, HealthSummaryUncheckedCreateWithoutApproverInput> | HealthSummaryCreateWithoutApproverInput[] | HealthSummaryUncheckedCreateWithoutApproverInput[]
+    connectOrCreate?: HealthSummaryCreateOrConnectWithoutApproverInput | HealthSummaryCreateOrConnectWithoutApproverInput[]
+    upsert?: HealthSummaryUpsertWithWhereUniqueWithoutApproverInput | HealthSummaryUpsertWithWhereUniqueWithoutApproverInput[]
+    createMany?: HealthSummaryCreateManyApproverInputEnvelope
+    set?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    disconnect?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    delete?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    connect?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    update?: HealthSummaryUpdateWithWhereUniqueWithoutApproverInput | HealthSummaryUpdateWithWhereUniqueWithoutApproverInput[]
+    updateMany?: HealthSummaryUpdateManyWithWhereWithoutApproverInput | HealthSummaryUpdateManyWithWhereWithoutApproverInput[]
+    deleteMany?: HealthSummaryScalarWhereInput | HealthSummaryScalarWhereInput[]
   }
 
   export type VisitCreateNestedManyWithoutClientInput = {
@@ -12325,6 +16455,19 @@ export namespace Prisma {
     connect?: PrescriptionWhereUniqueInput | PrescriptionWhereUniqueInput[]
   }
 
+  export type OrganizationCreateNestedOneWithoutClientsInput = {
+    create?: XOR<OrganizationCreateWithoutClientsInput, OrganizationUncheckedCreateWithoutClientsInput>
+    connectOrCreate?: OrganizationCreateOrConnectWithoutClientsInput
+    connect?: OrganizationWhereUniqueInput
+  }
+
+  export type HealthSummaryCreateNestedManyWithoutClientInput = {
+    create?: XOR<HealthSummaryCreateWithoutClientInput, HealthSummaryUncheckedCreateWithoutClientInput> | HealthSummaryCreateWithoutClientInput[] | HealthSummaryUncheckedCreateWithoutClientInput[]
+    connectOrCreate?: HealthSummaryCreateOrConnectWithoutClientInput | HealthSummaryCreateOrConnectWithoutClientInput[]
+    createMany?: HealthSummaryCreateManyClientInputEnvelope
+    connect?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+  }
+
   export type VisitUncheckedCreateNestedManyWithoutClientInput = {
     create?: XOR<VisitCreateWithoutClientInput, VisitUncheckedCreateWithoutClientInput> | VisitCreateWithoutClientInput[] | VisitUncheckedCreateWithoutClientInput[]
     connectOrCreate?: VisitCreateOrConnectWithoutClientInput | VisitCreateOrConnectWithoutClientInput[]
@@ -12337,6 +16480,13 @@ export namespace Prisma {
     connectOrCreate?: PrescriptionCreateOrConnectWithoutClientInput | PrescriptionCreateOrConnectWithoutClientInput[]
     createMany?: PrescriptionCreateManyClientInputEnvelope
     connect?: PrescriptionWhereUniqueInput | PrescriptionWhereUniqueInput[]
+  }
+
+  export type HealthSummaryUncheckedCreateNestedManyWithoutClientInput = {
+    create?: XOR<HealthSummaryCreateWithoutClientInput, HealthSummaryUncheckedCreateWithoutClientInput> | HealthSummaryCreateWithoutClientInput[] | HealthSummaryUncheckedCreateWithoutClientInput[]
+    connectOrCreate?: HealthSummaryCreateOrConnectWithoutClientInput | HealthSummaryCreateOrConnectWithoutClientInput[]
+    createMany?: HealthSummaryCreateManyClientInputEnvelope
+    connect?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
   }
 
   export type VisitUpdateManyWithoutClientNestedInput = {
@@ -12367,6 +16517,30 @@ export namespace Prisma {
     deleteMany?: PrescriptionScalarWhereInput | PrescriptionScalarWhereInput[]
   }
 
+  export type OrganizationUpdateOneWithoutClientsNestedInput = {
+    create?: XOR<OrganizationCreateWithoutClientsInput, OrganizationUncheckedCreateWithoutClientsInput>
+    connectOrCreate?: OrganizationCreateOrConnectWithoutClientsInput
+    upsert?: OrganizationUpsertWithoutClientsInput
+    disconnect?: OrganizationWhereInput | boolean
+    delete?: OrganizationWhereInput | boolean
+    connect?: OrganizationWhereUniqueInput
+    update?: XOR<XOR<OrganizationUpdateToOneWithWhereWithoutClientsInput, OrganizationUpdateWithoutClientsInput>, OrganizationUncheckedUpdateWithoutClientsInput>
+  }
+
+  export type HealthSummaryUpdateManyWithoutClientNestedInput = {
+    create?: XOR<HealthSummaryCreateWithoutClientInput, HealthSummaryUncheckedCreateWithoutClientInput> | HealthSummaryCreateWithoutClientInput[] | HealthSummaryUncheckedCreateWithoutClientInput[]
+    connectOrCreate?: HealthSummaryCreateOrConnectWithoutClientInput | HealthSummaryCreateOrConnectWithoutClientInput[]
+    upsert?: HealthSummaryUpsertWithWhereUniqueWithoutClientInput | HealthSummaryUpsertWithWhereUniqueWithoutClientInput[]
+    createMany?: HealthSummaryCreateManyClientInputEnvelope
+    set?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    disconnect?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    delete?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    connect?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    update?: HealthSummaryUpdateWithWhereUniqueWithoutClientInput | HealthSummaryUpdateWithWhereUniqueWithoutClientInput[]
+    updateMany?: HealthSummaryUpdateManyWithWhereWithoutClientInput | HealthSummaryUpdateManyWithWhereWithoutClientInput[]
+    deleteMany?: HealthSummaryScalarWhereInput | HealthSummaryScalarWhereInput[]
+  }
+
   export type VisitUncheckedUpdateManyWithoutClientNestedInput = {
     create?: XOR<VisitCreateWithoutClientInput, VisitUncheckedCreateWithoutClientInput> | VisitCreateWithoutClientInput[] | VisitUncheckedCreateWithoutClientInput[]
     connectOrCreate?: VisitCreateOrConnectWithoutClientInput | VisitCreateOrConnectWithoutClientInput[]
@@ -12395,6 +16569,20 @@ export namespace Prisma {
     deleteMany?: PrescriptionScalarWhereInput | PrescriptionScalarWhereInput[]
   }
 
+  export type HealthSummaryUncheckedUpdateManyWithoutClientNestedInput = {
+    create?: XOR<HealthSummaryCreateWithoutClientInput, HealthSummaryUncheckedCreateWithoutClientInput> | HealthSummaryCreateWithoutClientInput[] | HealthSummaryUncheckedCreateWithoutClientInput[]
+    connectOrCreate?: HealthSummaryCreateOrConnectWithoutClientInput | HealthSummaryCreateOrConnectWithoutClientInput[]
+    upsert?: HealthSummaryUpsertWithWhereUniqueWithoutClientInput | HealthSummaryUpsertWithWhereUniqueWithoutClientInput[]
+    createMany?: HealthSummaryCreateManyClientInputEnvelope
+    set?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    disconnect?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    delete?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    connect?: HealthSummaryWhereUniqueInput | HealthSummaryWhereUniqueInput[]
+    update?: HealthSummaryUpdateWithWhereUniqueWithoutClientInput | HealthSummaryUpdateWithWhereUniqueWithoutClientInput[]
+    updateMany?: HealthSummaryUpdateManyWithWhereWithoutClientInput | HealthSummaryUpdateManyWithWhereWithoutClientInput[]
+    deleteMany?: HealthSummaryScalarWhereInput | HealthSummaryScalarWhereInput[]
+  }
+
   export type CarerCreateNestedOneWithoutVisitsInput = {
     create?: XOR<CarerCreateWithoutVisitsInput, CarerUncheckedCreateWithoutVisitsInput>
     connectOrCreate?: CarerCreateOrConnectWithoutVisitsInput
@@ -12421,6 +16609,13 @@ export namespace Prisma {
     connect?: MedicationAdministrationWhereUniqueInput | MedicationAdministrationWhereUniqueInput[]
   }
 
+  export type LogEmbeddingCreateNestedManyWithoutVisitInput = {
+    create?: XOR<LogEmbeddingCreateWithoutVisitInput, LogEmbeddingUncheckedCreateWithoutVisitInput> | LogEmbeddingCreateWithoutVisitInput[] | LogEmbeddingUncheckedCreateWithoutVisitInput[]
+    connectOrCreate?: LogEmbeddingCreateOrConnectWithoutVisitInput | LogEmbeddingCreateOrConnectWithoutVisitInput[]
+    createMany?: LogEmbeddingCreateManyVisitInputEnvelope
+    connect?: LogEmbeddingWhereUniqueInput | LogEmbeddingWhereUniqueInput[]
+  }
+
   export type VisitTaskUncheckedCreateNestedManyWithoutVisitInput = {
     create?: XOR<VisitTaskCreateWithoutVisitInput, VisitTaskUncheckedCreateWithoutVisitInput> | VisitTaskCreateWithoutVisitInput[] | VisitTaskUncheckedCreateWithoutVisitInput[]
     connectOrCreate?: VisitTaskCreateOrConnectWithoutVisitInput | VisitTaskCreateOrConnectWithoutVisitInput[]
@@ -12433,6 +16628,13 @@ export namespace Prisma {
     connectOrCreate?: MedicationAdministrationCreateOrConnectWithoutVisitInput | MedicationAdministrationCreateOrConnectWithoutVisitInput[]
     createMany?: MedicationAdministrationCreateManyVisitInputEnvelope
     connect?: MedicationAdministrationWhereUniqueInput | MedicationAdministrationWhereUniqueInput[]
+  }
+
+  export type LogEmbeddingUncheckedCreateNestedManyWithoutVisitInput = {
+    create?: XOR<LogEmbeddingCreateWithoutVisitInput, LogEmbeddingUncheckedCreateWithoutVisitInput> | LogEmbeddingCreateWithoutVisitInput[] | LogEmbeddingUncheckedCreateWithoutVisitInput[]
+    connectOrCreate?: LogEmbeddingCreateOrConnectWithoutVisitInput | LogEmbeddingCreateOrConnectWithoutVisitInput[]
+    createMany?: LogEmbeddingCreateManyVisitInputEnvelope
+    connect?: LogEmbeddingWhereUniqueInput | LogEmbeddingWhereUniqueInput[]
   }
 
   export type EnumVisitStatusFieldUpdateOperationsInput = {
@@ -12483,6 +16685,20 @@ export namespace Prisma {
     deleteMany?: MedicationAdministrationScalarWhereInput | MedicationAdministrationScalarWhereInput[]
   }
 
+  export type LogEmbeddingUpdateManyWithoutVisitNestedInput = {
+    create?: XOR<LogEmbeddingCreateWithoutVisitInput, LogEmbeddingUncheckedCreateWithoutVisitInput> | LogEmbeddingCreateWithoutVisitInput[] | LogEmbeddingUncheckedCreateWithoutVisitInput[]
+    connectOrCreate?: LogEmbeddingCreateOrConnectWithoutVisitInput | LogEmbeddingCreateOrConnectWithoutVisitInput[]
+    upsert?: LogEmbeddingUpsertWithWhereUniqueWithoutVisitInput | LogEmbeddingUpsertWithWhereUniqueWithoutVisitInput[]
+    createMany?: LogEmbeddingCreateManyVisitInputEnvelope
+    set?: LogEmbeddingWhereUniqueInput | LogEmbeddingWhereUniqueInput[]
+    disconnect?: LogEmbeddingWhereUniqueInput | LogEmbeddingWhereUniqueInput[]
+    delete?: LogEmbeddingWhereUniqueInput | LogEmbeddingWhereUniqueInput[]
+    connect?: LogEmbeddingWhereUniqueInput | LogEmbeddingWhereUniqueInput[]
+    update?: LogEmbeddingUpdateWithWhereUniqueWithoutVisitInput | LogEmbeddingUpdateWithWhereUniqueWithoutVisitInput[]
+    updateMany?: LogEmbeddingUpdateManyWithWhereWithoutVisitInput | LogEmbeddingUpdateManyWithWhereWithoutVisitInput[]
+    deleteMany?: LogEmbeddingScalarWhereInput | LogEmbeddingScalarWhereInput[]
+  }
+
   export type VisitTaskUncheckedUpdateManyWithoutVisitNestedInput = {
     create?: XOR<VisitTaskCreateWithoutVisitInput, VisitTaskUncheckedCreateWithoutVisitInput> | VisitTaskCreateWithoutVisitInput[] | VisitTaskUncheckedCreateWithoutVisitInput[]
     connectOrCreate?: VisitTaskCreateOrConnectWithoutVisitInput | VisitTaskCreateOrConnectWithoutVisitInput[]
@@ -12509,6 +16725,20 @@ export namespace Prisma {
     update?: MedicationAdministrationUpdateWithWhereUniqueWithoutVisitInput | MedicationAdministrationUpdateWithWhereUniqueWithoutVisitInput[]
     updateMany?: MedicationAdministrationUpdateManyWithWhereWithoutVisitInput | MedicationAdministrationUpdateManyWithWhereWithoutVisitInput[]
     deleteMany?: MedicationAdministrationScalarWhereInput | MedicationAdministrationScalarWhereInput[]
+  }
+
+  export type LogEmbeddingUncheckedUpdateManyWithoutVisitNestedInput = {
+    create?: XOR<LogEmbeddingCreateWithoutVisitInput, LogEmbeddingUncheckedCreateWithoutVisitInput> | LogEmbeddingCreateWithoutVisitInput[] | LogEmbeddingUncheckedCreateWithoutVisitInput[]
+    connectOrCreate?: LogEmbeddingCreateOrConnectWithoutVisitInput | LogEmbeddingCreateOrConnectWithoutVisitInput[]
+    upsert?: LogEmbeddingUpsertWithWhereUniqueWithoutVisitInput | LogEmbeddingUpsertWithWhereUniqueWithoutVisitInput[]
+    createMany?: LogEmbeddingCreateManyVisitInputEnvelope
+    set?: LogEmbeddingWhereUniqueInput | LogEmbeddingWhereUniqueInput[]
+    disconnect?: LogEmbeddingWhereUniqueInput | LogEmbeddingWhereUniqueInput[]
+    delete?: LogEmbeddingWhereUniqueInput | LogEmbeddingWhereUniqueInput[]
+    connect?: LogEmbeddingWhereUniqueInput | LogEmbeddingWhereUniqueInput[]
+    update?: LogEmbeddingUpdateWithWhereUniqueWithoutVisitInput | LogEmbeddingUpdateWithWhereUniqueWithoutVisitInput[]
+    updateMany?: LogEmbeddingUpdateManyWithWhereWithoutVisitInput | LogEmbeddingUpdateManyWithWhereWithoutVisitInput[]
+    deleteMany?: LogEmbeddingScalarWhereInput | LogEmbeddingScalarWhereInput[]
   }
 
   export type VisitCreateNestedOneWithoutTasksInput = {
@@ -12816,6 +17046,92 @@ export namespace Prisma {
     update?: XOR<XOR<MedicationAdministrationUpdateToOneWithWhereWithoutAuditsInput, MedicationAdministrationUpdateWithoutAuditsInput>, MedicationAdministrationUncheckedUpdateWithoutAuditsInput>
   }
 
+  export type ClientCreateNestedManyWithoutOrganizationInput = {
+    create?: XOR<ClientCreateWithoutOrganizationInput, ClientUncheckedCreateWithoutOrganizationInput> | ClientCreateWithoutOrganizationInput[] | ClientUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ClientCreateOrConnectWithoutOrganizationInput | ClientCreateOrConnectWithoutOrganizationInput[]
+    createMany?: ClientCreateManyOrganizationInputEnvelope
+    connect?: ClientWhereUniqueInput | ClientWhereUniqueInput[]
+  }
+
+  export type ClientUncheckedCreateNestedManyWithoutOrganizationInput = {
+    create?: XOR<ClientCreateWithoutOrganizationInput, ClientUncheckedCreateWithoutOrganizationInput> | ClientCreateWithoutOrganizationInput[] | ClientUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ClientCreateOrConnectWithoutOrganizationInput | ClientCreateOrConnectWithoutOrganizationInput[]
+    createMany?: ClientCreateManyOrganizationInputEnvelope
+    connect?: ClientWhereUniqueInput | ClientWhereUniqueInput[]
+  }
+
+  export type ClientUpdateManyWithoutOrganizationNestedInput = {
+    create?: XOR<ClientCreateWithoutOrganizationInput, ClientUncheckedCreateWithoutOrganizationInput> | ClientCreateWithoutOrganizationInput[] | ClientUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ClientCreateOrConnectWithoutOrganizationInput | ClientCreateOrConnectWithoutOrganizationInput[]
+    upsert?: ClientUpsertWithWhereUniqueWithoutOrganizationInput | ClientUpsertWithWhereUniqueWithoutOrganizationInput[]
+    createMany?: ClientCreateManyOrganizationInputEnvelope
+    set?: ClientWhereUniqueInput | ClientWhereUniqueInput[]
+    disconnect?: ClientWhereUniqueInput | ClientWhereUniqueInput[]
+    delete?: ClientWhereUniqueInput | ClientWhereUniqueInput[]
+    connect?: ClientWhereUniqueInput | ClientWhereUniqueInput[]
+    update?: ClientUpdateWithWhereUniqueWithoutOrganizationInput | ClientUpdateWithWhereUniqueWithoutOrganizationInput[]
+    updateMany?: ClientUpdateManyWithWhereWithoutOrganizationInput | ClientUpdateManyWithWhereWithoutOrganizationInput[]
+    deleteMany?: ClientScalarWhereInput | ClientScalarWhereInput[]
+  }
+
+  export type ClientUncheckedUpdateManyWithoutOrganizationNestedInput = {
+    create?: XOR<ClientCreateWithoutOrganizationInput, ClientUncheckedCreateWithoutOrganizationInput> | ClientCreateWithoutOrganizationInput[] | ClientUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ClientCreateOrConnectWithoutOrganizationInput | ClientCreateOrConnectWithoutOrganizationInput[]
+    upsert?: ClientUpsertWithWhereUniqueWithoutOrganizationInput | ClientUpsertWithWhereUniqueWithoutOrganizationInput[]
+    createMany?: ClientCreateManyOrganizationInputEnvelope
+    set?: ClientWhereUniqueInput | ClientWhereUniqueInput[]
+    disconnect?: ClientWhereUniqueInput | ClientWhereUniqueInput[]
+    delete?: ClientWhereUniqueInput | ClientWhereUniqueInput[]
+    connect?: ClientWhereUniqueInput | ClientWhereUniqueInput[]
+    update?: ClientUpdateWithWhereUniqueWithoutOrganizationInput | ClientUpdateWithWhereUniqueWithoutOrganizationInput[]
+    updateMany?: ClientUpdateManyWithWhereWithoutOrganizationInput | ClientUpdateManyWithWhereWithoutOrganizationInput[]
+    deleteMany?: ClientScalarWhereInput | ClientScalarWhereInput[]
+  }
+
+  export type VisitCreateNestedOneWithoutLog_embeddingsInput = {
+    create?: XOR<VisitCreateWithoutLog_embeddingsInput, VisitUncheckedCreateWithoutLog_embeddingsInput>
+    connectOrCreate?: VisitCreateOrConnectWithoutLog_embeddingsInput
+    connect?: VisitWhereUniqueInput
+  }
+
+  export type VisitUpdateOneRequiredWithoutLog_embeddingsNestedInput = {
+    create?: XOR<VisitCreateWithoutLog_embeddingsInput, VisitUncheckedCreateWithoutLog_embeddingsInput>
+    connectOrCreate?: VisitCreateOrConnectWithoutLog_embeddingsInput
+    upsert?: VisitUpsertWithoutLog_embeddingsInput
+    connect?: VisitWhereUniqueInput
+    update?: XOR<XOR<VisitUpdateToOneWithWhereWithoutLog_embeddingsInput, VisitUpdateWithoutLog_embeddingsInput>, VisitUncheckedUpdateWithoutLog_embeddingsInput>
+  }
+
+  export type ClientCreateNestedOneWithoutHealth_summariesInput = {
+    create?: XOR<ClientCreateWithoutHealth_summariesInput, ClientUncheckedCreateWithoutHealth_summariesInput>
+    connectOrCreate?: ClientCreateOrConnectWithoutHealth_summariesInput
+    connect?: ClientWhereUniqueInput
+  }
+
+  export type CarerCreateNestedOneWithoutApproved_summariesInput = {
+    create?: XOR<CarerCreateWithoutApproved_summariesInput, CarerUncheckedCreateWithoutApproved_summariesInput>
+    connectOrCreate?: CarerCreateOrConnectWithoutApproved_summariesInput
+    connect?: CarerWhereUniqueInput
+  }
+
+  export type ClientUpdateOneRequiredWithoutHealth_summariesNestedInput = {
+    create?: XOR<ClientCreateWithoutHealth_summariesInput, ClientUncheckedCreateWithoutHealth_summariesInput>
+    connectOrCreate?: ClientCreateOrConnectWithoutHealth_summariesInput
+    upsert?: ClientUpsertWithoutHealth_summariesInput
+    connect?: ClientWhereUniqueInput
+    update?: XOR<XOR<ClientUpdateToOneWithWhereWithoutHealth_summariesInput, ClientUpdateWithoutHealth_summariesInput>, ClientUncheckedUpdateWithoutHealth_summariesInput>
+  }
+
+  export type CarerUpdateOneWithoutApproved_summariesNestedInput = {
+    create?: XOR<CarerCreateWithoutApproved_summariesInput, CarerUncheckedCreateWithoutApproved_summariesInput>
+    connectOrCreate?: CarerCreateOrConnectWithoutApproved_summariesInput
+    upsert?: CarerUpsertWithoutApproved_summariesInput
+    disconnect?: CarerWhereInput | boolean
+    delete?: CarerWhereInput | boolean
+    connect?: CarerWhereUniqueInput
+    update?: XOR<XOR<CarerUpdateToOneWithWhereWithoutApproved_summariesInput, CarerUpdateWithoutApproved_summariesInput>, CarerUncheckedUpdateWithoutApproved_summariesInput>
+  }
+
   export type NestedStringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -13067,6 +17383,28 @@ export namespace Prisma {
     _min?: NestedEnumMedicationAuditActionFilter<$PrismaModel>
     _max?: NestedEnumMedicationAuditActionFilter<$PrismaModel>
   }
+  export type NestedJsonFilter<$PrismaModel = never> = 
+    | PatchUndefined<
+        Either<Required<NestedJsonFilterBase<$PrismaModel>>, Exclude<keyof Required<NestedJsonFilterBase<$PrismaModel>>, 'path'>>,
+        Required<NestedJsonFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<NestedJsonFilterBase<$PrismaModel>>, 'path'>>
+
+  export type NestedJsonFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
 
   export type VisitCreateWithoutCarerInput = {
     id?: string
@@ -13082,6 +17420,7 @@ export namespace Prisma {
     client: ClientCreateNestedOneWithoutVisitsInput
     tasks?: VisitTaskCreateNestedManyWithoutVisitInput
     medication_administrations?: MedicationAdministrationCreateNestedManyWithoutVisitInput
+    log_embeddings?: LogEmbeddingCreateNestedManyWithoutVisitInput
   }
 
   export type VisitUncheckedCreateWithoutCarerInput = {
@@ -13098,6 +17437,7 @@ export namespace Prisma {
     deleted_at?: Date | string | null
     tasks?: VisitTaskUncheckedCreateNestedManyWithoutVisitInput
     medication_administrations?: MedicationAdministrationUncheckedCreateNestedManyWithoutVisitInput
+    log_embeddings?: LogEmbeddingUncheckedCreateNestedManyWithoutVisitInput
   }
 
   export type VisitCreateOrConnectWithoutCarerInput = {
@@ -13107,6 +17447,48 @@ export namespace Prisma {
 
   export type VisitCreateManyCarerInputEnvelope = {
     data: VisitCreateManyCarerInput | VisitCreateManyCarerInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type HealthSummaryCreateWithoutApproverInput = {
+    id?: string
+    period_start: Date | string
+    period_end: Date | string
+    summary_json: JsonNullValueInput | InputJsonValue
+    risk_levels: JsonNullValueInput | InputJsonValue
+    generated_at: Date | string
+    generated_by?: string
+    approved_at?: Date | string | null
+    feedback?: string | null
+    expires_at?: Date | string
+    created_at?: Date | string
+    updated_at?: Date | string
+    client: ClientCreateNestedOneWithoutHealth_summariesInput
+  }
+
+  export type HealthSummaryUncheckedCreateWithoutApproverInput = {
+    id?: string
+    client_id: string
+    period_start: Date | string
+    period_end: Date | string
+    summary_json: JsonNullValueInput | InputJsonValue
+    risk_levels: JsonNullValueInput | InputJsonValue
+    generated_at: Date | string
+    generated_by?: string
+    approved_at?: Date | string | null
+    feedback?: string | null
+    expires_at?: Date | string
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type HealthSummaryCreateOrConnectWithoutApproverInput = {
+    where: HealthSummaryWhereUniqueInput
+    create: XOR<HealthSummaryCreateWithoutApproverInput, HealthSummaryUncheckedCreateWithoutApproverInput>
+  }
+
+  export type HealthSummaryCreateManyApproverInputEnvelope = {
+    data: HealthSummaryCreateManyApproverInput | HealthSummaryCreateManyApproverInput[]
     skipDuplicates?: boolean
   }
 
@@ -13144,6 +17526,42 @@ export namespace Prisma {
     deleted_at?: DateTimeNullableFilter<"Visit"> | Date | string | null
   }
 
+  export type HealthSummaryUpsertWithWhereUniqueWithoutApproverInput = {
+    where: HealthSummaryWhereUniqueInput
+    update: XOR<HealthSummaryUpdateWithoutApproverInput, HealthSummaryUncheckedUpdateWithoutApproverInput>
+    create: XOR<HealthSummaryCreateWithoutApproverInput, HealthSummaryUncheckedCreateWithoutApproverInput>
+  }
+
+  export type HealthSummaryUpdateWithWhereUniqueWithoutApproverInput = {
+    where: HealthSummaryWhereUniqueInput
+    data: XOR<HealthSummaryUpdateWithoutApproverInput, HealthSummaryUncheckedUpdateWithoutApproverInput>
+  }
+
+  export type HealthSummaryUpdateManyWithWhereWithoutApproverInput = {
+    where: HealthSummaryScalarWhereInput
+    data: XOR<HealthSummaryUpdateManyMutationInput, HealthSummaryUncheckedUpdateManyWithoutApproverInput>
+  }
+
+  export type HealthSummaryScalarWhereInput = {
+    AND?: HealthSummaryScalarWhereInput | HealthSummaryScalarWhereInput[]
+    OR?: HealthSummaryScalarWhereInput[]
+    NOT?: HealthSummaryScalarWhereInput | HealthSummaryScalarWhereInput[]
+    id?: StringFilter<"HealthSummary"> | string
+    client_id?: StringFilter<"HealthSummary"> | string
+    period_start?: DateTimeFilter<"HealthSummary"> | Date | string
+    period_end?: DateTimeFilter<"HealthSummary"> | Date | string
+    summary_json?: JsonFilter<"HealthSummary">
+    risk_levels?: JsonFilter<"HealthSummary">
+    generated_at?: DateTimeFilter<"HealthSummary"> | Date | string
+    generated_by?: StringFilter<"HealthSummary"> | string
+    approved_by?: StringNullableFilter<"HealthSummary"> | string | null
+    approved_at?: DateTimeNullableFilter<"HealthSummary"> | Date | string | null
+    feedback?: StringNullableFilter<"HealthSummary"> | string | null
+    expires_at?: DateTimeFilter<"HealthSummary"> | Date | string
+    created_at?: DateTimeFilter<"HealthSummary"> | Date | string
+    updated_at?: DateTimeFilter<"HealthSummary"> | Date | string
+  }
+
   export type VisitCreateWithoutClientInput = {
     id?: string
     scheduled_start: Date | string
@@ -13158,6 +17576,7 @@ export namespace Prisma {
     carer: CarerCreateNestedOneWithoutVisitsInput
     tasks?: VisitTaskCreateNestedManyWithoutVisitInput
     medication_administrations?: MedicationAdministrationCreateNestedManyWithoutVisitInput
+    log_embeddings?: LogEmbeddingCreateNestedManyWithoutVisitInput
   }
 
   export type VisitUncheckedCreateWithoutClientInput = {
@@ -13174,6 +17593,7 @@ export namespace Prisma {
     deleted_at?: Date | string | null
     tasks?: VisitTaskUncheckedCreateNestedManyWithoutVisitInput
     medication_administrations?: MedicationAdministrationUncheckedCreateNestedManyWithoutVisitInput
+    log_embeddings?: LogEmbeddingUncheckedCreateNestedManyWithoutVisitInput
   }
 
   export type VisitCreateOrConnectWithoutClientInput = {
@@ -13230,6 +17650,69 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type OrganizationCreateWithoutClientsInput = {
+    id?: string
+    name: string
+    ai_summary_enabled?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type OrganizationUncheckedCreateWithoutClientsInput = {
+    id?: string
+    name: string
+    ai_summary_enabled?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type OrganizationCreateOrConnectWithoutClientsInput = {
+    where: OrganizationWhereUniqueInput
+    create: XOR<OrganizationCreateWithoutClientsInput, OrganizationUncheckedCreateWithoutClientsInput>
+  }
+
+  export type HealthSummaryCreateWithoutClientInput = {
+    id?: string
+    period_start: Date | string
+    period_end: Date | string
+    summary_json: JsonNullValueInput | InputJsonValue
+    risk_levels: JsonNullValueInput | InputJsonValue
+    generated_at: Date | string
+    generated_by?: string
+    approved_at?: Date | string | null
+    feedback?: string | null
+    expires_at?: Date | string
+    created_at?: Date | string
+    updated_at?: Date | string
+    approver?: CarerCreateNestedOneWithoutApproved_summariesInput
+  }
+
+  export type HealthSummaryUncheckedCreateWithoutClientInput = {
+    id?: string
+    period_start: Date | string
+    period_end: Date | string
+    summary_json: JsonNullValueInput | InputJsonValue
+    risk_levels: JsonNullValueInput | InputJsonValue
+    generated_at: Date | string
+    generated_by?: string
+    approved_by?: string | null
+    approved_at?: Date | string | null
+    feedback?: string | null
+    expires_at?: Date | string
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type HealthSummaryCreateOrConnectWithoutClientInput = {
+    where: HealthSummaryWhereUniqueInput
+    create: XOR<HealthSummaryCreateWithoutClientInput, HealthSummaryUncheckedCreateWithoutClientInput>
+  }
+
+  export type HealthSummaryCreateManyClientInputEnvelope = {
+    data: HealthSummaryCreateManyClientInput | HealthSummaryCreateManyClientInput[]
+    skipDuplicates?: boolean
+  }
+
   export type VisitUpsertWithWhereUniqueWithoutClientInput = {
     where: VisitWhereUniqueInput
     update: XOR<VisitUpdateWithoutClientInput, VisitUncheckedUpdateWithoutClientInput>
@@ -13281,6 +17764,49 @@ export namespace Prisma {
     deleted_at?: DateTimeNullableFilter<"Prescription"> | Date | string | null
   }
 
+  export type OrganizationUpsertWithoutClientsInput = {
+    update: XOR<OrganizationUpdateWithoutClientsInput, OrganizationUncheckedUpdateWithoutClientsInput>
+    create: XOR<OrganizationCreateWithoutClientsInput, OrganizationUncheckedCreateWithoutClientsInput>
+    where?: OrganizationWhereInput
+  }
+
+  export type OrganizationUpdateToOneWithWhereWithoutClientsInput = {
+    where?: OrganizationWhereInput
+    data: XOR<OrganizationUpdateWithoutClientsInput, OrganizationUncheckedUpdateWithoutClientsInput>
+  }
+
+  export type OrganizationUpdateWithoutClientsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type OrganizationUncheckedUpdateWithoutClientsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type HealthSummaryUpsertWithWhereUniqueWithoutClientInput = {
+    where: HealthSummaryWhereUniqueInput
+    update: XOR<HealthSummaryUpdateWithoutClientInput, HealthSummaryUncheckedUpdateWithoutClientInput>
+    create: XOR<HealthSummaryCreateWithoutClientInput, HealthSummaryUncheckedCreateWithoutClientInput>
+  }
+
+  export type HealthSummaryUpdateWithWhereUniqueWithoutClientInput = {
+    where: HealthSummaryWhereUniqueInput
+    data: XOR<HealthSummaryUpdateWithoutClientInput, HealthSummaryUncheckedUpdateWithoutClientInput>
+  }
+
+  export type HealthSummaryUpdateManyWithWhereWithoutClientInput = {
+    where: HealthSummaryScalarWhereInput
+    data: XOR<HealthSummaryUpdateManyMutationInput, HealthSummaryUncheckedUpdateManyWithoutClientInput>
+  }
+
   export type CarerCreateWithoutVisitsInput = {
     id?: string
     first_name: string
@@ -13292,6 +17818,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
+    approved_summaries?: HealthSummaryCreateNestedManyWithoutApproverInput
   }
 
   export type CarerUncheckedCreateWithoutVisitsInput = {
@@ -13305,6 +17832,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
+    approved_summaries?: HealthSummaryUncheckedCreateNestedManyWithoutApproverInput
   }
 
   export type CarerCreateOrConnectWithoutVisitsInput = {
@@ -13324,6 +17852,8 @@ export namespace Prisma {
     updated_at?: Date | string
     deleted_at?: Date | string | null
     prescriptions?: PrescriptionCreateNestedManyWithoutClientInput
+    organization?: OrganizationCreateNestedOneWithoutClientsInput
+    health_summaries?: HealthSummaryCreateNestedManyWithoutClientInput
   }
 
   export type ClientUncheckedCreateWithoutVisitsInput = {
@@ -13334,10 +17864,12 @@ export namespace Prisma {
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    organization_id?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
     prescriptions?: PrescriptionUncheckedCreateNestedManyWithoutClientInput
+    health_summaries?: HealthSummaryUncheckedCreateNestedManyWithoutClientInput
   }
 
   export type ClientCreateOrConnectWithoutVisitsInput = {
@@ -13417,6 +17949,34 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type LogEmbeddingCreateWithoutVisitInput = {
+    id?: string
+    log_type: string
+    log_timestamp: Date | string
+    raw_data: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type LogEmbeddingUncheckedCreateWithoutVisitInput = {
+    id?: string
+    log_type: string
+    log_timestamp: Date | string
+    raw_data: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type LogEmbeddingCreateOrConnectWithoutVisitInput = {
+    where: LogEmbeddingWhereUniqueInput
+    create: XOR<LogEmbeddingCreateWithoutVisitInput, LogEmbeddingUncheckedCreateWithoutVisitInput>
+  }
+
+  export type LogEmbeddingCreateManyVisitInputEnvelope = {
+    data: LogEmbeddingCreateManyVisitInput | LogEmbeddingCreateManyVisitInput[]
+    skipDuplicates?: boolean
+  }
+
   export type CarerUpsertWithoutVisitsInput = {
     update: XOR<CarerUpdateWithoutVisitsInput, CarerUncheckedUpdateWithoutVisitsInput>
     create: XOR<CarerCreateWithoutVisitsInput, CarerUncheckedCreateWithoutVisitsInput>
@@ -13439,6 +17999,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    approved_summaries?: HealthSummaryUpdateManyWithoutApproverNestedInput
   }
 
   export type CarerUncheckedUpdateWithoutVisitsInput = {
@@ -13452,6 +18013,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    approved_summaries?: HealthSummaryUncheckedUpdateManyWithoutApproverNestedInput
   }
 
   export type ClientUpsertWithoutVisitsInput = {
@@ -13477,6 +18039,8 @@ export namespace Prisma {
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     prescriptions?: PrescriptionUpdateManyWithoutClientNestedInput
+    organization?: OrganizationUpdateOneWithoutClientsNestedInput
+    health_summaries?: HealthSummaryUpdateManyWithoutClientNestedInput
   }
 
   export type ClientUncheckedUpdateWithoutVisitsInput = {
@@ -13487,10 +18051,12 @@ export namespace Prisma {
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     prescriptions?: PrescriptionUncheckedUpdateManyWithoutClientNestedInput
+    health_summaries?: HealthSummaryUncheckedUpdateManyWithoutClientNestedInput
   }
 
   export type VisitTaskUpsertWithWhereUniqueWithoutVisitInput = {
@@ -13558,6 +18124,35 @@ export namespace Prisma {
     deleted_at?: DateTimeNullableFilter<"MedicationAdministration"> | Date | string | null
   }
 
+  export type LogEmbeddingUpsertWithWhereUniqueWithoutVisitInput = {
+    where: LogEmbeddingWhereUniqueInput
+    update: XOR<LogEmbeddingUpdateWithoutVisitInput, LogEmbeddingUncheckedUpdateWithoutVisitInput>
+    create: XOR<LogEmbeddingCreateWithoutVisitInput, LogEmbeddingUncheckedCreateWithoutVisitInput>
+  }
+
+  export type LogEmbeddingUpdateWithWhereUniqueWithoutVisitInput = {
+    where: LogEmbeddingWhereUniqueInput
+    data: XOR<LogEmbeddingUpdateWithoutVisitInput, LogEmbeddingUncheckedUpdateWithoutVisitInput>
+  }
+
+  export type LogEmbeddingUpdateManyWithWhereWithoutVisitInput = {
+    where: LogEmbeddingScalarWhereInput
+    data: XOR<LogEmbeddingUpdateManyMutationInput, LogEmbeddingUncheckedUpdateManyWithoutVisitInput>
+  }
+
+  export type LogEmbeddingScalarWhereInput = {
+    AND?: LogEmbeddingScalarWhereInput | LogEmbeddingScalarWhereInput[]
+    OR?: LogEmbeddingScalarWhereInput[]
+    NOT?: LogEmbeddingScalarWhereInput | LogEmbeddingScalarWhereInput[]
+    id?: StringFilter<"LogEmbedding"> | string
+    visit_id?: StringFilter<"LogEmbedding"> | string
+    log_type?: StringFilter<"LogEmbedding"> | string
+    log_timestamp?: DateTimeFilter<"LogEmbedding"> | Date | string
+    raw_data?: JsonFilter<"LogEmbedding">
+    created_at?: DateTimeFilter<"LogEmbedding"> | Date | string
+    updated_at?: DateTimeFilter<"LogEmbedding"> | Date | string
+  }
+
   export type VisitCreateWithoutTasksInput = {
     id?: string
     scheduled_start: Date | string
@@ -13572,6 +18167,7 @@ export namespace Prisma {
     carer: CarerCreateNestedOneWithoutVisitsInput
     client: ClientCreateNestedOneWithoutVisitsInput
     medication_administrations?: MedicationAdministrationCreateNestedManyWithoutVisitInput
+    log_embeddings?: LogEmbeddingCreateNestedManyWithoutVisitInput
   }
 
   export type VisitUncheckedCreateWithoutTasksInput = {
@@ -13588,6 +18184,7 @@ export namespace Prisma {
     updated_at?: Date | string
     deleted_at?: Date | string | null
     medication_administrations?: MedicationAdministrationUncheckedCreateNestedManyWithoutVisitInput
+    log_embeddings?: LogEmbeddingUncheckedCreateNestedManyWithoutVisitInput
   }
 
   export type VisitCreateOrConnectWithoutTasksInput = {
@@ -13620,6 +18217,7 @@ export namespace Prisma {
     carer?: CarerUpdateOneRequiredWithoutVisitsNestedInput
     client?: ClientUpdateOneRequiredWithoutVisitsNestedInput
     medication_administrations?: MedicationAdministrationUpdateManyWithoutVisitNestedInput
+    log_embeddings?: LogEmbeddingUpdateManyWithoutVisitNestedInput
   }
 
   export type VisitUncheckedUpdateWithoutTasksInput = {
@@ -13636,6 +18234,7 @@ export namespace Prisma {
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     medication_administrations?: MedicationAdministrationUncheckedUpdateManyWithoutVisitNestedInput
+    log_embeddings?: LogEmbeddingUncheckedUpdateManyWithoutVisitNestedInput
   }
 
   export type PrescriptionCreateWithoutMedicationInput = {
@@ -13710,6 +18309,8 @@ export namespace Prisma {
     updated_at?: Date | string
     deleted_at?: Date | string | null
     visits?: VisitCreateNestedManyWithoutClientInput
+    organization?: OrganizationCreateNestedOneWithoutClientsInput
+    health_summaries?: HealthSummaryCreateNestedManyWithoutClientInput
   }
 
   export type ClientUncheckedCreateWithoutPrescriptionsInput = {
@@ -13720,10 +18321,12 @@ export namespace Prisma {
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    organization_id?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
     visits?: VisitUncheckedCreateNestedManyWithoutClientInput
+    health_summaries?: HealthSummaryUncheckedCreateNestedManyWithoutClientInput
   }
 
   export type ClientCreateOrConnectWithoutPrescriptionsInput = {
@@ -13849,6 +18452,8 @@ export namespace Prisma {
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     visits?: VisitUpdateManyWithoutClientNestedInput
+    organization?: OrganizationUpdateOneWithoutClientsNestedInput
+    health_summaries?: HealthSummaryUpdateManyWithoutClientNestedInput
   }
 
   export type ClientUncheckedUpdateWithoutPrescriptionsInput = {
@@ -13859,10 +18464,12 @@ export namespace Prisma {
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     visits?: VisitUncheckedUpdateManyWithoutClientNestedInput
+    health_summaries?: HealthSummaryUncheckedUpdateManyWithoutClientNestedInput
   }
 
   export type MedicationUpsertWithoutPrescriptionsInput = {
@@ -13997,6 +18604,7 @@ export namespace Prisma {
     carer: CarerCreateNestedOneWithoutVisitsInput
     client: ClientCreateNestedOneWithoutVisitsInput
     tasks?: VisitTaskCreateNestedManyWithoutVisitInput
+    log_embeddings?: LogEmbeddingCreateNestedManyWithoutVisitInput
   }
 
   export type VisitUncheckedCreateWithoutMedication_administrationsInput = {
@@ -14013,6 +18621,7 @@ export namespace Prisma {
     updated_at?: Date | string
     deleted_at?: Date | string | null
     tasks?: VisitTaskUncheckedCreateNestedManyWithoutVisitInput
+    log_embeddings?: LogEmbeddingUncheckedCreateNestedManyWithoutVisitInput
   }
 
   export type VisitCreateOrConnectWithoutMedication_administrationsInput = {
@@ -14120,6 +18729,7 @@ export namespace Prisma {
     carer?: CarerUpdateOneRequiredWithoutVisitsNestedInput
     client?: ClientUpdateOneRequiredWithoutVisitsNestedInput
     tasks?: VisitTaskUpdateManyWithoutVisitNestedInput
+    log_embeddings?: LogEmbeddingUpdateManyWithoutVisitNestedInput
   }
 
   export type VisitUncheckedUpdateWithoutMedication_administrationsInput = {
@@ -14136,6 +18746,7 @@ export namespace Prisma {
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     tasks?: VisitTaskUncheckedUpdateManyWithoutVisitNestedInput
+    log_embeddings?: LogEmbeddingUncheckedUpdateManyWithoutVisitNestedInput
   }
 
   export type MedicationAuditUpsertWithWhereUniqueWithoutMedication_administrationInput = {
@@ -14310,6 +18921,317 @@ export namespace Prisma {
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
+  export type ClientCreateWithoutOrganizationInput = {
+    id?: string
+    full_name: string
+    address_line1: string
+    address_line2?: string | null
+    city: string
+    postcode: string
+    date_of_birth?: Date | string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    visits?: VisitCreateNestedManyWithoutClientInput
+    prescriptions?: PrescriptionCreateNestedManyWithoutClientInput
+    health_summaries?: HealthSummaryCreateNestedManyWithoutClientInput
+  }
+
+  export type ClientUncheckedCreateWithoutOrganizationInput = {
+    id?: string
+    full_name: string
+    address_line1: string
+    address_line2?: string | null
+    city: string
+    postcode: string
+    date_of_birth?: Date | string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    visits?: VisitUncheckedCreateNestedManyWithoutClientInput
+    prescriptions?: PrescriptionUncheckedCreateNestedManyWithoutClientInput
+    health_summaries?: HealthSummaryUncheckedCreateNestedManyWithoutClientInput
+  }
+
+  export type ClientCreateOrConnectWithoutOrganizationInput = {
+    where: ClientWhereUniqueInput
+    create: XOR<ClientCreateWithoutOrganizationInput, ClientUncheckedCreateWithoutOrganizationInput>
+  }
+
+  export type ClientCreateManyOrganizationInputEnvelope = {
+    data: ClientCreateManyOrganizationInput | ClientCreateManyOrganizationInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type ClientUpsertWithWhereUniqueWithoutOrganizationInput = {
+    where: ClientWhereUniqueInput
+    update: XOR<ClientUpdateWithoutOrganizationInput, ClientUncheckedUpdateWithoutOrganizationInput>
+    create: XOR<ClientCreateWithoutOrganizationInput, ClientUncheckedCreateWithoutOrganizationInput>
+  }
+
+  export type ClientUpdateWithWhereUniqueWithoutOrganizationInput = {
+    where: ClientWhereUniqueInput
+    data: XOR<ClientUpdateWithoutOrganizationInput, ClientUncheckedUpdateWithoutOrganizationInput>
+  }
+
+  export type ClientUpdateManyWithWhereWithoutOrganizationInput = {
+    where: ClientScalarWhereInput
+    data: XOR<ClientUpdateManyMutationInput, ClientUncheckedUpdateManyWithoutOrganizationInput>
+  }
+
+  export type ClientScalarWhereInput = {
+    AND?: ClientScalarWhereInput | ClientScalarWhereInput[]
+    OR?: ClientScalarWhereInput[]
+    NOT?: ClientScalarWhereInput | ClientScalarWhereInput[]
+    id?: StringFilter<"Client"> | string
+    full_name?: StringFilter<"Client"> | string
+    address_line1?: StringFilter<"Client"> | string
+    address_line2?: StringNullableFilter<"Client"> | string | null
+    city?: StringFilter<"Client"> | string
+    postcode?: StringFilter<"Client"> | string
+    date_of_birth?: DateTimeNullableFilter<"Client"> | Date | string | null
+    organization_id?: StringNullableFilter<"Client"> | string | null
+    created_at?: DateTimeFilter<"Client"> | Date | string
+    updated_at?: DateTimeFilter<"Client"> | Date | string
+    deleted_at?: DateTimeNullableFilter<"Client"> | Date | string | null
+  }
+
+  export type VisitCreateWithoutLog_embeddingsInput = {
+    id?: string
+    scheduled_start: Date | string
+    scheduled_end: Date | string
+    actual_start?: Date | string | null
+    actual_end?: Date | string | null
+    status?: $Enums.VisitStatus
+    notes?: string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    carer: CarerCreateNestedOneWithoutVisitsInput
+    client: ClientCreateNestedOneWithoutVisitsInput
+    tasks?: VisitTaskCreateNestedManyWithoutVisitInput
+    medication_administrations?: MedicationAdministrationCreateNestedManyWithoutVisitInput
+  }
+
+  export type VisitUncheckedCreateWithoutLog_embeddingsInput = {
+    id?: string
+    carer_id: string
+    client_id: string
+    scheduled_start: Date | string
+    scheduled_end: Date | string
+    actual_start?: Date | string | null
+    actual_end?: Date | string | null
+    status?: $Enums.VisitStatus
+    notes?: string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    tasks?: VisitTaskUncheckedCreateNestedManyWithoutVisitInput
+    medication_administrations?: MedicationAdministrationUncheckedCreateNestedManyWithoutVisitInput
+  }
+
+  export type VisitCreateOrConnectWithoutLog_embeddingsInput = {
+    where: VisitWhereUniqueInput
+    create: XOR<VisitCreateWithoutLog_embeddingsInput, VisitUncheckedCreateWithoutLog_embeddingsInput>
+  }
+
+  export type VisitUpsertWithoutLog_embeddingsInput = {
+    update: XOR<VisitUpdateWithoutLog_embeddingsInput, VisitUncheckedUpdateWithoutLog_embeddingsInput>
+    create: XOR<VisitCreateWithoutLog_embeddingsInput, VisitUncheckedCreateWithoutLog_embeddingsInput>
+    where?: VisitWhereInput
+  }
+
+  export type VisitUpdateToOneWithWhereWithoutLog_embeddingsInput = {
+    where?: VisitWhereInput
+    data: XOR<VisitUpdateWithoutLog_embeddingsInput, VisitUncheckedUpdateWithoutLog_embeddingsInput>
+  }
+
+  export type VisitUpdateWithoutLog_embeddingsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    scheduled_start?: DateTimeFieldUpdateOperationsInput | Date | string
+    scheduled_end?: DateTimeFieldUpdateOperationsInput | Date | string
+    actual_start?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    actual_end?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    status?: EnumVisitStatusFieldUpdateOperationsInput | $Enums.VisitStatus
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    carer?: CarerUpdateOneRequiredWithoutVisitsNestedInput
+    client?: ClientUpdateOneRequiredWithoutVisitsNestedInput
+    tasks?: VisitTaskUpdateManyWithoutVisitNestedInput
+    medication_administrations?: MedicationAdministrationUpdateManyWithoutVisitNestedInput
+  }
+
+  export type VisitUncheckedUpdateWithoutLog_embeddingsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    carer_id?: StringFieldUpdateOperationsInput | string
+    client_id?: StringFieldUpdateOperationsInput | string
+    scheduled_start?: DateTimeFieldUpdateOperationsInput | Date | string
+    scheduled_end?: DateTimeFieldUpdateOperationsInput | Date | string
+    actual_start?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    actual_end?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    status?: EnumVisitStatusFieldUpdateOperationsInput | $Enums.VisitStatus
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    tasks?: VisitTaskUncheckedUpdateManyWithoutVisitNestedInput
+    medication_administrations?: MedicationAdministrationUncheckedUpdateManyWithoutVisitNestedInput
+  }
+
+  export type ClientCreateWithoutHealth_summariesInput = {
+    id?: string
+    full_name: string
+    address_line1: string
+    address_line2?: string | null
+    city: string
+    postcode: string
+    date_of_birth?: Date | string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    visits?: VisitCreateNestedManyWithoutClientInput
+    prescriptions?: PrescriptionCreateNestedManyWithoutClientInput
+    organization?: OrganizationCreateNestedOneWithoutClientsInput
+  }
+
+  export type ClientUncheckedCreateWithoutHealth_summariesInput = {
+    id?: string
+    full_name: string
+    address_line1: string
+    address_line2?: string | null
+    city: string
+    postcode: string
+    date_of_birth?: Date | string | null
+    organization_id?: string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    visits?: VisitUncheckedCreateNestedManyWithoutClientInput
+    prescriptions?: PrescriptionUncheckedCreateNestedManyWithoutClientInput
+  }
+
+  export type ClientCreateOrConnectWithoutHealth_summariesInput = {
+    where: ClientWhereUniqueInput
+    create: XOR<ClientCreateWithoutHealth_summariesInput, ClientUncheckedCreateWithoutHealth_summariesInput>
+  }
+
+  export type CarerCreateWithoutApproved_summariesInput = {
+    id?: string
+    first_name: string
+    last_name: string
+    email: string
+    phone?: string | null
+    hire_date?: Date | string
+    is_active?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    visits?: VisitCreateNestedManyWithoutCarerInput
+  }
+
+  export type CarerUncheckedCreateWithoutApproved_summariesInput = {
+    id?: string
+    first_name: string
+    last_name: string
+    email: string
+    phone?: string | null
+    hire_date?: Date | string
+    is_active?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    visits?: VisitUncheckedCreateNestedManyWithoutCarerInput
+  }
+
+  export type CarerCreateOrConnectWithoutApproved_summariesInput = {
+    where: CarerWhereUniqueInput
+    create: XOR<CarerCreateWithoutApproved_summariesInput, CarerUncheckedCreateWithoutApproved_summariesInput>
+  }
+
+  export type ClientUpsertWithoutHealth_summariesInput = {
+    update: XOR<ClientUpdateWithoutHealth_summariesInput, ClientUncheckedUpdateWithoutHealth_summariesInput>
+    create: XOR<ClientCreateWithoutHealth_summariesInput, ClientUncheckedCreateWithoutHealth_summariesInput>
+    where?: ClientWhereInput
+  }
+
+  export type ClientUpdateToOneWithWhereWithoutHealth_summariesInput = {
+    where?: ClientWhereInput
+    data: XOR<ClientUpdateWithoutHealth_summariesInput, ClientUncheckedUpdateWithoutHealth_summariesInput>
+  }
+
+  export type ClientUpdateWithoutHealth_summariesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    full_name?: StringFieldUpdateOperationsInput | string
+    address_line1?: StringFieldUpdateOperationsInput | string
+    address_line2?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: StringFieldUpdateOperationsInput | string
+    postcode?: StringFieldUpdateOperationsInput | string
+    date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    visits?: VisitUpdateManyWithoutClientNestedInput
+    prescriptions?: PrescriptionUpdateManyWithoutClientNestedInput
+    organization?: OrganizationUpdateOneWithoutClientsNestedInput
+  }
+
+  export type ClientUncheckedUpdateWithoutHealth_summariesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    full_name?: StringFieldUpdateOperationsInput | string
+    address_line1?: StringFieldUpdateOperationsInput | string
+    address_line2?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: StringFieldUpdateOperationsInput | string
+    postcode?: StringFieldUpdateOperationsInput | string
+    date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    visits?: VisitUncheckedUpdateManyWithoutClientNestedInput
+    prescriptions?: PrescriptionUncheckedUpdateManyWithoutClientNestedInput
+  }
+
+  export type CarerUpsertWithoutApproved_summariesInput = {
+    update: XOR<CarerUpdateWithoutApproved_summariesInput, CarerUncheckedUpdateWithoutApproved_summariesInput>
+    create: XOR<CarerCreateWithoutApproved_summariesInput, CarerUncheckedCreateWithoutApproved_summariesInput>
+    where?: CarerWhereInput
+  }
+
+  export type CarerUpdateToOneWithWhereWithoutApproved_summariesInput = {
+    where?: CarerWhereInput
+    data: XOR<CarerUpdateWithoutApproved_summariesInput, CarerUncheckedUpdateWithoutApproved_summariesInput>
+  }
+
+  export type CarerUpdateWithoutApproved_summariesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    first_name?: StringFieldUpdateOperationsInput | string
+    last_name?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    hire_date?: DateTimeFieldUpdateOperationsInput | Date | string
+    is_active?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    visits?: VisitUpdateManyWithoutCarerNestedInput
+  }
+
+  export type CarerUncheckedUpdateWithoutApproved_summariesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    first_name?: StringFieldUpdateOperationsInput | string
+    last_name?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    hire_date?: DateTimeFieldUpdateOperationsInput | Date | string
+    is_active?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    visits?: VisitUncheckedUpdateManyWithoutCarerNestedInput
+  }
+
   export type VisitCreateManyCarerInput = {
     id?: string
     client_id: string
@@ -14322,6 +19244,22 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
+  }
+
+  export type HealthSummaryCreateManyApproverInput = {
+    id?: string
+    client_id: string
+    period_start: Date | string
+    period_end: Date | string
+    summary_json: JsonNullValueInput | InputJsonValue
+    risk_levels: JsonNullValueInput | InputJsonValue
+    generated_at: Date | string
+    generated_by?: string
+    approved_at?: Date | string | null
+    feedback?: string | null
+    expires_at?: Date | string
+    created_at?: Date | string
+    updated_at?: Date | string
   }
 
   export type VisitUpdateWithoutCarerInput = {
@@ -14338,6 +19276,7 @@ export namespace Prisma {
     client?: ClientUpdateOneRequiredWithoutVisitsNestedInput
     tasks?: VisitTaskUpdateManyWithoutVisitNestedInput
     medication_administrations?: MedicationAdministrationUpdateManyWithoutVisitNestedInput
+    log_embeddings?: LogEmbeddingUpdateManyWithoutVisitNestedInput
   }
 
   export type VisitUncheckedUpdateWithoutCarerInput = {
@@ -14354,6 +19293,7 @@ export namespace Prisma {
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     tasks?: VisitTaskUncheckedUpdateManyWithoutVisitNestedInput
     medication_administrations?: MedicationAdministrationUncheckedUpdateManyWithoutVisitNestedInput
+    log_embeddings?: LogEmbeddingUncheckedUpdateManyWithoutVisitNestedInput
   }
 
   export type VisitUncheckedUpdateManyWithoutCarerInput = {
@@ -14368,6 +19308,54 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type HealthSummaryUpdateWithoutApproverInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    period_start?: DateTimeFieldUpdateOperationsInput | Date | string
+    period_end?: DateTimeFieldUpdateOperationsInput | Date | string
+    summary_json?: JsonNullValueInput | InputJsonValue
+    risk_levels?: JsonNullValueInput | InputJsonValue
+    generated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    generated_by?: StringFieldUpdateOperationsInput | string
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    feedback?: NullableStringFieldUpdateOperationsInput | string | null
+    expires_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    client?: ClientUpdateOneRequiredWithoutHealth_summariesNestedInput
+  }
+
+  export type HealthSummaryUncheckedUpdateWithoutApproverInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    client_id?: StringFieldUpdateOperationsInput | string
+    period_start?: DateTimeFieldUpdateOperationsInput | Date | string
+    period_end?: DateTimeFieldUpdateOperationsInput | Date | string
+    summary_json?: JsonNullValueInput | InputJsonValue
+    risk_levels?: JsonNullValueInput | InputJsonValue
+    generated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    generated_by?: StringFieldUpdateOperationsInput | string
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    feedback?: NullableStringFieldUpdateOperationsInput | string | null
+    expires_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type HealthSummaryUncheckedUpdateManyWithoutApproverInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    client_id?: StringFieldUpdateOperationsInput | string
+    period_start?: DateTimeFieldUpdateOperationsInput | Date | string
+    period_end?: DateTimeFieldUpdateOperationsInput | Date | string
+    summary_json?: JsonNullValueInput | InputJsonValue
+    risk_levels?: JsonNullValueInput | InputJsonValue
+    generated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    generated_by?: StringFieldUpdateOperationsInput | string
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    feedback?: NullableStringFieldUpdateOperationsInput | string | null
+    expires_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type VisitCreateManyClientInput = {
@@ -14399,6 +19387,22 @@ export namespace Prisma {
     deleted_at?: Date | string | null
   }
 
+  export type HealthSummaryCreateManyClientInput = {
+    id?: string
+    period_start: Date | string
+    period_end: Date | string
+    summary_json: JsonNullValueInput | InputJsonValue
+    risk_levels: JsonNullValueInput | InputJsonValue
+    generated_at: Date | string
+    generated_by?: string
+    approved_by?: string | null
+    approved_at?: Date | string | null
+    feedback?: string | null
+    expires_at?: Date | string
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
   export type VisitUpdateWithoutClientInput = {
     id?: StringFieldUpdateOperationsInput | string
     scheduled_start?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -14413,6 +19417,7 @@ export namespace Prisma {
     carer?: CarerUpdateOneRequiredWithoutVisitsNestedInput
     tasks?: VisitTaskUpdateManyWithoutVisitNestedInput
     medication_administrations?: MedicationAdministrationUpdateManyWithoutVisitNestedInput
+    log_embeddings?: LogEmbeddingUpdateManyWithoutVisitNestedInput
   }
 
   export type VisitUncheckedUpdateWithoutClientInput = {
@@ -14429,6 +19434,7 @@ export namespace Prisma {
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     tasks?: VisitTaskUncheckedUpdateManyWithoutVisitNestedInput
     medication_administrations?: MedicationAdministrationUncheckedUpdateManyWithoutVisitNestedInput
+    log_embeddings?: LogEmbeddingUncheckedUpdateManyWithoutVisitNestedInput
   }
 
   export type VisitUncheckedUpdateManyWithoutClientInput = {
@@ -14494,6 +19500,54 @@ export namespace Prisma {
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
+  export type HealthSummaryUpdateWithoutClientInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    period_start?: DateTimeFieldUpdateOperationsInput | Date | string
+    period_end?: DateTimeFieldUpdateOperationsInput | Date | string
+    summary_json?: JsonNullValueInput | InputJsonValue
+    risk_levels?: JsonNullValueInput | InputJsonValue
+    generated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    generated_by?: StringFieldUpdateOperationsInput | string
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    feedback?: NullableStringFieldUpdateOperationsInput | string | null
+    expires_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    approver?: CarerUpdateOneWithoutApproved_summariesNestedInput
+  }
+
+  export type HealthSummaryUncheckedUpdateWithoutClientInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    period_start?: DateTimeFieldUpdateOperationsInput | Date | string
+    period_end?: DateTimeFieldUpdateOperationsInput | Date | string
+    summary_json?: JsonNullValueInput | InputJsonValue
+    risk_levels?: JsonNullValueInput | InputJsonValue
+    generated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    generated_by?: StringFieldUpdateOperationsInput | string
+    approved_by?: NullableStringFieldUpdateOperationsInput | string | null
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    feedback?: NullableStringFieldUpdateOperationsInput | string | null
+    expires_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type HealthSummaryUncheckedUpdateManyWithoutClientInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    period_start?: DateTimeFieldUpdateOperationsInput | Date | string
+    period_end?: DateTimeFieldUpdateOperationsInput | Date | string
+    summary_json?: JsonNullValueInput | InputJsonValue
+    risk_levels?: JsonNullValueInput | InputJsonValue
+    generated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    generated_by?: StringFieldUpdateOperationsInput | string
+    approved_by?: NullableStringFieldUpdateOperationsInput | string | null
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    feedback?: NullableStringFieldUpdateOperationsInput | string | null
+    expires_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type VisitTaskCreateManyVisitInput = {
     id?: string
     task_name: string
@@ -14517,6 +19571,15 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
+  }
+
+  export type LogEmbeddingCreateManyVisitInput = {
+    id?: string
+    log_type: string
+    log_timestamp: Date | string
+    raw_data: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
   }
 
   export type VisitTaskUpdateWithoutVisitInput = {
@@ -14594,6 +19657,33 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type LogEmbeddingUpdateWithoutVisitInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    log_type?: StringFieldUpdateOperationsInput | string
+    log_timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    raw_data?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type LogEmbeddingUncheckedUpdateWithoutVisitInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    log_type?: StringFieldUpdateOperationsInput | string
+    log_timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    raw_data?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type LogEmbeddingUncheckedUpdateManyWithoutVisitInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    log_type?: StringFieldUpdateOperationsInput | string
+    log_timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    raw_data?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type PrescriptionCreateManyMedicationInput = {
@@ -14794,6 +19884,64 @@ export namespace Prisma {
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type ClientCreateManyOrganizationInput = {
+    id?: string
+    full_name: string
+    address_line1: string
+    address_line2?: string | null
+    city: string
+    postcode: string
+    date_of_birth?: Date | string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+  }
+
+  export type ClientUpdateWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    full_name?: StringFieldUpdateOperationsInput | string
+    address_line1?: StringFieldUpdateOperationsInput | string
+    address_line2?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: StringFieldUpdateOperationsInput | string
+    postcode?: StringFieldUpdateOperationsInput | string
+    date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    visits?: VisitUpdateManyWithoutClientNestedInput
+    prescriptions?: PrescriptionUpdateManyWithoutClientNestedInput
+    health_summaries?: HealthSummaryUpdateManyWithoutClientNestedInput
+  }
+
+  export type ClientUncheckedUpdateWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    full_name?: StringFieldUpdateOperationsInput | string
+    address_line1?: StringFieldUpdateOperationsInput | string
+    address_line2?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: StringFieldUpdateOperationsInput | string
+    postcode?: StringFieldUpdateOperationsInput | string
+    date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    visits?: VisitUncheckedUpdateManyWithoutClientNestedInput
+    prescriptions?: PrescriptionUncheckedUpdateManyWithoutClientNestedInput
+    health_summaries?: HealthSummaryUncheckedUpdateManyWithoutClientNestedInput
+  }
+
+  export type ClientUncheckedUpdateManyWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    full_name?: StringFieldUpdateOperationsInput | string
+    address_line1?: StringFieldUpdateOperationsInput | string
+    address_line2?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: StringFieldUpdateOperationsInput | string
+    postcode?: StringFieldUpdateOperationsInput | string
+    date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
 
 
   /**
@@ -14823,6 +19971,10 @@ export namespace Prisma {
      * @deprecated Use MedicationAdministrationCountOutputTypeDefaultArgs instead
      */
     export type MedicationAdministrationCountOutputTypeArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = MedicationAdministrationCountOutputTypeDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use OrganizationCountOutputTypeDefaultArgs instead
+     */
+    export type OrganizationCountOutputTypeArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = OrganizationCountOutputTypeDefaultArgs<ExtArgs>
     /**
      * @deprecated Use CarerDefaultArgs instead
      */
@@ -14855,6 +20007,18 @@ export namespace Prisma {
      * @deprecated Use MedicationAuditDefaultArgs instead
      */
     export type MedicationAuditArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = MedicationAuditDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use OrganizationDefaultArgs instead
+     */
+    export type OrganizationArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = OrganizationDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use LogEmbeddingDefaultArgs instead
+     */
+    export type LogEmbeddingArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = LogEmbeddingDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use HealthSummaryDefaultArgs instead
+     */
+    export type HealthSummaryArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = HealthSummaryDefaultArgs<ExtArgs>
 
   /**
    * Batch Payload for updateMany & deleteMany & createMany
