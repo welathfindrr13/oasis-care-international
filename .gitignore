@@ -66,3 +66,6 @@ libs/**/src/*.js.map
 terraform.tfstate
 terraform.tfstate.backup
 *.tfvars
+
+# Design cache (contains Figma API responses)
+design-cache/
