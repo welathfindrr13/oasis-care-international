@@ -1,0 +1,2 @@
+{"data":{"__schema":{"queryType":{"name":"Query"},"mutationType":{"name":"Mutation"},"subscriptionType":null,"types":[{"kind":"OBJECT","name":"Query","description":null},{"kind":"OBJECT","name":"Mutation","description":null}]}}}
+HTTP 200

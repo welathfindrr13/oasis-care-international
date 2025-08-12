@@ -1,0 +1,23 @@
+{
+  "directories": [
+    "apps",
+    "cypress",
+    "design",
+    "design-cache",
+    "docs",
+    "infrastructure",
+    "libs",
+    "ops",
+    "prisma",
+    "scripts"
+  ],
+  "key_files": [
+    "package.json",
+    "pnpm-workspace.yaml",
+    "turbo.json",
+    "tsconfig.json",
+    "README.md",
+    "ROADMAP.md"
+  ],
+  "note": "Top-level index at depth 1. Excluded: node_modules, .git, .github, .turbo directories"
+}

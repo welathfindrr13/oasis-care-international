@@ -1,0 +1,9 @@
+{
+  "has_web_app": true,
+  "package_json_exists": true,
+  "app_dir_exists": true,
+  "pages_dir_exists": false,
+  "tailwind_config_exists": true,
+  "tokens_css_exists": true,
+  "framework": "Next.js App Router"
+}

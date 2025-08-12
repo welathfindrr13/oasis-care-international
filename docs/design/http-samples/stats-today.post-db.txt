@@ -1,0 +1,2 @@
+{"visitCount":0,"appointmentCount":0,"medicationCount":0,"alertsCount":0}
+HTTP 200

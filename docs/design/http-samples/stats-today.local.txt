@@ -1,0 +1,9 @@
+TIMEOUT: Operation timed out after 5002ms with 0 bytes received
+Status: HTTP 200 (from Next.js logs: "GET /api/stats/today 200 in 5008ms")
+Response: Endpoint exists but response too slow (>5s timeout)
+
+Headers: Unable to capture due to timeout
+Body: Unable to capture due to timeout
+
+Note: URL plumbing ✅ - endpoint accessible and returns 200
+Backend health ⛔ - slow response time indicates backend issues

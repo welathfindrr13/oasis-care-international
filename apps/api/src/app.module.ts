@@ -10,7 +10,7 @@ import { JwtStrategy } from '@oasis/auth';
 import { PrismaService } from '@oasis/db';
 import { LoggerModule } from './logger/logger.module';
 import { HealthModule } from './health/health.module';
-import { MetricsModule } from './metrics/metrics.module';
+import { MetricsDynamicModule } from './metrics/metrics.dynamic.module';
 import { VisitModule } from './visit/visit.module';
 import { StatsModule } from './stats/stats.module';
 import { MedicationModule } from './medication/medication.module';
@@ -18,7 +18,7 @@ import { formatGraphQLError } from './common/filters/graphql-error.filter';
 
 @Module({
   imports: [
-    MetricsModule,
+    MetricsDynamicModule.register(process.env.METRICS_ENABLED === 'true'),
     LoggerModule,
     HealthModule,
     ConfigModule,

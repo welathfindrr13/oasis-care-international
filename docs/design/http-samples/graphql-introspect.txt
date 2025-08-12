@@ -1,0 +1,6 @@
+Test: POST /api/graphql {"query":"query{__typename}"}
+Status: HTTP 500 (expected - GraphQL also timing out to backend)
+Result: ✅ URL FIX SUCCESS - Proxy working, same backend DI issue
+
+Previous: "TypeError: Invalid URL" (relative URL in server context)
+Fixed: Absolute URLs with cookie forwarding working

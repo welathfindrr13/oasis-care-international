@@ -1,0 +1,41 @@
+{
+  "ui_components": [
+    {
+      "path": "apps/web/components/ui/Button.tsx",
+      "type": "ui"
+    },
+    {
+      "path": "apps/web/components/ui/Card.tsx",
+      "type": "ui"
+    },
+    {
+      "path": "apps/web/components/ui/index.ts",
+      "type": "ui"
+    }
+  ],
+  "feature_components": [
+    {
+      "path": "apps/web/components/MedsTab.tsx",
+      "type": "feature"
+    },
+    {
+      "path": "apps/web/components/HealthSummary/ApprovalControls.tsx",
+      "type": "feature"
+    },
+    {
+      "path": "apps/web/components/HealthSummary/RiskIndicator.tsx",
+      "type": "feature"
+    },
+    {
+      "path": "apps/web/components/HealthSummary/SummaryViewer.tsx",
+      "type": "feature"
+    },
+    {
+      "path": "apps/web/components/HealthSummary/index.ts",
+      "type": "feature"
+    }
+  ],
+  "ui_component_count": 3,
+  "feature_component_count": 5,
+  "total_component_count": 8
+}

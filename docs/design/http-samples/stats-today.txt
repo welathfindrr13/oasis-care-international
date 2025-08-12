@@ -1,0 +1,6 @@
+Test: GET /api/stats/today
+Status: HTTP 500
+Result: ✅ URL FIX SUCCESS - Server responds (backend error expected due to DI issue)
+
+Previous: "TypeError: Invalid URL" (relative URL in server context)
+Fixed: Absolute URLs with cookie forwarding working

@@ -1,0 +1,21 @@
+{
+  "design_tokens": {
+    "path": "design/tokens.json",
+    "bytes": 8612,
+    "first2000": "{ '$schema': 'https://raw.githubusercontent.com/tokens-studio/figma-plugin/main/token-transformer/schemas/tokens.schema.json', 'version': '1.0.0', 'source': { 'figmaFile': 'XPh9lANClKeAtHfnDT5q7l', 'figmaName': 'A's team library', 'extractedAt': '2025-08-11T15:03:00Z' }, 'color': { 'base': { 'black': { 'value': '#000000', 'type': 'color', 'description': 'Primary black color' }, 'white': { 'value': '#FFFFFF', 'type': 'color', 'description': 'Primary white color' }, 'gray': { '50': { 'value': '#FAFAFA', 'type': 'color', 'description': 'Very light gray' }, '100': { 'value': '#EDF5FA', 'type': 'color', 'description': 'Light blue-gray' }, '300': { 'value': '#D8D8D8', 'type': 'color', 'description': 'Light gray' }, '500': { 'value': '#AFAFAF', 'type': 'color', 'description': 'Medium gray' }, '800': { 'value': 'rgba(0, 0, 0, 0.8)', 'type': 'color', 'description': 'Dark gray with opacity' } } }, 'brand': { 'fuschia': {...",
+    "has_colors": true,
+    "has_typography": true,
+    "has_spacing": true
+  },
+  "tokens_css": {
+    "path": "apps/web/styles/tokens.css",
+    "bytes": 5387,
+    "exists": true,
+    "note": "CSS custom properties generated from design tokens"
+  },
+  "tailwind_integration": {
+    "config_exists": true,
+    "path": "apps/web/tailwind.config.js",
+    "bytes": 2958
+  }
+}
