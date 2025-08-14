@@ -1,14 +1,11 @@
 import { Module } from '@nestjs/common';
-import {
-  PrometheusModule,
-  makeCounterProvider,
-} from '@willsoto/nestjs-prometheus';
+import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import { RolesGuard } from '@oasis/auth';
 import { Controller, Get, UseGuards, Res } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { SetMetadata } from '@nestjs/common';
 import { Response } from 'express';
-import { register } from 'prom-client';
+import { register, Counter } from 'prom-client';
 
 // Roles decorator
 export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => 
@@ -26,34 +23,29 @@ export class MetricsController {
   }
 }
 
-// --- Provider constants ----------------------
-const visitOverlapCounterProvider = makeCounterProvider({
-  name: 'visit_overlap_total',
-  help: 'Number of visit‐overlap attempts rejected',
-});
-
-const visitsCreatedCounterProvider = makeCounterProvider({
-  name: 'visits_created_total',
-  help: 'Number of visits successfully created',
-});
-
-// --- Module ----------------------------------
-@Module({
-  imports: [
-    PrometheusModule.register({
-      defaultMetrics: {
-        enabled: true,
-      },
+const visitOverlapCounterProvider = {
+  provide: 'visit_overlap_total',
+  useFactory: () =>
+    new Counter({
+      name: 'visit_overlap_total',
+      help: 'Number of visit-overlap attempts rejected',
     }),
-  ],
+};
+
+const visitsCreatedCounterProvider = {
+  provide: 'visits_created_total',
+  useFactory: () =>
+    new Counter({
+      name: 'visits_created_total',
+      help: 'Number of visits successfully created',
+    }),
+};
+
+@Module({
+  // Import Prometheus exactly once here
+  imports: [PrometheusModule.register()],
   controllers: [MetricsController],
-  providers: [
-    visitOverlapCounterProvider,
-    visitsCreatedCounterProvider,
-  ],
-  exports: [
-    visitOverlapCounterProvider,
-    visitsCreatedCounterProvider,
-  ],
+  providers: [visitOverlapCounterProvider, visitsCreatedCounterProvider],
+  exports: [visitOverlapCounterProvider, visitsCreatedCounterProvider],
 })
 export class MetricsModule {}
