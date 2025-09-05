@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import SummaryViewer from '../../../../components/HealthSummary/SummaryViewer';
 import ApprovalControls from '../../../../components/HealthSummary/ApprovalControls';
@@ -194,11 +194,6 @@ export default function SummaryPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  useEffect(() => {
-    loadCurrentSummary();
-    checkAIEnabled();
-  }, [clientId]);
-
   const checkAIEnabled = async () => {
     try {
       // Mock API call to check if AI is enabled for this client's organization
@@ -210,7 +205,7 @@ export default function SummaryPage() {
     }
   };
 
-  const loadCurrentSummary = async () => {
+  const loadCurrentSummary = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -249,7 +244,12 @@ export default function SummaryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [clientId]);
+
+  useEffect(() => {
+    loadCurrentSummary();
+    checkAIEnabled();
+  }, [clientId, loadCurrentSummary]);
 
   const handleGenerateSummary = async () => {
     try {

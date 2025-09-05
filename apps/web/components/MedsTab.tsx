@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { fetcher } from '../lib/api';
 
 interface MedicationAdministration {
@@ -30,57 +30,53 @@ interface MedsTabProps {
   userRole: string;
 }
 
+// Mock data for demonstration
+const mockMedications: MedicationAdministration[] = [
+  {
+    id: '1',
+    scheduledTime: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes from now
+    status: 'SCHEDULED',
+    prescription: {
+      id: 'p1',
+      medication: {
+        name: 'Metformin',
+        dosage: '500',
+        unit: 'mg'
+      },
+      client: {
+        fullName: 'John Smith'
+      },
+      administrationTimes: ['08:00', '20:00'],
+      specialInstructions: 'Take with food'
+    }
+  },
+  {
+    id: '2',
+    scheduledTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours from now
+    status: 'SCHEDULED',
+    prescription: {
+      id: 'p2',
+      medication: {
+        name: 'Lisinopril',
+        dosage: '10',
+        unit: 'mg'
+      },
+      client: {
+        fullName: 'John Smith'
+      },
+      administrationTimes: ['12:00'],
+      specialInstructions: 'Monitor blood pressure'
+    }
+  }
+];
+
 export default function MedsTab({ visitId, userId, userRole }: MedsTabProps) {
   const [medications, setMedications] = useState<MedicationAdministration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 
-  // Mock data for demonstration
-  const mockMedications: MedicationAdministration[] = [
-    {
-      id: '1',
-      scheduledTime: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes from now
-      status: 'SCHEDULED',
-      prescription: {
-        id: 'p1',
-        medication: {
-          name: 'Metformin',
-          dosage: '500',
-          unit: 'mg'
-        },
-        client: {
-          fullName: 'John Smith'
-        },
-        administrationTimes: ['08:00', '20:00'],
-        specialInstructions: 'Take with food'
-      }
-    },
-    {
-      id: '2',
-      scheduledTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours from now
-      status: 'SCHEDULED',
-      prescription: {
-        id: 'p2',
-        medication: {
-          name: 'Lisinopril',
-          dosage: '10',
-          unit: 'mg'
-        },
-        client: {
-          fullName: 'John Smith'
-        },
-        administrationTimes: ['12:00'],
-        specialInstructions: 'Monitor blood pressure'
-      }
-    }
-  ];
-
-  useEffect(() => {
-    fetchDueMedications();
-  }, [visitId]);
-
-  const fetchDueMedications = async () => {
+  const fetchDueMedications = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -93,7 +89,11 @@ export default function MedsTab({ visitId, userId, userRole }: MedsTabProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchDueMedications();
+  }, [visitId, fetchDueMedications]);
 
   const recordAdministration = async (
     administrationId: string, 
