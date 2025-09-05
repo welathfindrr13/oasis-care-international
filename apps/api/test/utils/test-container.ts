@@ -5,7 +5,7 @@ export async function startPostgres(): Promise<{
   container: StartedTestContainer;
   dbUrl: string;
 }> {
-  const container = await new GenericContainer('postgres:16-alpine')
+  const container = await new GenericContainer('pgvector/pgvector:pg16')
     .withEnvironment({
       POSTGRES_USER: 'test',
       POSTGRES_PASSWORD: 'test',
@@ -17,6 +17,12 @@ export async function startPostgres(): Promise<{
   const port = container.getMappedPort(5432);
   const host = container.getHost();
   const dbUrl = `postgresql://test:test@${host}:${port}/oasis_test`;
+
+  // Create vector extension before running migrations
+  execSync(
+    `psql "${dbUrl}" -c "CREATE EXTENSION IF NOT EXISTS vector;"`,
+    { stdio: 'inherit' }
+  );
 
   // apply migrations
   execSync(
