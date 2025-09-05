@@ -8,17 +8,17 @@ resource "aws_ecs_task_definition" "api" {
 
   container_definitions = jsonencode([
     {
-      name      = "api",
-      image     = "721689331449.dkr.ecr.eu-west-2.amazonaws.com/oasis-backend:latest",
+      name         = "api",
+      image        = "721689331449.dkr.ecr.eu-west-2.amazonaws.com/oasis-backend:latest",
       portMappings = [{ containerPort = 4000, protocol = "tcp" }],
       environment = [
-        { name = "PORT",         value = "4000" },
-        { name = "NODE_ENV",     value = "production" },
+        { name = "PORT", value = "4000" },
+        { name = "NODE_ENV", value = "production" },
         { name = "FRONTEND_URL", value = var.frontend_url }
       ],
       secrets = [
         { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn },
-        { name = "JWT_SECRET",   valueFrom = aws_ssm_parameter.jwt_secret.arn }
+        { name = "JWT_SECRET", valueFrom = aws_ssm_parameter.jwt_secret.arn }
       ],
       healthCheck = {
         command     = ["CMD-SHELL", "wget -qO- http://localhost:4000/healthz || exit 1"],
@@ -52,8 +52,8 @@ resource "aws_ecs_service" "api" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = aws_subnet.private[*].id
-    security_groups = [aws_security_group.ecs.id]
+    subnets          = aws_subnet.private[*].id
+    security_groups  = [aws_security_group.ecs.id]
     assign_public_ip = false
   }
 
@@ -63,7 +63,7 @@ resource "aws_ecs_service" "api" {
     container_port   = 4000
   }
 
-  lifecycle { 
-    ignore_changes = [desired_count] 
+  lifecycle {
+    ignore_changes = [desired_count]
   }
 }

@@ -4,7 +4,7 @@ resource "aws_lambda_function" "embedding_generator" {
   role          = aws_iam_role.lambda_embedding_execution.arn
   handler       = "index.handler"
   runtime       = "nodejs20.x"
-  timeout       = 900  # 15 minutes
+  timeout       = 900 # 15 minutes
   memory_size   = 1024
 
   # Placeholder code - will be replaced by deployment pipeline
@@ -43,7 +43,7 @@ resource "aws_lambda_function" "embedding_generator" {
 data "archive_file" "lambda_placeholder" {
   type        = "zip"
   output_path = "${path.module}/lambda-placeholder.zip"
-  
+
   source {
     content = jsonencode({
       message = "Placeholder Lambda - will be replaced by CI/CD"

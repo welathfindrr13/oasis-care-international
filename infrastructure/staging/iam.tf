@@ -5,7 +5,7 @@ resource "aws_iam_role" "ecs_task_execution" {
 
 data "aws_iam_policy_document" "ecs_task_assume" {
   statement {
-    effect = "Allow"
+    effect  = "Allow"
     actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
@@ -29,12 +29,12 @@ resource "aws_iam_role_policy" "read_secrets" {
 
 data "aws_iam_policy_document" "read_secrets" {
   statement {
-    effect    = "Allow"
-    actions   = ["ssm:GetParameter", "secretsmanager:GetSecretValue"]
+    effect  = "Allow"
+    actions = ["ssm:GetParameter", "secretsmanager:GetSecretValue"]
     resources = [
       aws_secretsmanager_secret.database_url.arn,
-      aws_secretsmanager_secret.jwt_signing_key.arn,  # New JWT secret
-      aws_ssm_parameter.jwt_secret.arn                 # Keep temporarily for rollback
+      aws_secretsmanager_secret.jwt_signing_key.arn, # New JWT secret
+      aws_ssm_parameter.jwt_secret.arn               # Keep temporarily for rollback
     ]
   }
 }
@@ -67,7 +67,7 @@ resource "aws_iam_role" "lambda_embedding_execution" {
 
 data "aws_iam_policy_document" "lambda_assume" {
   statement {
-    effect = "Allow"
+    effect  = "Allow"
     actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
