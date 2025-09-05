@@ -15,6 +15,7 @@ import { VisitModule } from './visit/visit.module';
 import { StatsModule } from './stats/stats.module';
 import { MedicationModule } from './medication/medication.module';
 import { formatGraphQLError } from './common/filters/graphql-error.filter';
+import { GdprModule } from './gdpr/gdpr.module';
 
 @Module({
   imports: [
@@ -49,6 +50,8 @@ import { formatGraphQLError } from './common/filters/graphql-error.filter';
     VisitModule,
     StatsModule,
     MedicationModule,
+    // GDPR module (feature-flagged)
+    ...(process.env.GDPR_ENABLED === 'true' ? [GdprModule] : []),
     // Add other feature modules here
   ],
   providers: [
