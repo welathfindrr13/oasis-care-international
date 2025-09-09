@@ -36,7 +36,9 @@ async function bootstrap() {
   );
 
   const port = process.env.PORT || 4000;
-  await app.listen(port);
+  const origins=(process.env.ALLOWED_ORIGINS||"").split(",").filter(Boolean);
+app.enableCors({ origin: origins, credentials: true });
+await app.listen(process.env.PORT || 4000);
   // console.log removed – use logger
   // console.log removed – use logger
   // console.log removed – use logger
