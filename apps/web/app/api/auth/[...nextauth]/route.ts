@@ -6,7 +6,7 @@ const handler = NextAuth({
     Cognito({
       issuer: process.env.COGNITO_ISSUER,
       clientId: process.env.COGNITO_CLIENT_ID!,
-      clientSecret: process.env.COGNITO_CLIENT_SECRET,
+      clientSecret: process.env.COGNITO_CLIENT_SECRET!,
     }),
   ],
   callbacks: {
