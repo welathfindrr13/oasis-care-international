@@ -1,0 +1,37 @@
+size,hierarchy,state,exists,paddingX,paddingY,radius,textStyle,backgroundColor,textColor,notes
+sm,primary,default,FALSE,,,,,,,Missing small primary button
+sm,primary,hover,FALSE,,,,,,,Missing small primary hover
+sm,primary,focus,FALSE,,,,,,,Missing small primary focus  
+sm,primary,disabled,FALSE,,,,,,,Missing small primary disabled
+sm,secondary,default,FALSE,,,,,,,Missing small secondary button
+sm,secondary,hover,FALSE,,,,,,,Missing small secondary hover
+sm,secondary,focus,FALSE,,,,,,,Missing small secondary focus
+sm,secondary,disabled,FALSE,,,,,,,Missing small secondary disabled
+sm,ghost,default,FALSE,,,,,,,Missing small ghost button
+sm,ghost,hover,FALSE,,,,,,,Missing small ghost hover
+sm,ghost,focus,FALSE,,,,,,,Missing small ghost focus
+sm,ghost,disabled,FALSE,,,,,,,Missing small ghost disabled
+md,primary,default,TRUE,13,11,1000px,Inter 500 12px,#56CCF2,#FFFFFF,Light blue button in frame 09
+md,primary,hover,TRUE,11,11,1000px,Inter 500 12px,#359DD9,#FFFFFF,Medium blue hover button in frame 09
+md,primary,focus,FALSE,,,,,,,Missing medium primary focus
+md,primary,disabled,FALSE,,,,,,,Missing medium primary disabled
+md,secondary,default,TRUE,13,11,1000px,Inter 500 12px,#AFAFAF,#FFFFFF,Gray button example
+md,secondary,hover,FALSE,,,,,,,Missing medium secondary hover
+md,secondary,focus,FALSE,,,,,,,Missing medium secondary focus
+md,secondary,disabled,FALSE,,,,,,,Missing medium secondary disabled
+md,ghost,default,FALSE,,,,,,,Missing medium ghost button
+md,ghost,hover,FALSE,,,,,,,Missing medium ghost hover
+md,ghost,focus,FALSE,,,,,,,Missing medium ghost focus
+md,ghost,disabled,FALSE,,,,,,,Missing medium ghost disabled
+lg,primary,default,FALSE,,,,,,,Missing large primary button
+lg,primary,hover,FALSE,,,,,,,Missing large primary hover
+lg,primary,focus,FALSE,,,,,,,Missing large primary focus
+lg,primary,disabled,FALSE,,,,,,,Missing large primary disabled
+lg,secondary,default,FALSE,,,,,,,Missing large secondary button
+lg,secondary,hover,FALSE,,,,,,,Missing large secondary hover
+lg,secondary,focus,FALSE,,,,,,,Missing large secondary focus
+lg,secondary,disabled,FALSE,,,,,,,Missing large secondary disabled
+lg,ghost,default,FALSE,,,,,,,Missing large ghost button
+lg,ghost,hover,FALSE,,,,,,,Missing large ghost hover
+lg,ghost,focus,FALSE,,,,,,,Missing large ghost focus
+lg,ghost,disabled,FALSE,,,,,,,Missing large ghost disabled

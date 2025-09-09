@@ -69,3 +69,4 @@ terraform.tfstate.backup
 
 # Design cache (contains Figma API responses)
 design-cache/
+**/.env.production

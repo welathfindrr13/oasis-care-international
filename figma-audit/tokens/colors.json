@@ -1,0 +1,180 @@
+{
+  "auditTimestamp": "2025-08-19T13:49:00Z",
+  "publishedColors": [
+    {
+      "name": "Fuschia/100",
+      "hex": "#EF5DA8", 
+      "description": "Primary fuschia",
+      "origin": "figma"
+    },
+    {
+      "name": "Fuschia/80",
+      "hex": "#F178B6",
+      "description": "Light fuschia", 
+      "origin": "figma"
+    },
+    {
+      "name": "Fuschia/60",
+      "hex": "#FCDDEC",
+      "description": "Very light fuschia",
+      "origin": "figma"
+    },
+    {
+      "name": "Iris/100", 
+      "hex": "#5D5FEF",
+      "description": "Primary iris/purple",
+      "origin": "figma"
+    },
+    {
+      "name": "Iris/80",
+      "hex": "#7879F1", 
+      "description": "Light iris",
+      "origin": "figma"
+    },
+    {
+      "name": "Iris/60",
+      "hex": "#A5A6F6",
+      "description": "Very light iris", 
+      "origin": "figma"
+    }
+  ],
+  "additionalColorsFound": [
+    {
+      "name": "Base/Black",
+      "hex": "#000000",
+      "description": "Pure black",
+      "origin": "figma"
+    },
+    {
+      "name": "Base/White", 
+      "hex": "#FFFFFF",
+      "description": "Pure white",
+      "origin": "figma"
+    },
+    {
+      "name": "Base/Gray-50",
+      "hex": "#FAFAFA",
+      "description": "Very light gray background",
+      "origin": "figma"
+    },
+    {
+      "name": "Base/Gray-800",
+      "hex": "rgba(0, 0, 0, 0.8)",
+      "description": "Dark gray with opacity",
+      "origin": "figma"
+    },
+    {
+      "name": "Brand/Blue-Primary",
+      "hex": "#007BE5", 
+      "description": "Primary blue accent",
+      "origin": "figma"
+    },
+    {
+      "name": "Brand/Blue-Light",
+      "hex": "#56CCF2",
+      "description": "Light blue for buttons",
+      "origin": "figma"
+    },
+    {
+      "name": "Brand/Blue-Medium", 
+      "hex": "#359DD9",
+      "description": "Medium blue for button hovers",
+      "origin": "figma"
+    },
+    {
+      "name": "Base/Gray-300",
+      "hex": "#D8D8D8",
+      "description": "Light gray placeholder",
+      "origin": "figma"
+    },
+    {
+      "name": "Semantic/Text-Primary",
+      "hex": "#0E0E2C",
+      "description": "Primary text color",
+      "origin": "figma"
+    }
+  ],
+  "missingScales": [
+    {
+      "group": "Fuschia",
+      "existing": ["100", "80", "60"],
+      "missing": ["40", "20", "10"],
+      "recommendation": "Add darker Fuschia variants for better contrast options"
+    },
+    {
+      "group": "Iris", 
+      "existing": ["100", "80", "60"],
+      "missing": ["40", "20", "10"],
+      "recommendation": "Add darker Iris variants for better contrast options"
+    }
+  ],
+  "semanticAliases": [
+    {
+      "alias": "Primary",
+      "ref": "Iris/100",
+      "hex": "#5D5FEF",
+      "reason": "Main brand color used for primary actions"
+    },
+    {
+      "alias": "Accent", 
+      "ref": "Fuschia/100",
+      "hex": "#EF5DA8",
+      "reason": "Secondary brand color for highlights"
+    },
+    {
+      "alias": "Info",
+      "ref": "Brand/Blue-Primary", 
+      "hex": "#007BE5",
+      "reason": "Information and link color"
+    },
+    {
+      "alias": "Success",
+      "ref": "MISSING",
+      "hex": "#MISSING", 
+      "reason": "No green success color found - recommend adding"
+    },
+    {
+      "alias": "Warning",
+      "ref": "MISSING",
+      "hex": "#MISSING",
+      "reason": "No yellow/orange warning color found - recommend adding"
+    },
+    {
+      "alias": "Danger",
+      "ref": "MISSING", 
+      "hex": "#MISSING",
+      "reason": "No red danger/error color found - recommend adding"
+    },
+    {
+      "alias": "Surface",
+      "ref": "Base/White",
+      "hex": "#FFFFFF",
+      "reason": "Primary background surface"
+    },
+    {
+      "alias": "Surface-Muted",
+      "ref": "Base/Gray-50",
+      "hex": "#FAFAFA", 
+      "reason": "Secondary background surface"
+    },
+    {
+      "alias": "Text",
+      "ref": "Semantic/Text-Primary",
+      "hex": "#0E0E2C",
+      "reason": "Primary text color"
+    },
+    {
+      "alias": "Text-Muted",
+      "ref": "Base/Gray-800",
+      "hex": "rgba(0, 0, 0, 0.8)",
+      "reason": "Secondary text color"
+    }
+  ],
+  "recommendations": [
+    "Add missing scale values: Fuschia/40, Fuschia/20, Fuschia/10, Iris/40, Iris/20, Iris/10", 
+    "Add semantic colors: Success (green), Warning (yellow/orange), Danger (red)",
+    "Consider adding neutral gray scale: Gray/100, Gray/200, Gray/400, Gray/600, Gray/700, Gray/900",
+    "Publish utility colors like borders, dividers, and disabled states",
+    "Group related colors using Group/Color naming convention consistently"
+  ]
+}

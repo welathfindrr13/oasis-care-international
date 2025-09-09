@@ -1,0 +1,54 @@
+=== ENVIRONMENT SNAPSHOT ===
+Date: Tue Aug 12 21:03:56 BST 2025
+
+VERSIONS:
+v22.14.0
+10.9.2
+Docker version 27.5.1, build 9f9e405
+DOCKER CONTAINERS:
+CONTAINER ID   IMAGE                    COMMAND                  CREATED             STATUS             PORTS                     NAMES
+6f0caded0412   pgvector/pgvector:pg16   "docker-entrypoint.s…"   About an hour ago   Up About an hour   0.0.0.0:5432->5432/tcp    oasis-pg
+b87ee5846098   oasis-api:dryrun         "docker-entrypoint.s…"   3 days ago          Up 3 days          0.0.0.0:4000->4000/tcp    oasis-api
+808ce1247191   test-pgvector:15         "docker-entrypoint.s…"   4 days ago          Up 4 days          0.0.0.0:55065->5432/tcp   relaxed_cerf
+e3ec1ae2358f   test-pgvector:15         "docker-entrypoint.s…"   4 days ago          Up 4 days          0.0.0.0:55064->5432/tcp   quirky_hamilton
+fb18c7d32a48   test-pgvector:15         "docker-entrypoint.s…"   4 days ago          Up 4 days          0.0.0.0:55063->5432/tcp   sad_noyce
+d6378ac203f3   postgres:16-alpine       "docker-entrypoint.s…"   6 days ago          Up 6 days          0.0.0.0:55061->5432/tcp   friendly_gould
+a58741c417ca   postgres:16-alpine       "docker-entrypoint.s…"   6 days ago          Up 6 days          0.0.0.0:55060->5432/tcp   pedantic_wilbur
+a2b430792aa3   postgres:16-alpine       "docker-entrypoint.s…"   6 days ago          Up 6 days          0.0.0.0:55059->5432/tcp   zealous_mirzakhani
+92c0a6215634   postgres:16-alpine       "docker-entrypoint.s…"   6 days ago          Up 6 days          0.0.0.0:55058->5432/tcp   wonderful_maxwell
+df0a33675bbf   postgres:16-alpine       "docker-entrypoint.s…"   6 days ago          Up 6 days          0.0.0.0:55057->5432/tcp   eager_villani
+944082d1e8f9   postgres:16-alpine       "docker-entrypoint.s…"   6 days ago          Up 6 days          0.0.0.0:55056->5432/tcp   brave_khayyam
+4e0890ee42ec   postgres:16-alpine       "docker-entrypoint.s…"   6 days ago          Up 6 days          0.0.0.0:55055->5432/tcp   romantic_moser
+4302d9c88b54   postgres:16-alpine       "docker-entrypoint.s…"   13 days ago         Up 13 days         0.0.0.0:55037->5432/tcp   pensive_swirles
+df02a0e9310b   postgres:16-alpine       "docker-entrypoint.s…"   13 days ago         Up 13 days         0.0.0.0:55036->5432/tcp   elegant_cori
+e5f9af8e2db2   postgres:16-alpine       "docker-entrypoint.s…"   13 days ago         Up 13 days         0.0.0.0:55035->5432/tcp   modest_dubinsky
+e3881eaa3cfc   postgres:16-alpine       "docker-entrypoint.s…"   13 days ago         Up 13 days         0.0.0.0:55034->5432/tcp   brave_diffie
+23f8d892acfd   postgres:16-alpine       "docker-entrypoint.s…"   13 days ago         Up 13 days         0.0.0.0:55033->5432/tcp   gracious_stonebraker
+07504e761b0d   postgres:16-alpine       "docker-entrypoint.s…"   13 days ago         Up 13 days         0.0.0.0:55032->5432/tcp   blissful_mclean
+043eb4bf3085   postgres:16-alpine       "docker-entrypoint.s…"   13 days ago         Up 13 days         0.0.0.0:55031->5432/tcp   objective_khorana
+0dd7a6b35a95   postgres:16-alpine       "docker-entrypoint.s…"   2 weeks ago         Up 2 weeks         0.0.0.0:55008->5432/tcp   musing_carver
+678350ea51e2   postgres:16-alpine       "docker-entrypoint.s…"   2 weeks ago         Up 2 weeks         0.0.0.0:55007->5432/tcp   sharp_napier
+920a5a44ba2a   postgres:16-alpine       "docker-entrypoint.s…"   2 weeks ago         Up 2 weeks         0.0.0.0:55006->5432/tcp   fervent_wilbur
+6c698c1b33ab   postgres:16-alpine       "docker-entrypoint.s…"   2 weeks ago         Up 2 weeks         0.0.0.0:55005->5432/tcp   pensive_ellis
+8d28e8c831d8   postgres:16-alpine       "docker-entrypoint.s…"   2 weeks ago         Up 2 weeks         0.0.0.0:55004->5432/tcp   peaceful_solomon
+a0495f16fae0   postgres:16-alpine       "docker-entrypoint.s…"   2 weeks ago         Up 2 weeks         0.0.0.0:55003->5432/tcp   zen_bell
+fb93e110c8a6   postgres:16-alpine       "docker-entrypoint.s…"   2 weeks ago         Up 2 weeks         0.0.0.0:55002->5432/tcp   frosty_ellis
+15ed0e8c748f   postgres:16-alpine       "docker-entrypoint.s…"   2 weeks ago         Up 2 weeks         0.0.0.0:55001->5432/tcp   relaxed_shaw
+d69c7d10da53   postgres:16-alpine       "docker-entrypoint.s…"   2 weeks ago         Up 2 weeks         0.0.0.0:55000->5432/tcp   sad_easley
+
+ENVIRONMENT FILES:
+=== apps/api/.env.local ===
+# Local Development Environment Configuration
+NODE_ENV=development
+JWT_SECRET=development-jwt-secret-key-at-least-32-characters-long-for-testing
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/oasis
+METRICS_ENABLED=true
+PORT=4000
+
+# AWS Configuration (not needed for local development)
+# AWS_REGION=eu-west-2
+
+=== apps/web/.env.local ===
+NEXT_PUBLIC_API_URL=http://localhost:4000
+NEXT_PUBLIC_SITE_URL=http://localhost:3002
+

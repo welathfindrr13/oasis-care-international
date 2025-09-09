@@ -1,0 +1,102 @@
+{
+  "framesFound": 11,
+  "frames": {
+    "01": {
+      "nodeId": "1:2",
+      "name": "01",
+      "type": "FRAME",
+      "guidance": "Starting frame (introductory)"
+    },
+    "02": {
+      "nodeId": "1:10", 
+      "name": "02",
+      "type": "FRAME",
+      "guidance": "Edit team color styles",
+      "keyText": "Published styles are shared with everyone on the team—they can be used by all team members in any of their files. Changing these styles will update them everywhere they're used. Change these default colors to your team's colors by selecting a color layer and clicking on in the Design panel to the right."
+    },
+    "03": {
+      "nodeId": "1:37",
+      "name": "03", 
+      "type": "FRAME",
+      "guidance": "Create color styles",
+      "keyText": "To create new styles, select a layer and fill it with the color you want as a style. Then click on in the color styles menu. Tip: You can group styles together using the naming convention Group/Color. For example: Fuschia/100"
+    },
+    "04": {
+      "nodeId": "1:65",
+      "name": "04",
+      "type": "FRAME", 
+      "guidance": "Use color styles",
+      "keyText": "Select a layer, then click on next to the Fill property in the panel to the right."
+    },
+    "05": {
+      "nodeId": "411:3",
+      "name": "05",
+      "type": "FRAME",
+      "guidance": "Edit text styles", 
+      "keyText": "Just like published color styles, published text styles are shared across your team. Change text styles by selecting a text layer with the style and clicking on in the panel to the right."
+    },
+    "06": {
+      "nodeId": "1:108",
+      "name": "06",
+      "type": "FRAME",
+      "guidance": "Create text styles",
+      "keyText": "To create new text styles, first select a text layer and format it with the type you want as a style. Then, click on in the text styles menu."
+    },
+    "07": {
+      "nodeId": "1:124", 
+      "name": "07",
+      "type": "FRAME",
+      "guidance": "Use text styles",
+      "keyText": "Select a text layer and click on next to the Text property to use text styles."
+    },
+    "08": {
+      "nodeId": "1:158",
+      "name": "08", 
+      "type": "FRAME",
+      "guidance": "Create components",
+      "keyText": "Create components out of commonly used objects such as buttons and icons to reuse them across your designs. Select an element and click Create Component in the top bar or the right-click menu. Tip: The keyboard shortcut to create a component is Ctrl Alt K on Windows, or ⌘⌥K on a Mac."
+    },
+    "09": {
+      "nodeId": "1:188",
+      "name": "09",
+      "type": "FRAME",
+      "guidance": "Use components", 
+      "keyText": "Drag and drop components onto your canvas from the Assets panel. If you're on an Education, Professional, or Organization team, you can publish them for team members to use across their own files.",
+      "hasButtons": true,
+      "buttonTypes": ["Default", "Hover"]
+    },
+    "10": {
+      "nodeId": "1:207",
+      "name": "10",
+      "type": "FRAME",
+      "guidance": "Publish your Team Library"
+    },
+    "11": {
+      "nodeId": "1:222", 
+      "name": "11",
+      "type": "FRAME",
+      "guidance": "Using your Team Library",
+      "keyText": "To use styles and components from Team Libraries, click on in the Assets panel in any of your files. Toggle on the ones you want to use in your design."
+    }
+  },
+  "colorStylesFound": [
+    {"name": "Fuschia 100", "nodeId": "1:12", "fill": "#EF5DA8"},
+    {"name": "Fuschia 80", "nodeId": "1:13", "fill": "#F178B6"},
+    {"name": "Fuschi 60", "nodeId": "1:14", "fill": "#FCDDEC"},
+    {"name": "Iris 100", "nodeId": "1:15", "fill": "#5D5FEF"}, 
+    {"name": "Iris 80", "nodeId": "1:16", "fill": "#7879F1"},
+    {"name": "Iris 60", "nodeId": "1:17", "fill": "#A5A6F6"}
+  ],
+  "textStylesFound": [
+    {"name": "Header 1", "nodeId": "1:87", "style": "style_42MZHA"},
+    {"name": "Header 2", "nodeId": "1:88", "style": "style_18UYPG"},
+    {"name": "Body", "nodeId": "1:89", "style": "style_6R2TW4"},
+    {"name": "Body small", "nodeId": "1:121", "style": "style_RNBONR"},
+    {"name": "Button text", "nodeId": "1:122", "style": "style_RNBONR"},
+    {"name": "Link text", "nodeId": "1:123", "style": "style_RNBONR"}
+  ],
+  "componentsFound": [
+    {"name": "Cursor/Pointer", "nodeId": "1:176", "type": "FRAME"},
+    {"name": "Cursor/Default", "nodeId": "1:185", "type": "FRAME"}
+  ]
+}

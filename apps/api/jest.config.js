@@ -25,4 +25,5 @@ module.exports = {
   },
   setupFilesAfterEnv: ['<rootDir>/test/jest-setup.ts'],
   testTimeout: 60000, // 60 seconds for container startup
+  reporters: ['default', ['jest-junit', require('../../jest-junit-config.js')]],
 };

@@ -1,0 +1,150 @@
+{
+  "auditTimestamp": "2025-08-19T13:50:00Z",
+  "publishedTextStyles": [
+    {
+      "name": "Heading/1", 
+      "fontFamily": "Work Sans",
+      "fontWeight": 700,
+      "fontSizePx": 34,
+      "lineHeightPx": 39.88,
+      "lineHeightRatio": 1.173,
+      "letterSpacing": "-2%",
+      "origin": "figma"
+    },
+    {
+      "name": "Heading/2",
+      "fontFamily": "Work Sans", 
+      "fontWeight": 700,
+      "fontSizePx": 20,
+      "lineHeightPx": 23.46,
+      "lineHeightRatio": 1.173,
+      "letterSpacing": "-2%",
+      "origin": "figma"
+    },
+    {
+      "name": "Body/Base",
+      "fontFamily": "Work Sans",
+      "fontWeight": 400,
+      "fontSizePx": 13,
+      "lineHeightPx": 15.25,
+      "lineHeightRatio": 1.173, 
+      "letterSpacing": "-2%",
+      "origin": "figma"
+    },
+    {
+      "name": "Body/Small", 
+      "fontFamily": "Droid Sans",
+      "fontWeight": 400,
+      "fontSizePx": 14,
+      "lineHeightPx": 16,
+      "lineHeightRatio": 1.143,
+      "letterSpacing": "0%",
+      "origin": "figma"
+    },
+    {
+      "name": "Button/Text",
+      "fontFamily": "Inter",
+      "fontWeight": 500,
+      "fontSizePx": 12, 
+      "lineHeightPx": 16,
+      "lineHeightRatio": 1.333,
+      "letterSpacing": "0%",
+      "origin": "figma"
+    }
+  ],
+  "additionalStylesFound": [
+    {
+      "name": "Display/Large",
+      "fontFamily": "Inter", 
+      "fontWeight": 700,
+      "fontSizePx": 72,
+      "lineHeightPx": 87.14,
+      "lineHeightRatio": 1.210,
+      "letterSpacing": "-1.7%",
+      "origin": "figma",
+      "usage": "Start here text"
+    },
+    {
+      "name": "Body/Medium",
+      "fontFamily": "Inter",
+      "fontWeight": 400,
+      "fontSizePx": 14,
+      "lineHeightPx": 24,
+      "lineHeightRatio": 1.714,
+      "letterSpacing": "-0.6%", 
+      "origin": "figma",
+      "usage": "Build your own team library text"
+    },
+    {
+      "name": "Caption/Small",
+      "fontFamily": "Inter",
+      "fontWeight": 700,
+      "fontSizePx": 11,
+      "lineHeightPx": 16,
+      "lineHeightRatio": 1.455,
+      "letterSpacing": "0.5%",
+      "origin": "figma",
+      "usage": "Instruction text"
+    }
+  ],
+  "coverageAnalysis": {
+    "target": ["Display", "H1", "H2", "H3", "H4", "H5", "H6", "Body-lg", "Body-md", "Body-sm", "Caption", "Button", "Link"],
+    "present": ["Display", "H1", "H2", "Body-md", "Body-sm", "Caption", "Button"],
+    "missing": ["H3", "H4", "H5", "H6", "Body-lg", "Link"], 
+    "coveragePercent": 53.8
+  },
+  "consistencyIssues": [
+    {
+      "issue": "Inconsistent font families",
+      "details": "Using Work Sans, Droid Sans, and Inter across different styles",
+      "recommendation": "Standardize on one primary font family (suggest Inter) with optional display/heading family"
+    },
+    {
+      "issue": "Inconsistent line heights", 
+      "details": "Line height ratios vary from 1.143 to 1.714 without clear pattern",
+      "recommendation": "Establish consistent line height scale: 1.1 (tight), 1.3 (normal), 1.5 (relaxed)"
+    },
+    {
+      "issue": "Missing link style",
+      "details": "No dedicated link text style found, using generic body text",
+      "recommendation": "Create Link style with Info color and underline decoration"
+    },
+    {
+      "issue": "Letter spacing inconsistency",
+      "details": "Letter spacing varies from -2% to +0.5% without systematic approach", 
+      "recommendation": "Use negative letter spacing only for large headings, 0% for body text"
+    }
+  ],
+  "localOverrides": [
+    {
+      "location": "Body small/Button text/Link text",
+      "issue": "Same text style (style_WGMEHB) used for multiple semantic purposes",
+      "recommendation": "Create separate Button and Link styles with appropriate colors"
+    }
+  ],
+  "recommendations": [
+    "Add missing heading levels: H3 (16px), H4 (14px), H5 (12px), H6 (10px)",
+    "Add Body-lg (16px) and dedicated Link style",
+    "Standardize font families: Inter for UI, Work Sans for headings (optional)",
+    "Establish consistent line height scale: Tight (1.1), Normal (1.3), Relaxed (1.5)",
+    "Create semantic text styles: Link, Caption-muted, Button-small, Button-large",
+    "Use consistent letter spacing: -1.5% for large headings, 0% for body/UI text",
+    "Publish text colors as part of text styles rather than separate color tokens"
+  ],
+  "fontStackAnalysis": {
+    "primary": "Inter", 
+    "usage": "Display text, captions, UI elements",
+    "fallback": ["system-ui", "sans-serif"]
+  },
+  "secondary": {
+    "primary": "Work Sans",
+    "usage": "Headings and body text", 
+    "fallback": ["system-ui", "sans-serif"]
+  },
+  "tertiary": {
+    "primary": "Droid Sans",
+    "usage": "Small body text",
+    "fallback": ["system-ui", "sans-serif"], 
+    "recommendation": "Consider removing to reduce font loading"
+  }
+}

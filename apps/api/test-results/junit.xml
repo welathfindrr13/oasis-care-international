@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="80" failures="15" errors="0" time="28.66">
+  <testsuite name="test/visit.e2e.spec.ts" errors="0" failures="11" skipped="0" timestamp="2025-09-09T08:38:27" time="15.132" tests="11">
+    <testcase classname="Visit E2E Tests Visit Creation" name="should create a visit successfully as admin" time="0.001">
+      <failure>Error: Command failed: cd ../../libs/db &amp;&amp; npx prisma migrate deploy
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/visit.e2e.spec.ts:49:13)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)</failure>
+    </testcase>
+    <testcase classname="Visit E2E Tests Visit Creation" name="should prevent overlapping visits for same carer" time="0">
+      <failure>Error: Command failed: cd ../../libs/db &amp;&amp; npx prisma migrate deploy
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/visit.e2e.spec.ts:49:13)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)</failure>
+    </testcase>
+    <testcase classname="Visit E2E Tests Visit Query - RBAC" name="should allow carer to view only their own visits" time="0">
+      <failure>Error: Command failed: cd ../../libs/db &amp;&amp; npx prisma migrate deploy
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/visit.e2e.spec.ts:49:13)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)</failure>
+    </testcase>
+    <testcase classname="Visit E2E Tests Visit Query - RBAC" name="should allow client to view only their visits (read-only)" time="0">
+      <failure>Error: Command failed: cd ../../libs/db &amp;&amp; npx prisma migrate deploy
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/visit.e2e.spec.ts:49:13)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)</failure>
+    </testcase>
+    <testcase classname="Visit E2E Tests Visit Query - RBAC" name="should prevent client from creating visits" time="0">
+      <failure>Error: Command failed: cd ../../libs/db &amp;&amp; npx prisma migrate deploy
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/visit.e2e.spec.ts:49:13)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)</failure>
+    </testcase>
+    <testcase classname="Visit E2E Tests Task Completion" name="should allow carer to complete their visit tasks" time="0">
+      <failure>Error: Command failed: cd ../../libs/db &amp;&amp; npx prisma migrate deploy
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/visit.e2e.spec.ts:49:13)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)</failure>
+    </testcase>
+    <testcase classname="Visit E2E Tests Task Completion" name="should prevent other carers from completing tasks" time="0">
+      <failure>Error: Command failed: cd ../../libs/db &amp;&amp; npx prisma migrate deploy
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/visit.e2e.spec.ts:49:13)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)</failure>
+    </testcase>
+    <testcase classname="Visit E2E Tests Visit Updates" name="should update visit schedule without conflicts" time="0">
+      <failure>Error: Command failed: cd ../../libs/db &amp;&amp; npx prisma migrate deploy
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/visit.e2e.spec.ts:49:13)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)</failure>
+    </testcase>
+    <testcase classname="Visit E2E Tests Visit Updates" name="should prevent update if it creates overlap" time="0">
+      <failure>Error: Command failed: cd ../../libs/db &amp;&amp; npx prisma migrate deploy
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/visit.e2e.spec.ts:49:13)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)</failure>
+    </testcase>
+    <testcase classname="Visit E2E Tests Visit Deletion" name="should soft delete visit as admin" time="0">
+      <failure>Error: Command failed: cd ../../libs/db &amp;&amp; npx prisma migrate deploy
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/visit.e2e.spec.ts:49:13)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)</failure>
+    </testcase>
+    <testcase classname="Visit E2E Tests Visit Deletion" name="should prevent non-admin from deleting visits" time="0">
+      <failure>Error: Command failed: cd ../../libs/db &amp;&amp; npx prisma migrate deploy
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/visit.e2e.spec.ts:49:13)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)</failure>
+    </testcase>
+    <testcase classname="" name="Test execution failure: could be caused by test hooks like &apos;afterAll&apos;." time="0">
+      <failure>{&quot;message&quot;:&quot;&quot;,&quot;stack&quot;:&quot;TypeError: Cannot read properties of undefined (reading &apos;close&apos;)\n    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/visit.e2e.spec.ts:124:15)\n    at Promise.then.completed (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (&lt;anonymous&gt;)\n    at callAsyncCircusFn (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusHook (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/run.js:281:40)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at _runTestsForDescribeBlock (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/run.js:154:7)\n    at _runTestsForDescribeBlock (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/run.js:121:9)\n    at run (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-runner@29.7.0/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-runner@29.7.0/node_modules/jest-runner/build/runTest.js:444:34)&quot;}</failure>
+    </testcase>
+  </testsuite>
+  <testsuite name="src/medication/__tests__/medication.service.spec.ts" errors="0" failures="0" skipped="0" timestamp="2025-09-09T08:38:42" time="0.606" tests="14">
+    <testcase classname="MedicationService recordAdministration" name="should successfully record medication administration" time="0.006">
+    </testcase>
+    <testcase classname="MedicationService recordAdministration" name="should throw error if administration record not found" time="0.008">
+    </testcase>
+    <testcase classname="MedicationService recordAdministration" name="should throw error if carer tries to record for different visit" time="0.001">
+    </testcase>
+    <testcase classname="MedicationService recordAdministration" name="should detect and prevent medication overlap" time="0.001">
+    </testcase>
+    <testcase classname="MedicationService recordAdministration" name="should allow overlap with the same administration record" time="0.001">
+    </testcase>
+    <testcase classname="MedicationService recordAdministration" name="should record missed medication without overlap check" time="0.001">
+    </testcase>
+    <testcase classname="MedicationService listDueMeds" name="should return due medications for carer&apos;s own visit" time="0.001">
+    </testcase>
+    <testcase classname="MedicationService listDueMeds" name="should filter out medications for other carers" time="0.001">
+    </testcase>
+    <testcase classname="MedicationService listDueMeds" name="should return all medications for admin users" time="0.001">
+    </testcase>
+    <testcase classname="MedicationService getTodaysMedicationsByClient" name="should throw error for non-office users" time="0.003">
+    </testcase>
+    <testcase classname="MedicationService getTodaysMedicationsByClient" name="should return medications for office users" time="0.001">
+    </testcase>
+    <testcase classname="MedicationService getTodaysMedicationsByClient" name="should return medications for admin users" time="0">
+    </testcase>
+    <testcase classname="MedicationService permission checks" name="should allow admin to create medications" time="0">
+    </testcase>
+    <testcase classname="MedicationService permission checks" name="should prevent non-admin from creating medications" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="test/visit.service.spec.ts" errors="0" failures="0" skipped="0" timestamp="2025-09-09T08:38:42" time="0.349" tests="15">
+    <testcase classname="VisitService createVisit" name="should create a visit successfully" time="0.001">
+    </testcase>
+    <testcase classname="VisitService createVisit" name="should throw BaseHttpException for overlapping visits" time="0.009">
+    </testcase>
+    <testcase classname="VisitService updateVisit" name="should update a visit successfully" time="0.001">
+    </testcase>
+    <testcase classname="VisitService updateVisit" name="should throw BaseHttpException if visit not found" time="0.001">
+    </testcase>
+    <testcase classname="VisitService updateVisit" name="should throw BaseHttpException for unauthorized carer" time="0">
+    </testcase>
+    <testcase classname="VisitService findVisitById" name="should return a visit for authorized user" time="0.001">
+    </testcase>
+    <testcase classname="VisitService findVisitById" name="should throw BaseHttpException for unauthorized carer" time="0.005">
+    </testcase>
+    <testcase classname="VisitService findVisitById" name="should allow client to read their own visits" time="0.001">
+    </testcase>
+    <testcase classname="VisitService findVisits" name="should return paginated visits for admin" time="0.001">
+    </testcase>
+    <testcase classname="VisitService findVisits" name="should filter visits by carer role" time="0.001">
+    </testcase>
+    <testcase classname="VisitService completeTask" name="should complete a task successfully" time="0">
+    </testcase>
+    <testcase classname="VisitService completeTask" name="should throw BaseHttpException if task not found" time="0.001">
+    </testcase>
+    <testcase classname="VisitService deleteVisit" name="should soft delete a visit" time="0.001">
+    </testcase>
+    <testcase classname="VisitService deleteVisit" name="should throw BaseHttpException for carers trying to delete other carers visits" time="0">
+    </testcase>
+    <testcase classname="VisitService deleteVisit" name="should allow carers to delete their own visits" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="test/visit.resolver.spec.ts" errors="0" failures="0" skipped="0" timestamp="2025-09-09T08:38:43" time="0.622" tests="11">
+    <testcase classname="VisitResolver visit" name="should return a visit by id" time="0.002">
+    </testcase>
+    <testcase classname="VisitResolver visits" name="should return paginated visits" time="0.001">
+    </testcase>
+    <testcase classname="VisitResolver visits" name="should use carer role from context" time="0">
+    </testcase>
+    <testcase classname="VisitResolver createVisit" name="should create a visit successfully" time="0.001">
+    </testcase>
+    <testcase classname="VisitResolver createVisit" name="should use carer role when creating as carer" time="0">
+    </testcase>
+    <testcase classname="VisitResolver updateVisit" name="should update a visit successfully" time="0.001">
+    </testcase>
+    <testcase classname="VisitResolver deleteVisit" name="should delete a visit as admin" time="0.001">
+    </testcase>
+    <testcase classname="VisitResolver completeVisitTask" name="should complete a task successfully" time="0">
+    </testcase>
+    <testcase classname="VisitResolver completeVisitTask" name="should handle undefined notes" time="0.001">
+    </testcase>
+    <testcase classname="VisitResolver mapVisitToDTO" name="should handle null carer and client" time="0.002">
+    </testcase>
+    <testcase classname="VisitResolver mapVisitToDTO" name="should handle empty tasks array" time="0">
+    </testcase>
+  </testsuite>
+  <testsuite name="test/emar.e2e.spec.ts" errors="0" failures="1" skipped="0" timestamp="2025-09-09T08:38:43" time="5.498" tests="1">
+    <testcase classname="eMAR real DB flow" name="records medication administration end-to-end" time="0">
+      <failure>Error: Command failed: psql &quot;postgresql://test:test@localhost:55001/oasis_test&quot; -c &quot;CREATE EXTENSION IF NOT EXISTS vector;&quot;
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at startPostgres (/Users/tyreeseedwards/oasis international care/apps/api/test/utils/test-container.ts:22:11)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/emar.e2e.spec.ts:30:16)</failure>
+    </testcase>
+  </testsuite>
+  <testsuite name="test/stats.e2e.spec.ts" errors="0" failures="3" skipped="0" timestamp="2025-09-09T08:38:49" time="5.304" tests="3">
+    <testcase classname="Stats E2E Tests /stats/today (GET)" name="should return 403 for non-admin users" time="0">
+      <failure>Error: Command failed: psql &quot;postgresql://test:test@localhost:55002/oasis_test&quot; -c &quot;CREATE EXTENSION IF NOT EXISTS vector;&quot;
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at startPostgres (/Users/tyreeseedwards/oasis international care/apps/api/test/utils/test-container.ts:22:11)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/stats.e2e.spec.ts:26:16)</failure>
+    </testcase>
+    <testcase classname="Stats E2E Tests /stats/today (GET)" name="should return today stats for admin users" time="0">
+      <failure>Error: Command failed: psql &quot;postgresql://test:test@localhost:55002/oasis_test&quot; -c &quot;CREATE EXTENSION IF NOT EXISTS vector;&quot;
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at startPostgres (/Users/tyreeseedwards/oasis international care/apps/api/test/utils/test-container.ts:22:11)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/stats.e2e.spec.ts:26:16)</failure>
+    </testcase>
+    <testcase classname="Stats E2E Tests /stats/today (GET)" name="should return 401 for unauthenticated requests" time="0">
+      <failure>Error: Command failed: psql &quot;postgresql://test:test@localhost:55002/oasis_test&quot; -c &quot;CREATE EXTENSION IF NOT EXISTS vector;&quot;
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:882:11)
+    at execSync (node:child_process:954:15)
+    at startPostgres (/Users/tyreeseedwards/oasis international care/apps/api/test/utils/test-container.ts:22:11)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/stats.e2e.spec.ts:26:16)</failure>
+    </testcase>
+    <testcase classname="" name="Test execution failure: could be caused by test hooks like &apos;afterAll&apos;." time="0">
+      <failure>{&quot;message&quot;:&quot;&quot;,&quot;stack&quot;:&quot;TypeError: Cannot read properties of undefined (reading &apos;close&apos;)\n    at Object.&lt;anonymous&gt; (/Users/tyreeseedwards/oasis international care/apps/api/test/stats.e2e.spec.ts:142:15)\n    at Promise.then.completed (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (&lt;anonymous&gt;)\n    at callAsyncCircusFn (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusHook (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/run.js:281:40)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at _runTestsForDescribeBlock (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/run.js:154:7)\n    at _runTestsForDescribeBlock (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/run.js:121:9)\n    at run (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-circus@29.7.0/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-runner@29.7.0/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/Users/tyreeseedwards/oasis international care/node_modules/.pnpm/jest-runner@29.7.0/node_modules/jest-runner/build/runTest.js:444:34)&quot;}</failure>
+    </testcase>
+  </testsuite>
+  <testsuite name="src/common/filters/__tests__/gql-error.filter.spec.ts" errors="0" failures="0" skipped="0" timestamp="2025-09-09T08:38:54" time="0.3" tests="7">
+    <testcase classname="GqlErrorFilter" name="should handle BaseHttpException with code and message" time="0.005">
+    </testcase>
+    <testcase classname="GqlErrorFilter" name="should handle nested originalError with response" time="0">
+    </testcase>
+    <testcase classname="GqlErrorFilter" name="should handle exception with response directly" time="0.001">
+    </testcase>
+    <testcase classname="GqlErrorFilter" name="should default to INTERNAL_ERROR for unknown exceptions" time="0">
+    </testcase>
+    <testcase classname="GqlErrorFilter" name="should mask sensitive data in error messages" time="0">
+    </testcase>
+    <testcase classname="GqlErrorFilter" name="should handle null/undefined exceptions gracefully" time="0">
+    </testcase>
+    <testcase classname="GqlErrorFilter" name="should preserve error code when message is undefined" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="src/common/filters/__tests__/http-exception.filter.spec.ts" errors="0" failures="0" skipped="0" timestamp="2025-09-09T08:38:54" time="0.159" tests="5">
+    <testcase classname="HttpExceptionFilter" name="should skip non-HTTP contexts" time="0">
+    </testcase>
+    <testcase classname="HttpExceptionFilter" name="returns masked payload + code for BaseHttpException" time="0.003">
+    </testcase>
+    <testcase classname="HttpExceptionFilter" name="masks emails in error messages" time="0">
+    </testcase>
+    <testcase classname="HttpExceptionFilter" name="handles generic Error with INTERNAL_ERROR code" time="0">
+    </testcase>
+    <testcase classname="HttpExceptionFilter" name="preserves custom error codes" time="0">
+    </testcase>
+  </testsuite>
+  <testsuite name="src/stats/__tests__/stats.service.spec.ts" errors="0" failures="0" skipped="0" timestamp="2025-09-09T08:38:55" time="0.227" tests="4">
+    <testcase classname="StatsService" name="should be defined" time="0.001">
+    </testcase>
+    <testcase classname="StatsService getTodayStats" name="should return correct counts for booked and finished visits" time="0.001">
+    </testcase>
+    <testcase classname="StatsService getTodayStats" name="should use correct date for start of day" time="0.001">
+    </testcase>
+    <testcase classname="StatsService getTodayStats" name="should handle zero counts" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="src/common/utils/__tests__/masker.spec.ts" errors="0" failures="0" skipped="0" timestamp="2025-09-09T08:38:55" time="0.064" tests="6">
+    <testcase classname="Masker" name="masks e-mail" time="0.001">
+    </testcase>
+    <testcase classname="Masker" name="masks UK mobile" time="0">
+    </testcase>
+    <testcase classname="Masker" name="masks multiple emails in text" time="0">
+    </testcase>
+    <testcase classname="Masker" name="masks multiple UK phone numbers" time="0">
+    </testcase>
+    <testcase classname="Masker" name="masks +44 UK phone format" time="0">
+    </testcase>
+    <testcase classname="Masker" name="leaves non-PII text unchanged" time="0">
+    </testcase>
+  </testsuite>
+  <testsuite name="src/health/__tests__/health.controller.spec.ts" errors="0" failures="0" skipped="0" timestamp="2025-09-09T08:38:55" time="0.174" tests="2">
+    <testcase classname="HealthController" name="should be defined" time="0.002">
+    </testcase>
+    <testcase classname="HealthController" name="should return health status" time="0">
+    </testcase>
+  </testsuite>
+  <testsuite name="src/logger/__tests__/logger.spec.ts" errors="0" failures="0" skipped="0" timestamp="2025-09-09T08:38:55" time="0.098" tests="1">
+    <testcase classname="Logger redaction" name="masks email &amp; phone in log line" time="0.001">
+    </testcase>
+  </testsuite>
+</testsuites>
