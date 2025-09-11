@@ -1,45 +1,19 @@
-resource "aws_secretsmanager_secret" "database_url" {
-  name = "oasis/staging/DB_URL"
+# Secrets will be created and managed by the GitHub Actions deployment workflow
+# This file serves as documentation for the expected secrets structure
+
+# The following secrets will be created by the deployment workflow:
+# - oasis/staging/DATABASE_URL
+# - oasis/staging/NEXTAUTH_SECRET  
+# - oasis/staging/NEXTAUTH_URL
+# - oasis/staging/COGNITO_CLIENT_SECRET
+
+# Random passwords for RDS (used by Terraform)
+resource "random_password" "db" {
+  length  = 32
+  special = true
 }
 
-resource "aws_secretsmanager_secret_version" "database_url_version" {
-  secret_id     = aws_secretsmanager_secret.database_url.id
-  secret_string = "postgresql://${var.db_username}:${random_password.db.result}@${aws_db_instance.postgres.address}:5432/oasis_staging?schema=public"
-}
-
-# New shared JWT secret for all environments
-resource "aws_secretsmanager_secret" "jwt_signing_key" {
-  name        = "oasis/jwt-signing-key"
-  description = "JWT signing key shared across all Oasis environments"
-
-  tags = {
-    Environment = var.environment
-    Project     = "oasis"
-    Purpose     = "jwt-signing"
-  }
-}
-
-# Read existing SSM parameter value to preserve it
-data "aws_ssm_parameter" "existing_jwt_secret" {
-  name = "/oasis/staging/JWT_SECRET"
-}
-
-# Set initial secret version with existing value to avoid breaking sessions
-resource "aws_secretsmanager_secret_version" "jwt_signing_key_version" {
-  secret_id = aws_secretsmanager_secret.jwt_signing_key.id
-  secret_string = jsonencode({
-    value = data.aws_ssm_parameter.existing_jwt_secret.value
-  })
-}
-
-# Keep SSM parameter temporarily for rollback capability
-resource "aws_ssm_parameter" "jwt_secret" {
-  name  = "/oasis/staging/JWT_SECRET"
-  type  = "SecureString"
-  value = random_password.jwt.result
-
-  tags = {
-    Environment = var.environment
-    Status      = "deprecated-migrating-to-secrets-manager"
-  }
+resource "random_password" "nextauth" {
+  length  = 64
+  special = true
 }

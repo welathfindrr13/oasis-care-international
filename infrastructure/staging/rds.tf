@@ -14,12 +14,12 @@ resource "aws_db_subnet_group" "main" {
 }
 
 resource "aws_db_instance" "postgres" {
-  identifier             = "${local.name_prefix}-db"
+  identifier             = "oasis-staging"
   engine                 = "postgres"
   engine_version         = "15.6"
   instance_class         = var.db_instance_class
   allocated_storage      = 20
-  db_name                = "oasis_staging"
+  db_name                = "oasis"
   username               = var.db_username
   password               = random_password.db.result
   db_subnet_group_name   = aws_db_subnet_group.main.name
@@ -40,8 +40,7 @@ resource "aws_db_instance" "postgres" {
   multi_az            = false
   storage_encrypted   = true
 
-  tags = {
-    Name        = "${local.name_prefix}-database"
-    Environment = var.environment
-  }
+  tags = merge(var.default_tags, {
+    Name = "${local.name_prefix}-database"
+  })
 }
