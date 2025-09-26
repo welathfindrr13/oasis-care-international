@@ -1,0 +1,56 @@
+name: Web Amplify Trigger
+
+on:
+  push:
+    branches:
+      - main
+      - demo/**
+    paths:
+      - 'apps/web/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+
+jobs:
+  trigger-amplify:
+    name: Trigger Amplify Build
+    runs-on: ubuntu-latest
+    if: ${{ secrets.AMPLIFY_WEBHOOK_URL != '' }}
+    
+    steps:
+      - name: 🚀 Trigger Amplify deployment
+        run: |
+          echo "🔄 Triggering Amplify build for web app changes..."
+          curl -X POST "${{ secrets.AMPLIFY_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "ref": "${{ github.ref_name }}",
+              "sha": "${{ github.sha }}",
+              "message": "${{ github.event.head_commit.message }}",
+              "author": "${{ github.event.head_commit.author.name }}"
+            }'
+          echo "✅ Amplify webhook triggered successfully"
+          
+      - name: 📝 Build summary
+        run: |
+          echo "🌐 **Amplify Build Triggered** 🌐" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Message**: ${{ github.event.head_commit.message }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Author**: ${{ github.event.head_commit.author.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The Amplify build will start shortly. Check the AWS Amplify console for build progress." >> $GITHUB_STEP_SUMMARY
+
+  skip-trigger:
+    name: Skip Amplify Trigger
+    runs-on: ubuntu-latest
+    if: ${{ secrets.AMPLIFY_WEBHOOK_URL == '' }}
+    
+    steps:
+      - name: ℹ️ No webhook configured
+        run: |
+          echo "⚠️ AMPLIFY_WEBHOOK_URL secret not configured"
+          echo "To enable Amplify auto-deployment:"
+          echo "1. Set up AWS Amplify for the web app"
+          echo "2. Get the webhook URL from Amplify console"
+          echo "3. Add it as AMPLIFY_WEBHOOK_URL repository secret"

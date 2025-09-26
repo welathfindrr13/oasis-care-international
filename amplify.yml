@@ -1,0 +1,45 @@
+version: 1
+applications:
+  - appRoot: apps/web
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - echo "📦 Installing pnpm globally"
+            - corepack enable && corepack prepare pnpm@9.13.1 --activate
+            - echo "📦 Installing dependencies from workspace root"
+            - cd ../.. # Go to monorepo root
+            - pnpm install --frozen-lockfile
+            - echo "🔨 Building shared libraries"
+            - pnpm turbo run build --filter=@oasis/db --filter=@oasis/auth
+        build:
+          commands:
+            - echo "🔨 Building Next.js web app"
+            - cd apps/web # Back to web app directory
+            - pnpm build
+        postBuild:
+          commands:
+            - echo "✅ Build completed successfully"
+      artifacts:
+        baseDirectory: apps/web/.next
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*
+          - apps/web/node_modules/**/*
+          - apps/web/.next/cache/**/*
+    buildSpec: |
+      version: 0.2
+      phases:
+        pre_build:
+          commands:
+            - echo "🏁 Starting Amplify build for Oasis Web App"
+            - node --version
+            - npm --version
+        build:
+          commands:
+            - echo "✨ Build process handled by Amplify frontend config"
+        post_build:
+          commands:
+            - echo "🎉 Amplify build completed"

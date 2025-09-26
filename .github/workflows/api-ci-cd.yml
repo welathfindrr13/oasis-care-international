@@ -1,0 +1,113 @@
+name: API CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - demo/**
+    paths:
+      - 'apps/api/**'
+      - 'libs/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  pull_request:
+    paths:
+      - 'apps/api/**'
+      - 'libs/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+
+env:
+  AWS_ACCOUNT_ID: 721689331449
+  AWS_REGION: eu-west-2
+  ECR_REPO: oasis-api
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test:
+    name: Test API
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🔍 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: 🔧 Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9.13.1
+          
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile
+        
+      - name: 🔨 Build packages
+        run: pnpm turbo run build --filter=@oasis/api
+        
+      - name: 🧪 Run API tests
+        run: pnpm --filter @oasis/api test
+        env:
+          NODE_ENV: test
+
+  build-and-deploy:
+    name: Build and Deploy API
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/demo/')
+    
+    steps:
+      - name: 🔍 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+          
+      - name: 🔍 Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        
+      - name: 🏷️ Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=commit-
+            type=raw,value=latest,enable={{is_default_branch}}
+            
+      - name: 🔨 Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./apps/api/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            NODE_ENV=production
+            
+      - name: 🚀 Update App Runner service (if configured)
+        if: env.APP_RUNNER_SERVICE_ARN != ''
+        run: |
+          echo "Updating App Runner service: $APP_RUNNER_SERVICE_ARN"
+          aws apprunner start-deployment --service-arn $APP_RUNNER_SERVICE_ARN
+        env:
+          APP_RUNNER_SERVICE_ARN: ${{ secrets.APP_RUNNER_SERVICE_ARN }}
+          
+      - name: ✅ Deployment complete
+        run: |
+          echo "🎉 API deployment completed successfully!"
+          echo "📦 Image: ${{ steps.meta.outputs.tags }}"
+          echo "🔗 Registry: ${{ steps.login-ecr.outputs.registry }}"

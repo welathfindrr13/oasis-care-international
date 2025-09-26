@@ -8,6 +8,14 @@ export class HealthController {
   }
 }
 
+@Controller()
+export class StandardHealthController {
+  @Get('health')
+  standardHealth() {
+    return { status: 'ok' };
+  }
+}
+
 @Controller('demo')
 export class DemoController {
   @Get('health')

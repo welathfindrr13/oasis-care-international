@@ -71,6 +71,6 @@ COPY --from=build /app/libs/db/prisma ./libs/db/prisma
 RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
 USER nestjs
 
-EXPOSE 4000
+EXPOSE 3001
 
 CMD ["node", "apps/api/dist/main.js"]
