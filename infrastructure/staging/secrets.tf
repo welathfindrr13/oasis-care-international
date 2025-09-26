@@ -8,10 +8,7 @@
 # - oasis/staging/COGNITO_CLIENT_SECRET
 
 # Random passwords for RDS (used by Terraform)
-resource "random_password" "db" {
-  length  = 32
-  special = true
-}
+# Note: random_password "db" is defined in rds.tf
 
 resource "random_password" "nextauth" {
   length  = 64
