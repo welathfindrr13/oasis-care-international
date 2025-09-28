@@ -7,7 +7,16 @@
 # - oasis/staging/NEXTAUTH_URL
 # - oasis/staging/COGNITO_CLIENT_SECRET
 
-# Random passwords for RDS (used by Terraform)
+# Secrets Manager resources for ECS containers and Lambda functions
+resource "aws_secretsmanager_secret" "database_url" {
+  name                    = "oasis/staging/DATABASE_URL"
+  description             = "Database URL for Oasis staging"
+  recovery_window_in_days = 0  # For staging, allow immediate deletion
+  
+  tags = var.default_tags
+}
+
+# Random passwords for secrets (used by Terraform)
 # Note: random_password "db" is defined in rds.tf
 
 resource "random_password" "nextauth" {

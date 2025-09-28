@@ -206,11 +206,6 @@ resource "aws_ecs_service" "api" {
   # Enable ECS Exec for debugging
   enable_execute_command = true
 
-  deployment_configuration {
-    maximum_percent         = 200
-    minimum_healthy_percent = 50
-  }
-
   lifecycle {
     ignore_changes = [desired_count]
   }
@@ -242,11 +237,6 @@ resource "aws_ecs_service" "web" {
 
   # Enable ECS Exec for debugging
   enable_execute_command = true
-
-  deployment_configuration {
-    maximum_percent         = 200
-    minimum_healthy_percent = 50
-  }
 
   lifecycle {
     ignore_changes = [desired_count]

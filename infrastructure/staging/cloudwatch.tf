@@ -98,7 +98,7 @@ resource "aws_cloudwatch_metric_alarm" "alb_target_5xx_errors" {
   alarm_actions       = [aws_sns_topic.alerts.arn]
 
   dimensions = {
-    LoadBalancer = aws_lb.api.arn_suffix
+    LoadBalancer = aws_lb.main.arn_suffix
   }
 }
 
@@ -115,7 +115,7 @@ resource "aws_cloudwatch_metric_alarm" "alb_response_time" {
   alarm_actions       = [aws_sns_topic.alerts.arn]
 
   dimensions = {
-    LoadBalancer = aws_lb.api.arn_suffix
+    LoadBalancer = aws_lb.main.arn_suffix
   }
 }
 
