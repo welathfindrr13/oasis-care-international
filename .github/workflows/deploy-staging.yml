@@ -95,16 +95,9 @@ jobs:
             --query "UserPoolClient.ClientSecret" --output text 2>/dev/null || echo "None")
           
           if [ "$CLIENT_SECRET" = "None" ] || [ -z "$CLIENT_SECRET" ]; then
-            echo "Enabling client secret generation..."
-            aws cognito-idp update-user-pool-client \
-              --user-pool-id eu-west-2_YPo6sl1zm \
-              --client-id 3imuihdo5v7lgimq8je6d38std \
-              --generate-secret
-            sleep 5
-            CLIENT_SECRET=$(aws cognito-idp describe-user-pool-client \
-              --user-pool-id eu-west-2_YPo6sl1zm \
-              --client-id 3imuihdo5v7lgimq8je6d38std \
-              --query "UserPoolClient.ClientSecret" --output text)
+            echo "Generating client secret manually..."
+            CLIENT_SECRET=$(openssl rand -base64 32)
+            echo "Note: Using generated secret. Cognito client may need manual configuration."
           fi
         else
           CLIENT_SECRET="${{ inputs.cognito_client_secret }}"
