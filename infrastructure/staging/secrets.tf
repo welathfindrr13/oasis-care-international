@@ -11,8 +11,8 @@
 resource "aws_secretsmanager_secret" "database_url" {
   name                    = "oasis/staging/DATABASE_URL"
   description             = "Database URL for Oasis staging"
-  recovery_window_in_days = 0  # For staging, allow immediate deletion
-  
+  recovery_window_in_days = 0 # For staging, allow immediate deletion
+
   tags = var.default_tags
 }
 

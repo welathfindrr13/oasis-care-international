@@ -3,42 +3,42 @@ variable "environment" { default = "staging" }
 variable "aws_region" { default = "eu-west-2" }
 
 # Domain Configuration
-variable "api_domain" { 
+variable "api_domain" {
   description = "API domain name"
   type        = string
-  default     = "api.oasis-care.com" 
+  default     = "api.oasis-care.com"
 }
-variable "web_domain" { 
+variable "web_domain" {
   description = "Web app domain name"
   type        = string
-  default     = "app.oasis-care.com" 
+  default     = "app.oasis-care.com"
 }
 
 # Route53 Configuration
-variable "route53_zone_id" { 
+variable "route53_zone_id" {
   description = "Route53 hosted zone ID for oasis-care.com"
   type        = string
 }
 
 # ACM Certificate Configuration
-variable "app_cert_arn" { 
+variable "app_cert_arn" {
   description = "ACM certificate ARN for web app domain"
   type        = string
 }
-variable "api_cert_arn" { 
+variable "api_cert_arn" {
   description = "ACM certificate ARN for API domain"
   type        = string
 }
 
 # KMS Configuration
-variable "kms_key_id" { 
+variable "kms_key_id" {
   description = "KMS key ID for encryption"
   type        = string
   default     = "8995c5be-616f-4680-953e-8ed3b7252689"
 }
 
 # Monitoring Configuration
-variable "sns_topic_arn" { 
+variable "sns_topic_arn" {
   description = "SNS topic ARN for alerts"
   type        = string
   default     = "arn:aws:sns:eu-west-2:721689331449:oasis-staging-alerts"
@@ -54,10 +54,10 @@ variable "db_username" { default = "oasis" }
 variable "db_instance_class" { default = "db.t3.micro" }
 
 # Application Configuration
-variable "frontend_url" { 
+variable "frontend_url" {
   description = "Frontend URL for CORS configuration"
   type        = string
-  default     = "https://app.oasis-care.com,http://localhost:3000" 
+  default     = "https://app.oasis-care.com,http://localhost:3000"
 }
 variable "ai_summary_enabled" {
   default     = false

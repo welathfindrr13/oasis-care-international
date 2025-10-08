@@ -85,26 +85,74 @@ jobs:
 
     - name: 🔐 Phase 1 - Cognito Client Secret
       run: |
-        echo "🔐 Phase 1: Getting/Setting Cognito Client Secret"
+        echo "🔐 Phase 1: Cognito Confidential Client Configuration"
         
-        if [ -z "${{ inputs.cognito_client_secret }}" ]; then
-          echo "Checking if Cognito client secret exists..."
+        # Get AWS Account ID for ARN construction
+        AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        echo "AWS Account: $AWS_ACCOUNT_ID"
+        
+        # Check if confidential client already exists
+        NEW_CLIENT_NAME="oasis-staging-web-confidential"
+        echo "Checking for existing confidential client: $NEW_CLIENT_NAME"
+        
+        EXISTING_CLIENT=$(aws cognito-idp list-user-pool-clients \
+          --user-pool-id eu-west-2_YPo6sl1zm \
+          --query "UserPoolClients[?ClientName=='${NEW_CLIENT_NAME}'].ClientId" \
+          --output text 2>/dev/null || echo "")
+        
+        if [ -z "$EXISTING_CLIENT" ]; then
+          echo "Creating new confidential Cognito client with GenerateSecret=true..."
+          
+          CLIENT_RESPONSE=$(aws cognito-idp create-user-pool-client \
+            --user-pool-id eu-west-2_YPo6sl1zm \
+            --client-name "$NEW_CLIENT_NAME" \
+            --generate-secret \
+            --allowed-o-auth-flows code \
+            --allowed-o-auth-scopes email openid profile \
+            --allowed-o-auth-flows-user-pool-client \
+            --callback-urls "https://app.oasis-care.com/api/auth/callback/cognito" \
+            --logout-urls "https://app.oasis-care.com" \
+            --supported-identity-providers COGNITO \
+            --output json)
+          
+          NEW_CLIENT_ID=$(echo "$CLIENT_RESPONSE" | jq -r '.UserPoolClient.ClientId')
+          CLIENT_SECRET=$(echo "$CLIENT_RESPONSE" | jq -r '.UserPoolClient.ClientSecret')
+          
+          echo "✅ Created new confidential client: $NEW_CLIENT_ID"
+        else
+          echo "Using existing confidential client: $EXISTING_CLIENT"
+          NEW_CLIENT_ID="$EXISTING_CLIENT"
+          
+          # Retrieve existing secret
           CLIENT_SECRET=$(aws cognito-idp describe-user-pool-client \
             --user-pool-id eu-west-2_YPo6sl1zm \
-            --client-id 3imuihdo5v7lgimq8je6d38std \
-            --query "UserPoolClient.ClientSecret" --output text 2>/dev/null || echo "None")
+            --client-id "$NEW_CLIENT_ID" \
+            --query "UserPoolClient.ClientSecret" --output text)
           
-          if [ "$CLIENT_SECRET" = "None" ] || [ -z "$CLIENT_SECRET" ]; then
-            echo "Generating client secret manually..."
-            CLIENT_SECRET=$(openssl rand -base64 32)
-            echo "Note: Using generated secret. Cognito client may need manual configuration."
-          fi
-        else
-          CLIENT_SECRET="${{ inputs.cognito_client_secret }}"
+          echo "✅ Retrieved existing client secret"
         fi
         
-        echo "COGNITO_CLIENT_SECRET=$CLIENT_SECRET" >> $GITHUB_ENV
-        echo "✅ Cognito client secret configured"
+        # Persist secret to Secrets Manager (idempotent)
+        echo "Persisting Cognito client secret to Secrets Manager..."
+        aws secretsmanager create-secret \
+          --name oasis/staging/cognito_web_client_secret \
+          --secret-string "$CLIENT_SECRET" \
+          --description "Cognito confidential client secret for Oasis staging web app" \
+          2>/dev/null || \
+        aws secretsmanager put-secret-value \
+          --secret-id oasis/staging/cognito_web_client_secret \
+          --secret-string "$CLIENT_SECRET"
+        
+        # Export ARN and client ID (NOT the raw secret)
+        SECRET_ARN="arn:aws:secretsmanager:eu-west-2:${AWS_ACCOUNT_ID}:secret:oasis/staging/cognito_web_client_secret"
+        
+        echo "COGNITO_CLIENT_ID=$NEW_CLIENT_ID" >> $GITHUB_ENV
+        echo "COGNITO_CLIENT_SECRET_ARN=$SECRET_ARN" >> $GITHUB_ENV
+        echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID" >> $GITHUB_ENV
+        
+        echo "✅ Cognito confidential client configured with real secret"
+        echo "   Client ID: $NEW_CLIENT_ID"
+        echo "   Secret ARN: $SECRET_ARN"
 
     - name: 🗄️ Phase 2 - RDS Setup  
       run: |

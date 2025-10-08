@@ -19,20 +19,20 @@ resource "aws_ecs_task_definition" "api" {
   cpu                      = 512
   memory                   = 1024
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
-  task_role_arn           = aws_iam_role.ecs_task_role.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
 
   container_definitions = jsonencode([
     {
       name  = "api"
       image = "721689331449.dkr.ecr.eu-west-2.amazonaws.com/oasis-api:staging"
-      
+
       portMappings = [
         {
           containerPort = 3000
           protocol      = "tcp"
         }
       ]
-      
+
       environment = [
         {
           name  = "PORT"
@@ -59,7 +59,7 @@ resource "aws_ecs_task_definition" "api" {
           value = var.frontend_url
         }
       ]
-      
+
       secrets = [
         {
           name      = "DATABASE_URL"
@@ -74,7 +74,7 @@ resource "aws_ecs_task_definition" "api" {
           valueFrom = "arn:aws:secretsmanager:eu-west-2:721689331449:secret:oasis/staging/COGNITO_CLIENT_SECRET"
         }
       ]
-      
+
       healthCheck = {
         command = [
           "CMD-SHELL",
@@ -85,7 +85,7 @@ resource "aws_ecs_task_definition" "api" {
         retries     = 3
         startPeriod = 60
       }
-      
+
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -94,7 +94,7 @@ resource "aws_ecs_task_definition" "api" {
           "awslogs-stream-prefix" = "api"
         }
       }
-      
+
       essential = true
     }
   ])
@@ -110,20 +110,20 @@ resource "aws_ecs_task_definition" "web" {
   cpu                      = 512
   memory                   = 1024
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
-  task_role_arn           = aws_iam_role.ecs_task_role.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
 
   container_definitions = jsonencode([
     {
       name  = "web"
       image = "721689331449.dkr.ecr.eu-west-2.amazonaws.com/oasis-web:staging"
-      
+
       portMappings = [
         {
           containerPort = 3000
           protocol      = "tcp"
         }
       ]
-      
+
       environment = [
         {
           name  = "PORT"
@@ -146,14 +146,14 @@ resource "aws_ecs_task_definition" "web" {
           value = "https://cognito-idp.eu-west-2.amazonaws.com/eu-west-2_YPo6sl1zm"
         }
       ]
-      
+
       secrets = [
         {
           name      = "NEXTAUTH_SECRET"
           valueFrom = "arn:aws:secretsmanager:eu-west-2:721689331449:secret:oasis/staging/NEXTAUTH_SECRET"
         }
       ]
-      
+
       healthCheck = {
         command = [
           "CMD-SHELL",
@@ -164,7 +164,7 @@ resource "aws_ecs_task_definition" "web" {
         retries     = 3
         startPeriod = 60
       }
-      
+
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -173,7 +173,7 @@ resource "aws_ecs_task_definition" "web" {
           "awslogs-stream-prefix" = "web"
         }
       }
-      
+
       essential = true
     }
   ])

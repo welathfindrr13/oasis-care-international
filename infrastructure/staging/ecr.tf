@@ -9,7 +9,7 @@ resource "aws_ecr_repository" "api" {
 
   encryption_configuration {
     encryption_type = "KMS"
-    kms_key        = var.kms_key_id
+    kms_key         = var.kms_key_id
   }
 
 
@@ -26,7 +26,7 @@ resource "aws_ecr_repository" "web" {
 
   encryption_configuration {
     encryption_type = "KMS"
-    kms_key        = var.kms_key_id
+    kms_key         = var.kms_key_id
   }
 
 

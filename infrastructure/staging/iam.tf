@@ -38,7 +38,7 @@ resource "aws_iam_role_policy" "read_secrets" {
 
 data "aws_iam_policy_document" "read_secrets" {
   statement {
-    effect  = "Allow"
+    effect = "Allow"
     actions = [
       "secretsmanager:GetSecretValue",
       "secretsmanager:DescribeSecret"
