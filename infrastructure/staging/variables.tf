@@ -6,17 +6,17 @@ variable "aws_region" { default = "eu-west-2" }
 variable "api_domain" {
   description = "API domain name"
   type        = string
-  default     = "api.oasis-care.com"
+  default     = "api.oasis-care.co"
 }
 variable "web_domain" {
   description = "Web app domain name"
   type        = string
-  default     = "app.oasis-care.com"
+  default     = "app.oasis-care.co"
 }
 
 # Route53 Configuration
 variable "route53_zone_id" {
-  description = "Route53 hosted zone ID for oasis-care.com"
+  description = "Route53 hosted zone ID for oasis-care.co"
   type        = string
 }
 
@@ -57,7 +57,7 @@ variable "db_instance_class" { default = "db.t3.micro" }
 variable "frontend_url" {
   description = "Frontend URL for CORS configuration"
   type        = string
-  default     = "https://app.oasis-care.com,http://localhost:3000"
+  default     = "https://app.oasis-care.co,http://localhost:3000"
 }
 variable "ai_summary_enabled" {
   default     = false

@@ -18,12 +18,12 @@ on:
       admin_email:
         description: 'Admin user email for demo'
         required: false
-        default: 'boss@oasis-care.com'
+        default: 'boss@oasis-care.co'
         type: string
       carer_email:
         description: 'Carer demo email'
         required: false
-        default: 'carer-demo@oasis-care.com'
+        default: 'carer-demo@oasis-care.co'
         type: string
 
 env:
@@ -40,7 +40,7 @@ jobs:
     - name: 🚀 Starting Oasis Care Staging Deployment
       run: |
         echo "🏥 OASIS CARE - STAGING DEPLOYMENT STARTING"
-        echo "Target domains: app.oasis-care.com, api.oasis-care.com"
+        echo "Target domains: app.oasis-care.co, api.oasis-care.co"
         echo "AWS Region: ${{ env.AWS_REGION }}"
         echo "Time: $(date)"
 
@@ -77,7 +77,7 @@ jobs:
         # Auto-detect Route53 zone ID if not provided
         if [ -z "${{ inputs.route53_zone_id }}" ]; then
           echo "Auto-detecting Route53 zone ID..."
-          ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name oasis-care.com --query "HostedZones[0].Id" --output text | sed 's|/hostedzone/||')
+          ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name oasis-care.co --query "HostedZones[0].Id" --output text | sed 's|/hostedzone/||')
           echo "ROUTE53_ZONE_ID=$ZONE_ID" >> $GITHUB_ENV
         else
           echo "ROUTE53_ZONE_ID=${{ inputs.route53_zone_id }}" >> $GITHUB_ENV
@@ -110,8 +110,8 @@ jobs:
             --allowed-o-auth-flows code \
             --allowed-o-auth-scopes email openid profile \
             --allowed-o-auth-flows-user-pool-client \
-            --callback-urls "https://app.oasis-care.com/api/auth/callback/cognito" \
-            --logout-urls "https://app.oasis-care.com" \
+            --callback-urls "https://app.oasis-care.co/api/auth/callback/cognito" \
+            --logout-urls "https://app.oasis-care.co" \
             --supported-identity-providers COGNITO \
             --output json)
           
@@ -229,10 +229,10 @@ jobs:
         
         echo "Creating NEXTAUTH_URL secret..."
         aws secretsmanager create-secret --name oasis/staging/NEXTAUTH_URL \
-          --secret-string "https://app.oasis-care.com" \
+          --secret-string "https://app.oasis-care.co" \
           --description "NextAuth URL for Oasis staging" 2>/dev/null || \
         aws secretsmanager update-secret --secret-id oasis/staging/NEXTAUTH_URL \
-          --secret-string "https://app.oasis-care.com"
+          --secret-string "https://app.oasis-care.co"
         
         echo "Creating COGNITO_CLIENT_SECRET secret..."
         aws secretsmanager create-secret --name oasis/staging/COGNITO_CLIENT_SECRET \
@@ -247,18 +247,18 @@ jobs:
       run: |
         echo "🔒 Phase 4: Requesting ACM certificates"
         
-        # Request certificate for app.oasis-care.com
-        echo "Requesting certificate for app.oasis-care.com..."
+        # Request certificate for app.oasis-care.co
+        echo "Requesting certificate for app.oasis-care.co..."
         APP_CERT_ARN=$(aws acm request-certificate \
-          --domain-name app.oasis-care.com \
+          --domain-name app.oasis-care.co \
           --validation-method DNS \
           --query CertificateArn --output text)
         echo "APP_CERT_ARN=$APP_CERT_ARN" >> $GITHUB_ENV
         
-        # Request certificate for api.oasis-care.com
-        echo "Requesting certificate for api.oasis-care.com..."
+        # Request certificate for api.oasis-care.co
+        echo "Requesting certificate for api.oasis-care.co..."
         API_CERT_ARN=$(aws acm request-certificate \
-          --domain-name api.oasis-care.com \
+          --domain-name api.oasis-care.co \
           --validation-method DNS \
           --query CertificateArn --output text)
         echo "API_CERT_ARN=$API_CERT_ARN" >> $GITHUB_ENV
@@ -330,8 +330,8 @@ jobs:
         project = "oasis-care"
         environment = "staging"
         aws_region = "eu-west-2"
-        api_domain = "api.oasis-care.com"
-        web_domain = "app.oasis-care.com"
+        api_domain = "api.oasis-care.co"
+        web_domain = "app.oasis-care.co"
         route53_zone_id = "$ROUTE53_ZONE_ID"
         app_cert_arn = "$APP_CERT_ARN"
         api_cert_arn = "$API_CERT_ARN"
@@ -404,7 +404,7 @@ jobs:
             {
               "Action": "UPSERT",
               "ResourceRecordSet": {
-                "Name": "app.oasis-care.com",
+                "Name": "app.oasis-care.co",
                 "Type": "A",
                 "AliasTarget": {
                   "DNSName": "$ALB_DNS",
@@ -416,7 +416,7 @@ jobs:
             {
               "Action": "UPSERT",
               "ResourceRecordSet": {
-                "Name": "api.oasis-care.com", 
+                "Name": "api.oasis-care.co", 
                 "Type": "A",
                 "AliasTarget": {
                   "DNSName": "$ALB_DNS",
@@ -437,8 +437,8 @@ jobs:
         sleep 30
         
         # Verify DNS resolution
-        nslookup app.oasis-care.com
-        nslookup api.oasis-care.com
+        nslookup app.oasis-care.co
+        nslookup api.oasis-care.co
         
         echo "✅ DNS records created and propagating"
 
@@ -488,10 +488,10 @@ jobs:
         sleep 60
         
         echo "🔍 Testing API health endpoint..."
-        curl -f -I https://api.oasis-care.com/health || (echo "❌ API health check failed" && exit 1)
+        curl -f -I https://api.oasis-care.co/health || (echo "❌ API health check failed" && exit 1)
         
         echo "🔍 Testing Web app endpoint..."
-        curl -f -I https://app.oasis-care.com || (echo "❌ Web app health check failed" && exit 1)
+        curl -f -I https://app.oasis-care.co || (echo "❌ Web app health check failed" && exit 1)
         
         echo "✅ Smoke tests passed"
 
@@ -505,8 +505,8 @@ jobs:
           --message "🎉 Oasis Care staging deployment completed successfully! 
         
         ✅ Deployed at: $(date)
-        🌐 Web: https://app.oasis-care.com  
-        🔌 API: https://api.oasis-care.com
+        🌐 Web: https://app.oasis-care.co  
+        🔌 API: https://api.oasis-care.co
         📊 Monitoring: Active
         
         All systems operational." \
@@ -526,8 +526,8 @@ jobs:
         **Branch:** feat/staging-live-setup
         
         ## 🌐 Live Endpoints
-        - **Web Application:** https://app.oasis-care.com
-        - **API:** https://api.oasis-care.com
+        - **Web Application:** https://app.oasis-care.co
+        - **API:** https://api.oasis-care.co
         
         ## 📋 Resources Deployed
         
@@ -561,8 +561,8 @@ jobs:
         - **Seed Data:** ✅ Populated
         
         ### 🧪 Verification Results
-        - **API Health:** ✅ https://api.oasis-care.com/health
-        - **Web Health:** ✅ https://app.oasis-care.com
+        - **API Health:** ✅ https://api.oasis-care.co/health
+        - **Web Health:** ✅ https://app.oasis-care.co
         - **DNS Resolution:** ✅ Both domains resolving
         
         ### 📊 Monitoring
@@ -571,17 +571,17 @@ jobs:
         - **Log Groups:** ✅ Receiving logs
         
         ## 🎯 Next Steps
-        1. **Test Authentication:** Visit https://app.oasis-care.com and test Cognito login
+        1. **Test Authentication:** Visit https://app.oasis-care.co and test Cognito login
         2. **Create Users:** Set up admin and carer demo accounts in Cognito
         3. **Verify RBAC:** Test role-based access control
         4. **Monitor Metrics:** Check CloudWatch dashboards
         
         ## 🏁 Deployment Complete!
-        Oasis Care is now live on staging at **https://app.oasis-care.com**
+        Oasis Care is now live on staging at **https://app.oasis-care.co**
         EOF
         
         cat deployment-report.md
         
         echo "✅ DEPLOYMENT COMPLETED SUCCESSFULLY!"
-        echo "🌐 Web: https://app.oasis-care.com"
-        echo "🔌 API: https://api.oasis-care.com"
+        echo "🌐 Web: https://app.oasis-care.co"
+        echo "🔌 API: https://api.oasis-care.co"

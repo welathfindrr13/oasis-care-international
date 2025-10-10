@@ -12,7 +12,7 @@ resource "aws_sns_topic" "alerts" {
 resource "aws_sns_topic_subscription" "email_alerts" {
   topic_arn = aws_sns_topic.alerts.arn
   protocol  = "email"
-  endpoint  = "admin@oasis-care.com" # TODO: Replace with actual admin email
+  endpoint  = "admin@oasis-care.co" # TODO: Replace with actual admin email
 }
 
 # RDS CloudWatch Alarms

@@ -44,7 +44,7 @@ resource "aws_ecs_task_definition" "api" {
         },
         {
           name  = "NEXTAUTH_URL"
-          value = "https://app.oasis-care.com"
+          value = "https://app.oasis-care.co"
         },
         {
           name  = "COGNITO_CLIENT_ID"
@@ -135,7 +135,7 @@ resource "aws_ecs_task_definition" "web" {
         },
         {
           name  = "NEXTAUTH_URL"
-          value = "https://app.oasis-care.com"
+          value = "https://app.oasis-care.co"
         },
         {
           name  = "COGNITO_CLIENT_ID"
