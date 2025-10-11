@@ -14,10 +14,19 @@ jobs:
   trigger-amplify:
     name: Trigger Amplify Build
     runs-on: ubuntu-latest
-    if: ${{ secrets.AMPLIFY_WEBHOOK_URL != '' }}
     
     steps:
+      - name: 🔍 Check webhook configuration
+        id: check-webhook
+        run: |
+          if [ -n "${{ secrets.AMPLIFY_WEBHOOK_URL }}" ]; then
+            echo "webhook_configured=true" >> $GITHUB_OUTPUT
+          else
+            echo "webhook_configured=false" >> $GITHUB_OUTPUT
+          fi
+      
       - name: 🚀 Trigger Amplify deployment
+        if: steps.check-webhook.outputs.webhook_configured == 'true'
         run: |
           echo "🔄 Triggering Amplify build for web app changes..."
           curl -X POST "${{ secrets.AMPLIFY_WEBHOOK_URL }}" \
@@ -31,6 +40,7 @@ jobs:
           echo "✅ Amplify webhook triggered successfully"
           
       - name: 📝 Build summary
+        if: steps.check-webhook.outputs.webhook_configured == 'true'
         run: |
           echo "🌐 **Amplify Build Triggered** 🌐" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -41,13 +51,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "The Amplify build will start shortly. Check the AWS Amplify console for build progress." >> $GITHUB_STEP_SUMMARY
 
-  skip-trigger:
-    name: Skip Amplify Trigger
-    runs-on: ubuntu-latest
-    if: ${{ secrets.AMPLIFY_WEBHOOK_URL == '' }}
-    
-    steps:
       - name: ℹ️ No webhook configured
+        if: steps.check-webhook.outputs.webhook_configured == 'false'
         run: |
           echo "⚠️ AMPLIFY_WEBHOOK_URL secret not configured"
           echo "To enable Amplify auto-deployment:"
