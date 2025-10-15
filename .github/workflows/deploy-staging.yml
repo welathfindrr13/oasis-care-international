@@ -179,23 +179,30 @@ jobs:
           --db-instance-identifier "$RDS_ID" \
           --query "DBInstances[0].Endpoint.Address" --output text)
         
-        # Reset master password  
+        # Generate RDS-compliant password (no /, @, ", or spaces)
+        echo "🔄 Generating RDS-compliant master password..."
+        set +x
+        NEW_PASSWORD="$(openssl rand -base64 48 | tr -d '/+=' | head -c 32)"
+        echo "::add-mask::$NEW_PASSWORD"
+        set -x
+        
+        # Reset master password
         echo "🔄 Resetting RDS master password..."
         aws rds modify-db-instance \
           --db-instance-identifier "$RDS_ID" \
-          --master-user-password "$(openssl rand -base64 32)" \
+          --master-user-password "$NEW_PASSWORD" \
           --apply-immediately
         
         # Wait for available state
         echo "⏳ Waiting for RDS to become available..."
         aws rds wait db-instance-available --db-instance-identifier "$RDS_ID"
         
-        # Get the new password (we'll get it from the master user password)
-        NEW_PASSWORD=$(openssl rand -base64 32)
-        
         # Build DATABASE_URL (URL encode password)
+        set +x
         ENCODED_PASSWORD=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$NEW_PASSWORD'))")
         DATABASE_URL="postgresql://oasis:$ENCODED_PASSWORD@$RDS_ENDPOINT:5432/oasis"
+        echo "::add-mask::$DATABASE_URL"
+        set -x
         
         echo "RDS_ENDPOINT=$RDS_ENDPOINT" >> $GITHUB_ENV
         echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_ENV
