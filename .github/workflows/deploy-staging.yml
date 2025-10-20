@@ -208,9 +208,42 @@ jobs:
         echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_ENV
         echo "✅ RDS configured - endpoint: $RDS_ENDPOINT"
 
-    - name: 🔐 Phase 3 - Secrets Manager
+    - name: 🔍 Phase 2.5 - Secrets Manager Preflight Check
       run: |
-        echo "🔐 Phase 3: Creating/updating secrets in Secrets Manager"
+        set -euo pipefail
+        echo "🔍 Phase 2.5: Verifying Secrets Manager write permissions..."
+        
+        # Create a temporary secret to test full CRUD permissions
+        TMP="oasis/staging/preflight-$(date +%s)"
+        echo "Testing CRUD on temporary secret: $TMP"
+        
+        aws secretsmanager create-secret \
+          --name "$TMP" \
+          --secret-string "preflight-test" \
+          --tags Key=env,Value=staging >/dev/null
+        echo "  ✓ CreateSecret"
+        
+        aws secretsmanager put-secret-value \
+          --secret-id "$TMP" \
+          --secret-string "preflight-test-updated" >/dev/null
+        echo "  ✓ PutSecretValue"
+        
+        aws secretsmanager describe-secret \
+          --secret-id "$TMP" >/dev/null
+        echo "  ✓ DescribeSecret"
+        
+        aws secretsmanager delete-secret \
+          --secret-id "$TMP" \
+          --force-delete-without-recovery >/dev/null
+        echo "  ✓ DeleteSecret"
+        
+        echo "✅ Preflight: All Secrets Manager permissions verified"
+
+    - name: 🔐 Phase 3 - Secrets Manager (Application Secrets Only)
+      run: |
+        set -euo pipefail
+        echo "🔐 Phase 3: Creating/updating application secrets in Secrets Manager"
+        echo "Note: Cognito client secret managed in Phase 1 at oasis/staging/cognito_web_client_secret"
         
         # Generate NextAuth secret if not provided
         if [ -z "${{ inputs.nextauth_secret }}" ]; then
@@ -219,36 +252,54 @@ jobs:
           NEXTAUTH_SECRET="${{ inputs.nextauth_secret }}"
         fi
         
-        # Create/update secrets
-        echo "Creating DATABASE_URL secret..."
-        aws secretsmanager create-secret --name oasis/staging/DATABASE_URL \
-          --secret-string "$DATABASE_URL" \
-          --description "Database URL for Oasis staging" 2>/dev/null || \
-        aws secretsmanager update-secret --secret-id oasis/staging/DATABASE_URL \
-          --secret-string "$DATABASE_URL"
+        # Validate required variables
+        required_vars=(DATABASE_URL NEXTAUTH_SECRET)
+        for var in "${required_vars[@]}"; do
+          if [ -z "${!var:-}" ]; then
+            echo "❌ Phase 3: Missing required variable: $var"
+            exit 1
+          fi
+        done
         
-        echo "Creating NEXTAUTH_SECRET secret..."
-        aws secretsmanager create-secret --name oasis/staging/NEXTAUTH_SECRET \
-          --secret-string "$NEXTAUTH_SECRET" \
-          --description "NextAuth secret for Oasis staging" 2>/dev/null || \
-        aws secretsmanager update-secret --secret-id oasis/staging/NEXTAUTH_SECRET \
-          --secret-string "$NEXTAUTH_SECRET"
+        # Idempotent secret upsert function
+        upsert_secret() {
+          local name="$1"
+          local value="$2"
+          local description="$3"
+          
+          if aws secretsmanager describe-secret --secret-id "$name" >/dev/null 2>&1; then
+            echo "Updating existing secret: $name"
+            aws secretsmanager put-secret-value \
+              --secret-id "$name" \
+              --secret-string "$value" >/dev/null
+          else
+            echo "Creating new secret: $name"
+            aws secretsmanager create-secret \
+              --name "$name" \
+              --secret-string "$value" \
+              --description "$description" \
+              --tags Key=env,Value=staging >/dev/null
+          fi
+        }
         
-        echo "Creating NEXTAUTH_URL secret..."
-        aws secretsmanager create-secret --name oasis/staging/NEXTAUTH_URL \
-          --secret-string "https://app.oasis-care.co" \
-          --description "NextAuth URL for Oasis staging" 2>/dev/null || \
-        aws secretsmanager update-secret --secret-id oasis/staging/NEXTAUTH_URL \
-          --secret-string "https://app.oasis-care.co"
+        # Create/update the 3 application secrets
+        upsert_secret \
+          "oasis/staging/DATABASE_URL" \
+          "$DATABASE_URL" \
+          "Database URL for Oasis staging"
         
-        echo "Creating COGNITO_CLIENT_SECRET secret..."
-        aws secretsmanager create-secret --name oasis/staging/COGNITO_CLIENT_SECRET \
-          --secret-string "$COGNITO_CLIENT_SECRET" \
-          --description "Cognito client secret for Oasis staging" 2>/dev/null || \
-        aws secretsmanager update-secret --secret-id oasis/staging/COGNITO_CLIENT_SECRET \
-          --secret-string "$COGNITO_CLIENT_SECRET"
+        upsert_secret \
+          "oasis/staging/NEXTAUTH_SECRET" \
+          "$NEXTAUTH_SECRET" \
+          "NextAuth secret for Oasis staging"
         
-        echo "✅ All secrets created/updated in Secrets Manager"
+        upsert_secret \
+          "oasis/staging/NEXTAUTH_URL" \
+          "https://app.oasis-care.co" \
+          "NextAuth URL for Oasis staging"
+        
+        echo "✅ All application secrets created/updated (3/3)"
+        echo "✅ Cognito secret already managed in Phase 1"
 
     - name: 🔒 Phase 4 - ACM Certificates
       run: |
