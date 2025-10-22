@@ -82,19 +82,29 @@ AWS credentials are not available locally. You MUST add these policies via AWS C
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "WriteCognitoSecret",
+      "Sid": "OasisSecretsStagingWrite",
       "Effect": "Allow",
       "Action": [
         "secretsmanager:CreateSecret",
         "secretsmanager:PutSecretValue",
+        "secretsmanager:UpdateSecret",
         "secretsmanager:DescribeSecret",
-        "secretsmanager:GetSecretValue"
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:ListSecrets",
+        "secretsmanager:TagResource",
+        "secretsmanager:UntagResource",
+        "secretsmanager:DeleteSecret"
       ],
-      "Resource": "arn:aws:secretsmanager:eu-west-2:721689331449:secret:oasis/staging/cognito_web_client_secret*"
+      "Resource": "arn:aws:secretsmanager:eu-west-2:721689331449:secret:oasis/staging/*"
     }
   ]
 }
 ```
+
+**Note:** This policy grants access to all secrets under `oasis/staging/*` path. This is required because:
+- Phase 1 creates `oasis/staging/cognito_web_client_secret` for the Cognito client
+- Phase 3 creates `oasis/staging/DATABASE_URL`, `oasis/staging/NEXTAUTH_SECRET`, and `oasis/staging/NEXTAUTH_URL`
+- Phase 2.5 runs a preflight check that creates a temporary secret to verify permissions
 
 #### Policy 4: `OasisACMRequest`
 ```json
