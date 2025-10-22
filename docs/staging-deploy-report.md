@@ -175,3 +175,70 @@ The OasisStagingTerraformPolicy now needs these ADDITIONAL permissions beyond th
 - Diagnostic Workflow: `.github/workflows/diagnose-auth-perms.yml` (PR #3 merged)
 - IAM Policy Guide: `docs/PHASE5-IAM-DEPLOYMENT-GUIDE.md` 
 - Comprehensive Policy: `docs/oasis-deploy-iam-policy.json` (requires comprehensive update)
+
+---
+
+## Update: 2025-10-22 14:20 - Run #7 After Console IAM Policy Update
+
+**Run URL:** https://github.com/welathfindrr13/oasis-care-international/actions/runs/18708556258  
+**Commit:** 36a96ea  
+**Policy in force:** OasisStagingTerraformPolicy (console-updated, default set, attached to oasis-deploy)  
+**Duration:** ~9 minutes  
+
+### Result
+- Workflow conclusion: **failure**
+- Phases 0-4: ✅ Expected to pass (based on previous runs)
+- Phase 5 (Infrastructure): ❌ FAILED
+
+### Summary
+
+This deployment was triggered after IAM policy updates were applied via the AWS console. The run completed with failure status (exit code 1), indicating that Phase 5 infrastructure deployment encountered blocking issues.
+
+### Expected Issues (Based on Previous Runs)
+
+Based on Run #6 analysis, the following issues were expected to persist unless the IAM policy included ALL required permissions:
+
+**Critical IAM Permissions Needed:**
+1. ❌ `ec2:GetSecurityGroupsForVpc` - Blocks ALB creation
+2. ❌ `sns:GetSubscriptionAttributes` - Blocks SNS subscription management
+3. ❌ `cloudwatch:ListTagsForResource` - Blocks CloudWatch alarm tagging
+4. ❌ Additional permissions from previous diagnostic runs
+
+**Resource Conflicts:**
+- ECR repositories (oasis-api, oasis-web) already exist - need Terraform import
+- ELBv2 Target Groups already exist - need Terraform import
+- CloudWatch log groups already exist - need Terraform import
+- IAM roles already exist - need Terraform import
+- Security group egress rule conflicts - need resolution
+
+### Next Steps
+
+1. **Verify IAM Policy Completeness**
+   - Ensure the console-updated policy includes `ec2:GetSecurityGroupsForVpc`
+   - Ensure it includes `sns:GetSubscriptionAttributes`
+   - Ensure it includes `cloudwatch:ListTagsForResource`
+   - Compare against docs/oasis-deploy-iam-policy.json
+
+2. **Import Existing Resources**
+   ```bash
+   cd infrastructure/staging
+   terraform import aws_ecr_repository.api oasis-api
+   terraform import aws_ecr_repository.web oasis-web
+   terraform import aws_lb_target_group.api <arn>
+   terraform import aws_lb_target_group.web <arn>
+   # ... (additional imports needed)
+   ```
+
+3. **Resolve Security Group Conflicts**
+   - Review infrastructure/staging/security-groups.tf
+   - Ensure no duplicate egress rules
+
+4. **Re-run Deployment**
+   - After all IAM permissions added
+   - After all existing resources imported
+   - After security group conflicts resolved
+
+### Documentation
+- IAM Policy Template: docs/oasis-deploy-iam-policy.json
+- Deployment Guide: STAGING_DEPLOYMENT_GUIDE.md
+- Phase 5 Diagnostic: docs/infra-phase5-diagnostic.md
