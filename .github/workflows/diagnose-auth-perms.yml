@@ -1,0 +1,154 @@
+name: Diagnose Auth & Permissions for Phase 5
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to test
+        required: true
+        default: feat/staging-live-setup
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      # Prefer OIDC role if provided; else fall back to Access Keys.
+      - name: Configure AWS (OIDC role)
+        if: ${{ secrets.AWS_DEPLOY_ROLE_ARN != '' }}
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-west-2
+          role-session-name: phase5-diagnose
+
+      - name: Configure AWS (access keys)
+        if: ${{ secrets.AWS_DEPLOY_ROLE_ARN == '' }}
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-2
+
+      - name: Who am I (AWS)
+        id: whoami
+        run: |
+          set -e
+          aws sts get-caller-identity | tee /tmp/whoami.json
+          echo "principal=$(jq -r '.Arn' /tmp/whoami.json)" >> $GITHUB_OUTPUT
+          echo "account=$(jq -r '.Account' /tmp/whoami.json)" >> $GITHUB_OUTPUT
+
+      - name: Permission probes
+        id: probes
+        env:
+          REGION: eu-west-2
+        run: |
+          set -euo pipefail
+          diag() { echo "::notice::$1"; }
+
+          res_json="/tmp/probes.json"
+          : > "$res_json"
+
+          mark() {
+            local key="$1" val="$2"
+            jq -n --arg k "$key" --arg v "$val" '{($k):$v}' > /tmp/one.json
+            if [ -s "$res_json" ]; then
+              jq -s '.[0] * .[1]' "$res_json" /tmp/one.json > /tmp/m.json && mv /tmp/m.json "$res_json"
+            else
+              mv /tmp/one.json "$res_json"
+            fi
+          }
+
+          # 1) iam:GetRole on expected roles (AccessDenied vs NotFound)
+          check_getrole() {
+            local rn="$1"
+            if out=$(aws iam get-role --role-name "$rn" 2>&1); then
+              mark "iam:GetRole:$rn" "Allowed"
+            else
+              if echo "$out" | grep -qi "AccessDenied"; then
+                mark "iam:GetRole:$rn" "AccessDenied"
+              elif echo "$out" | grep -qi "NoSuchEntity|NotFound"; then
+                mark "iam:GetRole:$rn" "NotFound"
+              else
+                mark "iam:GetRole:$rn" "Unknown"
+              fi
+            fi
+          }
+          check_getrole "oasis-care-staging-ecsTaskExec"
+          check_getrole "oasis-care-staging-ecsTaskRole"
+          check_getrole "oasis-care-staging-lambda-embedding"
+
+          # 2) sns:ListTagsForResource (create temp, list tags, delete)
+          SNS_ARN=$(aws sns create-topic --name oasis-diagnose-$RANDOM --query TopicArn --output text)
+          if out=$(aws sns list-tags-for-resource --resource-arn "$SNS_ARN" 2>&1); then
+            mark "sns:ListTagsForResource" "Allowed"
+          else
+            echo "$out" >&2
+            if echo "$out" | grep -qi "AccessDenied"; then
+              mark "sns:ListTagsForResource" "AccessDenied"
+            else
+              mark "sns:ListTagsForResource" "Unknown"
+            fi
+          fi
+          aws sns delete-topic --topic-arn "$SNS_ARN" || true
+
+          # 3) sqs:ListQueueTags (create temp, list tags, delete)
+          QURL=$(aws sqs create-queue --queue-name oasis-diagnose-$RANDOM --query QueueUrl --output text)
+          if out=$(aws sqs list-queue-tags --queue-url "$QURL" 2>&1); then
+            mark "sqs:ListQueueTags" "Allowed"
+          else
+            echo "$out" >&2
+            if echo "$out" | grep -qi "AccessDenied"; then
+              mark "sqs:ListQueueTags" "AccessDenied"
+            else
+              mark "sqs:ListQueueTags" "Unknown"
+            fi
+          fi
+          aws sqs delete-queue --queue-url "$QURL" || true
+
+          # 4) ec2:ModifySubnetAttribute (safe dry-run on first subnet)
+          SUBNET=$(aws ec2 describe-subnets --query 'Subnets[0].SubnetId' --output text || echo "")
+          if [ -n "$SUBNET" ] && out=$(aws ec2 modify-subnet-attribute --subnet-id "$SUBNET" --map-public-ip-on-launch --dry-run 2>&1); then
+            mark "ec2:ModifySubnetAttribute" "Allowed"
+          else
+            # DryRun returns non-zero with message "DryRunOperation" when allowed
+            if echo "${out:-}" | grep -qi "DryRunOperation"; then
+              mark "ec2:ModifySubnetAttribute" "Allowed"
+            elif echo "${out:-}" | grep -qi "AccessDenied|UnauthorizedOperation"; then
+              mark "ec2:ModifySubnetAttribute" "AccessDenied"
+            else
+              mark "ec2:ModifySubnetAttribute" "Unknown"
+            fi
+          fi
+
+          echo "Probes summary:"
+          cat "$res_json"
+
+          # Produce a concise markdown summary
+          principal=$(jq -r '.Arn? // empty' /tmp/whoami.json || true)
+          {
+            echo "### Diagnostics Summary"
+            echo ""
+            echo "- Principal: \`${principal:-unknown}\`"
+            echo "- Region: eu-west-2"
+            echo ""
+            echo "| Check | Result |"
+            echo "|------|--------|"
+            jq -r 'to_entries[] | "| \(.key) | \(.value) |"' "$res_json"
+          } > /tmp/diag.md
+
+      - name: Upload diagnostics artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase5-diagnostics
+          path: |
+            /tmp/diag.md
+            /tmp/whoami.json
+            /tmp/probes.json
