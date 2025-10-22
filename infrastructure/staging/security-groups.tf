@@ -20,7 +20,7 @@ resource "aws_security_group" "alb" {
 
 resource "aws_security_group" "ecs" {
   name        = "${local.name_prefix}-ecs-sg"
-  description = "Allow ALB ➞ ECS"
+  description = "Allow ALB to ECS"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -40,7 +40,7 @@ resource "aws_security_group" "ecs" {
 
 resource "aws_security_group" "rds" {
   name        = "${local.name_prefix}-rds-sg"
-  description = "Allow ECS ➞ RDS"
+  description = "Allow ECS to RDS"
   vpc_id      = aws_vpc.main.id
 
   ingress {
