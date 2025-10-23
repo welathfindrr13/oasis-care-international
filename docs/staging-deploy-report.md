@@ -242,3 +242,39 @@ Based on Run #6 analysis, the following issues were expected to persist unless t
 - IAM Policy Template: docs/oasis-deploy-iam-policy.json
 - Deployment Guide: STAGING_DEPLOYMENT_GUIDE.md
 - Phase 5 Diagnostic: docs/infra-phase5-diagnostic.md
+
+---
+## Update: 2025-10-23 15:03 — Redeploy after enhanced state repair
+**Run URL:** https://github.com/welathfindrr13/oasis-care-international/actions/runs/18741483769  
+**Result:** failure
+
+### Phase 5 Status
+Phase 5 failed after ~7 minutes of execution. Phases 0-4 all passed successfully:
+- ✅ Phase 0 - Pre-flight Setup
+- ✅ Phase 1 - Cognito Client Secret  
+- ✅ Phase 2 - RDS Setup
+- ✅ Phase 2.5 - Secrets Manager Preflight Check
+- ✅ Phase 3 - Secrets Manager (Application Secrets Only)
+- ✅ Phase 4 - ACM Certificates
+- ❌ Phase 5 - Infrastructure Deployment (FAILED)
+
+### Phase 5 tail
+```
+(Logs unavailable via gh CLI - check GitHub Actions UI for details)
+Run URL: https://github.com/welathfindrr13/oasis-care-international/actions/runs/18741483769
+```
+
+### Expected Issues
+Based on previous runs, Phase 5 likely failed due to:
+- Missing IAM permissions (ec2:GetSecurityGroupsForVpc, sns:GetSubscriptionAttributes, cloudwatch:ListTagsForResource)
+- Resource conflicts requiring Terraform imports (ECR repos, target groups, log groups, IAM roles)
+
+### Smoke Tests
+API /health: unreachable (deployment incomplete)
+Web /: unreachable (deployment incomplete)
+
+### Next Actions Required
+1. Review detailed logs at https://github.com/welathfindrr13/oasis-care-international/actions/runs/18741483769
+2. Verify all required IAM permissions are in place
+3. Complete Terraform state imports for existing resources
+4. Re-run deployment after resolving blockers
