@@ -378,6 +378,49 @@ jobs:
         
         echo "✅ Certificates validated and issued"
 
+    - name: 🔄 Phase 4.5 - Import Existing Resources
+      working-directory: infrastructure/staging
+      run: |
+        set -euo pipefail
+        echo "🔄 Phase 4.5: Importing pre-existing AWS resources into Terraform state"
+        echo "This prevents AlreadyExists errors in Phase 5"
+        
+        terraform init -input=false
+        
+        import_if_missing() {
+          local addr="$1"
+          local id="$2"
+          if terraform state show "$addr" >/dev/null 2>&1; then
+            echo "  ✅ $addr already in state"
+            return 0
+          fi
+          echo "  ➡️  Importing $addr"
+          terraform import -input=false "$addr" "$id" 2>&1 || echo "  ⚠️  Skip (not in config or not found)"
+        }
+        
+        echo ""
+        echo "Importing ECR repositories..."
+        import_if_missing aws_ecr_repository.api oasis-api
+        import_if_missing aws_ecr_repository.web oasis-web
+        
+        echo ""
+        echo "Importing CloudWatch log groups..."
+        import_if_missing aws_cloudwatch_log_group.api "/ecs/oasis-api-staging"
+        import_if_missing aws_cloudwatch_log_group.web "/ecs/oasis-web-staging"
+        
+        echo ""
+        echo "Importing IAM roles..."
+        import_if_missing aws_iam_role.ecs_task_execution oasis-care-staging-ecsTaskExec
+        import_if_missing aws_iam_role.ecs_task_role oasis-care-staging-ecsTaskRole
+        import_if_missing aws_iam_role.lambda_embedding_execution oasis-care-staging-lambda-embedding
+        
+        echo ""
+        echo "Importing Secrets Manager..."
+        import_if_missing aws_secretsmanager_secret.database_url oasis/staging/DATABASE_URL
+        
+        echo ""
+        echo "✅ Phase 4.5 complete - resources imported into Terraform state"
+
     - name: 🏗️ Phase 5 - Infrastructure Deployment  
       working-directory: infrastructure/staging
       run: |
