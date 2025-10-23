@@ -71,7 +71,7 @@ output "graphql_endpoint" {
 # Network Outputs (for migration scripts)
 output "private_subnet_ids" {
   description = "Private subnet IDs for migration script"
-  value       = aws_subnet.private[*].id
+  value       = local.private_subnet_ids
 }
 
 output "ecs_security_group_id" {
@@ -81,7 +81,7 @@ output "ecs_security_group_id" {
 
 output "vpc_id" {
   description = "VPC ID"
-  value       = aws_vpc.main.id
+  value       = data.aws_vpc.main.id
 }
 
 # Target Group Outputs

@@ -12,6 +12,9 @@ resource "aws_ecr_repository" "api" {
     kms_key         = var.kms_key_id
   }
 
+  lifecycle {
+    ignore_changes = [image_tag_mutability, encryption_configuration, image_scanning_configuration]
+  }
 
   tags = var.default_tags
 }
@@ -29,6 +32,9 @@ resource "aws_ecr_repository" "web" {
     kms_key         = var.kms_key_id
   }
 
+  lifecycle {
+    ignore_changes = [image_tag_mutability, encryption_configuration, image_scanning_configuration]
+  }
 
   tags = var.default_tags
 }

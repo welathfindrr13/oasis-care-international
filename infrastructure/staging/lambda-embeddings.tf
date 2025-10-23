@@ -12,7 +12,7 @@ resource "aws_lambda_function" "embedding_generator" {
   source_code_hash = data.archive_file.lambda_placeholder.output_base64sha256
 
   vpc_config {
-    subnet_ids         = aws_subnet.private[*].id
+    subnet_ids         = local.private_subnet_ids
     security_group_ids = [aws_security_group.lambda_embedding.id]
   }
 
@@ -58,7 +58,7 @@ data "archive_file" "lambda_placeholder" {
 # Security group for Lambda in VPC
 resource "aws_security_group" "lambda_embedding" {
   name_prefix = "${local.name_prefix}-lambda-embedding-"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = data.aws_vpc.main.id
   description = "Security group for embedding generation Lambda"
 
   # Outbound to RDS
@@ -66,7 +66,7 @@ resource "aws_security_group" "lambda_embedding" {
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.main.cidr_block]
+    cidr_blocks = [data.aws_vpc.main.cidr_block]
     description = "PostgreSQL access"
   }
 

@@ -4,7 +4,7 @@ resource "aws_lb" "main" {
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
-  subnets            = aws_subnet.public[*].id
+  subnets            = local.public_subnet_ids
 
   enable_deletion_protection = false
 
@@ -18,7 +18,7 @@ resource "aws_lb_target_group" "api" {
   name     = "${local.name_prefix}-api-tg"
   port     = 3000
   protocol = "HTTP"
-  vpc_id   = aws_vpc.main.id
+  vpc_id   = data.aws_vpc.main.id
 
   health_check {
     enabled             = true
@@ -44,7 +44,7 @@ resource "aws_lb_target_group" "web" {
   name     = "${local.name_prefix}-web-tg"
   port     = 3000
   protocol = "HTTP"
-  vpc_id   = aws_vpc.main.id
+  vpc_id   = data.aws_vpc.main.id
 
   health_check {
     enabled             = true
