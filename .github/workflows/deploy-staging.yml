@@ -419,7 +419,29 @@ jobs:
         import_if_missing aws_secretsmanager_secret.database_url oasis/staging/DATABASE_URL
         
         echo ""
-        echo "✅ Phase 4.5 complete - resources imported into Terraform state"
+        echo "Importing ALB and Target Groups..."
+        # Get ALB ARN
+        ALB_ARN=$(aws elbv2 describe-load-balancers --names oasis-care-staging-alb --query 'LoadBalancers[0].LoadBalancerArn' --output text 2>/dev/null || echo "")
+        if [ -n "$ALB_ARN" ] && [ "$ALB_ARN" != "None" ]; then
+          import_if_missing aws_lb.main "$ALB_ARN"
+        fi
+        
+        # Get Target Group ARNs
+        API_TG_ARN=$(aws elbv2 describe-target-groups --names oasis-care-staging-api-tg --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null || echo "")
+        WEB_TG_ARN=$(aws elbv2 describe-target-groups --names oasis-care-staging-web-tg --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null || echo "")
+        if [ -n "$API_TG_ARN" ] && [ "$API_TG_ARN" != "None" ]; then
+          import_if_missing aws_lb_target_group.api "$API_TG_ARN"
+        fi
+        if [ -n "$WEB_TG_ARN" ] && [ "$WEB_TG_ARN" != "None" ]; then
+          import_if_missing aws_lb_target_group.web "$WEB_TG_ARN"
+        fi
+        
+        echo ""
+        echo "Importing DB Subnet Group..."
+        import_if_missing aws_db_subnet_group.main oasis-care-staging-db-subnet-group
+        
+        echo ""
+        echo "✅ Phase 4.5 complete - all existing resources imported"
 
     - name: 🏗️ Phase 5 - Infrastructure Deployment  
       working-directory: infrastructure/staging

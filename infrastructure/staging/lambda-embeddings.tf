@@ -70,22 +70,13 @@ resource "aws_security_group" "lambda_embedding" {
     description = "PostgreSQL access"
   }
 
-  # Outbound for Bedrock API calls
+  # Outbound for HTTPS (Bedrock + AWS APIs)
   egress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTPS for Bedrock API"
-  }
-
-  # Outbound for Secrets Manager
-  egress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTPS for AWS API calls"
+    description = "HTTPS for Bedrock and AWS API calls"
   }
 
   tags = {
