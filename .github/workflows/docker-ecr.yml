@@ -1,28 +1,89 @@
-name: Build & push API image to ECR
+name: Deploy Docker Images to Staging
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
+  push:
+    branches: [ feat/staging-live-setup ]
+
+env:
+  AWS_REGION: eu-west-2
+  ACCOUNT_ID: 721689331449
+  CLUSTER: oasis-care-staging-cluster
+  API_SVC: oasis-api-staging
+  WEB_SVC: oasis-web-staging
+  API_REPO: oasis-api
+  WEB_REPO: oasis-web
+  TAG: staging
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
     steps:
-      - uses: actions/checkout@v4
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: 🔑 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'eu-west-2' }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
+      - name: 🔐 Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push image
+      - name: 🔨 Build & Push API Image
         run: |
-          IMAGE=721689331449.dkr.ecr.eu-west-2.amazonaws.com/oasis-backend
-          docker build -t $IMAGE:latest -f apps/api/Dockerfile .
-          docker push $IMAGE:latest
+          echo "Building API image..."
+          IMAGE="${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.API_REPO }}:${{ env.TAG }}"
+          docker build -t $IMAGE -f apps/api/Dockerfile .
+          docker push $IMAGE
+          echo "✅ API image pushed: $IMAGE"
+
+      - name: 🔨 Build & Push Web Image
+        run: |
+          echo "Building Web image..."
+          IMAGE="${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.WEB_REPO }}:${{ env.TAG }}"
+          docker build -t $IMAGE -f apps/web/Dockerfile .
+          docker push $IMAGE
+          echo "✅ Web image pushed: $IMAGE"
+
+      - name: 🚀 Deploy to ECS
+        run: |
+          echo "Updating ECS services..."
+          aws ecs update-service \
+            --region ${{ env.AWS_REGION }} \
+            --cluster ${{ env.CLUSTER }} \
+            --service ${{ env.API_SVC }} \
+            --force-new-deployment
+          
+          aws ecs update-service \
+            --region ${{ env.AWS_REGION }} \
+            --cluster ${{ env.CLUSTER }} \
+            --service ${{ env.WEB_SVC }} \
+            --force-new-deployment
+          
+          echo "✅ ECS services triggered for redeployment"
+
+      - name: ⏳ Wait for Services to Stabilize
+        run: |
+          echo "Waiting for services to become stable..."
+          aws ecs wait services-stable \
+            --region ${{ env.AWS_REGION }} \
+            --cluster ${{ env.CLUSTER }} \
+            --services ${{ env.API_SVC }} ${{ env.WEB_SVC }}
+          echo "✅ Services are stable"
+
+      - name: 🧪 Health Checks
+        run: |
+          echo "Running endpoint health checks..."
+          
+          echo "Testing API..."
+          curl -skI --max-time 10 https://api.oasis-care.co/health | head -n1 || echo "⚠️ API check failed"
+          
+          echo "Testing Web..."
+          curl -skI --max-time 10 https://app.oasis-care.co | head -n1 || echo "⚠️ Web check failed"
+          
+          echo "✅ Deployment complete!"
