@@ -20,16 +20,6 @@ variable "route53_zone_id" {
   type        = string
 }
 
-# ACM Certificate Configuration
-variable "app_cert_arn" {
-  description = "ACM certificate ARN for web app domain"
-  type        = string
-}
-variable "api_cert_arn" {
-  description = "ACM certificate ARN for API domain"
-  type        = string
-}
-
 # KMS Configuration
 variable "kms_key_id" {
   description = "KMS key ID for encryption"
