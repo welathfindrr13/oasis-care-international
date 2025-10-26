@@ -27,7 +27,7 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.env || 'staging' }}
+  group: ${{ github.workflow }}-${{ github.ref }}-staging
   cancel-in-progress: false
 
 env:
