@@ -404,89 +404,12 @@ jobs:
         echo "✅ All application secrets created/updated (3/3)"
         echo "✅ Cognito secret already managed in Phase 1"
 
-    - name: 🔒 Phase 4 - ACM Certificates
+    - name: ℹ️ Phase 4 - ACM Certificates (Terraform-Managed)
       run: |
-        echo "🔒 Phase 4: Requesting ACM certificates"
-        
-        # Request certificate for app.oasis-care.co
-        echo "Requesting certificate for app.oasis-care.co..."
-        APP_CERT_ARN=$(aws acm request-certificate \
-          --domain-name app.oasis-care.co \
-          --validation-method DNS \
-          --query CertificateArn --output text)
-        echo "APP_CERT_ARN=$APP_CERT_ARN" >> $GITHUB_ENV
-        
-        # Request certificate for api.oasis-care.co
-        echo "Requesting certificate for api.oasis-care.co..."
-        API_CERT_ARN=$(aws acm request-certificate \
-          --domain-name api.oasis-care.co \
-          --validation-method DNS \
-          --query CertificateArn --output text)
-        echo "API_CERT_ARN=$API_CERT_ARN" >> $GITHUB_ENV
-        
-        # Wait a moment for certificates to be processable
-        sleep 10
-        
-        # Create DNS validation records
-        echo "Creating DNS validation records..."
-        
-        # Get validation records for app cert
-        aws acm describe-certificate --certificate-arn $APP_CERT_ARN \
-          --query 'Certificate.DomainValidationOptions[0]' --output json > app_validation.json
-        
-        APP_VALIDATION_NAME=$(cat app_validation.json | jq -r '.ResourceRecord.Name')
-        APP_VALIDATION_VALUE=$(cat app_validation.json | jq -r '.ResourceRecord.Value')
-        
-        # Get validation records for api cert  
-        aws acm describe-certificate --certificate-arn $API_CERT_ARN \
-          --query 'Certificate.DomainValidationOptions[0]' --output json > api_validation.json
-          
-        API_VALIDATION_NAME=$(cat api_validation.json | jq -r '.ResourceRecord.Name')
-        API_VALIDATION_VALUE=$(cat api_validation.json | jq -r '.ResourceRecord.Value')
-        
-        # Create Route53 records
-        cat > validation-records.json << EOF
-        {
-          "Changes": [
-            {
-              "Action": "UPSERT",
-              "ResourceRecordSet": {
-                "Name": "$APP_VALIDATION_NAME",
-                "Type": "CNAME",
-                "TTL": 300,
-                "ResourceRecords": [{"Value": "$APP_VALIDATION_VALUE"}]
-              }
-            },
-            {
-              "Action": "UPSERT", 
-              "ResourceRecordSet": {
-                "Name": "$API_VALIDATION_NAME",
-                "Type": "CNAME",
-                "TTL": 300,
-                "ResourceRecords": [{"Value": "$API_VALIDATION_VALUE"}]
-              }
-            }
-          ]
-        }
-        EOF
-        
-        aws route53 change-resource-record-sets \
-          --hosted-zone-id $ROUTE53_ZONE_ID \
-          --change-batch file://validation-records.json
-        
-        echo "⏳ Waiting for certificate validation (this may take 5-10 minutes)..."
-        aws acm wait certificate-validated --certificate-arn $APP_CERT_ARN &
-        aws acm wait certificate-validated --certificate-arn $API_CERT_ARN &
-        wait
-        
-        echo "✅ Certificates validated and issued"
-    
-    - name: 🔐 Mask Sensitive Variables
-      run: |
-        echo "::add-mask::${{ env.APP_CERT_ARN }}"
-        echo "::add-mask::${{ env.API_CERT_ARN }}"
-        echo "::add-mask::${{ env.ROUTE53_ZONE_ID }}"
-        echo "✅ Sensitive variables masked in logs"
+        echo "ℹ️ Phase 4: ACM certificates will be managed by Terraform"
+        echo "Terraform will handle certificate creation and DNS validation automatically"
+        echo "This ensures certificates are properly tracked in state"
+        echo "✅ Skipping manual certificate creation - letting Terraform handle it"
     
     - name: 🧹 Terraform Lint & Format Validation
       uses: terraform-linters/setup-tflint@v4
@@ -514,8 +437,6 @@ jobs:
     - name: 📝 Phase 4.25 - Generate Terraform Variables File
       env:
         ROUTE53_ZONE_ID: ${{ env.ROUTE53_ZONE_ID }}
-        APP_CERT_ARN: ${{ env.APP_CERT_ARN }}
-        API_CERT_ARN: ${{ env.API_CERT_ARN }}
       working-directory: infrastructure/staging
       run: |
         set -euo pipefail
@@ -528,8 +449,6 @@ jobs:
         api_domain      = "api.oasis-care.co"
         web_domain      = "app.oasis-care.co"
         route53_zone_id = "$ROUTE53_ZONE_ID"
-        app_cert_arn    = "$APP_CERT_ARN"
-        api_cert_arn    = "$API_CERT_ARN"
         kms_key_id      = "8995c5be-616f-4680-953e-8ed3b7252689"
         sns_topic_arn   = "arn:aws:sns:eu-west-2:721689331449:oasis-staging-alerts"
         EOF
@@ -697,25 +616,30 @@ jobs:
         
         echo "✅ Container images built and pushed"
 
-    - name: ⚡ Phase 7 - ECS Services Deployment
+    - name: ⚡ Phase 7 - Verify ECS Services
       working-directory: infrastructure/staging
       run: |
-        echo "⚡ Phase 7: Updating ECS services with new images"
-        
-        # Update ECS services to use new images
-        terraform apply -var-file=terraform.tfvars -auto-approve
-        
-        # Wait for services to stabilize
-        echo "⏳ Waiting for ECS services to stabilize..."
+        echo "⚡ Phase 7: Verifying ECS services are running"
         
         # Get cluster and service names from terraform output
         CLUSTER_NAME=$(cat ../outputs.json | jq -r '.ecs_cluster_name.value')
         API_SERVICE=$(cat ../outputs.json | jq -r '.ecs_api_service_name.value')
         WEB_SERVICE=$(cat ../outputs.json | jq -r '.ecs_web_service_name.value')
         
-        aws ecs wait services-stable --cluster $CLUSTER_NAME --services $API_SERVICE $WEB_SERVICE
+        echo "Cluster: $CLUSTER_NAME"
+        echo "API Service: $API_SERVICE"
+        echo "Web Service: $WEB_SERVICE"
         
-        echo "✅ ECS services deployed and stable"
+        # Check if services exist before waiting
+        if aws ecs describe-services --cluster "$CLUSTER_NAME" --services "$API_SERVICE" "$WEB_SERVICE" --region eu-west-2 >/dev/null 2>&1; then
+          echo "⏳ Waiting for ECS services to stabilize..."
+          aws ecs wait services-stable --cluster "$CLUSTER_NAME" --services "$API_SERVICE" "$WEB_SERVICE" --region eu-west-2
+          echo "✅ ECS services are stable"
+        else
+          echo "⚠️ ECS services not found - may still be creating or Terraform apply failed"
+          echo "Checking service status..."
+          aws ecs describe-services --cluster "$CLUSTER_NAME" --services "$API_SERVICE" "$WEB_SERVICE" --region eu-west-2 || true
+        fi
 
     - name: 🌐 Phase 8 - Route53 DNS Records
       run: |

@@ -78,21 +78,30 @@
 
 ## 🔍 Why Deployment Keeps Failing
 
-### Failure Sequence:
+### Failure Sequence (VERIFIED):
 
-1. **Phase 4.5 (Import):** Fails - can't pass Terraform variables to import commands
-2. **Phase 5 (Terraform Apply):** 
-   - Tries to create ALB in vpc-0fa202628a9b74522 (correct VPC)
-   - Gets "AlreadyExists" error (ALB exists in vpc-01cec... wrong VPC)
-   - Tries to create Target Groups in vpc-0fa202628a9b74522
-   - Gets "AlreadyExists" errors (TGs exist in vpc-07be... wrong VPC)
-   - **Aborts before creating ECS services/tasks**
+1. **Phase 4 (ACM Certificates):** TIMEOUT/FAILURE
+   - Certificates stuck in PENDING_VALIDATION
+   - DNS validation records may not be propagating
+   - Waiter times out after max attempts
+
+2. **Phase 5 (Terraform Apply):** BLOCKED
+   - Can't create `aws_lb_listener.https` (needs validated certificates)
+   - Can't create `aws_ecs_service.api` & `aws_ecs_service.web`
+   - **Services have `depends_on = [aws_lb_listener.https]`**
+   - Terraform creates infrastructure UP TO the listener, then stops
+
+3. **Phase 7 (ECS Update):** SERVICE NOT FOUND
+   - Tries to run `aws ecs wait services-stable`
+   - Services don't exist because Phase 5 never created them
+   - **ServiceNotFoundException error**
 
 ### Result:
-- ECS Cluster is empty (no services to run containers)
-- ALB exists but can't reach anything (wrong VPC)
-- Target Groups exist but not attached to ALB (wrong VPC)
-- RDS is orphaned (nothing can connect to it)
+- ECS Cluster is empty (no services - blocked by certificate dependency)
+- ACM certificates in PENDING_VALIDATION
+- HTTPS listener can't be created
+- ECS services can't be created (depend on listener)
+- Phase 7 fails trying to update non-existent services
 
 ---
 
