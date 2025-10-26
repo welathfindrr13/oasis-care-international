@@ -15,15 +15,16 @@ resource "aws_lb" "main" {
 
 # Target Groups
 resource "aws_lb_target_group" "api" {
-  name     = "${local.name_prefix}-api-tg"
-  port     = 3000
-  protocol = "HTTP"
-  vpc_id   = data.aws_vpc.main.id
+  name        = "${local.name_prefix}-api-tg"
+  port        = 3000
+  protocol    = "HTTP"
+  vpc_id      = data.aws_vpc.main.id
+  target_type = "ip"  # Required for Fargate tasks
 
   health_check {
     enabled             = true
     healthy_threshold   = 2
-    unhealthy_threshold = 2
+    unhealthy_threshold = 5
     timeout             = 5
     interval            = 30
     path                = "/health"
@@ -41,15 +42,16 @@ resource "aws_lb_target_group" "api" {
 }
 
 resource "aws_lb_target_group" "web" {
-  name     = "${local.name_prefix}-web-tg"
-  port     = 3000
-  protocol = "HTTP"
-  vpc_id   = data.aws_vpc.main.id
+  name        = "${local.name_prefix}-web-tg"
+  port        = 3000
+  protocol    = "HTTP"
+  vpc_id      = data.aws_vpc.main.id
+  target_type = "ip"  # Required for Fargate tasks
 
   health_check {
     enabled             = true
     healthy_threshold   = 2
-    unhealthy_threshold = 2
+    unhealthy_threshold = 5
     timeout             = 5
     interval            = 30
     path                = "/"

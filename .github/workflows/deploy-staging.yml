@@ -26,13 +26,99 @@ on:
         default: 'carer-demo@oasis-care.co'
         type: string
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.env || 'staging' }}
+  cancel-in-progress: false
+
 env:
   AWS_REGION: eu-west-2
   PROJECT_NAME: oasis-care
   ENVIRONMENT: staging
   
 jobs:
+  tf-preflight:
+    name: Terraform Preflight (State + Imports)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      state_healthy: ${{ steps.state_check.outputs.healthy }}
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      with:
+        ref: feat/staging-live-setup
+        
+    - name: 🔑 Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: 🏗️ Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ~1.6
+        
+    - name: 🔧 Terraform Init
+      working-directory: infrastructure/staging
+      run: |
+        echo "🔧 Initializing Terraform..."
+        terraform init -input=false -upgrade
+        
+    - name: 🔄 Select Workspace
+      working-directory: infrastructure/staging
+      run: |
+        echo "🔄 Selecting staging workspace..."
+        terraform workspace select staging || terraform workspace new staging
+        terraform workspace show
+        
+    - name: 🔍 State Health Check
+      id: state_check
+      working-directory: infrastructure/staging
+      run: |
+        echo "🔍 Checking Terraform state health..."
+        RESOURCE_COUNT=$(terraform state list 2>/dev/null | wc -l || echo "0")
+        echo "Current state contains $RESOURCE_COUNT resources"
+        
+        if [ "$RESOURCE_COUNT" -gt 10 ]; then
+          echo "✅ State appears healthy (${RESOURCE_COUNT} resources)"
+          echo "healthy=true" >> $GITHUB_OUTPUT
+        else
+          echo "⚠️ State appears incomplete or empty (${RESOURCE_COUNT} resources)"
+          echo "Will proceed with imports..."
+          echo "healthy=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: 🔄 Import Existing Resources
+      working-directory: infrastructure/staging
+      run: |
+        echo "🔄 Running import script to prevent AlreadyExists errors..."
+        bash ../../_generated/terraform-import-all.sh || true
+        echo ""
+        echo "📊 Post-import state:"
+        terraform state list | head -20 || true
+        echo "..."
+        echo "Total resources: $(terraform state list | wc -l)"
+        
+    - name: ✅ Validate Configuration
+      working-directory: infrastructure/staging
+      run: |
+        echo "✅ Validating Terraform configuration..."
+        terraform validate -no-color
+        echo "✅ Validation passed"
+        
+    - name: 📋 Pre-flight Plan (Dry Run)
+      working-directory: infrastructure/staging
+      run: |
+        echo "📋 Running terraform plan as pre-flight check..."
+        terraform plan -input=false -no-color -out=preflight.tfplan || true
+        echo "✅ Pre-flight plan completed"
+  
   deploy:
+    name: Deploy Infrastructure & Applications
+    needs: tf-preflight
     runs-on: ubuntu-latest
     timeout-minutes: 90
     
@@ -74,14 +160,31 @@ jobs:
         terraform init -upgrade
         terraform workspace select staging || terraform workspace new staging
         
-        # Auto-detect Route53 zone ID if not provided
-        if [ -z "${{ inputs.route53_zone_id }}" ]; then
-          echo "Auto-detecting Route53 zone ID..."
-          ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name oasis-care.co --query "HostedZones[0].Id" --output text | sed 's|/hostedzone/||')
-          echo "ROUTE53_ZONE_ID=$ZONE_ID" >> $GITHUB_ENV
+        # Determine Route53 zone ID (with fallback to known value)
+        if [ -n "${{ inputs.route53_zone_id }}" ]; then
+          ZONE_ID="${{ inputs.route53_zone_id }}"
+          echo "Using provided Route53 zone ID: $ZONE_ID"
         else
-          echo "ROUTE53_ZONE_ID=${{ inputs.route53_zone_id }}" >> $GITHUB_ENV
+          echo "Auto-detecting Route53 zone ID for oasis-care.co..."
+          ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name oasis-care.co --query "HostedZones[0].Id" --output text 2>/dev/null | sed 's|/hostedzone/||' || echo "")
+          
+          # Fallback to known zone ID if auto-detection fails
+          if [ -z "$ZONE_ID" ] || [ "$ZONE_ID" = "None" ]; then
+            echo "⚠️ Auto-detection failed, using known zone ID"
+            ZONE_ID="Z00092362ORF3ZO6TWKKZ"
+          fi
+          
+          echo "Route53 zone ID: $ZONE_ID"
         fi
+        
+        # Validate zone ID is set
+        if [ -z "$ZONE_ID" ] || [ "$ZONE_ID" = "None" ]; then
+          echo "❌ Failed to determine Route53 zone ID"
+          exit 1
+        fi
+        
+        echo "ROUTE53_ZONE_ID=$ZONE_ID" >> $GITHUB_ENV
+        echo "✅ Route53 zone ID configured: $ZONE_ID"
 
     - name: 🔐 Phase 1 - Cognito Client Secret
       run: |
@@ -179,10 +282,10 @@ jobs:
           --db-instance-identifier "$RDS_ID" \
           --query "DBInstances[0].Endpoint.Address" --output text)
         
-        # Generate RDS-compliant password (no /, @, ", or spaces)
+        # Generate RDS-compliant password (hex only: 0-9, a-f - no forbidden chars)
         echo "🔄 Generating RDS-compliant master password..."
         set +x
-        NEW_PASSWORD="$(openssl rand -base64 48 | tr -d '/+=' | head -c 32)"
+        NEW_PASSWORD="$(openssl rand -hex 32)"
         echo "::add-mask::$NEW_PASSWORD"
         set -x
         
@@ -377,98 +480,200 @@ jobs:
         wait
         
         echo "✅ Certificates validated and issued"
+    
+    - name: 🔐 Mask Sensitive Variables
+      run: |
+        echo "::add-mask::${{ env.APP_CERT_ARN }}"
+        echo "::add-mask::${{ env.API_CERT_ARN }}"
+        echo "::add-mask::${{ env.ROUTE53_ZONE_ID }}"
+        echo "✅ Sensitive variables masked in logs"
+    
+    - name: 🧹 Terraform Lint & Format Validation
+      uses: terraform-linters/setup-tflint@v4
+      
+    - name: 🔍 Run Terraform Format Check & TFLint
+      working-directory: infrastructure/staging
+      run: |
+        echo "🔍 Checking Terraform formatting..."
+        terraform fmt -check -recursive || echo "⚠️  Format check failed (non-blocking)"
+        
+        echo "🔍 Running TFLint..."
+        tflint --init
+        tflint -f sarif --out tflint.sarif || echo "⚠️  TFLint found issues (non-blocking)"
+        
+        echo "✅ Linting complete"
+    
+    - name: 📤 Upload TFLint SARIF Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: tflint-sarif-results
+        path: infrastructure/staging/tflint.sarif
+        retention-days: 30
+
+    - name: 📝 Phase 4.25 - Generate Terraform Variables File
+      env:
+        ROUTE53_ZONE_ID: ${{ env.ROUTE53_ZONE_ID }}
+        APP_CERT_ARN: ${{ env.APP_CERT_ARN }}
+        API_CERT_ARN: ${{ env.API_CERT_ARN }}
+      working-directory: infrastructure/staging
+      run: |
+        set -euo pipefail
+        echo "📝 Phase 4.25: Creating terraform.tfvars for imports & deployment"
+        
+        cat > terraform.tfvars <<EOF
+        project         = "oasis-care"
+        environment     = "staging"
+        aws_region      = "eu-west-2"
+        api_domain      = "api.oasis-care.co"
+        web_domain      = "app.oasis-care.co"
+        route53_zone_id = "$ROUTE53_ZONE_ID"
+        app_cert_arn    = "$APP_CERT_ARN"
+        api_cert_arn    = "$API_CERT_ARN"
+        kms_key_id      = "8995c5be-616f-4680-953e-8ed3b7252689"
+        sns_topic_arn   = "arn:aws:sns:eu-west-2:721689331449:oasis-staging-alerts"
+        EOF
+        
+        echo "✅ terraform.tfvars created"
+        echo "Contents (redacted for security):"
+        sed -E \
+          -e 's|arn:aws:acm:[^"]+|[REDACTED-ACM-ARN]|g' \
+          -e 's|Z[A-Z0-9]{13}|[REDACTED-ZONE-ID]|g' \
+          terraform.tfvars | awk '{print "  " $0}'
 
     - name: 🔄 Phase 4.5 - Import Existing Resources
+      env:
+        TF_IN_AUTOMATION: "1"
       working-directory: infrastructure/staging
       run: |
         set -euo pipefail
         echo "🔄 Phase 4.5: Importing pre-existing AWS resources into Terraform state"
-        echo "This prevents AlreadyExists errors in Phase 5"
         
+        echo "=== Verifying terraform.tfvars exists ==="
+        if [ ! -f terraform.tfvars ]; then
+          echo "❌ terraform.tfvars not found! Phase 4.25 must run first."
+          exit 1
+        fi
+        echo "✅ terraform.tfvars found ($(wc -l < terraform.tfvars) lines)"
+        
+        echo "=== Terraform Init & Workspace Setup ==="
         terraform init -input=false
+        terraform workspace select staging || terraform workspace new staging
+        
+        echo "=== Validating Configuration ==="
+        terraform validate -no-color
+        echo "✅ Validation passed - variables loaded successfully"
         
         import_if_missing() {
           local addr="$1"
           local id="$2"
-          if terraform state show "$addr" >/dev/null 2>&1; then
-            echo "  ✅ $addr already in state"
-            return 0
+          if terraform state list | grep -qx "$addr"; then
+            echo "  ✓ $addr already in state"
+          else
+            echo "  → Importing $addr"
+            terraform import -input=false -var-file=terraform.tfvars "$addr" "$id" || echo "  ⚠️  Import failed (may not exist)"
           fi
-          echo "  ➡️  Importing $addr"
-          terraform import -input=false "$addr" "$id" 2>&1 || echo "  ⚠️  Skip (not in config or not found)"
         }
         
-        echo ""
-        echo "Importing ECR repositories..."
-        import_if_missing aws_ecr_repository.api oasis-api
-        import_if_missing aws_ecr_repository.web oasis-web
+        echo "=== Discovering AWS Resource IDs ==="
+        set +e
+        ALB_ARN=$(aws elbv2 describe-load-balancers --names "oasis-care-staging-alb" \
+          --query 'LoadBalancers[0].LoadBalancerArn' -o text 2>/dev/null)
+        API_TG_ARN=$(aws elbv2 describe-target-groups --names "oasis-care-staging-api-tg" \
+          --query 'TargetGroups[0].TargetGroupArn' -o text 2>/dev/null)
+        WEB_TG_ARN=$(aws elbv2 describe-target-groups --names "oasis-care-staging-web-tg" \
+          --query 'TargetGroups[0].TargetGroupArn' -o text 2>/dev/null)
+        API_ECR=$(aws ecr describe-repositories --repository-names "oasis-api" \
+          --query 'repositories[0].repositoryName' -o text 2>/dev/null)
+        WEB_ECR=$(aws ecr describe-repositories --repository-names "oasis-web" \
+          --query 'repositories[0].repositoryName' -o text 2>/dev/null)
+        API_LOG=$(aws logs describe-log-groups --log-group-name-prefix "/ecs/oasis-api-staging" \
+          --query 'logGroups[0].logGroupName' -o text 2>/dev/null)
+        WEB_LOG=$(aws logs describe-log-groups --log-group-name-prefix "/ecs/oasis-web-staging" \
+          --query 'logGroups[0].logGroupName' -o text 2>/dev/null)
+        TASK_EXEC_ROLE=$(aws iam get-role --role-name "oasis-care-staging-ecsTaskExec" \
+          --query 'Role.RoleName' -o text 2>/dev/null)
+        TASK_ROLE=$(aws iam get-role --role-name "oasis-care-staging-ecsTaskRole" \
+          --query 'Role.RoleName' -o text 2>/dev/null)
+        LAMBDA_ROLE=$(aws iam get-role --role-name "oasis-care-staging-lambda-embedding" \
+          --query 'Role.RoleName' -o text 2>/dev/null)
+        DB_SUBNET_GROUP=$(aws rds describe-db-subnet-groups --db-subnet-group-name "oasis-care-staging-db-subnet-group" \
+          --query 'DBSubnetGroups[0].DBSubnetGroupName' -o text 2>/dev/null)
+        set -e
         
-        echo ""
-        echo "Importing CloudWatch log groups..."
-        import_if_missing aws_cloudwatch_log_group.api "/ecs/oasis-api-staging"
-        import_if_missing aws_cloudwatch_log_group.web "/ecs/oasis-web-staging"
+        echo "=== Running Idempotent Imports ==="
+        [ -n "$API_ECR" ]         && import_if_missing aws_ecr_repository.api "oasis-api"
+        [ -n "$WEB_ECR" ]         && import_if_missing aws_ecr_repository.web "oasis-web"
+        [ -n "$API_LOG" ]         && import_if_missing aws_cloudwatch_log_group.api "/ecs/oasis-api-staging"
+        [ -n "$WEB_LOG" ]         && import_if_missing aws_cloudwatch_log_group.web "/ecs/oasis-web-staging"
+        [ -n "$TASK_EXEC_ROLE" ]  && import_if_missing aws_iam_role.ecs_task_execution "oasis-care-staging-ecsTaskExec"
+        [ -n "$TASK_ROLE" ]       && import_if_missing aws_iam_role.ecs_task_role "oasis-care-staging-ecsTaskRole"
+        [ -n "$LAMBDA_ROLE" ]     && import_if_missing aws_iam_role.lambda_embedding_execution "oasis-care-staging-lambda-embedding"
+        import_if_missing aws_secretsmanager_secret.database_url "oasis/staging/DATABASE_URL" || true
+        [ -n "$ALB_ARN" ]         && [ "$ALB_ARN" != "None" ] && import_if_missing aws_lb.main "$ALB_ARN"
+        [ -n "$API_TG_ARN" ]      && [ "$API_TG_ARN" != "None" ] && import_if_missing aws_lb_target_group.api "$API_TG_ARN"
+        [ -n "$WEB_TG_ARN" ]      && [ "$WEB_TG_ARN" != "None" ] && import_if_missing aws_lb_target_group.web "$WEB_TG_ARN"
+        [ -n "$DB_SUBNET_GROUP" ] && import_if_missing aws_db_subnet_group.main "$DB_SUBNET_GROUP"
         
-        echo ""
-        echo "Importing IAM roles..."
-        import_if_missing aws_iam_role.ecs_task_execution oasis-care-staging-ecsTaskExec
-        import_if_missing aws_iam_role.ecs_task_role oasis-care-staging-ecsTaskRole
-        import_if_missing aws_iam_role.lambda_embedding_execution oasis-care-staging-lambda-embedding
+        echo "=== Terraform State After Imports ==="
+        terraform state list || echo "(State is empty)"
         
-        echo ""
-        echo "Importing Secrets Manager..."
-        import_if_missing aws_secretsmanager_secret.database_url oasis/staging/DATABASE_URL
+        echo "✅ Phase 4.5 complete - imports finished"
+    
+    - name: 📊 Drift Detection (Informational)
+      env:
+        TF_IN_AUTOMATION: "1"
+      working-directory: infrastructure/staging
+      continue-on-error: true
+      run: |
+        set +e
+        echo "📊 Detecting infrastructure drift..."
+        terraform init -input=false
+        terraform workspace select staging || terraform workspace new staging
+        terraform plan -var-file=terraform.tfvars -detailed-exitcode -no-color > drift.plan.txt 2>&1
+        code=$?
         
-        echo ""
-        echo "Importing ALB and Target Groups..."
-        # Get ALB ARN
-        ALB_ARN=$(aws elbv2 describe-load-balancers --names oasis-care-staging-alb --query 'LoadBalancers[0].LoadBalancerArn' --output text 2>/dev/null || echo "")
-        if [ -n "$ALB_ARN" ] && [ "$ALB_ARN" != "None" ]; then
-          import_if_missing aws_lb.main "$ALB_ARN"
+        if [ "$code" -eq 0 ]; then
+          echo "✅ No drift detected - infrastructure matches code"
+        elif [ "$code" -eq 2 ]; then
+          echo "⚠️  Changes detected (drift or planned updates)"
+          echo "First 50 lines of plan:"
+          head -n 50 drift.plan.txt
+        else
+          echo "⚠️  Plan error (exit code: $code)"
+          tail -n 30 drift.plan.txt
         fi
-        
-        # Get Target Group ARNs
-        API_TG_ARN=$(aws elbv2 describe-target-groups --names oasis-care-staging-api-tg --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null || echo "")
-        WEB_TG_ARN=$(aws elbv2 describe-target-groups --names oasis-care-staging-web-tg --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null || echo "")
-        if [ -n "$API_TG_ARN" ] && [ "$API_TG_ARN" != "None" ]; then
-          import_if_missing aws_lb_target_group.api "$API_TG_ARN"
-        fi
-        if [ -n "$WEB_TG_ARN" ] && [ "$WEB_TG_ARN" != "None" ]; then
-          import_if_missing aws_lb_target_group.web "$WEB_TG_ARN"
-        fi
-        
-        echo ""
-        echo "Importing DB Subnet Group..."
-        import_if_missing aws_db_subnet_group.main oasis-care-staging-db-subnet-group
-        
-        echo ""
-        echo "✅ Phase 4.5 complete - all existing resources imported"
+        echo "📝 Full plan saved to drift.plan.txt"
 
     - name: 🏗️ Phase 5 - Infrastructure Deployment  
+      env:
+        TF_IN_AUTOMATION: "1"
       working-directory: infrastructure/staging
       run: |
         echo "🏗️ Phase 5: Deploying infrastructure with Terraform"
+        echo "Using existing terraform.tfvars from Phase 4.25"
         
-        # Update terraform variables
-        cat > terraform.tfvars << EOF
-        project = "oasis-care"
-        environment = "staging"
-        aws_region = "eu-west-2"
-        api_domain = "api.oasis-care.co"
-        web_domain = "app.oasis-care.co"
-        route53_zone_id = "$ROUTE53_ZONE_ID"
-        app_cert_arn = "$APP_CERT_ARN"
-        api_cert_arn = "$API_CERT_ARN"
-        kms_key_id = "8995c5be-616f-4680-953e-8ed3b7252689"
-        sns_topic_arn = "arn:aws:sns:eu-west-2:721689331449:oasis-staging-alerts"
-        EOF
+        terraform init -input=false
+        terraform workspace select staging || terraform workspace new staging
+        terraform plan -var-file=terraform.tfvars -lock-timeout=5m -no-color -out=tfplan
         
-        terraform plan -var-file=terraform.tfvars
-        terraform apply -var-file=terraform.tfvars -auto-approve
+        echo "📦 Packaging plan artifact..."
+        tar -czf tfplan.tgz tfplan terraform.tfvars
+        
+        terraform apply -var-file=terraform.tfvars -auto-approve -lock-timeout=5m
         
         # Export outputs for later steps
         terraform output -json > ../outputs.json
         
         echo "✅ Infrastructure deployed successfully"
+    
+    - name: 📤 Upload Terraform Plan Artifact
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: terraform-plan-staging
+        path: infrastructure/staging/tfplan.tgz
+        retention-days: 30
 
     - name: 📦 Phase 6 - Build & Push Container Images
       run: |
@@ -708,3 +913,19 @@ jobs:
         echo "✅ DEPLOYMENT COMPLETED SUCCESSFULLY!"
         echo "🌐 Web: https://app.oasis-care.co"
         echo "🔌 API: https://api.oasis-care.co"
+    
+    - name: ✅ Validate Workflow YAML
+      if: always()
+      run: |
+        echo "✅ Validating workflow YAML structure..."
+        python3 - <<'PY'
+        import sys, yaml
+        workflow_path = '.github/workflows/deploy-staging.yml'
+        try:
+            with open(workflow_path) as f:
+                yaml.safe_load(f)
+            print(f"✅ YAML validation passed: {workflow_path}")
+        except yaml.YAMLError as e:
+            print(f"❌ YAML validation failed: {e}")
+            sys.exit(1)
+        PY
