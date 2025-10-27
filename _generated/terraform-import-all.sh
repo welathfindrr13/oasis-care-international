@@ -52,7 +52,7 @@ import_if_missing() {
   echo "     Address: $tf_address"
   echo "     ID: $resource_id"
   
-  if terraform import -input=false "$tf_address" "$resource_id" 2>&1 | tee /tmp/tf-import.log | grep -q "successfully"; then
+  if terraform import -input=false "$tf_address" "$resource_id" 2>&1 | tee /tmp/tf-import.log | grep -q "Import successful"; then
     echo "  ✅ SUCCESS: $resource_name imported"
     ((IMPORTED++))
     return 0
@@ -123,6 +123,14 @@ DB_SUBNET_GROUP=$(aws rds describe-db-subnet-groups --db-subnet-group-name "oasi
 echo "  - DB Subnet Group: ${DB_SUBNET_GROUP:-NOT FOUND}"
 echo ""
 
+# Security Groups
+echo "🔒 Security Groups:"
+ALB_SG=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=oasis-care-staging-alb-sg" --region "$REGION" \
+  --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || echo "")
+
+echo "  - ALB Security Group: ${ALB_SG:-NOT FOUND}"
+echo ""
+
 # ALB and Target Groups
 echo "⚖️ Load Balancer Resources:"
 ALB_ARN=$(aws elbv2 describe-load-balancers --names "oasis-care-staging-alb" --region "$REGION" \
@@ -188,6 +196,11 @@ fi
 # Import Secrets Manager secret (using ARN)
 if [ -n "$DB_SECRET_ARN" ] && [ "$DB_SECRET_ARN" != "None" ]; then
   import_if_missing "aws_secretsmanager_secret.database_url" "$DB_SECRET_ARN" "Secrets Manager: DATABASE_URL" || true
+fi
+
+# Import Security Group
+if [ -n "$ALB_SG" ] && [ "$ALB_SG" != "None" ]; then
+  import_if_missing "aws_security_group.alb" "$ALB_SG" "ALB Security Group" || true
 fi
 
 # Import RDS DB Subnet Group
