@@ -37,11 +37,9 @@ env:
   
 jobs:
   tf-preflight:
-    name: Terraform Preflight (State + Imports)
+    name: Terraform Backend Setup
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    outputs:
-      state_healthy: ${{ steps.state_check.outputs.healthy }}
+    timeout-minutes: 10
     
     steps:
     - name: 📥 Checkout Code
@@ -117,66 +115,6 @@ jobs:
         fi
         
         echo "✅ Terraform backend infrastructure ready"
-        
-    - name: 🏗️ Setup Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: ~1.6
-        
-    - name: 🔧 Terraform Init
-      working-directory: infrastructure/staging
-      run: |
-        echo "🔧 Initializing Terraform..."
-        terraform init -input=false -upgrade
-        
-    - name: 🔄 Select Workspace
-      working-directory: infrastructure/staging
-      run: |
-        echo "🔄 Selecting staging workspace..."
-        terraform workspace select staging || terraform workspace new staging
-        terraform workspace show
-        
-    - name: 🔍 State Health Check
-      id: state_check
-      working-directory: infrastructure/staging
-      run: |
-        echo "🔍 Checking Terraform state health..."
-        RESOURCE_COUNT=$(terraform state list 2>/dev/null | wc -l || echo "0")
-        echo "Current state contains $RESOURCE_COUNT resources"
-        
-        if [ "$RESOURCE_COUNT" -gt 10 ]; then
-          echo "✅ State appears healthy (${RESOURCE_COUNT} resources)"
-          echo "healthy=true" >> $GITHUB_OUTPUT
-        else
-          echo "⚠️ State appears incomplete or empty (${RESOURCE_COUNT} resources)"
-          echo "Will proceed with imports..."
-          echo "healthy=false" >> $GITHUB_OUTPUT
-        fi
-        
-    - name: 🔄 Import Existing Resources
-      working-directory: infrastructure/staging
-      run: |
-        echo "🔄 Running import script to prevent AlreadyExists errors..."
-        bash ../../_generated/terraform-import-all.sh || true
-        echo ""
-        echo "📊 Post-import state:"
-        terraform state list | head -20 || true
-        echo "..."
-        echo "Total resources: $(terraform state list | wc -l)"
-        
-    - name: ✅ Validate Configuration
-      working-directory: infrastructure/staging
-      run: |
-        echo "✅ Validating Terraform configuration..."
-        terraform validate -no-color
-        echo "✅ Validation passed"
-        
-    - name: 📋 Pre-flight Plan (Dry Run)
-      working-directory: infrastructure/staging
-      run: |
-        echo "📋 Running terraform plan as pre-flight check..."
-        terraform plan -input=false -no-color -out=preflight.tfplan || true
-        echo "✅ Pre-flight plan completed"
   
   deploy:
     name: Deploy Infrastructure & Applications
@@ -216,11 +154,8 @@ jobs:
         terraform_version: ~1.6
 
     - name: 📋 Phase 0 - Pre-flight Setup
-      working-directory: infrastructure/staging
       run: |
         echo "🏁 Phase 0: Pre-flight checks"
-        terraform init -upgrade
-        terraform workspace select staging || terraform workspace new staging
         
         # Determine Route53 zone ID (with fallback to known value)
         if [ -n "${{ inputs.route53_zone_id }}" ]; then
@@ -522,125 +457,39 @@ jobs:
           -e 's|Z[A-Z0-9]{13}|[REDACTED-ZONE-ID]|g' \
           terraform.tfvars | awk '{print "  " $0}'
 
-    - name: 🔄 Phase 4.5 - Import Existing Resources
+
+    - name: 🏗️ Phase 5 - Infrastructure Deployment (Init, Import, Apply)
       env:
         TF_IN_AUTOMATION: "1"
       working-directory: infrastructure/staging
       run: |
         set -euo pipefail
-        echo "🔄 Phase 4.5: Importing pre-existing AWS resources into Terraform state"
+        echo "🏗️ Phase 5: Terraform Init, Import, and Apply"
+        echo "Using terraform.tfvars from Phase 4.25"
         
-        echo "=== Verifying terraform.tfvars exists ==="
-        if [ ! -f terraform.tfvars ]; then
-          echo "❌ terraform.tfvars not found! Phase 4.25 must run first."
-          exit 1
+        echo "=== Step 1: Terraform Init ==="
+        terraform init -input=false -upgrade
+        terraform workspace select staging || terraform workspace new staging
+        
+        echo "=== Step 2: Import Existing Resources ==="
+        echo "Running automated import script..."
+        bash ../../_generated/terraform-import-all.sh || echo "⚠️ Some imports may have failed (non-blocking)"
+        
+        echo ""
+        echo "=== Step 3: Terraform State Check ==="
+        RESOURCE_COUNT=$(terraform state list 2>/dev/null | wc -l || echo "0")
+        echo "State now contains $RESOURCE_COUNT resources"
+        terraform state list | head -20 || echo "(No resources in state)"
+        if [ "$RESOURCE_COUNT" -gt 5 ]; then
+          echo "..."
         fi
-        echo "✅ terraform.tfvars found ($(wc -l < terraform.tfvars) lines)"
         
-        echo "=== Terraform Init & Workspace Setup ==="
-        terraform init -input=false
-        terraform workspace select staging || terraform workspace new staging
-        
-        echo "=== Validating Configuration ==="
-        terraform validate -no-color
-        echo "✅ Validation passed - variables loaded successfully"
-        
-        import_if_missing() {
-          local addr="$1"
-          local id="$2"
-          if terraform state list | grep -qx "$addr"; then
-            echo "  ✓ $addr already in state"
-          else
-            echo "  → Importing $addr"
-            terraform import -input=false -var-file=terraform.tfvars "$addr" "$id" || echo "  ⚠️  Import failed (may not exist)"
-          fi
-        }
-        
-        echo "=== Discovering AWS Resource IDs ==="
-        set +e
-        ALB_ARN=$(aws elbv2 describe-load-balancers --names "oasis-care-staging-alb" \
-          --query 'LoadBalancers[0].LoadBalancerArn' -o text 2>/dev/null)
-        API_TG_ARN=$(aws elbv2 describe-target-groups --names "oasis-care-staging-api-tg" \
-          --query 'TargetGroups[0].TargetGroupArn' -o text 2>/dev/null)
-        WEB_TG_ARN=$(aws elbv2 describe-target-groups --names "oasis-care-staging-web-tg" \
-          --query 'TargetGroups[0].TargetGroupArn' -o text 2>/dev/null)
-        API_ECR=$(aws ecr describe-repositories --repository-names "oasis-api" \
-          --query 'repositories[0].repositoryName' -o text 2>/dev/null)
-        WEB_ECR=$(aws ecr describe-repositories --repository-names "oasis-web" \
-          --query 'repositories[0].repositoryName' -o text 2>/dev/null)
-        API_LOG=$(aws logs describe-log-groups --log-group-name-prefix "/ecs/oasis-api-staging" \
-          --query 'logGroups[0].logGroupName' -o text 2>/dev/null)
-        WEB_LOG=$(aws logs describe-log-groups --log-group-name-prefix "/ecs/oasis-web-staging" \
-          --query 'logGroups[0].logGroupName' -o text 2>/dev/null)
-        TASK_EXEC_ROLE=$(aws iam get-role --role-name "oasis-care-staging-ecsTaskExec" \
-          --query 'Role.RoleName' -o text 2>/dev/null)
-        TASK_ROLE=$(aws iam get-role --role-name "oasis-care-staging-ecsTaskRole" \
-          --query 'Role.RoleName' -o text 2>/dev/null)
-        LAMBDA_ROLE=$(aws iam get-role --role-name "oasis-care-staging-lambda-embedding" \
-          --query 'Role.RoleName' -o text 2>/dev/null)
-        DB_SUBNET_GROUP=$(aws rds describe-db-subnet-groups --db-subnet-group-name "oasis-care-staging-db-subnet-group" \
-          --query 'DBSubnetGroups[0].DBSubnetGroupName' -o text 2>/dev/null)
-        set -e
-        
-        echo "=== Running Idempotent Imports ==="
-        [ -n "$API_ECR" ]         && import_if_missing aws_ecr_repository.api "oasis-api"
-        [ -n "$WEB_ECR" ]         && import_if_missing aws_ecr_repository.web "oasis-web"
-        [ -n "$API_LOG" ]         && import_if_missing aws_cloudwatch_log_group.api "/ecs/oasis-api-staging"
-        [ -n "$WEB_LOG" ]         && import_if_missing aws_cloudwatch_log_group.web "/ecs/oasis-web-staging"
-        [ -n "$TASK_EXEC_ROLE" ]  && import_if_missing aws_iam_role.ecs_task_execution "oasis-care-staging-ecsTaskExec"
-        [ -n "$TASK_ROLE" ]       && import_if_missing aws_iam_role.ecs_task_role "oasis-care-staging-ecsTaskRole"
-        [ -n "$LAMBDA_ROLE" ]     && import_if_missing aws_iam_role.lambda_embedding_execution "oasis-care-staging-lambda-embedding"
-        import_if_missing aws_secretsmanager_secret.database_url "oasis/staging/DATABASE_URL" || true
-        [ -n "$ALB_ARN" ]         && [ "$ALB_ARN" != "None" ] && import_if_missing aws_lb.main "$ALB_ARN"
-        [ -n "$API_TG_ARN" ]      && [ "$API_TG_ARN" != "None" ] && import_if_missing aws_lb_target_group.api "$API_TG_ARN"
-        [ -n "$WEB_TG_ARN" ]      && [ "$WEB_TG_ARN" != "None" ] && import_if_missing aws_lb_target_group.web "$WEB_TG_ARN"
-        [ -n "$DB_SUBNET_GROUP" ] && import_if_missing aws_db_subnet_group.main "$DB_SUBNET_GROUP"
-        
-        echo "=== Terraform State After Imports ==="
-        terraform state list || echo "(State is empty)"
-        
-        echo "✅ Phase 4.5 complete - imports finished"
-    
-    - name: 📊 Drift Detection (Informational)
-      env:
-        TF_IN_AUTOMATION: "1"
-      working-directory: infrastructure/staging
-      continue-on-error: true
-      run: |
-        set +e
-        echo "📊 Detecting infrastructure drift..."
-        terraform init -input=false
-        terraform workspace select staging || terraform workspace new staging
-        terraform plan -var-file=terraform.tfvars -detailed-exitcode -no-color > drift.plan.txt 2>&1
-        code=$?
-        
-        if [ "$code" -eq 0 ]; then
-          echo "✅ No drift detected - infrastructure matches code"
-        elif [ "$code" -eq 2 ]; then
-          echo "⚠️  Changes detected (drift or planned updates)"
-          echo "First 50 lines of plan:"
-          head -n 50 drift.plan.txt
-        else
-          echo "⚠️  Plan error (exit code: $code)"
-          tail -n 30 drift.plan.txt
-        fi
-        echo "📝 Full plan saved to drift.plan.txt"
-
-    - name: 🏗️ Phase 5 - Infrastructure Deployment  
-      env:
-        TF_IN_AUTOMATION: "1"
-      working-directory: infrastructure/staging
-      run: |
-        echo "🏗️ Phase 5: Deploying infrastructure with Terraform"
-        echo "Using existing terraform.tfvars from Phase 4.25"
-        
-        terraform init -input=false
-        terraform workspace select staging || terraform workspace new staging
+        echo ""
+        echo "=== Step 4: Terraform Plan ==="
         terraform plan -var-file=terraform.tfvars -lock-timeout=5m -no-color -out=tfplan
         
-        echo "📦 Packaging plan artifact..."
-        tar -czf tfplan.tgz tfplan terraform.tfvars
-        
+        echo ""
+        echo "=== Step 5: Terraform Apply ==="
         terraform apply -var-file=terraform.tfvars -auto-approve -lock-timeout=5m
         
         # Export outputs for later steps
