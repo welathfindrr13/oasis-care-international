@@ -6,15 +6,17 @@ import { GraphqlExceptionFilter } from './common/filters/gql-exception.filter';
 import { GqlErrorFilter } from './common/filters/gql-error.filter';
 import { BaseHttpException } from './common/errors/base-http.exception';
 import { ErrorCode } from './common/errors/error-codes';
+import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
+import { PrismaService } from '@oasis/db';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
   // Enable CORS for frontend
-  app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true,
-  });
+  const origins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3000')
+    .split(',')
+    .filter(Boolean);
+  app.enableCors({ origin: origins, credentials: true });
 
   // Global exception filters
   app.useGlobalFilters(
@@ -35,12 +37,12 @@ async function bootstrap() {
     }),
   );
 
-  const port = process.env.PORT || 4000;
-  const origins=(process.env.ALLOWED_ORIGINS||"").split(",").filter(Boolean);
-app.enableCors({ origin: origins, credentials: true });
-await app.listen(process.env.PORT || 4000);
-  // console.log removed – use logger
-  // console.log removed – use logger
-  // console.log removed – use logger
+  // Global audit logging interceptor (with PII masking)
+  const prismaService = app.get(PrismaService);
+  app.useGlobalInterceptors(new AuditLogInterceptor(prismaService));
+
+  const port = process.env.PORT || 3000;
+  await app.listen(port, '0.0.0.0');
+  console.log(`API listening on 0.0.0.0:${port}`);
 }
 bootstrap();
