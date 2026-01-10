@@ -334,6 +334,217 @@ If you encounter issues not covered in troubleshooting:
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** 2025-10-10  
+**Document Version:** 1.1  
+**Last Updated:** 2025-01-23  
 **Status:** Ready for IAM setup and deployment
+
+---
+
+## 🔧 Terraform Import & Deployment Flow (CI)
+
+### Overview
+The GitHub Actions workflow implements a robust, production-ready Terraform deployment process with safety guardrails and validation at every step.
+
+### Execution Flow
+
+```
+Phase 4: ACM Certificates
+  ↓ (sets APP_CERT_ARN, API_CERT_ARN in env)
+Mask Sensitive Variables
+  ↓ (masks ARNs and Zone ID in logs)
+TFLint & Format Validation
+  ↓ (validates Terraform code quality)
+Phase 4.25: Generate terraform.tfvars
+  ↓ (creates variables file with route53_zone_id, app_cert_arn, api_cert_arn)
+Phase 4.5: Import Existing Resources
+  ↓ (idempotent imports, validates config)
+Drift Detection (Informational)
+  ↓ (reports infrastructure drift, non-blocking)
+Phase 5: Infrastructure Deployment
+  ↓ (plan → package → apply)
+Upload Plan Artifact
+  ↓ (saves plan for audit/review)
+```
+
+### Key Components
+
+#### 1. **Concurrency Control**
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-staging
+  cancel-in-progress: false
+```
+- Prevents overlapping deployments
+- Queues concurrent runs instead of canceling
+- Ensures state integrity
+
+#### 2. **Phase 4.25: terraform.tfvars Generation**
+**Purpose:** Create variables file BEFORE imports and deployment
+
+**Variables Written:**
+- `route53_zone_id` - Route53 hosted zone ID
+- `app_cert_arn` - ACM certificate ARN for app.oasis-care.co
+- `api_cert_arn` - ACM certificate ARN for api.oasis-care.co
+- Plus static values: project, environment, region, domains, KMS, SNS
+
+**Why:** Terraform requires all variables be set before ANY command (including imports)
+
+#### 3. **Phase 4.5: Idempotent Resource Imports**
+**Purpose:** Import existing AWS resources into Terraform state
+
+**Safety Features:**
+- Validates terraform.tfvars exists
+- Runs `terraform validate` to ensure config loads
+- Auto-discovers resource IDs from AWS (no hardcoded values)
+- Skips resources already in state (idempotent)
+- Sets `TF_IN_AUTOMATION=1` for CI/CD best practices
+
+**Resources Imported:**
+- ECR Repositories (oasis-api, oasis-web)
+- CloudWatch Log Groups
+- IAM Roles (ECS task execution, task role, Lambda)
+- Secrets Manager secrets
+- ALB and Target Groups
+- DB Subnet Group
+
+#### 4. **Drift Detection (Informational)**
+**Purpose:** Report infrastructure drift before applying changes
+
+**Behavior:**
+- Runs `terraform plan -detailed-exitcode`
+- Exit code 0 = No drift
+- Exit code 2 = Changes detected
+- Saves full plan to `drift.plan.txt`
+- **Does NOT block deployment** (`continue-on-error: true`)
+
+#### 5. **Phase 5: Infrastructure Deployment**
+**Purpose:** Apply Terraform changes
+
+**Process:**
+1. Initialize Terraform (`terraform init`)
+2. Select workspace: `staging` (enforced)
+3. Generate plan with `-out=tfplan` (binary format)
+4. Package plan + tfvars into `tfplan.tgz`
+5. Apply plan with `-lock-timeout=5m`
+6. Export outputs to JSON
+
+**Environment Variables:**
+- `TF_IN_AUTOMATION=1` - Optimizes Terraform for CI/CD
+- Lock timeout prevents state lock conflicts
+
+#### 6. **Plan Artifact Upload**
+**Purpose:** Preserve plan for audit and review
+
+**Artifact Contains:**
+- `tfplan` - Binary Terraform plan
+- `terraform.tfvars` - Variables used for the plan
+
+**Retention:** 30 days
+
+**Access:** GitHub Actions → Workflow Run → Artifacts
+
+### Safety Guardrails
+
+| Feature | Purpose | Blocking? |
+|---------|---------|-----------|
+| **Concurrency Control** | Prevent simultaneous deployments | Yes |
+| **TFLint** | Catch Terraform anti-patterns | No |
+| **Format Check** | Enforce code style | No |
+| **Variable Masking** | Hide sensitive ARNs in logs | N/A |
+| **Drift Detection** | Report infrastructure changes | No |
+| **Workspace Enforcement** | Use correct state file | Yes |
+| **Lock Timeout** | Handle state conflicts | Yes |
+| **Validation Step** | Verify config before imports | Yes |
+| **YAML Validation** | Ensure workflow syntax | No |
+
+### Workspace Requirements
+
+**Critical:** All Terraform commands MUST use the `staging` workspace
+
+**Enforcement:**
+- Phase 0, 4.5, 5, and Drift Detection all enforce workspace selection
+- Command: `terraform workspace select staging || terraform workspace new staging`
+- **Never** run Terraform commands without verifying workspace first
+
+### Idempotency
+
+The deployment is **safe to rerun**:
+
+✅ **Imports skip existing resources** - Won't error if already imported  
+✅ **Secrets are upserted** - Creates or updates without failing  
+✅ **Cognito client reused** - Retrieves existing if present  
+✅ **DNS records UPSERT** - Updates existing or creates new  
+✅ **Terraform apply** - Only changes what's needed
+
+### Artifacts Generated
+
+| Artifact | Contains | Retention | Use Case |
+|----------|----------|-----------|----------|
+| **tflint-sarif-results** | TFLint SARIF report | 30 days | Code quality review |
+| **terraform-plan-staging** | tfplan + tfvars | 30 days | Audit trail, review changes |
+
+### Debugging Tips
+
+**If imports fail:**
+1. Check Phase 4.5 logs for "terraform validate" output
+2. Verify terraform.tfvars was created in Phase 4.25
+3. Confirm TF_VAR_* environment variables are set
+4. Review resource discovery output (may not exist yet)
+
+**If drift detection reports changes:**
+- This is INFORMATIONAL only
+- Review the drift.plan.txt output
+- Determine if drift is expected (manual changes) or code updates
+
+**If plan/apply fails:**
+- Check workspace is `staging`
+- Verify lock timeout didn't expire
+- Review state lock status in S3 backend (if configured)
+
+### Local Validation (Before CI)
+
+```bash
+cd infrastructure/staging
+
+# 1. Format check
+terraform fmt -check -recursive
+
+# 2. Validate syntax (requires temp tfvars)
+cat > terraform.tfvars <<EOF
+route53_zone_id = "Z00092362ORF3ZO6TWKKZ"
+app_cert_arn = "arn:aws:acm:eu-west-2:721689331449:certificate/dummy"
+api_cert_arn = "arn:aws:acm:eu-west-2:721689331449:certificate/dummy"
+EOF
+
+terraform init -input=false
+terraform workspace select staging || terraform workspace new staging
+terraform validate
+
+# 3. Cleanup
+rm terraform.tfvars
+```
+
+### Variables Required
+
+The following variables MUST be set before Terraform operations:
+
+| Variable | Source | Set In |
+|----------|--------|--------|
+| `route53_zone_id` | Auto-detected or input | Phase 0 |
+| `app_cert_arn` | ACM request | Phase 4 |
+| `api_cert_arn` | ACM request | Phase 4 |
+| `project` | Static | Phase 4.25 |
+| `environment` | Static | Phase 4.25 |
+| `aws_region` | Static | Phase 4.25 |
+| `kms_key_id` | Static | Phase 4.25 |
+| `sns_topic_arn` | Static | Phase 4.25 |
+
+### State Management
+
+**Backend:** S3 + DynamoDB (if configured in `backend.tf`)  
+**Workspace:** `staging` (enforced in all terraform commands)  
+**State Lock:** 5-minute timeout on plan/apply operations
+
+**Warning:** Never manually edit Terraform state. Use `terraform state` commands only.
+
+---

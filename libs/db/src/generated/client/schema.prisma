@@ -6,6 +6,8 @@ datasource db {
 generator client {
   provider        = "prisma-client-js"
   output          = "../src/generated/client"
+  engineType      = "library"
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
   previewFeatures = ["postgresqlExtensions"]
 }
 
@@ -246,4 +248,75 @@ model HealthSummary {
   @@index([client_id])
   @@index([period_start, period_end])
   @@map("health_summary")
+}
+
+model ConsentRecord {
+  id               String   @id @default(uuid())
+  user_id          String
+  consent_type     String   @db.VarChar(50)
+  purpose          String   @db.VarChar(100)
+  granted          Boolean
+  granted_at       DateTime
+  withdrawn_at     DateTime?
+  legal_basis      String   @db.VarChar(50)
+  metadata         Json?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@index([user_id])
+  @@index([consent_type])
+  @@index([granted_at])
+  @@map("consent_record")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  user_id        String?
+  action         String   @db.VarChar(50)
+  resource_type  String   @db.VarChar(50)
+  resource_id    String?
+  old_values     Json?
+  new_values     Json?
+  ip_address     String?  @db.VarChar(45)
+  user_agent     String?  @db.VarChar(500)
+  timestamp      DateTime @default(now())
+
+  @@index([user_id])
+  @@index([action])
+  @@index([resource_type, resource_id])
+  @@index([timestamp])
+  @@map("audit_log")
+}
+
+model RetentionPolicy {
+  id              String   @id @default(uuid())
+  data_category   String   @db.VarChar(50)
+  retention_days  Int
+  legal_basis     String   @db.VarChar(100)
+  description     String?
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([data_category])
+  @@index([is_active])
+  @@map("retention_policy")
+}
+
+model ErasureQueue {
+  id             String   @id @default(uuid())
+  user_id        String
+  request_type   String   @db.VarChar(50)
+  status         String   @db.VarChar(20) @default("PENDING")
+  requested_at   DateTime @default(now())
+  scheduled_for  DateTime?
+  completed_at   DateTime?
+  metadata       Json?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  @@index([user_id])
+  @@index([status])
+  @@index([scheduled_for])
+  @@map("erasure_queue")
 }

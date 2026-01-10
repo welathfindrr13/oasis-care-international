@@ -49,11 +49,11 @@ module.exports = {
         }
       },
       
-      // Typography from Figma
+      // Typography from Figma - using CSS variables from next/font
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        heading: ['Work Sans', 'system-ui', 'sans-serif'],
-        body: ['Droid Sans', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
+        heading: ['var(--font-work-sans)', 'Work Sans', 'system-ui', 'sans-serif'],
+        body: ['var(--font-source-sans)', 'Source Sans 3', 'system-ui', 'sans-serif'],
       },
       
       fontSize: {

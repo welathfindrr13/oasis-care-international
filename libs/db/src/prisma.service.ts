@@ -1,9 +1,9 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from './generated/client';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService extends PrismaClient implements OnModuleDestroy {
   constructor(private configService: ConfigService) {
     super({
       datasources: {
@@ -15,10 +15,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         ? ['query', 'info', 'warn', 'error']
         : ['error'],
     });
-  }
-
-  async onModuleInit() {
-    await this.$connect();
+    // NOTE: Prisma connects lazily on first query - no blocking $connect() at startup
   }
 
   async onModuleDestroy() {

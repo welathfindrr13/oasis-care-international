@@ -17,6 +17,7 @@ import { MedicationModule } from './medication/medication.module';
 import { formatGraphQLError } from './common/filters/graphql-error.filter';
 import { GdprModule } from './gdpr/gdpr.module';
 import { DemoModule } from './demo/demo.module';
+import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { DemoModule } from './demo/demo.module';
   providers: [
     JwtStrategy,
     PrismaService,
+    AuditLogInterceptor,
   ],
 })
 export class AppModule {}

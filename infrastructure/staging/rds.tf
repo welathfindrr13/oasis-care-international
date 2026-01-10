@@ -16,7 +16,7 @@ resource "aws_db_subnet_group" "main" {
 resource "aws_db_instance" "postgres" {
   identifier             = "oasis-staging"
   engine                 = "postgres"
-  engine_version         = "15.6"
+  engine_version         = "15.14"
   instance_class         = var.db_instance_class
   allocated_storage      = 20
   db_name                = "oasis"
@@ -31,9 +31,8 @@ resource "aws_db_instance" "postgres" {
   maintenance_window      = "sun:04:00-sun:05:00"
 
   # Protection settings
-  deletion_protection       = true
-  skip_final_snapshot       = false
-  final_snapshot_identifier = "${local.name_prefix}-db-final-snapshot"
+  deletion_protection       = false
+  skip_final_snapshot       = true
 
   # Other settings
   publicly_accessible = false
