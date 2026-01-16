@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter, Work_Sans, Source_Sans_3 } from 'next/font/google'
+import { SessionProvider } from '../components/providers/SessionProvider'
 import './globals.css'
 
 const inter = Inter({ 
@@ -21,7 +22,7 @@ const sourceSans = Source_Sans_3({
 })
 
 export const metadata: Metadata = {
-  title: 'Oasis International Care',
+  title: 'Oasis Care',
   description: 'Domiciliary care management platform',
 }
 
@@ -32,7 +33,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable} ${workSans.variable} ${sourceSans.variable}`}>
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <SessionProvider>
+          {children}
+        </SessionProvider>
+      </body>
     </html>
   )
 }

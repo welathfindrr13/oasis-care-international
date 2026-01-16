@@ -65,24 +65,26 @@ export interface VisitsQueryResponse {
 }
 
 export interface VisitsQueryVariables {
-  date?: string;
+  scheduledStartFrom?: string;
+  scheduledStartTo?: string;
   carerId?: string;
   status?: keyof VisitStatus;
-  limit?: number;
-  offset?: number;
+  skip?: number;
+  take?: number;
 }
 
 /**
  * Query to fetch visits with filtering and pagination
  */
 export const VISITS_QUERY = `
-  query Visits($date: String, $carerId: ID, $status: VisitStatus, $limit: Int, $offset: Int) {
+  query Visits($scheduledStartFrom: String, $scheduledStartTo: String, $carerId: ID, $status: VisitStatus, $skip: Int, $take: Int) {
     visits(
-      date: $date
+      scheduledStartFrom: $scheduledStartFrom
+      scheduledStartTo: $scheduledStartTo
       carerId: $carerId 
       status: $status
-      limit: $limit
-      offset: $offset
+      skip: $skip
+      take: $take
     ) {
       items {
         id
@@ -131,9 +133,9 @@ export const VISITS_QUERY = `
 export const DEFAULT_PAGE_SIZE = 25;
 
 /**
- * Calculate offset from page number
+ * Calculate skip from page number (for Prisma pagination)
  */
-export function getOffsetFromPage(page: number, pageSize: number = DEFAULT_PAGE_SIZE): number {
+export function getSkipFromPage(page: number, pageSize: number = DEFAULT_PAGE_SIZE): number {
   return Math.max(0, (page - 1) * pageSize);
 }
 
@@ -143,3 +145,50 @@ export function getOffsetFromPage(page: number, pageSize: number = DEFAULT_PAGE_
 export function getTotalPages(totalCount: number, pageSize: number = DEFAULT_PAGE_SIZE): number {
   return Math.ceil(totalCount / pageSize);
 }
+
+// ==================== CLIENT QUERIES ====================
+
+export interface ClientListItem {
+  id: string;
+  fullName: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  postcode: string;
+  // Note: lastVisitAt and nextVisitAt are not yet supported by the API
+  lastVisitAt?: string;
+  nextVisitAt?: string;
+}
+
+export interface ClientsQueryResponse {
+  clients: {
+    items: ClientListItem[];
+    total: number;
+  };
+}
+
+export interface ClientsQueryVariables {
+  search?: string;
+  skip?: number;
+  take?: number;
+}
+
+/**
+ * Query to fetch clients with pagination and search
+ * Note: lastVisitAt and nextVisitAt are not yet supported by the API
+ */
+export const CLIENTS_QUERY = `
+  query Clients($skip: Int, $take: Int, $search: String) {
+    clients(skip: $skip, take: $take, search: $search) {
+      items {
+        id
+        fullName
+        addressLine1
+        addressLine2
+        city
+        postcode
+      }
+      total
+    }
+  }
+`;

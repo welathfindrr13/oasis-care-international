@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { fetcher } from '../../lib/api';
+import { Header } from '../../components/oasis/Header';
+import { clientQuery } from '../../lib/graphql/client-side';
 
 interface MedicationAdministration {
   id: string;
@@ -10,24 +11,43 @@ interface MedicationAdministration {
   status: 'SCHEDULED' | 'ADMINISTERED' | 'MISSED' | 'REFUSED' | 'CANCELLED';
   notes?: string;
   prescription: {
-    id: string;
+    specialInstructions?: string;
+    client: {
+      fullName: string;
+    };
     medication: {
       name: string;
       dosage: string;
       unit: string;
     };
-    client: {
-      fullName: string;
-    };
-    administrationTimes: string[];
-    specialInstructions?: string;
   };
   visit?: {
-    id: string;
     scheduledStart: string;
     scheduledEnd: string;
   };
 }
+
+interface GetTodaysMedicationsResponse {
+  getTodaysMedicationsByClient: MedicationAdministration[];
+}
+
+const EMAR_QUERY = `
+  query GetTodaysMedications($date: String!) {
+    getTodaysMedicationsByClient(date: $date) {
+      id
+      scheduledTime
+      administeredTime
+      status
+      notes
+      prescription {
+        specialInstructions
+        client { fullName }
+        medication { name dosage unit }
+      }
+      visit { scheduledStart scheduledEnd }
+    }
+  }
+`;
 
 export default function EmarPage() {
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -35,84 +55,49 @@ export default function EmarPage() {
     return today.toISOString().split('T')[0];
   });
   
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [medications, setMedications] = useState<MedicationAdministration[]>([]);
 
-  // Mock data for demonstration
-  const medications: MedicationAdministration[] = [
-    {
-      id: '1',
-      scheduledTime: '2025-01-08T08:00',
-      status: 'SCHEDULED',
-      prescription: {
-        id: 'p1',
-        medication: {
-          name: 'Metformin',
-          dosage: '500',
-          unit: 'mg'
-        },
-        client: {
-          fullName: 'John Smith'
-        },
-        administrationTimes: ['08:00', '20:00'],
-        specialInstructions: 'Take with food'
-      },
-      visit: {
-        id: 'v1',
-        scheduledStart: '2025-01-08T07:30',
-        scheduledEnd: '2025-01-08T08:30'
-      }
-    },
-    {
-      id: '2',
-      scheduledTime: '2025-01-08T09:00',
-      administeredTime: '2025-01-08T09:05',
-      status: 'ADMINISTERED',
-      notes: 'Patient took medication without issues',
-      prescription: {
-        id: 'p2',
-        medication: {
-          name: 'Lisinopril',
-          dosage: '10',
-          unit: 'mg'
-        },
-        client: {
-          fullName: 'Jane Doe'
-        },
-        administrationTimes: ['09:00'],
-      },
-      visit: {
-        id: 'v2',
-        scheduledStart: '2025-01-08T08:45',
-        scheduledEnd: '2025-01-08T09:15'
-      }
-    },
-    {
-      id: '3',
-      scheduledTime: '2025-01-08T12:00',
-      status: 'MISSED',
-      notes: 'Patient was sleeping, will attempt later',
-      prescription: {
-        id: 'p3',
-        medication: {
-          name: 'Warfarin',
-          dosage: '5',
-          unit: 'mg'
-        },
-        client: {
-          fullName: 'Bob Johnson'
-        },
-        administrationTimes: ['12:00'],
-        specialInstructions: 'Monitor INR levels'
+  // Fetch medications when date changes
+  useEffect(() => {
+    async function fetchMedications() {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const data = await clientQuery<GetTodaysMedicationsResponse>(EMAR_QUERY, {
+          date: selectedDate,
+        });
+        setMedications(data.getTodaysMedicationsByClient || []);
+      } catch (err) {
+        console.error('Failed to fetch medications:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load medications');
+        setMedications([]);
+      } finally {
+        setLoading(false);
       }
     }
-  ];
+
+    fetchMedications();
+  }, [selectedDate]);
 
   const refetch = () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    setError(null);
+    
+    clientQuery<GetTodaysMedicationsResponse>(EMAR_QUERY, { date: selectedDate })
+      .then((data) => {
+        setMedications(data.getTodaysMedicationsByClient || []);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch medications:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load medications');
+        setMedications([]);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   const getStatusColor = (status: string) => {
@@ -197,14 +182,18 @@ export default function EmarPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-8">
-        {/* Header */}
+    <div className="min-h-screen bg-slate-50">
+      <Header />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {/* Page Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Electronic Medication Administration Record (eMAR)</h1>
+          <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">Electronic Medication Administration Record (eMAR)</h1>
+          <p className="text-slate-500 mt-1">Track and manage medication administration</p>
+        </div>
+        <div className="mb-6">
           
           <div className="flex items-center space-x-4">
-            <label htmlFor="date" className="text-sm font-medium text-gray-700">
+            <label htmlFor="date" className="text-sm font-medium text-slate-700">
               Date:
             </label>
             <input
@@ -212,9 +201,9 @@ export default function EmarPage() {
               id="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-slate-600">
               {medications.length} medication{medications.length !== 1 ? 's' : ''} scheduled
             </div>
           </div>
@@ -326,7 +315,7 @@ export default function EmarPage() {
             ))
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
