@@ -1,8 +1,8 @@
 # ---- build stage ----
-FROM node:20-alpine AS build
+FROM node:20-slim AS build
 
 # Install native build dependencies for node-gyp packages
-RUN apk add --no-cache python3 make g++ openssl
+RUN apt-get update && apt-get install -y python3 make g++ openssl && rm -rf /var/lib/apt/lists/*
 
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
@@ -35,10 +35,10 @@ RUN cd libs/db && pnpm build
 RUN cd apps/api && pnpm build
 
 # ---- production image ----
-FROM node:20-alpine AS production
+FROM node:20-slim AS production
 
 # Install openssl for Prisma and curl for health checks
-RUN apk add --no-cache openssl curl
+RUN apt-get update && apt-get install -y openssl curl && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
 WORKDIR /app
@@ -80,10 +80,14 @@ COPY --from=build /app/libs/db/src/generated ./libs/db/src/generated
 # Also copy to dist/ where the compiled code expects it
 COPY --from=build /app/libs/db/src/generated ./libs/db/dist/generated
 
+# Copy entrypoint script
+COPY apps/api/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
+RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs nestjs
 USER nestjs
 
 EXPOSE 3000
 
-CMD ["node", "apps/api/dist/apps/api/src/main.js"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

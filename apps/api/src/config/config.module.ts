@@ -6,7 +6,7 @@ import * as Joi from 'joi';
 const configValidationSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'test', 'staging', 'production').required(),
   JWT_SECRET: Joi.string().min(32).required(),
-  DATABASE_URL: Joi.string().uri().required(),
+  DATABASE_URL: Joi.string().required(),
   PORT: Joi.number().default(3000),
 });
 

@@ -1,17 +1,22 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from './generated/client';
-import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleDestroy {
-  constructor(private configService: ConfigService) {
+  constructor() {
+    // Read directly from process.env to avoid ConfigService timing issues
+    const databaseUrl = process.env.DATABASE_URL;
+    const nodeEnv = process.env.NODE_ENV || 'development';
+    
+    console.log(`>>> PrismaService: DATABASE_URL ${databaseUrl ? 'is set' : 'IS MISSING'}`);
+    
     super({
       datasources: {
         db: {
-          url: configService.get<string>('DATABASE_URL'),
+          url: databaseUrl,
         },
       },
-      log: configService.get<string>('NODE_ENV') === 'development' 
+      log: nodeEnv === 'development' 
         ? ['query', 'info', 'warn', 'error']
         : ['error'],
     });

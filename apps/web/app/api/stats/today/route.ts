@@ -6,26 +6,38 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    // Extract base API URL without /graphql path for REST endpoints
+    const fullApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql';
+    const apiUrl = fullApiUrl.replace(/\/graphql$/, '');
+    
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
     const res = await fetch(`${apiUrl}/stats/today`, {
       headers: {
         Cookie: cookies().toString(),
       },
       cache: 'no-store',
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
 
     if (res.status === 403) {
       return new NextResponse('Forbidden', { status: 403 });
     }
 
     if (!res.ok) {
-      return new NextResponse('Internal Server Error', { status: 500 });
+      // Return fallback stats instead of error
+      return NextResponse.json({ booked: 0, finished: 0 });
     }
 
     const data = await res.json();
     return NextResponse.json(data);
   } catch (error) {
     console.error('Failed to fetch stats:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    // Return fallback stats on error
+    return NextResponse.json({ booked: 0, finished: 0 });
   }
 }

@@ -155,13 +155,17 @@ resource "aws_ecs_task_definition" "web" {
         {
           name      = "NEXTAUTH_SECRET"
           valueFrom = "arn:aws:secretsmanager:eu-west-2:721689331449:secret:oasis/staging/NEXTAUTH_SECRET"
+        },
+        {
+          name      = "COGNITO_CLIENT_SECRET"
+          valueFrom = "arn:aws:secretsmanager:eu-west-2:721689331449:secret:oasis/staging/COGNITO_CLIENT_SECRET"
         }
       ]
 
       healthCheck = {
         command = [
           "CMD-SHELL",
-          "curl -f http://localhost:3000/ || exit 1"
+          "curl -f http://localhost:3000/api/health || exit 1"
         ]
         interval    = 30
         timeout     = 5

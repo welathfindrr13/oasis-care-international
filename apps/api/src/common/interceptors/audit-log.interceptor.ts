@@ -1,6 +1,7 @@
 import { Injectable, NestInterceptor, ExecutionContext, CallHandler, Inject, Optional } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
+import { GqlExecutionContext } from '@nestjs/graphql';
 import { PrismaService } from '@oasis/db';
 import { Masker } from '../utils/masker';
 
@@ -31,20 +32,50 @@ export class AuditLogInterceptor implements NestInterceptor {
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest();
-    const { method, url, user, ip, headers, body } = request;
-    
-    const auditInfo: AuditLogEntry = {
-      userId: user?.id || 'anonymous',
-      action: `${method} ${url}`,
-      resourceType: this.extractResourceType(url),
-      resourceId: this.extractResourceId(url),
-      ipAddress: ip || headers['x-forwarded-for'] || headers['x-real-ip'],
-      userAgent: headers['user-agent'],
-    };
+    const contextType = context.getType<'http' | 'graphql'>();
+    let auditInfo: AuditLogEntry;
 
-    if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
-      auditInfo.newValues = this.maskPII(body);
+    if (contextType === 'graphql') {
+      // Handle GraphQL context
+      const gqlContext = GqlExecutionContext.create(context);
+      const gqlCtx = gqlContext.getContext();
+      const info = gqlContext.getInfo();
+      const args = gqlContext.getArgs();
+      const req = gqlCtx.req;
+
+      auditInfo = {
+        userId: req?.user?.sub || req?.user?.id || 'anonymous',
+        action: `GraphQL ${info?.parentType?.name || ''}.${info?.fieldName || 'unknown'}`,
+        resourceType: info?.parentType?.name || 'GraphQL',
+        resourceId: args?.id || args?.input?.id,
+        ipAddress: req?.ip || req?.headers?.['x-forwarded-for'] || req?.headers?.['x-real-ip'],
+        userAgent: req?.headers?.['user-agent'],
+      };
+
+      if (args) {
+        auditInfo.newValues = this.maskPII(args);
+      }
+    } else {
+      // Handle HTTP context
+      const request = context.switchToHttp().getRequest();
+      if (!request) {
+        // Skip audit logging if no request context
+        return next.handle();
+      }
+      const { method, url, user, ip, headers, body } = request;
+
+      auditInfo = {
+        userId: user?.id || 'anonymous',
+        action: `${method} ${url}`,
+        resourceType: this.extractResourceType(url),
+        resourceId: this.extractResourceId(url),
+        ipAddress: ip || headers?.['x-forwarded-for'] || headers?.['x-real-ip'],
+        userAgent: headers?.['user-agent'],
+      };
+
+      if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
+        auditInfo.newValues = this.maskPII(body);
+      }
     }
 
     const startTime = Date.now();

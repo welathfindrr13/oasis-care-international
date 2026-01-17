@@ -1,0 +1,14 @@
+{
+  "created": "_reports/02_frontend_overview.md",
+  "routes": 12,
+  "components": 13,
+  "dataFlowSignals": [
+    "graphql",
+    "swr",
+    "use server",
+    "export async function GET",
+    "export async function POST",
+    "fetch(",
+    "next/headers"
+  ]
+}

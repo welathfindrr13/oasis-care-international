@@ -1,0 +1,6 @@
+{
+  "file": "apps/web/tailwind.config.js",
+  "extend": {},
+  "extendBlock": "extend: {\n      // Colors from Figma design tokens\n      colors: {\n        base: {\n          black: '#000000',\n          white: '#ffffff',\n          gray: {\n            50: '#fafafa',\n            100: '#edf5fa',\n            300: '#d8d8d8',\n            500: '#afafaf',\n            800: 'rgba(0, 0, 0, 0.8)',\n          }",
+  "pluginsBlock": ""
+}

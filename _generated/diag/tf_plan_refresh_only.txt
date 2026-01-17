@@ -1,0 +1,36 @@
+var.api_cert_arn
+  ACM certificate ARN for API domain
+
+  Enter a value: var.app_cert_arn
+  ACM certificate ARN for web app domain
+
+  Enter a value: var.route53_zone_id
+  Route53 hosted zone ID for oasis-care.co
+
+  Enter a value: 
+Error: No value for required variable
+
+  on variables.tf line 18:
+  18: variable "route53_zone_id" {
+
+The root module input variable "route53_zone_id" is not set, and has no
+default value. Use a -var or -var-file command line argument to provide a
+value for this variable.
+
+Error: No value for required variable
+
+  on variables.tf line 24:
+  24: variable "app_cert_arn" {
+
+The root module input variable "app_cert_arn" is not set, and has no default
+value. Use a -var or -var-file command line argument to provide a value for
+this variable.
+
+Error: No value for required variable
+
+  on variables.tf line 28:
+  28: variable "api_cert_arn" {
+
+The root module input variable "api_cert_arn" is not set, and has no default
+value. Use a -var or -var-file command line argument to provide a value for
+this variable.

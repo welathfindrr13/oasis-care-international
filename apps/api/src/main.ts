@@ -10,7 +10,9 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
 import { PrismaService } from '@oasis/db';
 
 async function bootstrap() {
+  console.log('>>> BOOTSTRAP START');
   const app = await NestFactory.create(AppModule);
+  console.log('>>> APP CREATED');
   
   // Enable CORS for frontend
   const origins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3000')
@@ -41,8 +43,9 @@ async function bootstrap() {
   const prismaService = app.get(PrismaService);
   app.useGlobalInterceptors(new AuditLogInterceptor(prismaService));
 
-  const port = process.env.PORT || 3000;
+  const port = parseInt(process.env.PORT || '3000', 10);
+  console.log('>>> ABOUT TO LISTEN ON PORT', port);
   await app.listen(port, '0.0.0.0');
-  console.log(`API listening on 0.0.0.0:${port}`);
+  console.log(`>>> API LISTENING ON 0.0.0.0:${port}`);
 }
 bootstrap();

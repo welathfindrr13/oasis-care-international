@@ -18,8 +18,8 @@ HOSTED_UI_DOMAIN="https://eu-west-2ypo6sl1zm.auth.eu-west-2.amazoncognito.com"
 ISSUER="https://cognito-idp.${REGION}.amazonaws.com/${USER_POOL_ID}"
 JWKS_URI="${ISSUER}/.well-known/jwks.json"
 
-WEB_DOMAIN="https://app.oasis-care.com"
-API_DOMAIN="https://api.oasis-care.com"
+WEB_DOMAIN="https://app.oasis-care.co"
+API_DOMAIN="https://api.oasis-care.co"
 
 API_ENV="apps/api/.env.production"
 WEB_ENV="apps/web/.env.production"

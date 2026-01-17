@@ -1,0 +1,49 @@
+Resource Type,Terraform Address,AWS ID/ARN,Description,Import Status
+ECR Repository,aws_ecr_repository.api,oasis-api,Container registry for API images,✅ Import Required
+ECR Repository,aws_ecr_repository.web,oasis-web,Container registry for Web images,✅ Import Required
+ECR Repository Policy,aws_ecr_repository_policy.api,oasis-api,Pull permissions for ECS tasks,✅ Import Required
+ECR Repository Policy,aws_ecr_repository_policy.web,oasis-web,Pull permissions for ECS tasks,✅ Import Required
+ECS Cluster,aws_ecs_cluster.main,oasis-care-staging-cluster,Fargate cluster with Container Insights,✅ Import Required
+ECS Service,aws_ecs_service.api,oasis-care-staging-cluster/oasis-care-staging-api,API service (1 task),✅ Import Required
+ECS Service,aws_ecs_service.web,oasis-care-staging-cluster/oasis-care-staging-web,Web service (1 task),✅ Import Required
+ECS Task Definition,aws_ecs_task_definition.api,[Latest],API task: 512 CPU / 1024 MB,⚠️ Managed by ECS
+ECS Task Definition,aws_ecs_task_definition.web,[Latest],Web task: 512 CPU / 1024 MB,⚠️ Managed by ECS
+CloudWatch Log Group,aws_cloudwatch_log_group.api,/ecs/oasis-api-staging,API logs (14 day retention),✅ Import Required
+CloudWatch Log Group,aws_cloudwatch_log_group.web,/ecs/oasis-web-staging,Web logs (14 day retention),✅ Import Required
+ALB,aws_lb.main,[Dynamic ARN],Application Load Balancer,✅ Import Required
+ALB Target Group,aws_lb_target_group.api,oasis-care-staging-api-tg,API targets (port 3000),✅ Import Required
+ALB Target Group,aws_lb_target_group.web,oasis-care-staging-web-tg,Web targets (port 3000),✅ Import Required
+ALB Listener,aws_lb_listener.http,[Dynamic ARN],HTTP → HTTPS redirect (port 80),✅ Import Required
+ALB Listener,aws_lb_listener.https,[Dynamic ARN],HTTPS listener (port 443),✅ Import Required
+ALB Listener Rule,aws_lb_listener_rule.api,[Dynamic ARN],Route api.oasis-care.co to API,⚠️ May auto-create
+ALB Listener Rule,aws_lb_listener_rule.web,[Dynamic ARN],Route app.oasis-care.co to Web,⚠️ May auto-create
+ALB Listener Certificate,aws_lb_listener_certificate.web,[Dynamic ARN],Additional cert for web domain,⚠️ May auto-create
+Security Group,aws_security_group.alb,[Dynamic SG ID],ALB SG: 443 inbound from internet,✅ Import Required
+Security Group,aws_security_group.ecs,[Dynamic SG ID],ECS SG: 4000 from ALB only,✅ Import Required
+Security Group,aws_security_group.rds,[Dynamic SG ID],RDS SG: 5432 from ECS only,✅ Import Required
+VPC (data),data.aws_vpc.main,vpc-0fa202628a9b74522,Existing VPC (reused),N/A (data source)
+Subnet (data),data.aws_subnet.public_a,subnet-08853b0f79dc7eb8a,Public subnet A,N/A (data source)
+Subnet (data),data.aws_subnet.public_b,subnet-0edae41ff907ad302,Public subnet B,N/A (data source)
+Subnet (data),data.aws_subnet.public_c,subnet-03d629a38764b4395,Public subnet C,N/A (data source)
+DB Subnet Group,aws_db_subnet_group.main,oasis-care-staging-db-subnet-group,RDS subnet group,✅ Import Required
+RDS Instance,aws_db_instance.postgres,oasis-staging,PostgreSQL 15.6 (db.t3.micro),✅ Import Required
+IAM Role,aws_iam_role.ecs_task_execution,oasis-care-staging-ecsTaskExec,ECS task execution role,✅ Import Required
+IAM Role,aws_iam_role.ecs_task_role,oasis-care-staging-ecsTaskRole,ECS task runtime role,✅ Import Required
+IAM Role,aws_iam_role.lambda_embedding_execution,oasis-care-staging-lambda-embedding,Lambda execution role,✅ Import Required
+IAM Policy (inline),aws_iam_role_policy.read_secrets,oasis-care-staging-ecsTaskExec:ReadSecrets,Secrets Manager read access,✅ Import Required
+IAM Policy (inline),aws_iam_role_policy.bedrock_access,oasis-care-staging-ecsTaskRole:BedrockAccess,Bedrock model access,✅ Import Required
+IAM Policy (inline),aws_iam_role_policy.ecs_exec,oasis-care-staging-ecsTaskRole:ECSExec,ECS Exec debugging,✅ Import Required
+IAM Policy (inline),aws_iam_role_policy.lambda_embedding_permissions,oasis-care-staging-lambda-embedding:EmbeddingPermissions,Lambda permissions,✅ Import Required
+IAM Policy Attachment,aws_iam_role_policy_attachment.ecs_task_exec_policy,AmazonECSTaskExecutionRolePolicy,AWS managed policy,✅ Import Required
+IAM Policy Attachment,aws_iam_role_policy_attachment.lambda_basic_execution,AWSLambdaBasicExecutionRole,AWS managed policy,✅ Import Required
+IAM Policy Attachment,aws_iam_role_policy_attachment.lambda_vpc_execution,AWSLambdaVPCAccessExecutionRole,AWS managed policy,✅ Import Required
+SNS Topic,aws_sns_topic.alerts,arn:aws:sns:eu-west-2:721689331449:oasis-care-staging-alerts,Alert notifications,✅ Import Required
+SNS Subscription,aws_sns_topic_subscription.email_alerts,[Dynamic],Email subscription,⚠️ Manual config
+CloudWatch Alarm,aws_cloudwatch_metric_alarm.rds_cpu_utilization,oasis-care-staging-rds-cpu-high,RDS CPU > 80%,🆕 Will be created
+CloudWatch Alarm,aws_cloudwatch_metric_alarm.rds_free_storage_space,oasis-care-staging-rds-storage-low,RDS storage < 2GB,🆕 Will be created
+CloudWatch Alarm,aws_cloudwatch_metric_alarm.rds_freeable_memory,oasis-care-staging-rds-memory-low,RDS memory < 100MB,🆕 Will be created
+CloudWatch Alarm,aws_cloudwatch_metric_alarm.rds_database_connections,oasis-care-staging-rds-connections-high,RDS connections > 50,🆕 Will be created
+CloudWatch Alarm,aws_cloudwatch_metric_alarm.alb_target_5xx_errors,oasis-care-staging-alb-5xx-errors,ALB 5XX count > 10,🆕 Will be created
+CloudWatch Alarm,aws_cloudwatch_metric_alarm.alb_response_time,oasis-care-staging-alb-response-time-high,ALB latency > 5s,🆕 Will be created
+CloudWatch Alarm,aws_cloudwatch_metric_alarm.ecs_cpu_utilization,oasis-care-staging-ecs-cpu-high,ECS CPU > 80%,🆕 Will be created
+CloudWatch Alarm,aws_cloudwatch_metric_alarm.ecs_memory_utilization,oasis-care-staging-ecs-memory-high,ECS memory > 80%,🆕 Will be created

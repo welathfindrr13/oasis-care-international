@@ -1,0 +1,53 @@
+{
+  "counts": {
+    "graphql": 7,
+    "@apollo/client": 0,
+    "urql": 0,
+    "react-query": 0,
+    "swr": 2,
+    "use server": 1,
+    "export async function GET": 1,
+    "export async function POST": 1,
+    "fetch(": 17,
+    "next/headers": 5
+  },
+  "samples": {
+    "graphql": [
+      "apps/web/.next/server/app/api/graphql/route.js",
+      "apps/web/.next/server/app/visits/page.js",
+      "apps/web/.next/types/app/api/graphql/route.ts",
+      "apps/web/app/api/graphql/route.ts",
+      "apps/web/app/visits/__tests__/smoke.test.tsx"
+    ],
+    "@apollo/client": [],
+    "urql": [],
+    "react-query": [],
+    "swr": [
+      "apps/web/.next/server/app/api/auth/[...nextauth]/route.js",
+      "apps/web/app/activity/page.tsx"
+    ],
+    "use server": [
+      "apps/web/.next/static/chunks/406-c9f0d75bce3ac2c9.js"
+    ],
+    "export async function GET": [
+      "apps/web/app/api/stats/today/route.ts"
+    ],
+    "export async function POST": [
+      "apps/web/app/api/graphql/route.ts"
+    ],
+    "fetch(": [
+      "apps/web/.next/server/app/admin/metrics/page.js",
+      "apps/web/.next/server/app/api/auth/[...nextauth]/route.js",
+      "apps/web/.next/server/app/api/graphql/route.js",
+      "apps/web/.next/server/app/api/stats/today/route.js",
+      "apps/web/.next/server/app/dashboard/page.js"
+    ],
+    "next/headers": [
+      "apps/web/app/api/graphql/route.ts",
+      "apps/web/app/api/stats/today/route.ts",
+      "apps/web/app/dashboard/page.tsx",
+      "apps/web/lib/graphql/client.ts",
+      "apps/web/lib/url.ts"
+    ]
+  }
+}
