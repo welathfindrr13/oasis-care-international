@@ -5,6 +5,8 @@ import { chromium } from 'playwright';
 const BASE_URL = 'https://app.oasis-care.co';
 const OUT_DIR = 'output/playwright/e2e-live';
 const TS = Date.now();
+const RESULT_PREFIX = 'PROBE_RESULT_JSON:';
+const REQUIRED_CHECKS = ['clientLookup', 'createMedication', 'createPrescription', 'readBack'];
 
 const ACCOUNT = { email: 'boss@yourdomain.com', password: 'SecurePassword123!1' };
 
@@ -217,24 +219,40 @@ async function main() {
   }
 
   const checks = Object.values(report.checks || {});
+  const missingChecks = REQUIRED_CHECKS.filter((name) => !report.checks?.[name]);
   const passed = checks.filter((c) => c?.pass).length;
   const failed = checks.filter((c) => !c?.pass).length;
+  const gateChecks = [
+    { name: 'noFatal', pass: !report.fatal, actual: report.fatal || null },
+    {
+      name: 'expectedCheckCount',
+      pass: checks.length === REQUIRED_CHECKS.length,
+      actual: { observed: checks.length, expected: REQUIRED_CHECKS.length },
+    },
+    { name: 'noMissingChecks', pass: missingChecks.length === 0, actual: { missingChecks } },
+  ];
+  const combinedChecks = [...checks, ...gateChecks];
   report.summary = { total: checks.length, passed, failed };
-  report.totalChecks = checks.length;
-  report.passedChecks = passed;
-  report.failedChecks = failed;
-  report.verdict = failed === 0 && !report.fatal ? 'PASS' : 'FAIL';
+  report.gateChecks = gateChecks;
+  report.totalChecks = combinedChecks.length;
+  report.passedChecks = combinedChecks.filter((c) => c?.pass).length;
+  report.failedChecks = combinedChecks.filter((c) => !c?.pass).length;
+  report.expectedChecks = REQUIRED_CHECKS;
+  report.missingChecks = missingChecks;
+  report.verdict = report.failedChecks === 0 ? 'PASS' : 'FAIL';
 
   const outJson = path.join(OUT_DIR, `${TS}_emar_provisioning_probe.json`);
   await fs.writeFile(outJson, JSON.stringify(report, null, 2));
 
-  console.log(JSON.stringify({
+  const result = {
     ok: report.verdict === 'PASS',
     outJson,
     verdict: report.verdict,
+    total: report.totalChecks,
     passed: report.passedChecks,
     failed: report.failedChecks,
-  }, null, 2));
+  };
+  console.log(`${RESULT_PREFIX}${JSON.stringify(result)}`);
 
   if (report.verdict !== 'PASS') {
     process.exit(1);

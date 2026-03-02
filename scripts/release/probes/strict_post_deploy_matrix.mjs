@@ -5,6 +5,8 @@ import { chromium } from 'playwright';
 const BASE_URL = 'https://app.oasis-care.co';
 const OUT_DIR = 'output/playwright/e2e-live';
 const TS = Date.now();
+const RESULT_PREFIX = 'PROBE_RESULT_JSON:';
+const REQUIRED_CHECKS = ['activity', 'adminCarers', 'adminMetrics', 'clientsNew', 'visitsNew', 'upsertCarer'];
 
 const ACCOUNTS = {
   admin: { email: 'boss@yourdomain.com', password: 'SecurePassword123!1' },
@@ -329,7 +331,7 @@ async function main() {
   const report = {
     generatedAt: stamp(),
     baseUrl: BASE_URL,
-    matrix: ['activity', 'adminCarers', 'adminMetrics', 'clientsNew', 'visitsNew', 'upsertCarer'],
+    matrix: REQUIRED_CHECKS,
     results: {},
     verdict: 'PENDING',
   };
@@ -346,15 +348,55 @@ async function main() {
     ...Object.values(report.results.admin?.checks || {}),
     ...Object.values(report.results.carer?.checks || {}),
   ];
-  report.totalChecks = checks.length;
-  report.passedChecks = checks.filter((c) => c?.pass).length;
-  report.failedChecks = checks.filter((c) => !c?.pass).length;
+  const expectedChecksPerRole = report.matrix.length;
+  const expectedTotalChecks = expectedChecksPerRole * 2;
+  const observedRoleChecks = checks.length;
+  const adminMissingChecks = report.matrix.filter((name) => !report.results.admin?.checks?.[name]);
+  const carerMissingChecks = report.matrix.filter((name) => !report.results.carer?.checks?.[name]);
+  const roleFatalCount = [report.results.admin, report.results.carer].filter((r) => Boolean(r?.fatal)).length;
+  const gateChecks = [
+    { name: 'noRoleFatal', pass: roleFatalCount === 0, actual: { roleFatalCount } },
+    {
+      name: 'expectedCheckCount',
+      pass: observedRoleChecks === expectedTotalChecks,
+      actual: { observed: observedRoleChecks, expected: expectedTotalChecks },
+    },
+    { name: 'adminNoMissingChecks', pass: adminMissingChecks.length === 0, actual: { adminMissingChecks } },
+    { name: 'carerNoMissingChecks', pass: carerMissingChecks.length === 0, actual: { carerMissingChecks } },
+  ];
+  const combinedChecks = [...checks, ...gateChecks];
+
+  report.gateChecks = gateChecks;
+  report.totalChecks = combinedChecks.length;
+  report.passedChecks = combinedChecks.filter((c) => c?.pass).length;
+  report.failedChecks = combinedChecks.filter((c) => !c?.pass).length;
+  report.expectedChecks = {
+    perRole: expectedChecksPerRole,
+    total: expectedTotalChecks,
+  };
+  report.completeness = {
+    adminMissingChecks,
+    carerMissingChecks,
+    roleFatalCount,
+  };
   report.verdict = report.failedChecks === 0 ? 'PASS' : 'FAIL';
 
   const outJson = path.join(OUT_DIR, `${TS}_strict_post_deploy_matrix.json`);
   await fs.writeFile(outJson, JSON.stringify(report, null, 2));
 
-  console.log(JSON.stringify({ ok: true, outJson, verdict: report.verdict, passed: report.passedChecks, failed: report.failedChecks }, null, 2));
+  const result = {
+    ok: report.verdict === 'PASS',
+    outJson,
+    verdict: report.verdict,
+    total: report.totalChecks,
+    passed: report.passedChecks,
+    failed: report.failedChecks,
+  };
+  console.log(`${RESULT_PREFIX}${JSON.stringify(result)}`);
+
+  if (report.verdict !== 'PASS') {
+    process.exit(1);
+  }
 }
 
 main().catch((err) => {

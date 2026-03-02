@@ -5,6 +5,8 @@ import { chromium } from 'playwright';
 const BASE_URL = 'https://app.oasis-care.co';
 const OUT_DIR = 'output/playwright/e2e-live';
 const TS = Date.now();
+const RESULT_PREFIX = 'PROBE_RESULT_JSON:';
+const REQUIRED_ROLE_CHECKS = ['pageRender', 'createCareLog', 'readBack', 'monthlySummary'];
 
 const ACCOUNTS = {
   admin: { email: 'boss@yourdomain.com', password: 'SecurePassword123!1' },
@@ -436,10 +438,19 @@ async function probeRole(browser, role, preferredClientId = null) {
     } catch {}
   } finally {
     const checks = Object.values(out.checks || {});
+    const missingChecks = REQUIRED_ROLE_CHECKS.filter((name) => !out.checks?.[name]);
     const passed = checks.filter((c) => c?.pass).length;
     const failed = checks.filter((c) => !c?.pass).length;
     out.summary = { total: checks.length, passed, failed };
-    out.verdict = failed === 0 && !out.fatal ? 'PASS' : 'FAIL';
+    out.expectedCheckCount = REQUIRED_ROLE_CHECKS.length;
+    out.missingChecks = missingChecks;
+    out.verdict =
+      failed === 0 &&
+      !out.fatal &&
+      checks.length === REQUIRED_ROLE_CHECKS.length &&
+      missingChecks.length === 0
+        ? 'PASS'
+        : 'FAIL';
     out.finishedAt = nowIso();
     await context.close();
   }
@@ -472,16 +483,71 @@ async function main() {
     ...Object.values(report.results.admin?.checks || {}),
     ...Object.values(report.results.carer?.checks || {}),
   ];
+  const expectedChecksPerRole = REQUIRED_ROLE_CHECKS.length;
+  const expectedTotalChecks = expectedChecksPerRole * 2;
+  const observedRoleChecks = allChecks.length;
+  const roleFatalCount = [report.results.admin, report.results.carer].filter((r) => Boolean(r?.fatal)).length;
+  const adminMissingChecks = REQUIRED_ROLE_CHECKS.filter((name) => !report.results.admin?.checks?.[name]);
+  const carerMissingChecks = REQUIRED_ROLE_CHECKS.filter((name) => !report.results.carer?.checks?.[name]);
+  const assignmentPassed = Boolean(report.assignmentSetup?.ok);
+  const carerWriteValidated = Boolean(report.results.carer?.checks?.createCareLog?.pass);
+  const assignmentGatePass = assignmentPassed || carerWriteValidated;
 
-  report.totalChecks = allChecks.length;
-  report.passedChecks = allChecks.filter((c) => c?.pass).length;
-  report.failedChecks = allChecks.filter((c) => !c?.pass).length;
+  const gateChecks = [
+    { name: 'noRoleFatal', pass: roleFatalCount === 0, actual: { roleFatalCount } },
+    {
+      name: 'expectedCheckCount',
+      pass: observedRoleChecks === expectedTotalChecks,
+      actual: { observed: observedRoleChecks, expected: expectedTotalChecks },
+    },
+    { name: 'adminNoMissingChecks', pass: adminMissingChecks.length === 0, actual: { adminMissingChecks } },
+    { name: 'carerNoMissingChecks', pass: carerMissingChecks.length === 0, actual: { carerMissingChecks } },
+    {
+      name: 'assignmentSetup',
+      pass: assignmentGatePass,
+      actual: {
+        assignmentPassed,
+        carerWriteValidated,
+        assignmentSetup: report.assignmentSetup || null,
+      },
+    },
+  ];
+
+  const combinedChecks = [...allChecks, ...gateChecks];
+  report.gateChecks = gateChecks;
+  report.totalChecks = combinedChecks.length;
+  report.passedChecks = combinedChecks.filter((c) => c?.pass).length;
+  report.failedChecks = combinedChecks.filter((c) => !c?.pass).length;
+  report.expectedChecks = {
+    perRole: expectedChecksPerRole,
+    total: expectedTotalChecks,
+  };
+  report.completeness = {
+    roleFatalCount,
+    adminMissingChecks,
+    carerMissingChecks,
+    assignmentPassed,
+    carerWriteValidated,
+    assignmentGatePass,
+  };
   report.verdict = report.failedChecks === 0 ? 'PASS' : 'FAIL';
 
   const outJson = path.join(OUT_DIR, `${TS}_care_log_probe.json`);
   await fs.writeFile(outJson, JSON.stringify(report, null, 2));
 
-  console.log(JSON.stringify({ ok: true, outJson, verdict: report.verdict, passed: report.passedChecks, failed: report.failedChecks }, null, 2));
+  const result = {
+    ok: report.verdict === 'PASS',
+    outJson,
+    verdict: report.verdict,
+    total: report.totalChecks,
+    passed: report.passedChecks,
+    failed: report.failedChecks,
+  };
+  console.log(`${RESULT_PREFIX}${JSON.stringify(result)}`);
+
+  if (report.verdict !== 'PASS') {
+    process.exit(1);
+  }
 }
 
 main().catch((err) => {

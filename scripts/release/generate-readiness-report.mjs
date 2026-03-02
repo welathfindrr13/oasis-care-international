@@ -32,6 +32,16 @@ function statusIcon(pass) {
   return pass ? 'PASS' : 'FAIL';
 }
 
+function isValidProbeArtifact(data) {
+  if (!data || typeof data !== 'object') return false;
+  if (typeof data.verdict !== 'string') return false;
+  if (typeof data.totalChecks !== 'number') return false;
+  if (typeof data.passedChecks !== 'number') return false;
+  if (typeof data.failedChecks !== 'number') return false;
+  if (data.totalChecks <= 0) return false;
+  return data.totalChecks === data.passedChecks + data.failedChecks;
+}
+
 async function findLatestBySuffix(files, suffix) {
   const now = Date.now();
   const candidates = files
@@ -60,12 +70,13 @@ async function main() {
   const emarData = latestEmar ? await loadJson(latestEmar) : null;
   const suiteData = latestSuite ? await loadJson(latestSuite) : null;
 
-  const strictPass = strictData?.verdict === 'PASS';
-  const carePass = careData?.verdict === 'PASS';
-  const aiPass = aiData?.verdict === 'PASS';
-  const emarPass = emarData?.verdict === 'PASS';
+  const strictPass = isValidProbeArtifact(strictData) && strictData?.verdict === 'PASS';
+  const carePass = isValidProbeArtifact(careData) && careData?.verdict === 'PASS';
+  const aiPass = isValidProbeArtifact(aiData) && aiData?.verdict === 'PASS';
+  const emarPass = isValidProbeArtifact(emarData) && emarData?.verdict === 'PASS';
+  const suitePass = suiteData?.verdict === 'PASS';
 
-  const finalPass = strictPass && carePass && aiPass && emarPass;
+  const finalPass = strictPass && carePass && aiPass && emarPass && suitePass;
   const generatedAt = new Date().toISOString();
   const outPath = path.join(DEST_DIR, `${Date.now()}_production_readiness.md`);
 
@@ -82,7 +93,7 @@ async function main() {
     `- AI summary probe: ${statusIcon(aiPass)} (${latestAi || 'missing'})`,
     aiData ? `  - checks: ${aiData.passedChecks ?? 0}/${aiData.totalChecks ?? 0}` : '',
     `- eMAR provisioning probe: ${statusIcon(emarPass)} (${latestEmar || 'missing'})`,
-    `- Reliability suite: ${suiteData?.verdict || 'N/A'} (${latestSuite || 'missing'})`,
+    `- Reliability suite: ${statusIcon(suitePass)} (${latestSuite || 'missing'})`,
     '',
     '## Gate Decision',
     '',
@@ -96,7 +107,11 @@ async function main() {
   ];
 
   await fs.writeFile(outPath, lines.join('\n'));
-  console.log(JSON.stringify({ ok: true, outPath, finalPass }, null, 2));
+  console.log(JSON.stringify({ ok: finalPass, outPath, finalPass }, null, 2));
+
+  if (!finalPass) {
+    process.exit(1);
+  }
 }
 
 main().catch((error) => {

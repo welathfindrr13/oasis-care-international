@@ -5,6 +5,9 @@ import { chromium } from 'playwright';
 const BASE_URL = 'https://app.oasis-care.co';
 const OUT_DIR = 'output/playwright/e2e-live';
 const TS = Date.now();
+const RESULT_PREFIX = 'PROBE_RESULT_JSON:';
+const REQUIRED_ADMIN_CHECKS = ['noFatal', 'currentWeekBefore', 'currentWeekAfter', 'generateSummary', 'approveSummary'];
+const REQUIRED_CARER_CHECKS = ['noFatal', 'currentWeekBefore', 'currentWeekAfter', 'approveForbiddenForCarer'];
 
 const ACCOUNTS = {
   admin: { email: 'boss@yourdomain.com', password: 'SecurePassword123!1' },
@@ -198,13 +201,23 @@ async function probeSummaryOps(page, role, clientId, forcedSummaryId = null) {
     summary: after?.body?.data?.currentWeekSummary || null,
   };
 
-  const summaryId =
-    forcedSummaryId ||
-    generated?.body?.data?.generateSummary?.id ||
-    after?.body?.data?.currentWeekSummary?.id ||
-    before?.body?.data?.currentWeekSummary?.id ||
-    null;
+  let summaryId = null;
+  let summaryIdSource = null;
+  if (forcedSummaryId) {
+    summaryId = forcedSummaryId;
+    summaryIdSource = 'forced';
+  } else if (generated?.body?.data?.generateSummary?.id) {
+    summaryId = generated.body.data.generateSummary.id;
+    summaryIdSource = 'generate';
+  } else if (after?.body?.data?.currentWeekSummary?.id) {
+    summaryId = after.body.data.currentWeekSummary.id;
+    summaryIdSource = 'currentWeekAfter';
+  } else if (before?.body?.data?.currentWeekSummary?.id) {
+    summaryId = before.body.data.currentWeekSummary.id;
+    summaryIdSource = 'currentWeekBefore';
+  }
   out.summaryId = summaryId;
+  out.summaryIdSource = summaryIdSource;
 
   const approveMutation = `mutation ApproveSummary($input: ApproveSummaryInput!) {
     approveSummary(input: $input) { id status approvedBy approvedAt feedback }
@@ -265,13 +278,19 @@ function evaluateRoleResult(result) {
       (hasErrorCode(result?.approve, 'SUMMARY_ALREADY_PROCESSED') ||
         hasErrorMessage(result?.approve, 'already been processed'));
 
+    const generatedSummaryId = result?.generate?.summary?.id || null;
     checks.push({
       name: 'generateSummary',
       pass:
         result?.generate?.status === 200 &&
         !hasGraphQLErrors(result?.generate) &&
-        Boolean(result?.summaryId),
-      actual: result?.generate || null,
+        Boolean(generatedSummaryId) &&
+        result?.summaryIdSource === 'generate',
+      actual: {
+        ...(result?.generate || {}),
+        generatedSummaryId,
+        summaryIdSource: result?.summaryIdSource || null,
+      },
     });
 
     checks.push({
@@ -378,27 +397,55 @@ async function main() {
     ...report.results.adminEvaluation.checks,
     ...report.results.carerEvaluation.checks,
   ];
-  report.totalChecks = allChecks.length;
-  report.passedChecks = allChecks.filter((c) => c.pass).length;
-  report.failedChecks = allChecks.filter((c) => !c.pass).length;
+  const adminMissingChecks = REQUIRED_ADMIN_CHECKS.filter(
+    (name) => !report.results.adminEvaluation.checks.some((c) => c.name === name),
+  );
+  const carerMissingChecks = REQUIRED_CARER_CHECKS.filter(
+    (name) => !report.results.carerEvaluation.checks.some((c) => c.name === name),
+  );
+  const expectedTotalChecks = REQUIRED_ADMIN_CHECKS.length + REQUIRED_CARER_CHECKS.length;
+  const observedRoleChecks = allChecks.length;
+  const roleFatalCount = [report.results.admin, report.results.carer].filter((r) => Boolean(r?.fatal)).length;
+  const gateChecks = [
+    { name: 'noRoleFatal', pass: roleFatalCount === 0, actual: { roleFatalCount } },
+    {
+      name: 'expectedCheckCount',
+      pass: observedRoleChecks === expectedTotalChecks,
+      actual: { observed: observedRoleChecks, expected: expectedTotalChecks },
+    },
+    { name: 'adminNoMissingChecks', pass: adminMissingChecks.length === 0, actual: { adminMissingChecks } },
+    { name: 'carerNoMissingChecks', pass: carerMissingChecks.length === 0, actual: { carerMissingChecks } },
+  ];
+  const combinedChecks = [...allChecks, ...gateChecks];
+
+  report.gateChecks = gateChecks;
+  report.totalChecks = combinedChecks.length;
+  report.passedChecks = combinedChecks.filter((c) => c.pass).length;
+  report.failedChecks = combinedChecks.filter((c) => !c.pass).length;
+  report.expectedChecks = {
+    admin: REQUIRED_ADMIN_CHECKS,
+    carer: REQUIRED_CARER_CHECKS,
+    total: expectedTotalChecks,
+  };
+  report.completeness = {
+    roleFatalCount,
+    adminMissingChecks,
+    carerMissingChecks,
+  };
   report.verdict = report.failedChecks === 0 ? 'PASS' : 'FAIL';
 
   const outJson = path.join(OUT_DIR, `${TS}_ai_summary_probe.json`);
   await fs.writeFile(outJson, JSON.stringify(report, null, 2));
-  console.log(
-    JSON.stringify(
-      {
-        ok: report.verdict === 'PASS',
-        outJson,
-        createdClientId: report.createdClientId,
-        verdict: report.verdict,
-        passed: report.passedChecks,
-        failed: report.failedChecks,
-      },
-      null,
-      2,
-    ),
-  );
+  const result = {
+    ok: report.verdict === 'PASS',
+    outJson,
+    createdClientId: report.createdClientId,
+    verdict: report.verdict,
+    total: report.totalChecks,
+    passed: report.passedChecks,
+    failed: report.failedChecks,
+  };
+  console.log(`${RESULT_PREFIX}${JSON.stringify(result)}`);
 
   if (report.verdict !== 'PASS') {
     process.exit(1);
