@@ -2,6 +2,7 @@
 
 ## Overview
 This document maps the scaffolded GDPR functionality to specific compliance requirements.
+For productized secondary-use and monetization controls, see `docs/gdpr/MONETIZATION_PLAYBOOK.md`.
 
 ## Database Tables
 
