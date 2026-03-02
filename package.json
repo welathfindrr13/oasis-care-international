@@ -14,7 +14,11 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
-    "seed:staging": "ts-node scripts/seed/staging.seed.ts"
+    "seed:staging": "ts-node scripts/seed/staging.seed.ts",
+    "release:check-secrets": "bash scripts/release/check-secrets-parity.sh",
+    "release:mobile-smoke": "node scripts/release/mobile-route-smoke.mjs",
+    "release:staging:reliability": "node scripts/release/run-staging-reliability-suite.mjs",
+    "release:readiness-report": "node scripts/release/generate-readiness-report.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",
