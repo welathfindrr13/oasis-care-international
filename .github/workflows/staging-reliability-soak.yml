@@ -9,10 +9,21 @@ jobs:
   soak:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      PLAYWRIGHT_BASE_URL: https://app.oasis-care.co
+      PLAYWRIGHT_ADMIN_EMAIL: boss@yourdomain.com
+      PLAYWRIGHT_ADMIN_PASSWORD: SecurePassword123!1
+      PLAYWRIGHT_CARER_EMAIL: carer-demo@yourdomain.com
+      PLAYWRIGHT_CARER_PASSWORD: SecurePassword123!2
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9.13.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -20,12 +31,50 @@ jobs:
           node-version: 20
           cache: pnpm
 
+      - name: Soak preflight and execution context
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-results/reliability
+
+          required_files=(
+            scripts/release/run-staging-reliability-suite.mjs
+            scripts/release/mobile-route-smoke.mjs
+            scripts/release/probes/strict_post_deploy_matrix.mjs
+            scripts/release/probes/care_log_probe.mjs
+            scripts/release/probes/ai_summary_probe.mjs
+            scripts/release/probes/emar_provisioning_probe.mjs
+          )
+          for f in "${required_files[@]}"; do
+            [[ -f "$f" ]] || { echo "Missing required file: $f"; exit 1; }
+          done
+
+          required_env=(
+            PLAYWRIGHT_BASE_URL
+            PLAYWRIGHT_ADMIN_EMAIL
+            PLAYWRIGHT_ADMIN_PASSWORD
+            PLAYWRIGHT_CARER_EMAIL
+            PLAYWRIGHT_CARER_PASSWORD
+          )
+          for v in "${required_env[@]}"; do
+            [[ -n "${!v:-}" ]] || { echo "Missing required env: $v"; exit 1; }
+          done
+
+          cat > test-results/reliability/_soak_context.txt <<EOF
+          Staging Reliability Soak Context
+          GeneratedAt=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          BaseURL=${PLAYWRIGHT_BASE_URL}
+          LoginURL=${PLAYWRIGHT_BASE_URL}/login
+          AuthFlow=Click "Sign in securely" (Cognito Hosted UI)
+          AdminUser=${PLAYWRIGHT_ADMIN_EMAIL}
+          CarerUser=${PLAYWRIGHT_CARER_EMAIL}
+          Probes=strict_post_deploy_matrix, care_log_probe, ai_summary_probe, emar_provisioning_probe, mobile_route_smoke
+          EOF
+
       - name: Install dependencies
         shell: bash
         run: |
           set -euo pipefail
-          corepack enable
-          corepack prepare pnpm@9.13.1 --activate
           pnpm install --frozen-lockfile
 
       - name: Install Playwright Chromium
