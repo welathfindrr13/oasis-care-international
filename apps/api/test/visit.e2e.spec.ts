@@ -33,8 +33,8 @@ describe('Visit E2E Tests', () => {
   let fixtures: any;
 
   beforeAll(async () => {
-    // Start PostgreSQL container with specific version for reproducibility
-    postgresContainer = await new PostgreSqlContainer('postgres:16-alpine')
+    // Use pgvector-enabled Postgres image because migrations require `vector` extension.
+    postgresContainer = await new PostgreSqlContainer('pgvector/pgvector:pg16')
       .withDatabase('oasis_test')
       .withUsername('test')
       .withPassword('test')
@@ -121,8 +121,12 @@ describe('Visit E2E Tests', () => {
   }, 180000); // 3 minutes total timeout
 
   afterAll(async () => {
-    await app.close();
-    await postgresContainer.stop();
+    if (app) {
+      await app.close();
+    }
+    if (postgresContainer) {
+      await postgresContainer.stop();
+    }
   });
 
   beforeEach(async () => {
