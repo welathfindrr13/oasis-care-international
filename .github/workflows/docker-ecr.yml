@@ -15,6 +15,10 @@ on:
       - 'scripts/**'
       - '.github/workflows/docker-ecr.yml'
 
+permissions:
+  id-token: write
+  contents: read
+
 concurrency:
   group: deploy-staging-${{ github.ref }}
   cancel-in-progress: false
@@ -40,6 +44,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Validate deploy auth configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${{ secrets.AWS_DEPLOY_ROLE_ARN_STAGING }}" ]]; then
+            echo "Using OIDC role auth for staging deploy."
+            exit 0
+          fi
+          if [[ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" && -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]]; then
+            echo "Using static key fallback for staging deploy."
+            exit 0
+          fi
+          echo "Missing deploy auth configuration."
+          echo "Set AWS_DEPLOY_ROLE_ARN_STAGING (preferred) or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY."
+          exit 1
+
       - name: Validate deployment checklist confirmation
         if: github.event_name == 'workflow_dispatch'
         shell: bash
@@ -59,11 +79,23 @@ jobs:
 
       - name: Configure AWS credentials (access keys fallback)
         if: ${{ secrets.AWS_DEPLOY_ROLE_ARN_STAGING == '' }}
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS identity and account
+        shell: bash
+        run: |
+          set -euo pipefail
+          account="$(aws sts get-caller-identity --query Account --output text)"
+          arn="$(aws sts get-caller-identity --query Arn --output text)"
+          echo "Authenticated as: $arn"
+          if [[ "$account" != "${{ env.ACCOUNT_ID }}" ]]; then
+            echo "Unexpected AWS account: $account (expected ${{ env.ACCOUNT_ID }})"
+            exit 1
+          fi
 
       - name: Verify clean tree before image build
         shell: bash
