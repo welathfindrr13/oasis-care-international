@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { chromium } from 'playwright';
 
-const BASE_URL = 'https://app.oasis-care.co';
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://app.oasis-care.co';
 const OUT_DIR = 'output/playwright/e2e-live';
 const TS = Date.now();
 const RESULT_PREFIX = 'PROBE_RESULT_JSON:';
@@ -10,8 +10,14 @@ const REQUIRED_ADMIN_CHECKS = ['noFatal', 'currentWeekBefore', 'currentWeekAfter
 const REQUIRED_CARER_CHECKS = ['noFatal', 'currentWeekBefore', 'currentWeekAfter', 'approveForbiddenForCarer'];
 
 const ACCOUNTS = {
-  admin: { email: 'boss@yourdomain.com', password: 'SecurePassword123!1' },
-  carer: { email: 'carer-demo@yourdomain.com', password: 'SecurePassword123!2' },
+  admin: {
+    email: process.env.PLAYWRIGHT_ADMIN_EMAIL || 'boss@yourdomain.com',
+    password: process.env.PLAYWRIGHT_ADMIN_PASSWORD || 'SecurePassword123!1',
+  },
+  carer: {
+    email: process.env.PLAYWRIGHT_CARER_EMAIL || 'carer-demo@yourdomain.com',
+    password: process.env.PLAYWRIGHT_CARER_PASSWORD || 'SecurePassword123!2',
+  },
 };
 
 function boundsThisWeek() {
@@ -23,6 +29,14 @@ function boundsThisWeek() {
   end.setDate(start.getDate() + 6);
   end.setHours(23, 59, 59, 999);
   return { periodStart: start.toISOString(), periodEnd: end.toISOString() };
+}
+
+function boundsFreshGenerationWindow() {
+  // Use a unique period each run to force real generation instead of cached period reuse.
+  const now = new Date();
+  const periodEnd = new Date(now.getTime() - 60 * 1000);
+  const periodStart = new Date(periodEnd.getTime() - 6 * 60 * 60 * 1000);
+  return { periodStart: periodStart.toISOString(), periodEnd: periodEnd.toISOString() };
 }
 
 async function safeVisible(locator, timeout = 2500) {
@@ -183,7 +197,7 @@ async function probeSummaryOps(page, role, clientId, forcedSummaryId = null) {
     summary: before?.body?.data?.currentWeekSummary || null,
   };
 
-  const { periodStart, periodEnd } = boundsThisWeek();
+  const { periodStart, periodEnd } = boundsFreshGenerationWindow();
   const generateMutation = `mutation GenerateSummary($input: GenerateSummaryInput!) {
     generateSummary(input: $input) { id status generatedAt expiresAt clientId }
   }`;
@@ -264,11 +278,16 @@ function evaluateRoleResult(result) {
   });
 
   if (role === 'admin') {
+    const beforeSummaryId = result?.currentWeekBefore?.summary?.id || null;
     const latestStatus =
       result?.currentWeekAfter?.summary?.status ||
       result?.generate?.summary?.status ||
       result?.currentWeekBefore?.summary?.status ||
       null;
+    const generatedSummaryId = result?.generate?.summary?.id || null;
+    const reusedExistingSummary = Boolean(
+      generatedSummaryId && beforeSummaryId && generatedSummaryId === beforeSummaryId,
+    );
     const approveSucceeded =
       result?.approve?.status === 200 &&
       !hasGraphQLErrors(result?.approve) &&
@@ -278,7 +297,6 @@ function evaluateRoleResult(result) {
       (hasErrorCode(result?.approve, 'SUMMARY_ALREADY_PROCESSED') ||
         hasErrorMessage(result?.approve, 'already been processed'));
 
-    const generatedSummaryId = result?.generate?.summary?.id || null;
     checks.push({
       name: 'generateSummary',
       pass:
@@ -289,6 +307,8 @@ function evaluateRoleResult(result) {
       actual: {
         ...(result?.generate || {}),
         generatedSummaryId,
+        beforeSummaryId,
+        reusedExistingSummary,
         summaryIdSource: result?.summaryIdSource || null,
       },
     });

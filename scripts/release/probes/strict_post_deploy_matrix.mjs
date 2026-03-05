@@ -2,22 +2,28 @@ import fs from 'fs/promises';
 import path from 'path';
 import { chromium } from 'playwright';
 
-const BASE_URL = 'https://app.oasis-care.co';
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://app.oasis-care.co';
 const OUT_DIR = 'output/playwright/e2e-live';
 const TS = Date.now();
 const RESULT_PREFIX = 'PROBE_RESULT_JSON:';
 const REQUIRED_CHECKS = ['activity', 'adminCarers', 'adminMetrics', 'clientsNew', 'visitsNew', 'upsertCarer'];
 
 const ACCOUNTS = {
-  admin: { email: 'boss@yourdomain.com', password: 'SecurePassword123!1' },
-  carer: { email: 'carer-demo@yourdomain.com', password: 'SecurePassword123!2' },
+  admin: {
+    email: process.env.PLAYWRIGHT_ADMIN_EMAIL || 'boss@yourdomain.com',
+    password: process.env.PLAYWRIGHT_ADMIN_PASSWORD || 'SecurePassword123!1',
+  },
+  carer: {
+    email: process.env.PLAYWRIGHT_CARER_EMAIL || 'carer-demo@yourdomain.com',
+    password: process.env.PLAYWRIGHT_CARER_PASSWORD || 'SecurePassword123!2',
+  },
 };
 
 const FALLBACK_CARER = {
   id: '863252b4-b0d1-7084-2588-940b36d0faa2',
   firstName: 'Carer',
   lastName: 'Demo',
-  email: 'carer-demo@yourdomain.com',
+  email: process.env.PLAYWRIGHT_CARER_EMAIL || 'carer-demo@yourdomain.com',
   phone: '',
 };
 
