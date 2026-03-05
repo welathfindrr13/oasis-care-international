@@ -2,88 +2,242 @@ name: Deploy Docker Images to Staging
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_checklist:
+        description: 'I confirm docs/DEPLOY_CHECKLIST.md has been completed'
+        required: true
+        type: boolean
   push:
-    branches: [ feat/staging-live-setup ]
+    branches: [ main ]
+    paths:
+      - 'apps/**'
+      - 'libs/**'
+      - 'scripts/**'
+      - '.github/workflows/docker-ecr.yml'
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-staging-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   AWS_REGION: eu-west-2
   ACCOUNT_ID: 721689331449
   CLUSTER: oasis-care-staging-cluster
-  API_SVC: oasis-api-staging
-  WEB_SVC: oasis-web-staging
+  API_SVC: oasis-care-staging-api
+  WEB_SVC: oasis-care-staging-web
   API_REPO: oasis-api
   WEB_REPO: oasis-web
+  API_CONTAINER: api
+  WEB_CONTAINER: web
   TAG: staging
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    
+    timeout-minutes: 45
+
     steps:
-      - name: 📥 Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🔑 Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
+      - name: Validate deploy auth configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${{ secrets.AWS_DEPLOY_ROLE_ARN_STAGING }}" ]]; then
+            echo "Using OIDC role auth for staging deploy."
+            exit 0
+          fi
+          if [[ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" && -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]]; then
+            echo "Using static key fallback for staging deploy."
+            exit 0
+          fi
+          echo "Missing deploy auth configuration."
+          echo "Set AWS_DEPLOY_ROLE_ARN_STAGING (preferred) or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY."
+          exit 1
+
+      - name: Validate deployment checklist confirmation
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.confirm_checklist }}" != "true" ]]; then
+            echo "Deployment checklist confirmation is required."
+            exit 1
+          fi
+
+      - name: Configure AWS credentials (OIDC role)
+        if: ${{ secrets.AWS_DEPLOY_ROLE_ARN_STAGING != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN_STAGING }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure AWS credentials (access keys fallback)
+        if: ${{ secrets.AWS_DEPLOY_ROLE_ARN_STAGING == '' }}
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: 🔐 Login to Amazon ECR
+      - name: Verify AWS identity and account
+        shell: bash
+        run: |
+          set -euo pipefail
+          account="$(aws sts get-caller-identity --query Account --output text)"
+          arn="$(aws sts get-caller-identity --query Arn --output text)"
+          echo "Authenticated as: $arn"
+          if [[ "$account" != "${{ env.ACCOUNT_ID }}" ]]; then
+            echo "Unexpected AWS account: $account (expected ${{ env.ACCOUNT_ID }})"
+            exit 1
+          fi
+
+      - name: Verify clean tree before image build
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "Repository is dirty before image build."
+            git status --short
+            exit 1
+          fi
+
+      - name: Fail fast on missing staging secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          AWS_REGION=${{ env.AWS_REGION }} bash scripts/release/check-secrets-parity.sh
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: 🔨 Build & Push API Image
+      - name: Compute immutable tags
+        id: tags
+        shell: bash
         run: |
-          echo "Building API image..."
-          IMAGE="${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.API_REPO }}:${{ env.TAG }}"
-          docker build -t $IMAGE -f apps/api/Dockerfile .
-          docker push $IMAGE
-          echo "✅ API image pushed: $IMAGE"
+          set -euo pipefail
+          registry="${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          short_sha="${GITHUB_SHA::12}"
+          echo "api_staging_tag=${registry}/${{ env.API_REPO }}:${{ env.TAG }}" >> "$GITHUB_OUTPUT"
+          echo "web_staging_tag=${registry}/${{ env.WEB_REPO }}:${{ env.TAG }}" >> "$GITHUB_OUTPUT"
+          echo "api_sha_tag=${registry}/${{ env.API_REPO }}:sha-${short_sha}" >> "$GITHUB_OUTPUT"
+          echo "web_sha_tag=${registry}/${{ env.WEB_REPO }}:sha-${short_sha}" >> "$GITHUB_OUTPUT"
 
-      - name: 🔨 Build & Push Web Image
-        run: |
-          echo "Building Web image..."
-          IMAGE="${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.WEB_REPO }}:${{ env.TAG }}"
-          docker build -t $IMAGE -f apps/web/Dockerfile .
-          docker push $IMAGE
-          echo "✅ Web image pushed: $IMAGE"
+      - name: Build and push API image
+        id: api_build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./apps/api/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.api_staging_tag }}
+            ${{ steps.tags.outputs.api_sha_tag }}
 
-      - name: 🚀 Deploy to ECS
-        run: |
-          echo "Updating ECS services..."
-          aws ecs update-service \
-            --region ${{ env.AWS_REGION }} \
-            --cluster ${{ env.CLUSTER }} \
-            --service ${{ env.API_SVC }} \
-            --force-new-deployment
-          
-          aws ecs update-service \
-            --region ${{ env.AWS_REGION }} \
-            --cluster ${{ env.CLUSTER }} \
-            --service ${{ env.WEB_SVC }} \
-            --force-new-deployment
-          
-          echo "✅ ECS services triggered for redeployment"
+      - name: Build and push Web image
+        id: web_build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./apps/web/Dockerfile
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.oasis-care.co/graphql
+            NEXT_PUBLIC_SITE_URL=https://app.oasis-care.co
+          provenance: false
+          tags: |
+            ${{ steps.tags.outputs.web_staging_tag }}
+            ${{ steps.tags.outputs.web_sha_tag }}
 
-      - name: ⏳ Wait for Services to Stabilize
+      - name: Deploy ECS services with immutable digests
+        shell: bash
+        env:
+          API_DIGEST: ${{ steps.api_build.outputs.digest }}
+          WEB_DIGEST: ${{ steps.web_build.outputs.digest }}
         run: |
-          echo "Waiting for services to become stable..."
-          aws ecs wait services-stable \
-            --region ${{ env.AWS_REGION }} \
-            --cluster ${{ env.CLUSTER }} \
-            --services ${{ env.API_SVC }} ${{ env.WEB_SVC }}
-          echo "✅ Services are stable"
+          set -euo pipefail
 
-      - name: 🧪 Health Checks
+          registry="${{ env.ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          api_image="${registry}/${{ env.API_REPO }}@${API_DIGEST}"
+          web_image="${registry}/${{ env.WEB_REPO }}@${WEB_DIGEST}"
+
+          api_td_arn="$(aws ecs describe-services --cluster "${{ env.CLUSTER }}" --services "${{ env.API_SVC }}" --query 'services[0].taskDefinition' --output text)"
+          web_td_arn="$(aws ecs describe-services --cluster "${{ env.CLUSTER }}" --services "${{ env.WEB_SVC }}" --query 'services[0].taskDefinition' --output text)"
+
+          aws ecs describe-task-definition --task-definition "$api_td_arn" --output json > api-taskdef.json
+          aws ecs describe-task-definition --task-definition "$web_td_arn" --output json > web-taskdef.json
+
+          jq -e --arg NAME "${{ env.API_CONTAINER }}" '.taskDefinition.containerDefinitions[] | select(.name == $NAME)' api-taskdef.json >/dev/null
+          jq -e --arg NAME "${{ env.WEB_CONTAINER }}" '.taskDefinition.containerDefinitions[] | select(.name == $NAME)' web-taskdef.json >/dev/null
+
+          jq --arg IMAGE "$api_image" --arg NAME "${{ env.API_CONTAINER }}" '
+            .taskDefinition
+            | .containerDefinitions = (.containerDefinitions | map(if .name == $NAME then .image = $IMAGE else . end))
+            | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)
+          ' api-taskdef.json > api-taskdef-updated.json
+
+          jq --arg IMAGE "$web_image" --arg NAME "${{ env.WEB_CONTAINER }}" '
+            .taskDefinition
+            | .containerDefinitions = (.containerDefinitions | map(if .name == $NAME then .image = $IMAGE else . end))
+            | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)
+          ' web-taskdef.json > web-taskdef-updated.json
+
+          new_api_td_arn="$(aws ecs register-task-definition --cli-input-json file://api-taskdef-updated.json --query 'taskDefinition.taskDefinitionArn' --output text)"
+          new_web_td_arn="$(aws ecs register-task-definition --cli-input-json file://web-taskdef-updated.json --query 'taskDefinition.taskDefinitionArn' --output text)"
+
+          aws ecs update-service --cluster "${{ env.CLUSTER }}" --service "${{ env.API_SVC }}" --task-definition "$new_api_td_arn" >/dev/null
+          aws ecs update-service --cluster "${{ env.CLUSTER }}" --service "${{ env.WEB_SVC }}" --task-definition "$new_web_td_arn" >/dev/null
+
+          aws ecs wait services-stable --cluster "${{ env.CLUSTER }}" --services "${{ env.API_SVC }}" "${{ env.WEB_SVC }}"
+
+      - name: Verify running task digests
+        shell: bash
+        env:
+          EXPECTED_API_DIGEST: ${{ steps.api_build.outputs.digest }}
+          EXPECTED_WEB_DIGEST: ${{ steps.web_build.outputs.digest }}
         run: |
-          echo "Running endpoint health checks..."
-          
-          echo "Testing API..."
-          curl -skI --max-time 10 https://api.oasis-care.co/health | head -n1 || echo "⚠️ API check failed"
-          
-          echo "Testing Web..."
-          curl -skI --max-time 10 https://app.oasis-care.co | head -n1 || echo "⚠️ Web check failed"
-          
-          echo "✅ Deployment complete!"
+          set -euo pipefail
+
+          api_task_arn="$(aws ecs list-tasks --cluster "${{ env.CLUSTER }}" --service-name "${{ env.API_SVC }}" --desired-status RUNNING --query 'taskArns[0]' --output text)"
+          web_task_arn="$(aws ecs list-tasks --cluster "${{ env.CLUSTER }}" --service-name "${{ env.WEB_SVC }}" --desired-status RUNNING --query 'taskArns[0]' --output text)"
+
+          api_running_digest="$(aws ecs describe-tasks --cluster "${{ env.CLUSTER }}" --tasks "$api_task_arn" --query 'tasks[0].containers[0].imageDigest' --output text)"
+          web_running_digest="$(aws ecs describe-tasks --cluster "${{ env.CLUSTER }}" --tasks "$web_task_arn" --query 'tasks[0].containers[0].imageDigest' --output text)"
+
+          [[ "$api_running_digest" == "$EXPECTED_API_DIGEST" ]] || {
+            echo "API digest mismatch: expected $EXPECTED_API_DIGEST, got $api_running_digest"
+            exit 1
+          }
+          [[ "$web_running_digest" == "$EXPECTED_WEB_DIGEST" ]] || {
+            echo "Web digest mismatch: expected $EXPECTED_WEB_DIGEST, got $web_running_digest"
+            exit 1
+          }
+
+          echo "Digest verification passed."
+
+      - name: Health checks
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Testing API health endpoint..."
+          curl -fsS --max-time 15 https://api.oasis-care.co/health
+
+          echo "Testing web health endpoint..."
+          curl -fsS --max-time 15 https://app.oasis-care.co/api/health
+
+      - name: Deployment summary
+        shell: bash
+        run: |
+          echo "API digest: ${{ steps.api_build.outputs.digest }}"
+          echo "Web digest: ${{ steps.web_build.outputs.digest }}"
+          echo "Cluster: ${{ env.CLUSTER }}"
+          echo "Services: ${{ env.API_SVC }}, ${{ env.WEB_SVC }}"

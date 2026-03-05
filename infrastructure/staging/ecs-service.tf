@@ -66,6 +66,10 @@ resource "aws_ecs_task_definition" "api" {
           valueFrom = "arn:aws:secretsmanager:eu-west-2:721689331449:secret:oasis/staging/DATABASE_URL"
         },
         {
+          name      = "JWT_SECRET"
+          valueFrom = aws_secretsmanager_secret.jwt_secret.arn
+        },
+        {
           name      = "NEXTAUTH_SECRET"
           valueFrom = "arn:aws:secretsmanager:eu-west-2:721689331449:secret:oasis/staging/NEXTAUTH_SECRET"
         },
@@ -151,13 +155,17 @@ resource "aws_ecs_task_definition" "web" {
         {
           name      = "NEXTAUTH_SECRET"
           valueFrom = "arn:aws:secretsmanager:eu-west-2:721689331449:secret:oasis/staging/NEXTAUTH_SECRET"
+        },
+        {
+          name      = "COGNITO_CLIENT_SECRET"
+          valueFrom = "arn:aws:secretsmanager:eu-west-2:721689331449:secret:oasis/staging/COGNITO_CLIENT_SECRET"
         }
       ]
 
       healthCheck = {
         command = [
           "CMD-SHELL",
-          "curl -f http://localhost:3000/ || exit 1"
+          "curl -f http://localhost:3000/api/health || exit 1"
         ]
         interval    = 30
         timeout     = 5
@@ -207,7 +215,7 @@ resource "aws_ecs_service" "api" {
   enable_execute_command = true
 
   lifecycle {
-    ignore_changes = [desired_count]
+    ignore_changes = [task_definition, desired_count]
   }
 
   tags = var.default_tags
@@ -239,7 +247,7 @@ resource "aws_ecs_service" "web" {
   enable_execute_command = true
 
   lifecycle {
-    ignore_changes = [desired_count]
+    ignore_changes = [task_definition, desired_count]
   }
 
   tags = var.default_tags

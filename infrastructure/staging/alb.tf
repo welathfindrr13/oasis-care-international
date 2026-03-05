@@ -88,6 +88,7 @@ resource "aws_lb_listener" "http" {
 }
 
 # HTTPS Listener with host-based routing
+# Certificates are automatically validated via Route53 DNS records
 resource "aws_lb_listener" "https" {
   load_balancer_arn = aws_lb.main.arn
   port              = "443"
@@ -102,19 +103,12 @@ resource "aws_lb_listener" "https" {
   }
 
   tags = var.default_tags
-
-  depends_on = [
-    aws_acm_certificate_validation.api,
-    aws_acm_certificate_validation.web
-  ]
 }
 
 # Additional certificate for web domain
 resource "aws_lb_listener_certificate" "web" {
   listener_arn    = aws_lb_listener.https.arn
   certificate_arn = aws_acm_certificate_validation.web.certificate_arn
-
-  depends_on = [aws_acm_certificate_validation.web]
 }
 
 # Listener rules for host-based routing

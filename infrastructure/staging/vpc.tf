@@ -1,41 +1,66 @@
-# Use existing staging VPC (VPC quota exceeded - cannot create new VPC)
+# Use existing staging VPC - CORRECT VPC discovered from AWS
 data "aws_vpc" "main" {
-  id = "vpc-0fa202628a9b74522"
+  id = "vpc-07be371ad8c521d90"
 }
 
-# Use existing subnets
+# Public subnets for ALB (MapPublicIpOnLaunch = True)
 data "aws_subnet" "public_a" {
-  id = "subnet-08853b0f79dc7eb8a"
+  id = "subnet-0113c93c99042f149"  # eu-west-2a, 10.1.1.0/24
 }
 
 data "aws_subnet" "public_b" {
-  id = "subnet-0edae41ff907ad302"
+  id = "subnet-02b20638f091d726b"  # eu-west-2b, 10.1.2.0/24
 }
 
-data "aws_subnet" "public_c" {
-  id = "subnet-03d629a38764b4395"
-}
-
-# Note: Assuming these are your private subnets - verify IDs if different
-# If you need to discover them, use: aws ec2 describe-subnets --filters "Name=vpc-id,Values=vpc-0fa202628a9b74522"
+# Private subnets for RDS and ECS (MapPublicIpOnLaunch = False)
 data "aws_subnet" "private_a" {
-  id = "subnet-08853b0f79dc7eb8a" # Replace with actual private subnet ID if different
+  id = "subnet-04c14709aa341adfa"  # eu-west-2a, 10.1.10.0/24
 }
 
 data "aws_subnet" "private_b" {
-  id = "subnet-0edae41ff907ad302" # Replace with actual private subnet ID if different
-}
-
-data "aws_subnet" "private_c" {
-  id = "subnet-03d629a38764b4395" # Replace with actual private subnet ID if different
+  id = "subnet-01674a29fc40e5a61"  # eu-west-2b, 10.1.11.0/24
 }
 
 data "aws_availability_zones" "available" {}
 
 # Local values for backward compatibility with other modules
 locals {
-  public_subnet_ids  = [data.aws_subnet.public_a.id, data.aws_subnet.public_b.id, data.aws_subnet.public_c.id]
-  private_subnet_ids = [data.aws_subnet.private_a.id, data.aws_subnet.private_b.id, data.aws_subnet.private_c.id]
+  public_subnet_ids  = [data.aws_subnet.public_a.id, data.aws_subnet.public_b.id]
+  private_subnet_ids = [data.aws_subnet.private_a.id, data.aws_subnet.private_b.id]
+}
+
+# NAT Gateway for private subnet internet access (required for Cognito OAuth)
+resource "aws_eip" "nat" {
+  domain = "vpc"
+  tags   = merge(var.default_tags, { Name = "${local.name_prefix}-nat-eip" })
+}
+
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = data.aws_subnet.public_a.id  # NAT goes in public subnet
+  tags          = merge(var.default_tags, { Name = "${local.name_prefix}-nat" })
+}
+
+# Route table for private subnets to use NAT gateway
+resource "aws_route_table" "private" {
+  vpc_id = data.aws_vpc.main.id
+  
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.main.id
+  }
+  
+  tags = merge(var.default_tags, { Name = "${local.name_prefix}-private-rt" })
+}
+
+resource "aws_route_table_association" "private_a" {
+  subnet_id      = data.aws_subnet.private_a.id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_route_table_association" "private_b" {
+  subnet_id      = data.aws_subnet.private_b.id
+  route_table_id = aws_route_table.private.id
 }
 
 # COMMENTED OUT - VPC resources no longer created, using existing infrastructure

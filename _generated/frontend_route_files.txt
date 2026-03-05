@@ -1,0 +1,15 @@
+apps/web/app/activity/page.tsx
+apps/web/app/admin/metrics/page.tsx
+apps/web/app/api/auth/[...nextauth]/route.ts
+apps/web/app/api/graphql/route.ts
+apps/web/app/api/stats/today/route.ts
+apps/web/app/clients/[id]/summary/page.tsx
+apps/web/app/clients/page.tsx
+apps/web/app/dashboard/error.tsx
+apps/web/app/dashboard/loading.tsx
+apps/web/app/dashboard/page.tsx
+apps/web/app/emar/page.tsx
+apps/web/app/layout.tsx
+apps/web/app/page.tsx
+apps/web/app/visits/new/page.tsx
+apps/web/app/visits/page.tsx

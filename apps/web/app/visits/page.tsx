@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
-import { Nav } from '../../components/oasis/Nav'
+import Link from 'next/link'
+import { Header } from '../../components/oasis/Header'
 import { FilterBar } from '../../components/oasis/FilterBar'
 import { StatusChip } from '../../components/oasis/StatusChip'
 import { Card, CardContent, CardHeader } from '../../components/ui/Card'
@@ -8,7 +9,7 @@ import { query } from '../../lib/graphql/client'
 import { 
   VISITS_QUERY, 
   DEFAULT_PAGE_SIZE, 
-  getOffsetFromPage,
+  getSkipFromPage,
   type VisitsQueryResponse,
   type Visit 
 } from '../../lib/graphql/queries'
@@ -31,14 +32,24 @@ interface VisitsPageProps {
 async function getVisits(searchParams: VisitsPageProps['searchParams']): Promise<{ visits: Visit[]; total: number }> {
   try {
     const page = parseInt(searchParams.page || '1', 10);
-    const offset = getOffsetFromPage(page);
+    const skip = getSkipFromPage(page);
+
+    // Convert date to date range (start of day to end of day)
+    let scheduledStartFrom: string | undefined;
+    let scheduledStartTo: string | undefined;
+    if (searchParams.date) {
+      const dateObj = new Date(searchParams.date);
+      scheduledStartFrom = new Date(dateObj.setHours(0, 0, 0, 0)).toISOString();
+      scheduledStartTo = new Date(dateObj.setHours(23, 59, 59, 999)).toISOString();
+    }
 
     const variables = {
-      date: searchParams.date || undefined,
+      scheduledStartFrom,
+      scheduledStartTo,
       carerId: searchParams.carerId || undefined,
       status: searchParams.status || undefined,
-      limit: DEFAULT_PAGE_SIZE,
-      offset,
+      take: DEFAULT_PAGE_SIZE,
+      skip,
     };
 
     const response = await query<VisitsQueryResponse>(VISITS_QUERY, variables);
@@ -92,15 +103,14 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
   const hasVisits = visits.length > 0;
 
   return (
-    <div className="min-h-screen bg-background-secondary">
-      <div className="max-w-7xl mx-auto p-6">
-        <Nav />
-        
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-text-primary font-heading mb-2">
+    <div className="min-h-screen bg-slate-50">
+      <Header />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <div className="mb-8">
+          <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">
             Visits
           </h1>
-          <p className="text-text-secondary">
+          <p className="text-slate-500 mt-1">
             Manage and track care visits for all clients
           </p>
         </div>
@@ -118,9 +128,11 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                   {hasVisits ? `${visits.length} of ${total} visits` : 'No visits found'}
                 </p>
               </div>
-              <Button variant="primary" size="sm">
-                Add Visit
-              </Button>
+              <Link href="/visits/new">
+                <Button variant="primary" size="sm">
+                  Add Visit
+                </Button>
+              </Link>
             </div>
           </CardHeader>
           <CardContent>
@@ -219,7 +231,7 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
             )}
           </CardContent>
         </Card>
-      </div>
+      </main>
     </div>
   )
 }

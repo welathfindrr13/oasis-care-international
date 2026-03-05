@@ -14,16 +14,16 @@ import { MetricsDynamicModule } from './metrics/metrics.dynamic.module';
 import { VisitModule } from './visit/visit.module';
 import { StatsModule } from './stats/stats.module';
 import { MedicationModule } from './medication/medication.module';
+import { ClientModule } from './client/client.module';
 import { formatGraphQLError } from './common/filters/graphql-error.filter';
 import { GdprModule } from './gdpr/gdpr.module';
 import { DemoModule } from './demo/demo.module';
+import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 
+// FIX: ClsModule must come before LoggerModule (RequestIdMiddleware depends on ClsService)
 @Module({
   imports: [
     MetricsDynamicModule.register(process.env.METRICS_ENABLED === 'true'),
-    LoggerModule,
-    HealthModule,
-    ConfigModule,
     ClsModule.forRoot({
       global: true,
       middleware: {
@@ -33,6 +33,9 @@ import { DemoModule } from './demo/demo.module';
         },
       },
     }),
+    LoggerModule,
+    HealthModule,
+    ConfigModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: true,
@@ -51,14 +54,15 @@ import { DemoModule } from './demo/demo.module';
     VisitModule,
     StatsModule,
     MedicationModule,
+    ClientModule,
     DemoModule,
     // GDPR module (feature-flagged)
     ...(process.env.GDPR_ENABLED === 'true' ? [GdprModule] : []),
-    // Add other feature modules here
   ],
   providers: [
     JwtStrategy,
     PrismaService,
+    AuditLogInterceptor,
   ],
 })
 export class AppModule {}

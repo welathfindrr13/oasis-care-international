@@ -26,31 +26,61 @@ resource "aws_acm_certificate" "web" {
   })
 }
 
-# Certificate validation - uses email validation instead of DNS
-# This avoids the for_each timing issue with domain_validation_options
-resource "aws_acm_certificate_validation" "api" {
-  certificate_arn = aws_acm_certificate.api.arn
-
-  timeouts {
-    create = "30m"
+# DNS validation records for API certificate
+resource "aws_route53_record" "api_cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.api.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
   }
+
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = data.aws_route53_zone.main.zone_id
 }
 
-resource "aws_acm_certificate_validation" "web" {
-  certificate_arn = aws_acm_certificate.web.arn
-
-  timeouts {
-    create = "30m"
+# DNS validation records for Web certificate
+resource "aws_route53_record" "web_cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.web.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
   }
+
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = data.aws_route53_zone.main.zone_id
+}
+
+# Wait for API certificate validation
+resource "aws_acm_certificate_validation" "api" {
+  certificate_arn         = aws_acm_certificate.api.arn
+  validation_record_fqdns = [for record in aws_route53_record.api_cert_validation : record.fqdn]
+}
+
+# Wait for Web certificate validation
+resource "aws_acm_certificate_validation" "web" {
+  certificate_arn         = aws_acm_certificate.web.arn
+  validation_record_fqdns = [for record in aws_route53_record.web_cert_validation : record.fqdn]
 }
 
 # Output certificate ARNs for reference
 output "api_certificate_arn" {
-  description = "ARN of the validated API certificate"
-  value       = aws_acm_certificate_validation.api.certificate_arn
+  description = "ARN of the API certificate (may be pending validation)"
+  value       = aws_acm_certificate.api.arn
 }
 
 output "web_certificate_arn" {
-  description = "ARN of the validated Web certificate"
-  value       = aws_acm_certificate_validation.web.certificate_arn
+  description = "ARN of the Web certificate (may be pending validation)"
+  value       = aws_acm_certificate.web.arn
 }

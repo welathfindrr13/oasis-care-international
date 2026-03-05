@@ -1,0 +1,283 @@
+{
+  "entries": [
+    {
+      "path": "/activity",
+      "file": "apps/web/app/activity/page.tsx",
+      "fileType": "page",
+      "dynamic": false
+    },
+    {
+      "path": "/admin/metrics",
+      "file": "apps/web/app/admin/metrics/page.tsx",
+      "fileType": "page",
+      "dynamic": false
+    },
+    {
+      "path": "/api/auth/[...nextauth]",
+      "file": "apps/web/app/api/auth/[...nextauth]/route.ts",
+      "fileType": "route",
+      "dynamic": true
+    },
+    {
+      "path": "/api/graphql",
+      "file": "apps/web/app/api/graphql/route.ts",
+      "fileType": "route",
+      "dynamic": false
+    },
+    {
+      "path": "/api/stats/today",
+      "file": "apps/web/app/api/stats/today/route.ts",
+      "fileType": "route",
+      "dynamic": false
+    },
+    {
+      "path": "/clients/[id]/summary",
+      "file": "apps/web/app/clients/[id]/summary/page.tsx",
+      "fileType": "page",
+      "dynamic": true
+    },
+    {
+      "path": "/clients",
+      "file": "apps/web/app/clients/page.tsx",
+      "fileType": "page",
+      "dynamic": false
+    },
+    {
+      "path": "/dashboard",
+      "file": "apps/web/app/dashboard/error.tsx",
+      "fileType": "error",
+      "dynamic": false
+    },
+    {
+      "path": "/dashboard",
+      "file": "apps/web/app/dashboard/loading.tsx",
+      "fileType": "loading",
+      "dynamic": false
+    },
+    {
+      "path": "/dashboard",
+      "file": "apps/web/app/dashboard/page.tsx",
+      "fileType": "page",
+      "dynamic": false
+    },
+    {
+      "path": "/emar",
+      "file": "apps/web/app/emar/page.tsx",
+      "fileType": "page",
+      "dynamic": false
+    },
+    {
+      "path": "/",
+      "file": "apps/web/app/layout.tsx",
+      "fileType": "layout",
+      "dynamic": false
+    },
+    {
+      "path": "/",
+      "file": "apps/web/app/page.tsx",
+      "fileType": "page",
+      "dynamic": false
+    },
+    {
+      "path": "/visits/new",
+      "file": "apps/web/app/visits/new/page.tsx",
+      "fileType": "page",
+      "dynamic": false
+    },
+    {
+      "path": "/visits",
+      "file": "apps/web/app/visits/page.tsx",
+      "fileType": "page",
+      "dynamic": false
+    }
+  ],
+  "summary": [
+    {
+      "path": "/",
+      "hasPage": true,
+      "hasLayout": true,
+      "hasLoading": false,
+      "hasError": false,
+      "hasRouteHandlers": false,
+      "hasNotFound": false,
+      "hasHead": false,
+      "hasSitemap": false,
+      "segments": [],
+      "dynamic": false
+    },
+    {
+      "path": "/activity",
+      "hasPage": true,
+      "hasLayout": false,
+      "hasLoading": false,
+      "hasError": false,
+      "hasRouteHandlers": false,
+      "hasNotFound": false,
+      "hasHead": false,
+      "hasSitemap": false,
+      "segments": [
+        "activity"
+      ],
+      "dynamic": false
+    },
+    {
+      "path": "/admin/metrics",
+      "hasPage": true,
+      "hasLayout": false,
+      "hasLoading": false,
+      "hasError": false,
+      "hasRouteHandlers": false,
+      "hasNotFound": false,
+      "hasHead": false,
+      "hasSitemap": false,
+      "segments": [
+        "admin",
+        "metrics"
+      ],
+      "dynamic": false
+    },
+    {
+      "path": "/api/auth/[...nextauth]",
+      "hasPage": false,
+      "hasLayout": false,
+      "hasLoading": false,
+      "hasError": false,
+      "hasRouteHandlers": true,
+      "hasNotFound": false,
+      "hasHead": false,
+      "hasSitemap": false,
+      "segments": [
+        "api",
+        "auth",
+        "[...nextauth]"
+      ],
+      "dynamic": true
+    },
+    {
+      "path": "/api/graphql",
+      "hasPage": false,
+      "hasLayout": false,
+      "hasLoading": false,
+      "hasError": false,
+      "hasRouteHandlers": true,
+      "hasNotFound": false,
+      "hasHead": false,
+      "hasSitemap": false,
+      "segments": [
+        "api",
+        "graphql"
+      ],
+      "dynamic": false
+    },
+    {
+      "path": "/api/stats/today",
+      "hasPage": false,
+      "hasLayout": false,
+      "hasLoading": false,
+      "hasError": false,
+      "hasRouteHandlers": true,
+      "hasNotFound": false,
+      "hasHead": false,
+      "hasSitemap": false,
+      "segments": [
+        "api",
+        "stats",
+        "today"
+      ],
+      "dynamic": false
+    },
+    {
+      "path": "/clients",
+      "hasPage": true,
+      "hasLayout": false,
+      "hasLoading": false,
+      "hasError": false,
+      "hasRouteHandlers": false,
+      "hasNotFound": false,
+      "hasHead": false,
+      "hasSitemap": false,
+      "segments": [
+        "clients"
+      ],
+      "dynamic": false
+    },
+    {
+      "path": "/clients/[id]/summary",
+      "hasPage": true,
+      "hasLayout": false,
+      "hasLoading": false,
+      "hasError": false,
+      "hasRouteHandlers": false,
+      "hasNotFound": false,
+      "hasHead": false,
+      "hasSitemap": false,
+      "segments": [
+        "clients",
+        "[id]",
+        "summary"
+      ],
+      "dynamic": true
+    },
+    {
+      "path": "/dashboard",
+      "hasPage": true,
+      "hasLayout": false,
+      "hasLoading": true,
+      "hasError": true,
+      "hasRouteHandlers": false,
+      "hasNotFound": false,
+      "hasHead": false,
+      "hasSitemap": false,
+      "segments": [
+        "dashboard"
+      ],
+      "dynamic": false
+    },
+    {
+      "path": "/emar",
+      "hasPage": true,
+      "hasLayout": false,
+      "hasLoading": false,
+      "hasError": false,
+      "hasRouteHandlers": false,
+      "hasNotFound": false,
+      "hasHead": false,
+      "hasSitemap": false,
+      "segments": [
+        "emar"
+      ],
+      "dynamic": false
+    },
+    {
+      "path": "/visits",
+      "hasPage": true,
+      "hasLayout": false,
+      "hasLoading": false,
+      "hasError": false,
+      "hasRouteHandlers": false,
+      "hasNotFound": false,
+      "hasHead": false,
+      "hasSitemap": false,
+      "segments": [
+        "visits"
+      ],
+      "dynamic": false
+    },
+    {
+      "path": "/visits/new",
+      "hasPage": true,
+      "hasLayout": false,
+      "hasLoading": false,
+      "hasError": false,
+      "hasRouteHandlers": false,
+      "hasNotFound": false,
+      "hasHead": false,
+      "hasSitemap": false,
+      "segments": [
+        "visits",
+        "new"
+      ],
+      "dynamic": false
+    }
+  ]
+}

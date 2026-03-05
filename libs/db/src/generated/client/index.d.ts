@@ -68,6 +68,26 @@ export type LogEmbedding = $Result.DefaultSelection<Prisma.$LogEmbeddingPayload>
  * 
  */
 export type HealthSummary = $Result.DefaultSelection<Prisma.$HealthSummaryPayload>
+/**
+ * Model ConsentRecord
+ * 
+ */
+export type ConsentRecord = $Result.DefaultSelection<Prisma.$ConsentRecordPayload>
+/**
+ * Model AuditLog
+ * 
+ */
+export type AuditLog = $Result.DefaultSelection<Prisma.$AuditLogPayload>
+/**
+ * Model RetentionPolicy
+ * 
+ */
+export type RetentionPolicy = $Result.DefaultSelection<Prisma.$RetentionPolicyPayload>
+/**
+ * Model ErasureQueue
+ * 
+ */
+export type ErasureQueue = $Result.DefaultSelection<Prisma.$ErasureQueuePayload>
 
 /**
  * Enums
@@ -355,6 +375,46 @@ export class PrismaClient<
     * ```
     */
   get healthSummary(): Prisma.HealthSummaryDelegate<ExtArgs>;
+
+  /**
+   * `prisma.consentRecord`: Exposes CRUD operations for the **ConsentRecord** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ConsentRecords
+    * const consentRecords = await prisma.consentRecord.findMany()
+    * ```
+    */
+  get consentRecord(): Prisma.ConsentRecordDelegate<ExtArgs>;
+
+  /**
+   * `prisma.auditLog`: Exposes CRUD operations for the **AuditLog** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more AuditLogs
+    * const auditLogs = await prisma.auditLog.findMany()
+    * ```
+    */
+  get auditLog(): Prisma.AuditLogDelegate<ExtArgs>;
+
+  /**
+   * `prisma.retentionPolicy`: Exposes CRUD operations for the **RetentionPolicy** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more RetentionPolicies
+    * const retentionPolicies = await prisma.retentionPolicy.findMany()
+    * ```
+    */
+  get retentionPolicy(): Prisma.RetentionPolicyDelegate<ExtArgs>;
+
+  /**
+   * `prisma.erasureQueue`: Exposes CRUD operations for the **ErasureQueue** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ErasureQueues
+    * const erasureQueues = await prisma.erasureQueue.findMany()
+    * ```
+    */
+  get erasureQueue(): Prisma.ErasureQueueDelegate<ExtArgs>;
 }
 
 export namespace Prisma {
@@ -835,7 +895,11 @@ export namespace Prisma {
     MedicationAudit: 'MedicationAudit',
     Organization: 'Organization',
     LogEmbedding: 'LogEmbedding',
-    HealthSummary: 'HealthSummary'
+    HealthSummary: 'HealthSummary',
+    ConsentRecord: 'ConsentRecord',
+    AuditLog: 'AuditLog',
+    RetentionPolicy: 'RetentionPolicy',
+    ErasureQueue: 'ErasureQueue'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -852,7 +916,7 @@ export namespace Prisma {
 
   export type TypeMap<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     meta: {
-      modelProps: 'carer' | 'client' | 'visit' | 'visitTask' | 'medication' | 'prescription' | 'medicationAdministration' | 'medicationAudit' | 'organization' | 'logEmbedding' | 'healthSummary'
+      modelProps: 'carer' | 'client' | 'visit' | 'visitTask' | 'medication' | 'prescription' | 'medicationAdministration' | 'medicationAudit' | 'organization' | 'logEmbedding' | 'healthSummary' | 'consentRecord' | 'auditLog' | 'retentionPolicy' | 'erasureQueue'
       txIsolationLevel: Prisma.TransactionIsolationLevel
     },
     model: {
@@ -1579,6 +1643,270 @@ export namespace Prisma {
           count: {
             args: Prisma.HealthSummaryCountArgs<ExtArgs>,
             result: $Utils.Optional<HealthSummaryCountAggregateOutputType> | number
+          }
+        }
+      }
+      ConsentRecord: {
+        payload: Prisma.$ConsentRecordPayload<ExtArgs>
+        fields: Prisma.ConsentRecordFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ConsentRecordFindUniqueArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ConsentRecordPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ConsentRecordFindUniqueOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ConsentRecordPayload>
+          }
+          findFirst: {
+            args: Prisma.ConsentRecordFindFirstArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ConsentRecordPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ConsentRecordFindFirstOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ConsentRecordPayload>
+          }
+          findMany: {
+            args: Prisma.ConsentRecordFindManyArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ConsentRecordPayload>[]
+          }
+          create: {
+            args: Prisma.ConsentRecordCreateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ConsentRecordPayload>
+          }
+          createMany: {
+            args: Prisma.ConsentRecordCreateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          delete: {
+            args: Prisma.ConsentRecordDeleteArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ConsentRecordPayload>
+          }
+          update: {
+            args: Prisma.ConsentRecordUpdateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ConsentRecordPayload>
+          }
+          deleteMany: {
+            args: Prisma.ConsentRecordDeleteManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ConsentRecordUpdateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          upsert: {
+            args: Prisma.ConsentRecordUpsertArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ConsentRecordPayload>
+          }
+          aggregate: {
+            args: Prisma.ConsentRecordAggregateArgs<ExtArgs>,
+            result: $Utils.Optional<AggregateConsentRecord>
+          }
+          groupBy: {
+            args: Prisma.ConsentRecordGroupByArgs<ExtArgs>,
+            result: $Utils.Optional<ConsentRecordGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ConsentRecordCountArgs<ExtArgs>,
+            result: $Utils.Optional<ConsentRecordCountAggregateOutputType> | number
+          }
+        }
+      }
+      AuditLog: {
+        payload: Prisma.$AuditLogPayload<ExtArgs>
+        fields: Prisma.AuditLogFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.AuditLogFindUniqueArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$AuditLogPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.AuditLogFindUniqueOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$AuditLogPayload>
+          }
+          findFirst: {
+            args: Prisma.AuditLogFindFirstArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$AuditLogPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.AuditLogFindFirstOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$AuditLogPayload>
+          }
+          findMany: {
+            args: Prisma.AuditLogFindManyArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$AuditLogPayload>[]
+          }
+          create: {
+            args: Prisma.AuditLogCreateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$AuditLogPayload>
+          }
+          createMany: {
+            args: Prisma.AuditLogCreateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          delete: {
+            args: Prisma.AuditLogDeleteArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$AuditLogPayload>
+          }
+          update: {
+            args: Prisma.AuditLogUpdateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$AuditLogPayload>
+          }
+          deleteMany: {
+            args: Prisma.AuditLogDeleteManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          updateMany: {
+            args: Prisma.AuditLogUpdateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          upsert: {
+            args: Prisma.AuditLogUpsertArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$AuditLogPayload>
+          }
+          aggregate: {
+            args: Prisma.AuditLogAggregateArgs<ExtArgs>,
+            result: $Utils.Optional<AggregateAuditLog>
+          }
+          groupBy: {
+            args: Prisma.AuditLogGroupByArgs<ExtArgs>,
+            result: $Utils.Optional<AuditLogGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.AuditLogCountArgs<ExtArgs>,
+            result: $Utils.Optional<AuditLogCountAggregateOutputType> | number
+          }
+        }
+      }
+      RetentionPolicy: {
+        payload: Prisma.$RetentionPolicyPayload<ExtArgs>
+        fields: Prisma.RetentionPolicyFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.RetentionPolicyFindUniqueArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$RetentionPolicyPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.RetentionPolicyFindUniqueOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$RetentionPolicyPayload>
+          }
+          findFirst: {
+            args: Prisma.RetentionPolicyFindFirstArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$RetentionPolicyPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.RetentionPolicyFindFirstOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$RetentionPolicyPayload>
+          }
+          findMany: {
+            args: Prisma.RetentionPolicyFindManyArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$RetentionPolicyPayload>[]
+          }
+          create: {
+            args: Prisma.RetentionPolicyCreateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$RetentionPolicyPayload>
+          }
+          createMany: {
+            args: Prisma.RetentionPolicyCreateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          delete: {
+            args: Prisma.RetentionPolicyDeleteArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$RetentionPolicyPayload>
+          }
+          update: {
+            args: Prisma.RetentionPolicyUpdateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$RetentionPolicyPayload>
+          }
+          deleteMany: {
+            args: Prisma.RetentionPolicyDeleteManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          updateMany: {
+            args: Prisma.RetentionPolicyUpdateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          upsert: {
+            args: Prisma.RetentionPolicyUpsertArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$RetentionPolicyPayload>
+          }
+          aggregate: {
+            args: Prisma.RetentionPolicyAggregateArgs<ExtArgs>,
+            result: $Utils.Optional<AggregateRetentionPolicy>
+          }
+          groupBy: {
+            args: Prisma.RetentionPolicyGroupByArgs<ExtArgs>,
+            result: $Utils.Optional<RetentionPolicyGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.RetentionPolicyCountArgs<ExtArgs>,
+            result: $Utils.Optional<RetentionPolicyCountAggregateOutputType> | number
+          }
+        }
+      }
+      ErasureQueue: {
+        payload: Prisma.$ErasureQueuePayload<ExtArgs>
+        fields: Prisma.ErasureQueueFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ErasureQueueFindUniqueArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ErasureQueuePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ErasureQueueFindUniqueOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ErasureQueuePayload>
+          }
+          findFirst: {
+            args: Prisma.ErasureQueueFindFirstArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ErasureQueuePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ErasureQueueFindFirstOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ErasureQueuePayload>
+          }
+          findMany: {
+            args: Prisma.ErasureQueueFindManyArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ErasureQueuePayload>[]
+          }
+          create: {
+            args: Prisma.ErasureQueueCreateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ErasureQueuePayload>
+          }
+          createMany: {
+            args: Prisma.ErasureQueueCreateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          delete: {
+            args: Prisma.ErasureQueueDeleteArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ErasureQueuePayload>
+          }
+          update: {
+            args: Prisma.ErasureQueueUpdateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ErasureQueuePayload>
+          }
+          deleteMany: {
+            args: Prisma.ErasureQueueDeleteManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ErasureQueueUpdateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          upsert: {
+            args: Prisma.ErasureQueueUpsertArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$ErasureQueuePayload>
+          }
+          aggregate: {
+            args: Prisma.ErasureQueueAggregateArgs<ExtArgs>,
+            result: $Utils.Optional<AggregateErasureQueue>
+          }
+          groupBy: {
+            args: Prisma.ErasureQueueGroupByArgs<ExtArgs>,
+            result: $Utils.Optional<ErasureQueueGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ErasureQueueCountArgs<ExtArgs>,
+            result: $Utils.Optional<ErasureQueueCountAggregateOutputType> | number
           }
         }
       }
@@ -13185,6 +13513,3713 @@ export namespace Prisma {
 
 
   /**
+   * Model ConsentRecord
+   */
+
+  export type AggregateConsentRecord = {
+    _count: ConsentRecordCountAggregateOutputType | null
+    _min: ConsentRecordMinAggregateOutputType | null
+    _max: ConsentRecordMaxAggregateOutputType | null
+  }
+
+  export type ConsentRecordMinAggregateOutputType = {
+    id: string | null
+    user_id: string | null
+    consent_type: string | null
+    purpose: string | null
+    granted: boolean | null
+    granted_at: Date | null
+    withdrawn_at: Date | null
+    legal_basis: string | null
+    created_at: Date | null
+    updated_at: Date | null
+  }
+
+  export type ConsentRecordMaxAggregateOutputType = {
+    id: string | null
+    user_id: string | null
+    consent_type: string | null
+    purpose: string | null
+    granted: boolean | null
+    granted_at: Date | null
+    withdrawn_at: Date | null
+    legal_basis: string | null
+    created_at: Date | null
+    updated_at: Date | null
+  }
+
+  export type ConsentRecordCountAggregateOutputType = {
+    id: number
+    user_id: number
+    consent_type: number
+    purpose: number
+    granted: number
+    granted_at: number
+    withdrawn_at: number
+    legal_basis: number
+    metadata: number
+    created_at: number
+    updated_at: number
+    _all: number
+  }
+
+
+  export type ConsentRecordMinAggregateInputType = {
+    id?: true
+    user_id?: true
+    consent_type?: true
+    purpose?: true
+    granted?: true
+    granted_at?: true
+    withdrawn_at?: true
+    legal_basis?: true
+    created_at?: true
+    updated_at?: true
+  }
+
+  export type ConsentRecordMaxAggregateInputType = {
+    id?: true
+    user_id?: true
+    consent_type?: true
+    purpose?: true
+    granted?: true
+    granted_at?: true
+    withdrawn_at?: true
+    legal_basis?: true
+    created_at?: true
+    updated_at?: true
+  }
+
+  export type ConsentRecordCountAggregateInputType = {
+    id?: true
+    user_id?: true
+    consent_type?: true
+    purpose?: true
+    granted?: true
+    granted_at?: true
+    withdrawn_at?: true
+    legal_basis?: true
+    metadata?: true
+    created_at?: true
+    updated_at?: true
+    _all?: true
+  }
+
+  export type ConsentRecordAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ConsentRecord to aggregate.
+     */
+    where?: ConsentRecordWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ConsentRecords to fetch.
+     */
+    orderBy?: ConsentRecordOrderByWithRelationInput | ConsentRecordOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ConsentRecordWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ConsentRecords from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ConsentRecords.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ConsentRecords
+    **/
+    _count?: true | ConsentRecordCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ConsentRecordMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ConsentRecordMaxAggregateInputType
+  }
+
+  export type GetConsentRecordAggregateType<T extends ConsentRecordAggregateArgs> = {
+        [P in keyof T & keyof AggregateConsentRecord]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateConsentRecord[P]>
+      : GetScalarType<T[P], AggregateConsentRecord[P]>
+  }
+
+
+
+
+  export type ConsentRecordGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ConsentRecordWhereInput
+    orderBy?: ConsentRecordOrderByWithAggregationInput | ConsentRecordOrderByWithAggregationInput[]
+    by: ConsentRecordScalarFieldEnum[] | ConsentRecordScalarFieldEnum
+    having?: ConsentRecordScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ConsentRecordCountAggregateInputType | true
+    _min?: ConsentRecordMinAggregateInputType
+    _max?: ConsentRecordMaxAggregateInputType
+  }
+
+  export type ConsentRecordGroupByOutputType = {
+    id: string
+    user_id: string
+    consent_type: string
+    purpose: string
+    granted: boolean
+    granted_at: Date
+    withdrawn_at: Date | null
+    legal_basis: string
+    metadata: JsonValue | null
+    created_at: Date
+    updated_at: Date
+    _count: ConsentRecordCountAggregateOutputType | null
+    _min: ConsentRecordMinAggregateOutputType | null
+    _max: ConsentRecordMaxAggregateOutputType | null
+  }
+
+  type GetConsentRecordGroupByPayload<T extends ConsentRecordGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ConsentRecordGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ConsentRecordGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ConsentRecordGroupByOutputType[P]>
+            : GetScalarType<T[P], ConsentRecordGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ConsentRecordSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    user_id?: boolean
+    consent_type?: boolean
+    purpose?: boolean
+    granted?: boolean
+    granted_at?: boolean
+    withdrawn_at?: boolean
+    legal_basis?: boolean
+    metadata?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+  }, ExtArgs["result"]["consentRecord"]>
+
+  export type ConsentRecordSelectScalar = {
+    id?: boolean
+    user_id?: boolean
+    consent_type?: boolean
+    purpose?: boolean
+    granted?: boolean
+    granted_at?: boolean
+    withdrawn_at?: boolean
+    legal_basis?: boolean
+    metadata?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+  }
+
+
+  export type $ConsentRecordPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ConsentRecord"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      user_id: string
+      consent_type: string
+      purpose: string
+      granted: boolean
+      granted_at: Date
+      withdrawn_at: Date | null
+      legal_basis: string
+      metadata: Prisma.JsonValue | null
+      created_at: Date
+      updated_at: Date
+    }, ExtArgs["result"]["consentRecord"]>
+    composites: {}
+  }
+
+
+  type ConsentRecordGetPayload<S extends boolean | null | undefined | ConsentRecordDefaultArgs> = $Result.GetResult<Prisma.$ConsentRecordPayload, S>
+
+  type ConsentRecordCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<ConsentRecordFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: ConsentRecordCountAggregateInputType | true
+    }
+
+  export interface ConsentRecordDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ConsentRecord'], meta: { name: 'ConsentRecord' } }
+    /**
+     * Find zero or one ConsentRecord that matches the filter.
+     * @param {ConsentRecordFindUniqueArgs} args - Arguments to find a ConsentRecord
+     * @example
+     * // Get one ConsentRecord
+     * const consentRecord = await prisma.consentRecord.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUnique<T extends ConsentRecordFindUniqueArgs<ExtArgs>>(
+      args: SelectSubset<T, ConsentRecordFindUniqueArgs<ExtArgs>>
+    ): Prisma__ConsentRecordClient<$Result.GetResult<Prisma.$ConsentRecordPayload<ExtArgs>, T, 'findUnique'> | null, null, ExtArgs>
+
+    /**
+     * Find one ConsentRecord that matches the filter or throw an error  with `error.code='P2025'` 
+     *     if no matches were found.
+     * @param {ConsentRecordFindUniqueOrThrowArgs} args - Arguments to find a ConsentRecord
+     * @example
+     * // Get one ConsentRecord
+     * const consentRecord = await prisma.consentRecord.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUniqueOrThrow<T extends ConsentRecordFindUniqueOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, ConsentRecordFindUniqueOrThrowArgs<ExtArgs>>
+    ): Prisma__ConsentRecordClient<$Result.GetResult<Prisma.$ConsentRecordPayload<ExtArgs>, T, 'findUniqueOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find the first ConsentRecord that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ConsentRecordFindFirstArgs} args - Arguments to find a ConsentRecord
+     * @example
+     * // Get one ConsentRecord
+     * const consentRecord = await prisma.consentRecord.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirst<T extends ConsentRecordFindFirstArgs<ExtArgs>>(
+      args?: SelectSubset<T, ConsentRecordFindFirstArgs<ExtArgs>>
+    ): Prisma__ConsentRecordClient<$Result.GetResult<Prisma.$ConsentRecordPayload<ExtArgs>, T, 'findFirst'> | null, null, ExtArgs>
+
+    /**
+     * Find the first ConsentRecord that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ConsentRecordFindFirstOrThrowArgs} args - Arguments to find a ConsentRecord
+     * @example
+     * // Get one ConsentRecord
+     * const consentRecord = await prisma.consentRecord.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirstOrThrow<T extends ConsentRecordFindFirstOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, ConsentRecordFindFirstOrThrowArgs<ExtArgs>>
+    ): Prisma__ConsentRecordClient<$Result.GetResult<Prisma.$ConsentRecordPayload<ExtArgs>, T, 'findFirstOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find zero or more ConsentRecords that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ConsentRecordFindManyArgs=} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ConsentRecords
+     * const consentRecords = await prisma.consentRecord.findMany()
+     * 
+     * // Get first 10 ConsentRecords
+     * const consentRecords = await prisma.consentRecord.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const consentRecordWithIdOnly = await prisma.consentRecord.findMany({ select: { id: true } })
+     * 
+    **/
+    findMany<T extends ConsentRecordFindManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, ConsentRecordFindManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConsentRecordPayload<ExtArgs>, T, 'findMany'>>
+
+    /**
+     * Create a ConsentRecord.
+     * @param {ConsentRecordCreateArgs} args - Arguments to create a ConsentRecord.
+     * @example
+     * // Create one ConsentRecord
+     * const ConsentRecord = await prisma.consentRecord.create({
+     *   data: {
+     *     // ... data to create a ConsentRecord
+     *   }
+     * })
+     * 
+    **/
+    create<T extends ConsentRecordCreateArgs<ExtArgs>>(
+      args: SelectSubset<T, ConsentRecordCreateArgs<ExtArgs>>
+    ): Prisma__ConsentRecordClient<$Result.GetResult<Prisma.$ConsentRecordPayload<ExtArgs>, T, 'create'>, never, ExtArgs>
+
+    /**
+     * Create many ConsentRecords.
+     *     @param {ConsentRecordCreateManyArgs} args - Arguments to create many ConsentRecords.
+     *     @example
+     *     // Create many ConsentRecords
+     *     const consentRecord = await prisma.consentRecord.createMany({
+     *       data: {
+     *         // ... provide data here
+     *       }
+     *     })
+     *     
+    **/
+    createMany<T extends ConsentRecordCreateManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, ConsentRecordCreateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Delete a ConsentRecord.
+     * @param {ConsentRecordDeleteArgs} args - Arguments to delete one ConsentRecord.
+     * @example
+     * // Delete one ConsentRecord
+     * const ConsentRecord = await prisma.consentRecord.delete({
+     *   where: {
+     *     // ... filter to delete one ConsentRecord
+     *   }
+     * })
+     * 
+    **/
+    delete<T extends ConsentRecordDeleteArgs<ExtArgs>>(
+      args: SelectSubset<T, ConsentRecordDeleteArgs<ExtArgs>>
+    ): Prisma__ConsentRecordClient<$Result.GetResult<Prisma.$ConsentRecordPayload<ExtArgs>, T, 'delete'>, never, ExtArgs>
+
+    /**
+     * Update one ConsentRecord.
+     * @param {ConsentRecordUpdateArgs} args - Arguments to update one ConsentRecord.
+     * @example
+     * // Update one ConsentRecord
+     * const consentRecord = await prisma.consentRecord.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    update<T extends ConsentRecordUpdateArgs<ExtArgs>>(
+      args: SelectSubset<T, ConsentRecordUpdateArgs<ExtArgs>>
+    ): Prisma__ConsentRecordClient<$Result.GetResult<Prisma.$ConsentRecordPayload<ExtArgs>, T, 'update'>, never, ExtArgs>
+
+    /**
+     * Delete zero or more ConsentRecords.
+     * @param {ConsentRecordDeleteManyArgs} args - Arguments to filter ConsentRecords to delete.
+     * @example
+     * // Delete a few ConsentRecords
+     * const { count } = await prisma.consentRecord.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+    **/
+    deleteMany<T extends ConsentRecordDeleteManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, ConsentRecordDeleteManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ConsentRecords.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ConsentRecordUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ConsentRecords
+     * const consentRecord = await prisma.consentRecord.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    updateMany<T extends ConsentRecordUpdateManyArgs<ExtArgs>>(
+      args: SelectSubset<T, ConsentRecordUpdateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one ConsentRecord.
+     * @param {ConsentRecordUpsertArgs} args - Arguments to update or create a ConsentRecord.
+     * @example
+     * // Update or create a ConsentRecord
+     * const consentRecord = await prisma.consentRecord.upsert({
+     *   create: {
+     *     // ... data to create a ConsentRecord
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ConsentRecord we want to update
+     *   }
+     * })
+    **/
+    upsert<T extends ConsentRecordUpsertArgs<ExtArgs>>(
+      args: SelectSubset<T, ConsentRecordUpsertArgs<ExtArgs>>
+    ): Prisma__ConsentRecordClient<$Result.GetResult<Prisma.$ConsentRecordPayload<ExtArgs>, T, 'upsert'>, never, ExtArgs>
+
+    /**
+     * Count the number of ConsentRecords.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ConsentRecordCountArgs} args - Arguments to filter ConsentRecords to count.
+     * @example
+     * // Count the number of ConsentRecords
+     * const count = await prisma.consentRecord.count({
+     *   where: {
+     *     // ... the filter for the ConsentRecords we want to count
+     *   }
+     * })
+    **/
+    count<T extends ConsentRecordCountArgs>(
+      args?: Subset<T, ConsentRecordCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ConsentRecordCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ConsentRecord.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ConsentRecordAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ConsentRecordAggregateArgs>(args: Subset<T, ConsentRecordAggregateArgs>): Prisma.PrismaPromise<GetConsentRecordAggregateType<T>>
+
+    /**
+     * Group by ConsentRecord.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ConsentRecordGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ConsentRecordGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ConsentRecordGroupByArgs['orderBy'] }
+        : { orderBy?: ConsentRecordGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ConsentRecordGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetConsentRecordGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ConsentRecord model
+   */
+  readonly fields: ConsentRecordFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ConsentRecord.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ConsentRecordClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: 'PrismaPromise';
+
+
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>;
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>;
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>;
+  }
+
+
+
+  /**
+   * Fields of the ConsentRecord model
+   */ 
+  interface ConsentRecordFieldRefs {
+    readonly id: FieldRef<"ConsentRecord", 'String'>
+    readonly user_id: FieldRef<"ConsentRecord", 'String'>
+    readonly consent_type: FieldRef<"ConsentRecord", 'String'>
+    readonly purpose: FieldRef<"ConsentRecord", 'String'>
+    readonly granted: FieldRef<"ConsentRecord", 'Boolean'>
+    readonly granted_at: FieldRef<"ConsentRecord", 'DateTime'>
+    readonly withdrawn_at: FieldRef<"ConsentRecord", 'DateTime'>
+    readonly legal_basis: FieldRef<"ConsentRecord", 'String'>
+    readonly metadata: FieldRef<"ConsentRecord", 'Json'>
+    readonly created_at: FieldRef<"ConsentRecord", 'DateTime'>
+    readonly updated_at: FieldRef<"ConsentRecord", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+
+  /**
+   * ConsentRecord findUnique
+   */
+  export type ConsentRecordFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsentRecord
+     */
+    select?: ConsentRecordSelect<ExtArgs> | null
+    /**
+     * Filter, which ConsentRecord to fetch.
+     */
+    where: ConsentRecordWhereUniqueInput
+  }
+
+
+  /**
+   * ConsentRecord findUniqueOrThrow
+   */
+  export type ConsentRecordFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsentRecord
+     */
+    select?: ConsentRecordSelect<ExtArgs> | null
+    /**
+     * Filter, which ConsentRecord to fetch.
+     */
+    where: ConsentRecordWhereUniqueInput
+  }
+
+
+  /**
+   * ConsentRecord findFirst
+   */
+  export type ConsentRecordFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsentRecord
+     */
+    select?: ConsentRecordSelect<ExtArgs> | null
+    /**
+     * Filter, which ConsentRecord to fetch.
+     */
+    where?: ConsentRecordWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ConsentRecords to fetch.
+     */
+    orderBy?: ConsentRecordOrderByWithRelationInput | ConsentRecordOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ConsentRecords.
+     */
+    cursor?: ConsentRecordWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ConsentRecords from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ConsentRecords.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ConsentRecords.
+     */
+    distinct?: ConsentRecordScalarFieldEnum | ConsentRecordScalarFieldEnum[]
+  }
+
+
+  /**
+   * ConsentRecord findFirstOrThrow
+   */
+  export type ConsentRecordFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsentRecord
+     */
+    select?: ConsentRecordSelect<ExtArgs> | null
+    /**
+     * Filter, which ConsentRecord to fetch.
+     */
+    where?: ConsentRecordWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ConsentRecords to fetch.
+     */
+    orderBy?: ConsentRecordOrderByWithRelationInput | ConsentRecordOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ConsentRecords.
+     */
+    cursor?: ConsentRecordWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ConsentRecords from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ConsentRecords.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ConsentRecords.
+     */
+    distinct?: ConsentRecordScalarFieldEnum | ConsentRecordScalarFieldEnum[]
+  }
+
+
+  /**
+   * ConsentRecord findMany
+   */
+  export type ConsentRecordFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsentRecord
+     */
+    select?: ConsentRecordSelect<ExtArgs> | null
+    /**
+     * Filter, which ConsentRecords to fetch.
+     */
+    where?: ConsentRecordWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ConsentRecords to fetch.
+     */
+    orderBy?: ConsentRecordOrderByWithRelationInput | ConsentRecordOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ConsentRecords.
+     */
+    cursor?: ConsentRecordWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ConsentRecords from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ConsentRecords.
+     */
+    skip?: number
+    distinct?: ConsentRecordScalarFieldEnum | ConsentRecordScalarFieldEnum[]
+  }
+
+
+  /**
+   * ConsentRecord create
+   */
+  export type ConsentRecordCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsentRecord
+     */
+    select?: ConsentRecordSelect<ExtArgs> | null
+    /**
+     * The data needed to create a ConsentRecord.
+     */
+    data: XOR<ConsentRecordCreateInput, ConsentRecordUncheckedCreateInput>
+  }
+
+
+  /**
+   * ConsentRecord createMany
+   */
+  export type ConsentRecordCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ConsentRecords.
+     */
+    data: ConsentRecordCreateManyInput | ConsentRecordCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+
+  /**
+   * ConsentRecord update
+   */
+  export type ConsentRecordUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsentRecord
+     */
+    select?: ConsentRecordSelect<ExtArgs> | null
+    /**
+     * The data needed to update a ConsentRecord.
+     */
+    data: XOR<ConsentRecordUpdateInput, ConsentRecordUncheckedUpdateInput>
+    /**
+     * Choose, which ConsentRecord to update.
+     */
+    where: ConsentRecordWhereUniqueInput
+  }
+
+
+  /**
+   * ConsentRecord updateMany
+   */
+  export type ConsentRecordUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ConsentRecords.
+     */
+    data: XOR<ConsentRecordUpdateManyMutationInput, ConsentRecordUncheckedUpdateManyInput>
+    /**
+     * Filter which ConsentRecords to update
+     */
+    where?: ConsentRecordWhereInput
+  }
+
+
+  /**
+   * ConsentRecord upsert
+   */
+  export type ConsentRecordUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsentRecord
+     */
+    select?: ConsentRecordSelect<ExtArgs> | null
+    /**
+     * The filter to search for the ConsentRecord to update in case it exists.
+     */
+    where: ConsentRecordWhereUniqueInput
+    /**
+     * In case the ConsentRecord found by the `where` argument doesn't exist, create a new ConsentRecord with this data.
+     */
+    create: XOR<ConsentRecordCreateInput, ConsentRecordUncheckedCreateInput>
+    /**
+     * In case the ConsentRecord was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ConsentRecordUpdateInput, ConsentRecordUncheckedUpdateInput>
+  }
+
+
+  /**
+   * ConsentRecord delete
+   */
+  export type ConsentRecordDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsentRecord
+     */
+    select?: ConsentRecordSelect<ExtArgs> | null
+    /**
+     * Filter which ConsentRecord to delete.
+     */
+    where: ConsentRecordWhereUniqueInput
+  }
+
+
+  /**
+   * ConsentRecord deleteMany
+   */
+  export type ConsentRecordDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ConsentRecords to delete
+     */
+    where?: ConsentRecordWhereInput
+  }
+
+
+  /**
+   * ConsentRecord without action
+   */
+  export type ConsentRecordDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsentRecord
+     */
+    select?: ConsentRecordSelect<ExtArgs> | null
+  }
+
+
+
+  /**
+   * Model AuditLog
+   */
+
+  export type AggregateAuditLog = {
+    _count: AuditLogCountAggregateOutputType | null
+    _min: AuditLogMinAggregateOutputType | null
+    _max: AuditLogMaxAggregateOutputType | null
+  }
+
+  export type AuditLogMinAggregateOutputType = {
+    id: string | null
+    user_id: string | null
+    action: string | null
+    resource_type: string | null
+    resource_id: string | null
+    ip_address: string | null
+    user_agent: string | null
+    timestamp: Date | null
+  }
+
+  export type AuditLogMaxAggregateOutputType = {
+    id: string | null
+    user_id: string | null
+    action: string | null
+    resource_type: string | null
+    resource_id: string | null
+    ip_address: string | null
+    user_agent: string | null
+    timestamp: Date | null
+  }
+
+  export type AuditLogCountAggregateOutputType = {
+    id: number
+    user_id: number
+    action: number
+    resource_type: number
+    resource_id: number
+    old_values: number
+    new_values: number
+    ip_address: number
+    user_agent: number
+    timestamp: number
+    _all: number
+  }
+
+
+  export type AuditLogMinAggregateInputType = {
+    id?: true
+    user_id?: true
+    action?: true
+    resource_type?: true
+    resource_id?: true
+    ip_address?: true
+    user_agent?: true
+    timestamp?: true
+  }
+
+  export type AuditLogMaxAggregateInputType = {
+    id?: true
+    user_id?: true
+    action?: true
+    resource_type?: true
+    resource_id?: true
+    ip_address?: true
+    user_agent?: true
+    timestamp?: true
+  }
+
+  export type AuditLogCountAggregateInputType = {
+    id?: true
+    user_id?: true
+    action?: true
+    resource_type?: true
+    resource_id?: true
+    old_values?: true
+    new_values?: true
+    ip_address?: true
+    user_agent?: true
+    timestamp?: true
+    _all?: true
+  }
+
+  export type AuditLogAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AuditLog to aggregate.
+     */
+    where?: AuditLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AuditLogs to fetch.
+     */
+    orderBy?: AuditLogOrderByWithRelationInput | AuditLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: AuditLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AuditLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AuditLogs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned AuditLogs
+    **/
+    _count?: true | AuditLogCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: AuditLogMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: AuditLogMaxAggregateInputType
+  }
+
+  export type GetAuditLogAggregateType<T extends AuditLogAggregateArgs> = {
+        [P in keyof T & keyof AggregateAuditLog]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateAuditLog[P]>
+      : GetScalarType<T[P], AggregateAuditLog[P]>
+  }
+
+
+
+
+  export type AuditLogGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: AuditLogWhereInput
+    orderBy?: AuditLogOrderByWithAggregationInput | AuditLogOrderByWithAggregationInput[]
+    by: AuditLogScalarFieldEnum[] | AuditLogScalarFieldEnum
+    having?: AuditLogScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: AuditLogCountAggregateInputType | true
+    _min?: AuditLogMinAggregateInputType
+    _max?: AuditLogMaxAggregateInputType
+  }
+
+  export type AuditLogGroupByOutputType = {
+    id: string
+    user_id: string | null
+    action: string
+    resource_type: string
+    resource_id: string | null
+    old_values: JsonValue | null
+    new_values: JsonValue | null
+    ip_address: string | null
+    user_agent: string | null
+    timestamp: Date
+    _count: AuditLogCountAggregateOutputType | null
+    _min: AuditLogMinAggregateOutputType | null
+    _max: AuditLogMaxAggregateOutputType | null
+  }
+
+  type GetAuditLogGroupByPayload<T extends AuditLogGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<AuditLogGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof AuditLogGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], AuditLogGroupByOutputType[P]>
+            : GetScalarType<T[P], AuditLogGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type AuditLogSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    user_id?: boolean
+    action?: boolean
+    resource_type?: boolean
+    resource_id?: boolean
+    old_values?: boolean
+    new_values?: boolean
+    ip_address?: boolean
+    user_agent?: boolean
+    timestamp?: boolean
+  }, ExtArgs["result"]["auditLog"]>
+
+  export type AuditLogSelectScalar = {
+    id?: boolean
+    user_id?: boolean
+    action?: boolean
+    resource_type?: boolean
+    resource_id?: boolean
+    old_values?: boolean
+    new_values?: boolean
+    ip_address?: boolean
+    user_agent?: boolean
+    timestamp?: boolean
+  }
+
+
+  export type $AuditLogPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "AuditLog"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      user_id: string | null
+      action: string
+      resource_type: string
+      resource_id: string | null
+      old_values: Prisma.JsonValue | null
+      new_values: Prisma.JsonValue | null
+      ip_address: string | null
+      user_agent: string | null
+      timestamp: Date
+    }, ExtArgs["result"]["auditLog"]>
+    composites: {}
+  }
+
+
+  type AuditLogGetPayload<S extends boolean | null | undefined | AuditLogDefaultArgs> = $Result.GetResult<Prisma.$AuditLogPayload, S>
+
+  type AuditLogCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<AuditLogFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: AuditLogCountAggregateInputType | true
+    }
+
+  export interface AuditLogDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['AuditLog'], meta: { name: 'AuditLog' } }
+    /**
+     * Find zero or one AuditLog that matches the filter.
+     * @param {AuditLogFindUniqueArgs} args - Arguments to find a AuditLog
+     * @example
+     * // Get one AuditLog
+     * const auditLog = await prisma.auditLog.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUnique<T extends AuditLogFindUniqueArgs<ExtArgs>>(
+      args: SelectSubset<T, AuditLogFindUniqueArgs<ExtArgs>>
+    ): Prisma__AuditLogClient<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, 'findUnique'> | null, null, ExtArgs>
+
+    /**
+     * Find one AuditLog that matches the filter or throw an error  with `error.code='P2025'` 
+     *     if no matches were found.
+     * @param {AuditLogFindUniqueOrThrowArgs} args - Arguments to find a AuditLog
+     * @example
+     * // Get one AuditLog
+     * const auditLog = await prisma.auditLog.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUniqueOrThrow<T extends AuditLogFindUniqueOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, AuditLogFindUniqueOrThrowArgs<ExtArgs>>
+    ): Prisma__AuditLogClient<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, 'findUniqueOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find the first AuditLog that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AuditLogFindFirstArgs} args - Arguments to find a AuditLog
+     * @example
+     * // Get one AuditLog
+     * const auditLog = await prisma.auditLog.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirst<T extends AuditLogFindFirstArgs<ExtArgs>>(
+      args?: SelectSubset<T, AuditLogFindFirstArgs<ExtArgs>>
+    ): Prisma__AuditLogClient<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, 'findFirst'> | null, null, ExtArgs>
+
+    /**
+     * Find the first AuditLog that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AuditLogFindFirstOrThrowArgs} args - Arguments to find a AuditLog
+     * @example
+     * // Get one AuditLog
+     * const auditLog = await prisma.auditLog.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirstOrThrow<T extends AuditLogFindFirstOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, AuditLogFindFirstOrThrowArgs<ExtArgs>>
+    ): Prisma__AuditLogClient<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, 'findFirstOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find zero or more AuditLogs that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AuditLogFindManyArgs=} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all AuditLogs
+     * const auditLogs = await prisma.auditLog.findMany()
+     * 
+     * // Get first 10 AuditLogs
+     * const auditLogs = await prisma.auditLog.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const auditLogWithIdOnly = await prisma.auditLog.findMany({ select: { id: true } })
+     * 
+    **/
+    findMany<T extends AuditLogFindManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, AuditLogFindManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, 'findMany'>>
+
+    /**
+     * Create a AuditLog.
+     * @param {AuditLogCreateArgs} args - Arguments to create a AuditLog.
+     * @example
+     * // Create one AuditLog
+     * const AuditLog = await prisma.auditLog.create({
+     *   data: {
+     *     // ... data to create a AuditLog
+     *   }
+     * })
+     * 
+    **/
+    create<T extends AuditLogCreateArgs<ExtArgs>>(
+      args: SelectSubset<T, AuditLogCreateArgs<ExtArgs>>
+    ): Prisma__AuditLogClient<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, 'create'>, never, ExtArgs>
+
+    /**
+     * Create many AuditLogs.
+     *     @param {AuditLogCreateManyArgs} args - Arguments to create many AuditLogs.
+     *     @example
+     *     // Create many AuditLogs
+     *     const auditLog = await prisma.auditLog.createMany({
+     *       data: {
+     *         // ... provide data here
+     *       }
+     *     })
+     *     
+    **/
+    createMany<T extends AuditLogCreateManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, AuditLogCreateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Delete a AuditLog.
+     * @param {AuditLogDeleteArgs} args - Arguments to delete one AuditLog.
+     * @example
+     * // Delete one AuditLog
+     * const AuditLog = await prisma.auditLog.delete({
+     *   where: {
+     *     // ... filter to delete one AuditLog
+     *   }
+     * })
+     * 
+    **/
+    delete<T extends AuditLogDeleteArgs<ExtArgs>>(
+      args: SelectSubset<T, AuditLogDeleteArgs<ExtArgs>>
+    ): Prisma__AuditLogClient<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, 'delete'>, never, ExtArgs>
+
+    /**
+     * Update one AuditLog.
+     * @param {AuditLogUpdateArgs} args - Arguments to update one AuditLog.
+     * @example
+     * // Update one AuditLog
+     * const auditLog = await prisma.auditLog.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    update<T extends AuditLogUpdateArgs<ExtArgs>>(
+      args: SelectSubset<T, AuditLogUpdateArgs<ExtArgs>>
+    ): Prisma__AuditLogClient<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, 'update'>, never, ExtArgs>
+
+    /**
+     * Delete zero or more AuditLogs.
+     * @param {AuditLogDeleteManyArgs} args - Arguments to filter AuditLogs to delete.
+     * @example
+     * // Delete a few AuditLogs
+     * const { count } = await prisma.auditLog.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+    **/
+    deleteMany<T extends AuditLogDeleteManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, AuditLogDeleteManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more AuditLogs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AuditLogUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many AuditLogs
+     * const auditLog = await prisma.auditLog.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    updateMany<T extends AuditLogUpdateManyArgs<ExtArgs>>(
+      args: SelectSubset<T, AuditLogUpdateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one AuditLog.
+     * @param {AuditLogUpsertArgs} args - Arguments to update or create a AuditLog.
+     * @example
+     * // Update or create a AuditLog
+     * const auditLog = await prisma.auditLog.upsert({
+     *   create: {
+     *     // ... data to create a AuditLog
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the AuditLog we want to update
+     *   }
+     * })
+    **/
+    upsert<T extends AuditLogUpsertArgs<ExtArgs>>(
+      args: SelectSubset<T, AuditLogUpsertArgs<ExtArgs>>
+    ): Prisma__AuditLogClient<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, 'upsert'>, never, ExtArgs>
+
+    /**
+     * Count the number of AuditLogs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AuditLogCountArgs} args - Arguments to filter AuditLogs to count.
+     * @example
+     * // Count the number of AuditLogs
+     * const count = await prisma.auditLog.count({
+     *   where: {
+     *     // ... the filter for the AuditLogs we want to count
+     *   }
+     * })
+    **/
+    count<T extends AuditLogCountArgs>(
+      args?: Subset<T, AuditLogCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], AuditLogCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a AuditLog.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AuditLogAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends AuditLogAggregateArgs>(args: Subset<T, AuditLogAggregateArgs>): Prisma.PrismaPromise<GetAuditLogAggregateType<T>>
+
+    /**
+     * Group by AuditLog.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AuditLogGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends AuditLogGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: AuditLogGroupByArgs['orderBy'] }
+        : { orderBy?: AuditLogGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, AuditLogGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetAuditLogGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the AuditLog model
+   */
+  readonly fields: AuditLogFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for AuditLog.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__AuditLogClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: 'PrismaPromise';
+
+
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>;
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>;
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>;
+  }
+
+
+
+  /**
+   * Fields of the AuditLog model
+   */ 
+  interface AuditLogFieldRefs {
+    readonly id: FieldRef<"AuditLog", 'String'>
+    readonly user_id: FieldRef<"AuditLog", 'String'>
+    readonly action: FieldRef<"AuditLog", 'String'>
+    readonly resource_type: FieldRef<"AuditLog", 'String'>
+    readonly resource_id: FieldRef<"AuditLog", 'String'>
+    readonly old_values: FieldRef<"AuditLog", 'Json'>
+    readonly new_values: FieldRef<"AuditLog", 'Json'>
+    readonly ip_address: FieldRef<"AuditLog", 'String'>
+    readonly user_agent: FieldRef<"AuditLog", 'String'>
+    readonly timestamp: FieldRef<"AuditLog", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+
+  /**
+   * AuditLog findUnique
+   */
+  export type AuditLogFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditLog
+     */
+    select?: AuditLogSelect<ExtArgs> | null
+    /**
+     * Filter, which AuditLog to fetch.
+     */
+    where: AuditLogWhereUniqueInput
+  }
+
+
+  /**
+   * AuditLog findUniqueOrThrow
+   */
+  export type AuditLogFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditLog
+     */
+    select?: AuditLogSelect<ExtArgs> | null
+    /**
+     * Filter, which AuditLog to fetch.
+     */
+    where: AuditLogWhereUniqueInput
+  }
+
+
+  /**
+   * AuditLog findFirst
+   */
+  export type AuditLogFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditLog
+     */
+    select?: AuditLogSelect<ExtArgs> | null
+    /**
+     * Filter, which AuditLog to fetch.
+     */
+    where?: AuditLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AuditLogs to fetch.
+     */
+    orderBy?: AuditLogOrderByWithRelationInput | AuditLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AuditLogs.
+     */
+    cursor?: AuditLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AuditLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AuditLogs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AuditLogs.
+     */
+    distinct?: AuditLogScalarFieldEnum | AuditLogScalarFieldEnum[]
+  }
+
+
+  /**
+   * AuditLog findFirstOrThrow
+   */
+  export type AuditLogFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditLog
+     */
+    select?: AuditLogSelect<ExtArgs> | null
+    /**
+     * Filter, which AuditLog to fetch.
+     */
+    where?: AuditLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AuditLogs to fetch.
+     */
+    orderBy?: AuditLogOrderByWithRelationInput | AuditLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AuditLogs.
+     */
+    cursor?: AuditLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AuditLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AuditLogs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AuditLogs.
+     */
+    distinct?: AuditLogScalarFieldEnum | AuditLogScalarFieldEnum[]
+  }
+
+
+  /**
+   * AuditLog findMany
+   */
+  export type AuditLogFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditLog
+     */
+    select?: AuditLogSelect<ExtArgs> | null
+    /**
+     * Filter, which AuditLogs to fetch.
+     */
+    where?: AuditLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AuditLogs to fetch.
+     */
+    orderBy?: AuditLogOrderByWithRelationInput | AuditLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing AuditLogs.
+     */
+    cursor?: AuditLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AuditLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AuditLogs.
+     */
+    skip?: number
+    distinct?: AuditLogScalarFieldEnum | AuditLogScalarFieldEnum[]
+  }
+
+
+  /**
+   * AuditLog create
+   */
+  export type AuditLogCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditLog
+     */
+    select?: AuditLogSelect<ExtArgs> | null
+    /**
+     * The data needed to create a AuditLog.
+     */
+    data: XOR<AuditLogCreateInput, AuditLogUncheckedCreateInput>
+  }
+
+
+  /**
+   * AuditLog createMany
+   */
+  export type AuditLogCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many AuditLogs.
+     */
+    data: AuditLogCreateManyInput | AuditLogCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+
+  /**
+   * AuditLog update
+   */
+  export type AuditLogUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditLog
+     */
+    select?: AuditLogSelect<ExtArgs> | null
+    /**
+     * The data needed to update a AuditLog.
+     */
+    data: XOR<AuditLogUpdateInput, AuditLogUncheckedUpdateInput>
+    /**
+     * Choose, which AuditLog to update.
+     */
+    where: AuditLogWhereUniqueInput
+  }
+
+
+  /**
+   * AuditLog updateMany
+   */
+  export type AuditLogUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update AuditLogs.
+     */
+    data: XOR<AuditLogUpdateManyMutationInput, AuditLogUncheckedUpdateManyInput>
+    /**
+     * Filter which AuditLogs to update
+     */
+    where?: AuditLogWhereInput
+  }
+
+
+  /**
+   * AuditLog upsert
+   */
+  export type AuditLogUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditLog
+     */
+    select?: AuditLogSelect<ExtArgs> | null
+    /**
+     * The filter to search for the AuditLog to update in case it exists.
+     */
+    where: AuditLogWhereUniqueInput
+    /**
+     * In case the AuditLog found by the `where` argument doesn't exist, create a new AuditLog with this data.
+     */
+    create: XOR<AuditLogCreateInput, AuditLogUncheckedCreateInput>
+    /**
+     * In case the AuditLog was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<AuditLogUpdateInput, AuditLogUncheckedUpdateInput>
+  }
+
+
+  /**
+   * AuditLog delete
+   */
+  export type AuditLogDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditLog
+     */
+    select?: AuditLogSelect<ExtArgs> | null
+    /**
+     * Filter which AuditLog to delete.
+     */
+    where: AuditLogWhereUniqueInput
+  }
+
+
+  /**
+   * AuditLog deleteMany
+   */
+  export type AuditLogDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AuditLogs to delete
+     */
+    where?: AuditLogWhereInput
+  }
+
+
+  /**
+   * AuditLog without action
+   */
+  export type AuditLogDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditLog
+     */
+    select?: AuditLogSelect<ExtArgs> | null
+  }
+
+
+
+  /**
+   * Model RetentionPolicy
+   */
+
+  export type AggregateRetentionPolicy = {
+    _count: RetentionPolicyCountAggregateOutputType | null
+    _avg: RetentionPolicyAvgAggregateOutputType | null
+    _sum: RetentionPolicySumAggregateOutputType | null
+    _min: RetentionPolicyMinAggregateOutputType | null
+    _max: RetentionPolicyMaxAggregateOutputType | null
+  }
+
+  export type RetentionPolicyAvgAggregateOutputType = {
+    retention_days: number | null
+  }
+
+  export type RetentionPolicySumAggregateOutputType = {
+    retention_days: number | null
+  }
+
+  export type RetentionPolicyMinAggregateOutputType = {
+    id: string | null
+    data_category: string | null
+    retention_days: number | null
+    legal_basis: string | null
+    description: string | null
+    is_active: boolean | null
+    created_at: Date | null
+    updated_at: Date | null
+  }
+
+  export type RetentionPolicyMaxAggregateOutputType = {
+    id: string | null
+    data_category: string | null
+    retention_days: number | null
+    legal_basis: string | null
+    description: string | null
+    is_active: boolean | null
+    created_at: Date | null
+    updated_at: Date | null
+  }
+
+  export type RetentionPolicyCountAggregateOutputType = {
+    id: number
+    data_category: number
+    retention_days: number
+    legal_basis: number
+    description: number
+    is_active: number
+    created_at: number
+    updated_at: number
+    _all: number
+  }
+
+
+  export type RetentionPolicyAvgAggregateInputType = {
+    retention_days?: true
+  }
+
+  export type RetentionPolicySumAggregateInputType = {
+    retention_days?: true
+  }
+
+  export type RetentionPolicyMinAggregateInputType = {
+    id?: true
+    data_category?: true
+    retention_days?: true
+    legal_basis?: true
+    description?: true
+    is_active?: true
+    created_at?: true
+    updated_at?: true
+  }
+
+  export type RetentionPolicyMaxAggregateInputType = {
+    id?: true
+    data_category?: true
+    retention_days?: true
+    legal_basis?: true
+    description?: true
+    is_active?: true
+    created_at?: true
+    updated_at?: true
+  }
+
+  export type RetentionPolicyCountAggregateInputType = {
+    id?: true
+    data_category?: true
+    retention_days?: true
+    legal_basis?: true
+    description?: true
+    is_active?: true
+    created_at?: true
+    updated_at?: true
+    _all?: true
+  }
+
+  export type RetentionPolicyAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which RetentionPolicy to aggregate.
+     */
+    where?: RetentionPolicyWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of RetentionPolicies to fetch.
+     */
+    orderBy?: RetentionPolicyOrderByWithRelationInput | RetentionPolicyOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: RetentionPolicyWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` RetentionPolicies from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` RetentionPolicies.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned RetentionPolicies
+    **/
+    _count?: true | RetentionPolicyCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: RetentionPolicyAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: RetentionPolicySumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: RetentionPolicyMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: RetentionPolicyMaxAggregateInputType
+  }
+
+  export type GetRetentionPolicyAggregateType<T extends RetentionPolicyAggregateArgs> = {
+        [P in keyof T & keyof AggregateRetentionPolicy]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateRetentionPolicy[P]>
+      : GetScalarType<T[P], AggregateRetentionPolicy[P]>
+  }
+
+
+
+
+  export type RetentionPolicyGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: RetentionPolicyWhereInput
+    orderBy?: RetentionPolicyOrderByWithAggregationInput | RetentionPolicyOrderByWithAggregationInput[]
+    by: RetentionPolicyScalarFieldEnum[] | RetentionPolicyScalarFieldEnum
+    having?: RetentionPolicyScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: RetentionPolicyCountAggregateInputType | true
+    _avg?: RetentionPolicyAvgAggregateInputType
+    _sum?: RetentionPolicySumAggregateInputType
+    _min?: RetentionPolicyMinAggregateInputType
+    _max?: RetentionPolicyMaxAggregateInputType
+  }
+
+  export type RetentionPolicyGroupByOutputType = {
+    id: string
+    data_category: string
+    retention_days: number
+    legal_basis: string
+    description: string | null
+    is_active: boolean
+    created_at: Date
+    updated_at: Date
+    _count: RetentionPolicyCountAggregateOutputType | null
+    _avg: RetentionPolicyAvgAggregateOutputType | null
+    _sum: RetentionPolicySumAggregateOutputType | null
+    _min: RetentionPolicyMinAggregateOutputType | null
+    _max: RetentionPolicyMaxAggregateOutputType | null
+  }
+
+  type GetRetentionPolicyGroupByPayload<T extends RetentionPolicyGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<RetentionPolicyGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof RetentionPolicyGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], RetentionPolicyGroupByOutputType[P]>
+            : GetScalarType<T[P], RetentionPolicyGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type RetentionPolicySelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    data_category?: boolean
+    retention_days?: boolean
+    legal_basis?: boolean
+    description?: boolean
+    is_active?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+  }, ExtArgs["result"]["retentionPolicy"]>
+
+  export type RetentionPolicySelectScalar = {
+    id?: boolean
+    data_category?: boolean
+    retention_days?: boolean
+    legal_basis?: boolean
+    description?: boolean
+    is_active?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+  }
+
+
+  export type $RetentionPolicyPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "RetentionPolicy"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      data_category: string
+      retention_days: number
+      legal_basis: string
+      description: string | null
+      is_active: boolean
+      created_at: Date
+      updated_at: Date
+    }, ExtArgs["result"]["retentionPolicy"]>
+    composites: {}
+  }
+
+
+  type RetentionPolicyGetPayload<S extends boolean | null | undefined | RetentionPolicyDefaultArgs> = $Result.GetResult<Prisma.$RetentionPolicyPayload, S>
+
+  type RetentionPolicyCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<RetentionPolicyFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: RetentionPolicyCountAggregateInputType | true
+    }
+
+  export interface RetentionPolicyDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['RetentionPolicy'], meta: { name: 'RetentionPolicy' } }
+    /**
+     * Find zero or one RetentionPolicy that matches the filter.
+     * @param {RetentionPolicyFindUniqueArgs} args - Arguments to find a RetentionPolicy
+     * @example
+     * // Get one RetentionPolicy
+     * const retentionPolicy = await prisma.retentionPolicy.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUnique<T extends RetentionPolicyFindUniqueArgs<ExtArgs>>(
+      args: SelectSubset<T, RetentionPolicyFindUniqueArgs<ExtArgs>>
+    ): Prisma__RetentionPolicyClient<$Result.GetResult<Prisma.$RetentionPolicyPayload<ExtArgs>, T, 'findUnique'> | null, null, ExtArgs>
+
+    /**
+     * Find one RetentionPolicy that matches the filter or throw an error  with `error.code='P2025'` 
+     *     if no matches were found.
+     * @param {RetentionPolicyFindUniqueOrThrowArgs} args - Arguments to find a RetentionPolicy
+     * @example
+     * // Get one RetentionPolicy
+     * const retentionPolicy = await prisma.retentionPolicy.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUniqueOrThrow<T extends RetentionPolicyFindUniqueOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, RetentionPolicyFindUniqueOrThrowArgs<ExtArgs>>
+    ): Prisma__RetentionPolicyClient<$Result.GetResult<Prisma.$RetentionPolicyPayload<ExtArgs>, T, 'findUniqueOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find the first RetentionPolicy that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RetentionPolicyFindFirstArgs} args - Arguments to find a RetentionPolicy
+     * @example
+     * // Get one RetentionPolicy
+     * const retentionPolicy = await prisma.retentionPolicy.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirst<T extends RetentionPolicyFindFirstArgs<ExtArgs>>(
+      args?: SelectSubset<T, RetentionPolicyFindFirstArgs<ExtArgs>>
+    ): Prisma__RetentionPolicyClient<$Result.GetResult<Prisma.$RetentionPolicyPayload<ExtArgs>, T, 'findFirst'> | null, null, ExtArgs>
+
+    /**
+     * Find the first RetentionPolicy that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RetentionPolicyFindFirstOrThrowArgs} args - Arguments to find a RetentionPolicy
+     * @example
+     * // Get one RetentionPolicy
+     * const retentionPolicy = await prisma.retentionPolicy.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirstOrThrow<T extends RetentionPolicyFindFirstOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, RetentionPolicyFindFirstOrThrowArgs<ExtArgs>>
+    ): Prisma__RetentionPolicyClient<$Result.GetResult<Prisma.$RetentionPolicyPayload<ExtArgs>, T, 'findFirstOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find zero or more RetentionPolicies that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RetentionPolicyFindManyArgs=} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all RetentionPolicies
+     * const retentionPolicies = await prisma.retentionPolicy.findMany()
+     * 
+     * // Get first 10 RetentionPolicies
+     * const retentionPolicies = await prisma.retentionPolicy.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const retentionPolicyWithIdOnly = await prisma.retentionPolicy.findMany({ select: { id: true } })
+     * 
+    **/
+    findMany<T extends RetentionPolicyFindManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, RetentionPolicyFindManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RetentionPolicyPayload<ExtArgs>, T, 'findMany'>>
+
+    /**
+     * Create a RetentionPolicy.
+     * @param {RetentionPolicyCreateArgs} args - Arguments to create a RetentionPolicy.
+     * @example
+     * // Create one RetentionPolicy
+     * const RetentionPolicy = await prisma.retentionPolicy.create({
+     *   data: {
+     *     // ... data to create a RetentionPolicy
+     *   }
+     * })
+     * 
+    **/
+    create<T extends RetentionPolicyCreateArgs<ExtArgs>>(
+      args: SelectSubset<T, RetentionPolicyCreateArgs<ExtArgs>>
+    ): Prisma__RetentionPolicyClient<$Result.GetResult<Prisma.$RetentionPolicyPayload<ExtArgs>, T, 'create'>, never, ExtArgs>
+
+    /**
+     * Create many RetentionPolicies.
+     *     @param {RetentionPolicyCreateManyArgs} args - Arguments to create many RetentionPolicies.
+     *     @example
+     *     // Create many RetentionPolicies
+     *     const retentionPolicy = await prisma.retentionPolicy.createMany({
+     *       data: {
+     *         // ... provide data here
+     *       }
+     *     })
+     *     
+    **/
+    createMany<T extends RetentionPolicyCreateManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, RetentionPolicyCreateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Delete a RetentionPolicy.
+     * @param {RetentionPolicyDeleteArgs} args - Arguments to delete one RetentionPolicy.
+     * @example
+     * // Delete one RetentionPolicy
+     * const RetentionPolicy = await prisma.retentionPolicy.delete({
+     *   where: {
+     *     // ... filter to delete one RetentionPolicy
+     *   }
+     * })
+     * 
+    **/
+    delete<T extends RetentionPolicyDeleteArgs<ExtArgs>>(
+      args: SelectSubset<T, RetentionPolicyDeleteArgs<ExtArgs>>
+    ): Prisma__RetentionPolicyClient<$Result.GetResult<Prisma.$RetentionPolicyPayload<ExtArgs>, T, 'delete'>, never, ExtArgs>
+
+    /**
+     * Update one RetentionPolicy.
+     * @param {RetentionPolicyUpdateArgs} args - Arguments to update one RetentionPolicy.
+     * @example
+     * // Update one RetentionPolicy
+     * const retentionPolicy = await prisma.retentionPolicy.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    update<T extends RetentionPolicyUpdateArgs<ExtArgs>>(
+      args: SelectSubset<T, RetentionPolicyUpdateArgs<ExtArgs>>
+    ): Prisma__RetentionPolicyClient<$Result.GetResult<Prisma.$RetentionPolicyPayload<ExtArgs>, T, 'update'>, never, ExtArgs>
+
+    /**
+     * Delete zero or more RetentionPolicies.
+     * @param {RetentionPolicyDeleteManyArgs} args - Arguments to filter RetentionPolicies to delete.
+     * @example
+     * // Delete a few RetentionPolicies
+     * const { count } = await prisma.retentionPolicy.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+    **/
+    deleteMany<T extends RetentionPolicyDeleteManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, RetentionPolicyDeleteManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more RetentionPolicies.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RetentionPolicyUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many RetentionPolicies
+     * const retentionPolicy = await prisma.retentionPolicy.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    updateMany<T extends RetentionPolicyUpdateManyArgs<ExtArgs>>(
+      args: SelectSubset<T, RetentionPolicyUpdateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one RetentionPolicy.
+     * @param {RetentionPolicyUpsertArgs} args - Arguments to update or create a RetentionPolicy.
+     * @example
+     * // Update or create a RetentionPolicy
+     * const retentionPolicy = await prisma.retentionPolicy.upsert({
+     *   create: {
+     *     // ... data to create a RetentionPolicy
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the RetentionPolicy we want to update
+     *   }
+     * })
+    **/
+    upsert<T extends RetentionPolicyUpsertArgs<ExtArgs>>(
+      args: SelectSubset<T, RetentionPolicyUpsertArgs<ExtArgs>>
+    ): Prisma__RetentionPolicyClient<$Result.GetResult<Prisma.$RetentionPolicyPayload<ExtArgs>, T, 'upsert'>, never, ExtArgs>
+
+    /**
+     * Count the number of RetentionPolicies.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RetentionPolicyCountArgs} args - Arguments to filter RetentionPolicies to count.
+     * @example
+     * // Count the number of RetentionPolicies
+     * const count = await prisma.retentionPolicy.count({
+     *   where: {
+     *     // ... the filter for the RetentionPolicies we want to count
+     *   }
+     * })
+    **/
+    count<T extends RetentionPolicyCountArgs>(
+      args?: Subset<T, RetentionPolicyCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], RetentionPolicyCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a RetentionPolicy.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RetentionPolicyAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends RetentionPolicyAggregateArgs>(args: Subset<T, RetentionPolicyAggregateArgs>): Prisma.PrismaPromise<GetRetentionPolicyAggregateType<T>>
+
+    /**
+     * Group by RetentionPolicy.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RetentionPolicyGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends RetentionPolicyGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: RetentionPolicyGroupByArgs['orderBy'] }
+        : { orderBy?: RetentionPolicyGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, RetentionPolicyGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetRetentionPolicyGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the RetentionPolicy model
+   */
+  readonly fields: RetentionPolicyFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for RetentionPolicy.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__RetentionPolicyClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: 'PrismaPromise';
+
+
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>;
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>;
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>;
+  }
+
+
+
+  /**
+   * Fields of the RetentionPolicy model
+   */ 
+  interface RetentionPolicyFieldRefs {
+    readonly id: FieldRef<"RetentionPolicy", 'String'>
+    readonly data_category: FieldRef<"RetentionPolicy", 'String'>
+    readonly retention_days: FieldRef<"RetentionPolicy", 'Int'>
+    readonly legal_basis: FieldRef<"RetentionPolicy", 'String'>
+    readonly description: FieldRef<"RetentionPolicy", 'String'>
+    readonly is_active: FieldRef<"RetentionPolicy", 'Boolean'>
+    readonly created_at: FieldRef<"RetentionPolicy", 'DateTime'>
+    readonly updated_at: FieldRef<"RetentionPolicy", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+
+  /**
+   * RetentionPolicy findUnique
+   */
+  export type RetentionPolicyFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RetentionPolicy
+     */
+    select?: RetentionPolicySelect<ExtArgs> | null
+    /**
+     * Filter, which RetentionPolicy to fetch.
+     */
+    where: RetentionPolicyWhereUniqueInput
+  }
+
+
+  /**
+   * RetentionPolicy findUniqueOrThrow
+   */
+  export type RetentionPolicyFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RetentionPolicy
+     */
+    select?: RetentionPolicySelect<ExtArgs> | null
+    /**
+     * Filter, which RetentionPolicy to fetch.
+     */
+    where: RetentionPolicyWhereUniqueInput
+  }
+
+
+  /**
+   * RetentionPolicy findFirst
+   */
+  export type RetentionPolicyFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RetentionPolicy
+     */
+    select?: RetentionPolicySelect<ExtArgs> | null
+    /**
+     * Filter, which RetentionPolicy to fetch.
+     */
+    where?: RetentionPolicyWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of RetentionPolicies to fetch.
+     */
+    orderBy?: RetentionPolicyOrderByWithRelationInput | RetentionPolicyOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for RetentionPolicies.
+     */
+    cursor?: RetentionPolicyWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` RetentionPolicies from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` RetentionPolicies.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of RetentionPolicies.
+     */
+    distinct?: RetentionPolicyScalarFieldEnum | RetentionPolicyScalarFieldEnum[]
+  }
+
+
+  /**
+   * RetentionPolicy findFirstOrThrow
+   */
+  export type RetentionPolicyFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RetentionPolicy
+     */
+    select?: RetentionPolicySelect<ExtArgs> | null
+    /**
+     * Filter, which RetentionPolicy to fetch.
+     */
+    where?: RetentionPolicyWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of RetentionPolicies to fetch.
+     */
+    orderBy?: RetentionPolicyOrderByWithRelationInput | RetentionPolicyOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for RetentionPolicies.
+     */
+    cursor?: RetentionPolicyWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` RetentionPolicies from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` RetentionPolicies.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of RetentionPolicies.
+     */
+    distinct?: RetentionPolicyScalarFieldEnum | RetentionPolicyScalarFieldEnum[]
+  }
+
+
+  /**
+   * RetentionPolicy findMany
+   */
+  export type RetentionPolicyFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RetentionPolicy
+     */
+    select?: RetentionPolicySelect<ExtArgs> | null
+    /**
+     * Filter, which RetentionPolicies to fetch.
+     */
+    where?: RetentionPolicyWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of RetentionPolicies to fetch.
+     */
+    orderBy?: RetentionPolicyOrderByWithRelationInput | RetentionPolicyOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing RetentionPolicies.
+     */
+    cursor?: RetentionPolicyWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` RetentionPolicies from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` RetentionPolicies.
+     */
+    skip?: number
+    distinct?: RetentionPolicyScalarFieldEnum | RetentionPolicyScalarFieldEnum[]
+  }
+
+
+  /**
+   * RetentionPolicy create
+   */
+  export type RetentionPolicyCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RetentionPolicy
+     */
+    select?: RetentionPolicySelect<ExtArgs> | null
+    /**
+     * The data needed to create a RetentionPolicy.
+     */
+    data: XOR<RetentionPolicyCreateInput, RetentionPolicyUncheckedCreateInput>
+  }
+
+
+  /**
+   * RetentionPolicy createMany
+   */
+  export type RetentionPolicyCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many RetentionPolicies.
+     */
+    data: RetentionPolicyCreateManyInput | RetentionPolicyCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+
+  /**
+   * RetentionPolicy update
+   */
+  export type RetentionPolicyUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RetentionPolicy
+     */
+    select?: RetentionPolicySelect<ExtArgs> | null
+    /**
+     * The data needed to update a RetentionPolicy.
+     */
+    data: XOR<RetentionPolicyUpdateInput, RetentionPolicyUncheckedUpdateInput>
+    /**
+     * Choose, which RetentionPolicy to update.
+     */
+    where: RetentionPolicyWhereUniqueInput
+  }
+
+
+  /**
+   * RetentionPolicy updateMany
+   */
+  export type RetentionPolicyUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update RetentionPolicies.
+     */
+    data: XOR<RetentionPolicyUpdateManyMutationInput, RetentionPolicyUncheckedUpdateManyInput>
+    /**
+     * Filter which RetentionPolicies to update
+     */
+    where?: RetentionPolicyWhereInput
+  }
+
+
+  /**
+   * RetentionPolicy upsert
+   */
+  export type RetentionPolicyUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RetentionPolicy
+     */
+    select?: RetentionPolicySelect<ExtArgs> | null
+    /**
+     * The filter to search for the RetentionPolicy to update in case it exists.
+     */
+    where: RetentionPolicyWhereUniqueInput
+    /**
+     * In case the RetentionPolicy found by the `where` argument doesn't exist, create a new RetentionPolicy with this data.
+     */
+    create: XOR<RetentionPolicyCreateInput, RetentionPolicyUncheckedCreateInput>
+    /**
+     * In case the RetentionPolicy was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<RetentionPolicyUpdateInput, RetentionPolicyUncheckedUpdateInput>
+  }
+
+
+  /**
+   * RetentionPolicy delete
+   */
+  export type RetentionPolicyDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RetentionPolicy
+     */
+    select?: RetentionPolicySelect<ExtArgs> | null
+    /**
+     * Filter which RetentionPolicy to delete.
+     */
+    where: RetentionPolicyWhereUniqueInput
+  }
+
+
+  /**
+   * RetentionPolicy deleteMany
+   */
+  export type RetentionPolicyDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which RetentionPolicies to delete
+     */
+    where?: RetentionPolicyWhereInput
+  }
+
+
+  /**
+   * RetentionPolicy without action
+   */
+  export type RetentionPolicyDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RetentionPolicy
+     */
+    select?: RetentionPolicySelect<ExtArgs> | null
+  }
+
+
+
+  /**
+   * Model ErasureQueue
+   */
+
+  export type AggregateErasureQueue = {
+    _count: ErasureQueueCountAggregateOutputType | null
+    _min: ErasureQueueMinAggregateOutputType | null
+    _max: ErasureQueueMaxAggregateOutputType | null
+  }
+
+  export type ErasureQueueMinAggregateOutputType = {
+    id: string | null
+    user_id: string | null
+    request_type: string | null
+    status: string | null
+    requested_at: Date | null
+    scheduled_for: Date | null
+    completed_at: Date | null
+    created_at: Date | null
+    updated_at: Date | null
+  }
+
+  export type ErasureQueueMaxAggregateOutputType = {
+    id: string | null
+    user_id: string | null
+    request_type: string | null
+    status: string | null
+    requested_at: Date | null
+    scheduled_for: Date | null
+    completed_at: Date | null
+    created_at: Date | null
+    updated_at: Date | null
+  }
+
+  export type ErasureQueueCountAggregateOutputType = {
+    id: number
+    user_id: number
+    request_type: number
+    status: number
+    requested_at: number
+    scheduled_for: number
+    completed_at: number
+    metadata: number
+    created_at: number
+    updated_at: number
+    _all: number
+  }
+
+
+  export type ErasureQueueMinAggregateInputType = {
+    id?: true
+    user_id?: true
+    request_type?: true
+    status?: true
+    requested_at?: true
+    scheduled_for?: true
+    completed_at?: true
+    created_at?: true
+    updated_at?: true
+  }
+
+  export type ErasureQueueMaxAggregateInputType = {
+    id?: true
+    user_id?: true
+    request_type?: true
+    status?: true
+    requested_at?: true
+    scheduled_for?: true
+    completed_at?: true
+    created_at?: true
+    updated_at?: true
+  }
+
+  export type ErasureQueueCountAggregateInputType = {
+    id?: true
+    user_id?: true
+    request_type?: true
+    status?: true
+    requested_at?: true
+    scheduled_for?: true
+    completed_at?: true
+    metadata?: true
+    created_at?: true
+    updated_at?: true
+    _all?: true
+  }
+
+  export type ErasureQueueAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ErasureQueue to aggregate.
+     */
+    where?: ErasureQueueWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ErasureQueues to fetch.
+     */
+    orderBy?: ErasureQueueOrderByWithRelationInput | ErasureQueueOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ErasureQueueWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ErasureQueues from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ErasureQueues.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ErasureQueues
+    **/
+    _count?: true | ErasureQueueCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ErasureQueueMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ErasureQueueMaxAggregateInputType
+  }
+
+  export type GetErasureQueueAggregateType<T extends ErasureQueueAggregateArgs> = {
+        [P in keyof T & keyof AggregateErasureQueue]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateErasureQueue[P]>
+      : GetScalarType<T[P], AggregateErasureQueue[P]>
+  }
+
+
+
+
+  export type ErasureQueueGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ErasureQueueWhereInput
+    orderBy?: ErasureQueueOrderByWithAggregationInput | ErasureQueueOrderByWithAggregationInput[]
+    by: ErasureQueueScalarFieldEnum[] | ErasureQueueScalarFieldEnum
+    having?: ErasureQueueScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ErasureQueueCountAggregateInputType | true
+    _min?: ErasureQueueMinAggregateInputType
+    _max?: ErasureQueueMaxAggregateInputType
+  }
+
+  export type ErasureQueueGroupByOutputType = {
+    id: string
+    user_id: string
+    request_type: string
+    status: string
+    requested_at: Date
+    scheduled_for: Date | null
+    completed_at: Date | null
+    metadata: JsonValue | null
+    created_at: Date
+    updated_at: Date
+    _count: ErasureQueueCountAggregateOutputType | null
+    _min: ErasureQueueMinAggregateOutputType | null
+    _max: ErasureQueueMaxAggregateOutputType | null
+  }
+
+  type GetErasureQueueGroupByPayload<T extends ErasureQueueGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ErasureQueueGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ErasureQueueGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ErasureQueueGroupByOutputType[P]>
+            : GetScalarType<T[P], ErasureQueueGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ErasureQueueSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    user_id?: boolean
+    request_type?: boolean
+    status?: boolean
+    requested_at?: boolean
+    scheduled_for?: boolean
+    completed_at?: boolean
+    metadata?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+  }, ExtArgs["result"]["erasureQueue"]>
+
+  export type ErasureQueueSelectScalar = {
+    id?: boolean
+    user_id?: boolean
+    request_type?: boolean
+    status?: boolean
+    requested_at?: boolean
+    scheduled_for?: boolean
+    completed_at?: boolean
+    metadata?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+  }
+
+
+  export type $ErasureQueuePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ErasureQueue"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      user_id: string
+      request_type: string
+      status: string
+      requested_at: Date
+      scheduled_for: Date | null
+      completed_at: Date | null
+      metadata: Prisma.JsonValue | null
+      created_at: Date
+      updated_at: Date
+    }, ExtArgs["result"]["erasureQueue"]>
+    composites: {}
+  }
+
+
+  type ErasureQueueGetPayload<S extends boolean | null | undefined | ErasureQueueDefaultArgs> = $Result.GetResult<Prisma.$ErasureQueuePayload, S>
+
+  type ErasureQueueCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<ErasureQueueFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: ErasureQueueCountAggregateInputType | true
+    }
+
+  export interface ErasureQueueDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ErasureQueue'], meta: { name: 'ErasureQueue' } }
+    /**
+     * Find zero or one ErasureQueue that matches the filter.
+     * @param {ErasureQueueFindUniqueArgs} args - Arguments to find a ErasureQueue
+     * @example
+     * // Get one ErasureQueue
+     * const erasureQueue = await prisma.erasureQueue.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUnique<T extends ErasureQueueFindUniqueArgs<ExtArgs>>(
+      args: SelectSubset<T, ErasureQueueFindUniqueArgs<ExtArgs>>
+    ): Prisma__ErasureQueueClient<$Result.GetResult<Prisma.$ErasureQueuePayload<ExtArgs>, T, 'findUnique'> | null, null, ExtArgs>
+
+    /**
+     * Find one ErasureQueue that matches the filter or throw an error  with `error.code='P2025'` 
+     *     if no matches were found.
+     * @param {ErasureQueueFindUniqueOrThrowArgs} args - Arguments to find a ErasureQueue
+     * @example
+     * // Get one ErasureQueue
+     * const erasureQueue = await prisma.erasureQueue.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUniqueOrThrow<T extends ErasureQueueFindUniqueOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, ErasureQueueFindUniqueOrThrowArgs<ExtArgs>>
+    ): Prisma__ErasureQueueClient<$Result.GetResult<Prisma.$ErasureQueuePayload<ExtArgs>, T, 'findUniqueOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find the first ErasureQueue that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ErasureQueueFindFirstArgs} args - Arguments to find a ErasureQueue
+     * @example
+     * // Get one ErasureQueue
+     * const erasureQueue = await prisma.erasureQueue.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirst<T extends ErasureQueueFindFirstArgs<ExtArgs>>(
+      args?: SelectSubset<T, ErasureQueueFindFirstArgs<ExtArgs>>
+    ): Prisma__ErasureQueueClient<$Result.GetResult<Prisma.$ErasureQueuePayload<ExtArgs>, T, 'findFirst'> | null, null, ExtArgs>
+
+    /**
+     * Find the first ErasureQueue that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ErasureQueueFindFirstOrThrowArgs} args - Arguments to find a ErasureQueue
+     * @example
+     * // Get one ErasureQueue
+     * const erasureQueue = await prisma.erasureQueue.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirstOrThrow<T extends ErasureQueueFindFirstOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, ErasureQueueFindFirstOrThrowArgs<ExtArgs>>
+    ): Prisma__ErasureQueueClient<$Result.GetResult<Prisma.$ErasureQueuePayload<ExtArgs>, T, 'findFirstOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find zero or more ErasureQueues that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ErasureQueueFindManyArgs=} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ErasureQueues
+     * const erasureQueues = await prisma.erasureQueue.findMany()
+     * 
+     * // Get first 10 ErasureQueues
+     * const erasureQueues = await prisma.erasureQueue.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const erasureQueueWithIdOnly = await prisma.erasureQueue.findMany({ select: { id: true } })
+     * 
+    **/
+    findMany<T extends ErasureQueueFindManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, ErasureQueueFindManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ErasureQueuePayload<ExtArgs>, T, 'findMany'>>
+
+    /**
+     * Create a ErasureQueue.
+     * @param {ErasureQueueCreateArgs} args - Arguments to create a ErasureQueue.
+     * @example
+     * // Create one ErasureQueue
+     * const ErasureQueue = await prisma.erasureQueue.create({
+     *   data: {
+     *     // ... data to create a ErasureQueue
+     *   }
+     * })
+     * 
+    **/
+    create<T extends ErasureQueueCreateArgs<ExtArgs>>(
+      args: SelectSubset<T, ErasureQueueCreateArgs<ExtArgs>>
+    ): Prisma__ErasureQueueClient<$Result.GetResult<Prisma.$ErasureQueuePayload<ExtArgs>, T, 'create'>, never, ExtArgs>
+
+    /**
+     * Create many ErasureQueues.
+     *     @param {ErasureQueueCreateManyArgs} args - Arguments to create many ErasureQueues.
+     *     @example
+     *     // Create many ErasureQueues
+     *     const erasureQueue = await prisma.erasureQueue.createMany({
+     *       data: {
+     *         // ... provide data here
+     *       }
+     *     })
+     *     
+    **/
+    createMany<T extends ErasureQueueCreateManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, ErasureQueueCreateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Delete a ErasureQueue.
+     * @param {ErasureQueueDeleteArgs} args - Arguments to delete one ErasureQueue.
+     * @example
+     * // Delete one ErasureQueue
+     * const ErasureQueue = await prisma.erasureQueue.delete({
+     *   where: {
+     *     // ... filter to delete one ErasureQueue
+     *   }
+     * })
+     * 
+    **/
+    delete<T extends ErasureQueueDeleteArgs<ExtArgs>>(
+      args: SelectSubset<T, ErasureQueueDeleteArgs<ExtArgs>>
+    ): Prisma__ErasureQueueClient<$Result.GetResult<Prisma.$ErasureQueuePayload<ExtArgs>, T, 'delete'>, never, ExtArgs>
+
+    /**
+     * Update one ErasureQueue.
+     * @param {ErasureQueueUpdateArgs} args - Arguments to update one ErasureQueue.
+     * @example
+     * // Update one ErasureQueue
+     * const erasureQueue = await prisma.erasureQueue.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    update<T extends ErasureQueueUpdateArgs<ExtArgs>>(
+      args: SelectSubset<T, ErasureQueueUpdateArgs<ExtArgs>>
+    ): Prisma__ErasureQueueClient<$Result.GetResult<Prisma.$ErasureQueuePayload<ExtArgs>, T, 'update'>, never, ExtArgs>
+
+    /**
+     * Delete zero or more ErasureQueues.
+     * @param {ErasureQueueDeleteManyArgs} args - Arguments to filter ErasureQueues to delete.
+     * @example
+     * // Delete a few ErasureQueues
+     * const { count } = await prisma.erasureQueue.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+    **/
+    deleteMany<T extends ErasureQueueDeleteManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, ErasureQueueDeleteManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ErasureQueues.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ErasureQueueUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ErasureQueues
+     * const erasureQueue = await prisma.erasureQueue.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    updateMany<T extends ErasureQueueUpdateManyArgs<ExtArgs>>(
+      args: SelectSubset<T, ErasureQueueUpdateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one ErasureQueue.
+     * @param {ErasureQueueUpsertArgs} args - Arguments to update or create a ErasureQueue.
+     * @example
+     * // Update or create a ErasureQueue
+     * const erasureQueue = await prisma.erasureQueue.upsert({
+     *   create: {
+     *     // ... data to create a ErasureQueue
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ErasureQueue we want to update
+     *   }
+     * })
+    **/
+    upsert<T extends ErasureQueueUpsertArgs<ExtArgs>>(
+      args: SelectSubset<T, ErasureQueueUpsertArgs<ExtArgs>>
+    ): Prisma__ErasureQueueClient<$Result.GetResult<Prisma.$ErasureQueuePayload<ExtArgs>, T, 'upsert'>, never, ExtArgs>
+
+    /**
+     * Count the number of ErasureQueues.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ErasureQueueCountArgs} args - Arguments to filter ErasureQueues to count.
+     * @example
+     * // Count the number of ErasureQueues
+     * const count = await prisma.erasureQueue.count({
+     *   where: {
+     *     // ... the filter for the ErasureQueues we want to count
+     *   }
+     * })
+    **/
+    count<T extends ErasureQueueCountArgs>(
+      args?: Subset<T, ErasureQueueCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ErasureQueueCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ErasureQueue.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ErasureQueueAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ErasureQueueAggregateArgs>(args: Subset<T, ErasureQueueAggregateArgs>): Prisma.PrismaPromise<GetErasureQueueAggregateType<T>>
+
+    /**
+     * Group by ErasureQueue.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ErasureQueueGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ErasureQueueGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ErasureQueueGroupByArgs['orderBy'] }
+        : { orderBy?: ErasureQueueGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ErasureQueueGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetErasureQueueGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ErasureQueue model
+   */
+  readonly fields: ErasureQueueFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ErasureQueue.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ErasureQueueClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: 'PrismaPromise';
+
+
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>;
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>;
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>;
+  }
+
+
+
+  /**
+   * Fields of the ErasureQueue model
+   */ 
+  interface ErasureQueueFieldRefs {
+    readonly id: FieldRef<"ErasureQueue", 'String'>
+    readonly user_id: FieldRef<"ErasureQueue", 'String'>
+    readonly request_type: FieldRef<"ErasureQueue", 'String'>
+    readonly status: FieldRef<"ErasureQueue", 'String'>
+    readonly requested_at: FieldRef<"ErasureQueue", 'DateTime'>
+    readonly scheduled_for: FieldRef<"ErasureQueue", 'DateTime'>
+    readonly completed_at: FieldRef<"ErasureQueue", 'DateTime'>
+    readonly metadata: FieldRef<"ErasureQueue", 'Json'>
+    readonly created_at: FieldRef<"ErasureQueue", 'DateTime'>
+    readonly updated_at: FieldRef<"ErasureQueue", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+
+  /**
+   * ErasureQueue findUnique
+   */
+  export type ErasureQueueFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ErasureQueue
+     */
+    select?: ErasureQueueSelect<ExtArgs> | null
+    /**
+     * Filter, which ErasureQueue to fetch.
+     */
+    where: ErasureQueueWhereUniqueInput
+  }
+
+
+  /**
+   * ErasureQueue findUniqueOrThrow
+   */
+  export type ErasureQueueFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ErasureQueue
+     */
+    select?: ErasureQueueSelect<ExtArgs> | null
+    /**
+     * Filter, which ErasureQueue to fetch.
+     */
+    where: ErasureQueueWhereUniqueInput
+  }
+
+
+  /**
+   * ErasureQueue findFirst
+   */
+  export type ErasureQueueFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ErasureQueue
+     */
+    select?: ErasureQueueSelect<ExtArgs> | null
+    /**
+     * Filter, which ErasureQueue to fetch.
+     */
+    where?: ErasureQueueWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ErasureQueues to fetch.
+     */
+    orderBy?: ErasureQueueOrderByWithRelationInput | ErasureQueueOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ErasureQueues.
+     */
+    cursor?: ErasureQueueWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ErasureQueues from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ErasureQueues.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ErasureQueues.
+     */
+    distinct?: ErasureQueueScalarFieldEnum | ErasureQueueScalarFieldEnum[]
+  }
+
+
+  /**
+   * ErasureQueue findFirstOrThrow
+   */
+  export type ErasureQueueFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ErasureQueue
+     */
+    select?: ErasureQueueSelect<ExtArgs> | null
+    /**
+     * Filter, which ErasureQueue to fetch.
+     */
+    where?: ErasureQueueWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ErasureQueues to fetch.
+     */
+    orderBy?: ErasureQueueOrderByWithRelationInput | ErasureQueueOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ErasureQueues.
+     */
+    cursor?: ErasureQueueWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ErasureQueues from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ErasureQueues.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ErasureQueues.
+     */
+    distinct?: ErasureQueueScalarFieldEnum | ErasureQueueScalarFieldEnum[]
+  }
+
+
+  /**
+   * ErasureQueue findMany
+   */
+  export type ErasureQueueFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ErasureQueue
+     */
+    select?: ErasureQueueSelect<ExtArgs> | null
+    /**
+     * Filter, which ErasureQueues to fetch.
+     */
+    where?: ErasureQueueWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ErasureQueues to fetch.
+     */
+    orderBy?: ErasureQueueOrderByWithRelationInput | ErasureQueueOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ErasureQueues.
+     */
+    cursor?: ErasureQueueWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ErasureQueues from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ErasureQueues.
+     */
+    skip?: number
+    distinct?: ErasureQueueScalarFieldEnum | ErasureQueueScalarFieldEnum[]
+  }
+
+
+  /**
+   * ErasureQueue create
+   */
+  export type ErasureQueueCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ErasureQueue
+     */
+    select?: ErasureQueueSelect<ExtArgs> | null
+    /**
+     * The data needed to create a ErasureQueue.
+     */
+    data: XOR<ErasureQueueCreateInput, ErasureQueueUncheckedCreateInput>
+  }
+
+
+  /**
+   * ErasureQueue createMany
+   */
+  export type ErasureQueueCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ErasureQueues.
+     */
+    data: ErasureQueueCreateManyInput | ErasureQueueCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+
+  /**
+   * ErasureQueue update
+   */
+  export type ErasureQueueUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ErasureQueue
+     */
+    select?: ErasureQueueSelect<ExtArgs> | null
+    /**
+     * The data needed to update a ErasureQueue.
+     */
+    data: XOR<ErasureQueueUpdateInput, ErasureQueueUncheckedUpdateInput>
+    /**
+     * Choose, which ErasureQueue to update.
+     */
+    where: ErasureQueueWhereUniqueInput
+  }
+
+
+  /**
+   * ErasureQueue updateMany
+   */
+  export type ErasureQueueUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ErasureQueues.
+     */
+    data: XOR<ErasureQueueUpdateManyMutationInput, ErasureQueueUncheckedUpdateManyInput>
+    /**
+     * Filter which ErasureQueues to update
+     */
+    where?: ErasureQueueWhereInput
+  }
+
+
+  /**
+   * ErasureQueue upsert
+   */
+  export type ErasureQueueUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ErasureQueue
+     */
+    select?: ErasureQueueSelect<ExtArgs> | null
+    /**
+     * The filter to search for the ErasureQueue to update in case it exists.
+     */
+    where: ErasureQueueWhereUniqueInput
+    /**
+     * In case the ErasureQueue found by the `where` argument doesn't exist, create a new ErasureQueue with this data.
+     */
+    create: XOR<ErasureQueueCreateInput, ErasureQueueUncheckedCreateInput>
+    /**
+     * In case the ErasureQueue was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ErasureQueueUpdateInput, ErasureQueueUncheckedUpdateInput>
+  }
+
+
+  /**
+   * ErasureQueue delete
+   */
+  export type ErasureQueueDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ErasureQueue
+     */
+    select?: ErasureQueueSelect<ExtArgs> | null
+    /**
+     * Filter which ErasureQueue to delete.
+     */
+    where: ErasureQueueWhereUniqueInput
+  }
+
+
+  /**
+   * ErasureQueue deleteMany
+   */
+  export type ErasureQueueDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ErasureQueues to delete
+     */
+    where?: ErasureQueueWhereInput
+  }
+
+
+  /**
+   * ErasureQueue without action
+   */
+  export type ErasureQueueDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ErasureQueue
+     */
+    select?: ErasureQueueSelect<ExtArgs> | null
+  }
+
+
+
+  /**
    * Enums
    */
 
@@ -13373,6 +17408,69 @@ export namespace Prisma {
   export type HealthSummaryScalarFieldEnum = (typeof HealthSummaryScalarFieldEnum)[keyof typeof HealthSummaryScalarFieldEnum]
 
 
+  export const ConsentRecordScalarFieldEnum: {
+    id: 'id',
+    user_id: 'user_id',
+    consent_type: 'consent_type',
+    purpose: 'purpose',
+    granted: 'granted',
+    granted_at: 'granted_at',
+    withdrawn_at: 'withdrawn_at',
+    legal_basis: 'legal_basis',
+    metadata: 'metadata',
+    created_at: 'created_at',
+    updated_at: 'updated_at'
+  };
+
+  export type ConsentRecordScalarFieldEnum = (typeof ConsentRecordScalarFieldEnum)[keyof typeof ConsentRecordScalarFieldEnum]
+
+
+  export const AuditLogScalarFieldEnum: {
+    id: 'id',
+    user_id: 'user_id',
+    action: 'action',
+    resource_type: 'resource_type',
+    resource_id: 'resource_id',
+    old_values: 'old_values',
+    new_values: 'new_values',
+    ip_address: 'ip_address',
+    user_agent: 'user_agent',
+    timestamp: 'timestamp'
+  };
+
+  export type AuditLogScalarFieldEnum = (typeof AuditLogScalarFieldEnum)[keyof typeof AuditLogScalarFieldEnum]
+
+
+  export const RetentionPolicyScalarFieldEnum: {
+    id: 'id',
+    data_category: 'data_category',
+    retention_days: 'retention_days',
+    legal_basis: 'legal_basis',
+    description: 'description',
+    is_active: 'is_active',
+    created_at: 'created_at',
+    updated_at: 'updated_at'
+  };
+
+  export type RetentionPolicyScalarFieldEnum = (typeof RetentionPolicyScalarFieldEnum)[keyof typeof RetentionPolicyScalarFieldEnum]
+
+
+  export const ErasureQueueScalarFieldEnum: {
+    id: 'id',
+    user_id: 'user_id',
+    request_type: 'request_type',
+    status: 'status',
+    requested_at: 'requested_at',
+    scheduled_for: 'scheduled_for',
+    completed_at: 'completed_at',
+    metadata: 'metadata',
+    created_at: 'created_at',
+    updated_at: 'updated_at'
+  };
+
+  export type ErasureQueueScalarFieldEnum = (typeof ErasureQueueScalarFieldEnum)[keyof typeof ErasureQueueScalarFieldEnum]
+
+
   export const SortOrder: {
     asc: 'asc',
     desc: 'desc'
@@ -13386,6 +17484,14 @@ export namespace Prisma {
   };
 
   export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
+
+
+  export const NullableJsonNullValueInput: {
+    DbNull: typeof DbNull,
+    JsonNull: typeof JsonNull
+  };
+
+  export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
 
 
   export const QueryMode: {
@@ -14455,6 +18561,311 @@ export namespace Prisma {
     updated_at?: DateTimeWithAggregatesFilter<"HealthSummary"> | Date | string
   }
 
+  export type ConsentRecordWhereInput = {
+    AND?: ConsentRecordWhereInput | ConsentRecordWhereInput[]
+    OR?: ConsentRecordWhereInput[]
+    NOT?: ConsentRecordWhereInput | ConsentRecordWhereInput[]
+    id?: StringFilter<"ConsentRecord"> | string
+    user_id?: StringFilter<"ConsentRecord"> | string
+    consent_type?: StringFilter<"ConsentRecord"> | string
+    purpose?: StringFilter<"ConsentRecord"> | string
+    granted?: BoolFilter<"ConsentRecord"> | boolean
+    granted_at?: DateTimeFilter<"ConsentRecord"> | Date | string
+    withdrawn_at?: DateTimeNullableFilter<"ConsentRecord"> | Date | string | null
+    legal_basis?: StringFilter<"ConsentRecord"> | string
+    metadata?: JsonNullableFilter<"ConsentRecord">
+    created_at?: DateTimeFilter<"ConsentRecord"> | Date | string
+    updated_at?: DateTimeFilter<"ConsentRecord"> | Date | string
+  }
+
+  export type ConsentRecordOrderByWithRelationInput = {
+    id?: SortOrder
+    user_id?: SortOrder
+    consent_type?: SortOrder
+    purpose?: SortOrder
+    granted?: SortOrder
+    granted_at?: SortOrder
+    withdrawn_at?: SortOrderInput | SortOrder
+    legal_basis?: SortOrder
+    metadata?: SortOrderInput | SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type ConsentRecordWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: ConsentRecordWhereInput | ConsentRecordWhereInput[]
+    OR?: ConsentRecordWhereInput[]
+    NOT?: ConsentRecordWhereInput | ConsentRecordWhereInput[]
+    user_id?: StringFilter<"ConsentRecord"> | string
+    consent_type?: StringFilter<"ConsentRecord"> | string
+    purpose?: StringFilter<"ConsentRecord"> | string
+    granted?: BoolFilter<"ConsentRecord"> | boolean
+    granted_at?: DateTimeFilter<"ConsentRecord"> | Date | string
+    withdrawn_at?: DateTimeNullableFilter<"ConsentRecord"> | Date | string | null
+    legal_basis?: StringFilter<"ConsentRecord"> | string
+    metadata?: JsonNullableFilter<"ConsentRecord">
+    created_at?: DateTimeFilter<"ConsentRecord"> | Date | string
+    updated_at?: DateTimeFilter<"ConsentRecord"> | Date | string
+  }, "id">
+
+  export type ConsentRecordOrderByWithAggregationInput = {
+    id?: SortOrder
+    user_id?: SortOrder
+    consent_type?: SortOrder
+    purpose?: SortOrder
+    granted?: SortOrder
+    granted_at?: SortOrder
+    withdrawn_at?: SortOrderInput | SortOrder
+    legal_basis?: SortOrder
+    metadata?: SortOrderInput | SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    _count?: ConsentRecordCountOrderByAggregateInput
+    _max?: ConsentRecordMaxOrderByAggregateInput
+    _min?: ConsentRecordMinOrderByAggregateInput
+  }
+
+  export type ConsentRecordScalarWhereWithAggregatesInput = {
+    AND?: ConsentRecordScalarWhereWithAggregatesInput | ConsentRecordScalarWhereWithAggregatesInput[]
+    OR?: ConsentRecordScalarWhereWithAggregatesInput[]
+    NOT?: ConsentRecordScalarWhereWithAggregatesInput | ConsentRecordScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"ConsentRecord"> | string
+    user_id?: StringWithAggregatesFilter<"ConsentRecord"> | string
+    consent_type?: StringWithAggregatesFilter<"ConsentRecord"> | string
+    purpose?: StringWithAggregatesFilter<"ConsentRecord"> | string
+    granted?: BoolWithAggregatesFilter<"ConsentRecord"> | boolean
+    granted_at?: DateTimeWithAggregatesFilter<"ConsentRecord"> | Date | string
+    withdrawn_at?: DateTimeNullableWithAggregatesFilter<"ConsentRecord"> | Date | string | null
+    legal_basis?: StringWithAggregatesFilter<"ConsentRecord"> | string
+    metadata?: JsonNullableWithAggregatesFilter<"ConsentRecord">
+    created_at?: DateTimeWithAggregatesFilter<"ConsentRecord"> | Date | string
+    updated_at?: DateTimeWithAggregatesFilter<"ConsentRecord"> | Date | string
+  }
+
+  export type AuditLogWhereInput = {
+    AND?: AuditLogWhereInput | AuditLogWhereInput[]
+    OR?: AuditLogWhereInput[]
+    NOT?: AuditLogWhereInput | AuditLogWhereInput[]
+    id?: StringFilter<"AuditLog"> | string
+    user_id?: StringNullableFilter<"AuditLog"> | string | null
+    action?: StringFilter<"AuditLog"> | string
+    resource_type?: StringFilter<"AuditLog"> | string
+    resource_id?: StringNullableFilter<"AuditLog"> | string | null
+    old_values?: JsonNullableFilter<"AuditLog">
+    new_values?: JsonNullableFilter<"AuditLog">
+    ip_address?: StringNullableFilter<"AuditLog"> | string | null
+    user_agent?: StringNullableFilter<"AuditLog"> | string | null
+    timestamp?: DateTimeFilter<"AuditLog"> | Date | string
+  }
+
+  export type AuditLogOrderByWithRelationInput = {
+    id?: SortOrder
+    user_id?: SortOrderInput | SortOrder
+    action?: SortOrder
+    resource_type?: SortOrder
+    resource_id?: SortOrderInput | SortOrder
+    old_values?: SortOrderInput | SortOrder
+    new_values?: SortOrderInput | SortOrder
+    ip_address?: SortOrderInput | SortOrder
+    user_agent?: SortOrderInput | SortOrder
+    timestamp?: SortOrder
+  }
+
+  export type AuditLogWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: AuditLogWhereInput | AuditLogWhereInput[]
+    OR?: AuditLogWhereInput[]
+    NOT?: AuditLogWhereInput | AuditLogWhereInput[]
+    user_id?: StringNullableFilter<"AuditLog"> | string | null
+    action?: StringFilter<"AuditLog"> | string
+    resource_type?: StringFilter<"AuditLog"> | string
+    resource_id?: StringNullableFilter<"AuditLog"> | string | null
+    old_values?: JsonNullableFilter<"AuditLog">
+    new_values?: JsonNullableFilter<"AuditLog">
+    ip_address?: StringNullableFilter<"AuditLog"> | string | null
+    user_agent?: StringNullableFilter<"AuditLog"> | string | null
+    timestamp?: DateTimeFilter<"AuditLog"> | Date | string
+  }, "id">
+
+  export type AuditLogOrderByWithAggregationInput = {
+    id?: SortOrder
+    user_id?: SortOrderInput | SortOrder
+    action?: SortOrder
+    resource_type?: SortOrder
+    resource_id?: SortOrderInput | SortOrder
+    old_values?: SortOrderInput | SortOrder
+    new_values?: SortOrderInput | SortOrder
+    ip_address?: SortOrderInput | SortOrder
+    user_agent?: SortOrderInput | SortOrder
+    timestamp?: SortOrder
+    _count?: AuditLogCountOrderByAggregateInput
+    _max?: AuditLogMaxOrderByAggregateInput
+    _min?: AuditLogMinOrderByAggregateInput
+  }
+
+  export type AuditLogScalarWhereWithAggregatesInput = {
+    AND?: AuditLogScalarWhereWithAggregatesInput | AuditLogScalarWhereWithAggregatesInput[]
+    OR?: AuditLogScalarWhereWithAggregatesInput[]
+    NOT?: AuditLogScalarWhereWithAggregatesInput | AuditLogScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"AuditLog"> | string
+    user_id?: StringNullableWithAggregatesFilter<"AuditLog"> | string | null
+    action?: StringWithAggregatesFilter<"AuditLog"> | string
+    resource_type?: StringWithAggregatesFilter<"AuditLog"> | string
+    resource_id?: StringNullableWithAggregatesFilter<"AuditLog"> | string | null
+    old_values?: JsonNullableWithAggregatesFilter<"AuditLog">
+    new_values?: JsonNullableWithAggregatesFilter<"AuditLog">
+    ip_address?: StringNullableWithAggregatesFilter<"AuditLog"> | string | null
+    user_agent?: StringNullableWithAggregatesFilter<"AuditLog"> | string | null
+    timestamp?: DateTimeWithAggregatesFilter<"AuditLog"> | Date | string
+  }
+
+  export type RetentionPolicyWhereInput = {
+    AND?: RetentionPolicyWhereInput | RetentionPolicyWhereInput[]
+    OR?: RetentionPolicyWhereInput[]
+    NOT?: RetentionPolicyWhereInput | RetentionPolicyWhereInput[]
+    id?: StringFilter<"RetentionPolicy"> | string
+    data_category?: StringFilter<"RetentionPolicy"> | string
+    retention_days?: IntFilter<"RetentionPolicy"> | number
+    legal_basis?: StringFilter<"RetentionPolicy"> | string
+    description?: StringNullableFilter<"RetentionPolicy"> | string | null
+    is_active?: BoolFilter<"RetentionPolicy"> | boolean
+    created_at?: DateTimeFilter<"RetentionPolicy"> | Date | string
+    updated_at?: DateTimeFilter<"RetentionPolicy"> | Date | string
+  }
+
+  export type RetentionPolicyOrderByWithRelationInput = {
+    id?: SortOrder
+    data_category?: SortOrder
+    retention_days?: SortOrder
+    legal_basis?: SortOrder
+    description?: SortOrderInput | SortOrder
+    is_active?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type RetentionPolicyWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: RetentionPolicyWhereInput | RetentionPolicyWhereInput[]
+    OR?: RetentionPolicyWhereInput[]
+    NOT?: RetentionPolicyWhereInput | RetentionPolicyWhereInput[]
+    data_category?: StringFilter<"RetentionPolicy"> | string
+    retention_days?: IntFilter<"RetentionPolicy"> | number
+    legal_basis?: StringFilter<"RetentionPolicy"> | string
+    description?: StringNullableFilter<"RetentionPolicy"> | string | null
+    is_active?: BoolFilter<"RetentionPolicy"> | boolean
+    created_at?: DateTimeFilter<"RetentionPolicy"> | Date | string
+    updated_at?: DateTimeFilter<"RetentionPolicy"> | Date | string
+  }, "id">
+
+  export type RetentionPolicyOrderByWithAggregationInput = {
+    id?: SortOrder
+    data_category?: SortOrder
+    retention_days?: SortOrder
+    legal_basis?: SortOrder
+    description?: SortOrderInput | SortOrder
+    is_active?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    _count?: RetentionPolicyCountOrderByAggregateInput
+    _avg?: RetentionPolicyAvgOrderByAggregateInput
+    _max?: RetentionPolicyMaxOrderByAggregateInput
+    _min?: RetentionPolicyMinOrderByAggregateInput
+    _sum?: RetentionPolicySumOrderByAggregateInput
+  }
+
+  export type RetentionPolicyScalarWhereWithAggregatesInput = {
+    AND?: RetentionPolicyScalarWhereWithAggregatesInput | RetentionPolicyScalarWhereWithAggregatesInput[]
+    OR?: RetentionPolicyScalarWhereWithAggregatesInput[]
+    NOT?: RetentionPolicyScalarWhereWithAggregatesInput | RetentionPolicyScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"RetentionPolicy"> | string
+    data_category?: StringWithAggregatesFilter<"RetentionPolicy"> | string
+    retention_days?: IntWithAggregatesFilter<"RetentionPolicy"> | number
+    legal_basis?: StringWithAggregatesFilter<"RetentionPolicy"> | string
+    description?: StringNullableWithAggregatesFilter<"RetentionPolicy"> | string | null
+    is_active?: BoolWithAggregatesFilter<"RetentionPolicy"> | boolean
+    created_at?: DateTimeWithAggregatesFilter<"RetentionPolicy"> | Date | string
+    updated_at?: DateTimeWithAggregatesFilter<"RetentionPolicy"> | Date | string
+  }
+
+  export type ErasureQueueWhereInput = {
+    AND?: ErasureQueueWhereInput | ErasureQueueWhereInput[]
+    OR?: ErasureQueueWhereInput[]
+    NOT?: ErasureQueueWhereInput | ErasureQueueWhereInput[]
+    id?: StringFilter<"ErasureQueue"> | string
+    user_id?: StringFilter<"ErasureQueue"> | string
+    request_type?: StringFilter<"ErasureQueue"> | string
+    status?: StringFilter<"ErasureQueue"> | string
+    requested_at?: DateTimeFilter<"ErasureQueue"> | Date | string
+    scheduled_for?: DateTimeNullableFilter<"ErasureQueue"> | Date | string | null
+    completed_at?: DateTimeNullableFilter<"ErasureQueue"> | Date | string | null
+    metadata?: JsonNullableFilter<"ErasureQueue">
+    created_at?: DateTimeFilter<"ErasureQueue"> | Date | string
+    updated_at?: DateTimeFilter<"ErasureQueue"> | Date | string
+  }
+
+  export type ErasureQueueOrderByWithRelationInput = {
+    id?: SortOrder
+    user_id?: SortOrder
+    request_type?: SortOrder
+    status?: SortOrder
+    requested_at?: SortOrder
+    scheduled_for?: SortOrderInput | SortOrder
+    completed_at?: SortOrderInput | SortOrder
+    metadata?: SortOrderInput | SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type ErasureQueueWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: ErasureQueueWhereInput | ErasureQueueWhereInput[]
+    OR?: ErasureQueueWhereInput[]
+    NOT?: ErasureQueueWhereInput | ErasureQueueWhereInput[]
+    user_id?: StringFilter<"ErasureQueue"> | string
+    request_type?: StringFilter<"ErasureQueue"> | string
+    status?: StringFilter<"ErasureQueue"> | string
+    requested_at?: DateTimeFilter<"ErasureQueue"> | Date | string
+    scheduled_for?: DateTimeNullableFilter<"ErasureQueue"> | Date | string | null
+    completed_at?: DateTimeNullableFilter<"ErasureQueue"> | Date | string | null
+    metadata?: JsonNullableFilter<"ErasureQueue">
+    created_at?: DateTimeFilter<"ErasureQueue"> | Date | string
+    updated_at?: DateTimeFilter<"ErasureQueue"> | Date | string
+  }, "id">
+
+  export type ErasureQueueOrderByWithAggregationInput = {
+    id?: SortOrder
+    user_id?: SortOrder
+    request_type?: SortOrder
+    status?: SortOrder
+    requested_at?: SortOrder
+    scheduled_for?: SortOrderInput | SortOrder
+    completed_at?: SortOrderInput | SortOrder
+    metadata?: SortOrderInput | SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    _count?: ErasureQueueCountOrderByAggregateInput
+    _max?: ErasureQueueMaxOrderByAggregateInput
+    _min?: ErasureQueueMinOrderByAggregateInput
+  }
+
+  export type ErasureQueueScalarWhereWithAggregatesInput = {
+    AND?: ErasureQueueScalarWhereWithAggregatesInput | ErasureQueueScalarWhereWithAggregatesInput[]
+    OR?: ErasureQueueScalarWhereWithAggregatesInput[]
+    NOT?: ErasureQueueScalarWhereWithAggregatesInput | ErasureQueueScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"ErasureQueue"> | string
+    user_id?: StringWithAggregatesFilter<"ErasureQueue"> | string
+    request_type?: StringWithAggregatesFilter<"ErasureQueue"> | string
+    status?: StringWithAggregatesFilter<"ErasureQueue"> | string
+    requested_at?: DateTimeWithAggregatesFilter<"ErasureQueue"> | Date | string
+    scheduled_for?: DateTimeNullableWithAggregatesFilter<"ErasureQueue"> | Date | string | null
+    completed_at?: DateTimeNullableWithAggregatesFilter<"ErasureQueue"> | Date | string | null
+    metadata?: JsonNullableWithAggregatesFilter<"ErasureQueue">
+    created_at?: DateTimeWithAggregatesFilter<"ErasureQueue"> | Date | string
+    updated_at?: DateTimeWithAggregatesFilter<"ErasureQueue"> | Date | string
+  }
+
   export type CarerCreateInput = {
     id?: string
     first_name: string
@@ -15488,6 +19899,363 @@ export namespace Prisma {
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type ConsentRecordCreateInput = {
+    id?: string
+    user_id: string
+    consent_type: string
+    purpose: string
+    granted: boolean
+    granted_at: Date | string
+    withdrawn_at?: Date | string | null
+    legal_basis: string
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type ConsentRecordUncheckedCreateInput = {
+    id?: string
+    user_id: string
+    consent_type: string
+    purpose: string
+    granted: boolean
+    granted_at: Date | string
+    withdrawn_at?: Date | string | null
+    legal_basis: string
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type ConsentRecordUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: StringFieldUpdateOperationsInput | string
+    consent_type?: StringFieldUpdateOperationsInput | string
+    purpose?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    granted_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    withdrawn_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    legal_basis?: StringFieldUpdateOperationsInput | string
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ConsentRecordUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: StringFieldUpdateOperationsInput | string
+    consent_type?: StringFieldUpdateOperationsInput | string
+    purpose?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    granted_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    withdrawn_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    legal_basis?: StringFieldUpdateOperationsInput | string
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ConsentRecordCreateManyInput = {
+    id?: string
+    user_id: string
+    consent_type: string
+    purpose: string
+    granted: boolean
+    granted_at: Date | string
+    withdrawn_at?: Date | string | null
+    legal_basis: string
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type ConsentRecordUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: StringFieldUpdateOperationsInput | string
+    consent_type?: StringFieldUpdateOperationsInput | string
+    purpose?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    granted_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    withdrawn_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    legal_basis?: StringFieldUpdateOperationsInput | string
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ConsentRecordUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: StringFieldUpdateOperationsInput | string
+    consent_type?: StringFieldUpdateOperationsInput | string
+    purpose?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    granted_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    withdrawn_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    legal_basis?: StringFieldUpdateOperationsInput | string
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AuditLogCreateInput = {
+    id?: string
+    user_id?: string | null
+    action: string
+    resource_type: string
+    resource_id?: string | null
+    old_values?: NullableJsonNullValueInput | InputJsonValue
+    new_values?: NullableJsonNullValueInput | InputJsonValue
+    ip_address?: string | null
+    user_agent?: string | null
+    timestamp?: Date | string
+  }
+
+  export type AuditLogUncheckedCreateInput = {
+    id?: string
+    user_id?: string | null
+    action: string
+    resource_type: string
+    resource_id?: string | null
+    old_values?: NullableJsonNullValueInput | InputJsonValue
+    new_values?: NullableJsonNullValueInput | InputJsonValue
+    ip_address?: string | null
+    user_agent?: string | null
+    timestamp?: Date | string
+  }
+
+  export type AuditLogUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: NullableStringFieldUpdateOperationsInput | string | null
+    action?: StringFieldUpdateOperationsInput | string
+    resource_type?: StringFieldUpdateOperationsInput | string
+    resource_id?: NullableStringFieldUpdateOperationsInput | string | null
+    old_values?: NullableJsonNullValueInput | InputJsonValue
+    new_values?: NullableJsonNullValueInput | InputJsonValue
+    ip_address?: NullableStringFieldUpdateOperationsInput | string | null
+    user_agent?: NullableStringFieldUpdateOperationsInput | string | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AuditLogUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: NullableStringFieldUpdateOperationsInput | string | null
+    action?: StringFieldUpdateOperationsInput | string
+    resource_type?: StringFieldUpdateOperationsInput | string
+    resource_id?: NullableStringFieldUpdateOperationsInput | string | null
+    old_values?: NullableJsonNullValueInput | InputJsonValue
+    new_values?: NullableJsonNullValueInput | InputJsonValue
+    ip_address?: NullableStringFieldUpdateOperationsInput | string | null
+    user_agent?: NullableStringFieldUpdateOperationsInput | string | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AuditLogCreateManyInput = {
+    id?: string
+    user_id?: string | null
+    action: string
+    resource_type: string
+    resource_id?: string | null
+    old_values?: NullableJsonNullValueInput | InputJsonValue
+    new_values?: NullableJsonNullValueInput | InputJsonValue
+    ip_address?: string | null
+    user_agent?: string | null
+    timestamp?: Date | string
+  }
+
+  export type AuditLogUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: NullableStringFieldUpdateOperationsInput | string | null
+    action?: StringFieldUpdateOperationsInput | string
+    resource_type?: StringFieldUpdateOperationsInput | string
+    resource_id?: NullableStringFieldUpdateOperationsInput | string | null
+    old_values?: NullableJsonNullValueInput | InputJsonValue
+    new_values?: NullableJsonNullValueInput | InputJsonValue
+    ip_address?: NullableStringFieldUpdateOperationsInput | string | null
+    user_agent?: NullableStringFieldUpdateOperationsInput | string | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AuditLogUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: NullableStringFieldUpdateOperationsInput | string | null
+    action?: StringFieldUpdateOperationsInput | string
+    resource_type?: StringFieldUpdateOperationsInput | string
+    resource_id?: NullableStringFieldUpdateOperationsInput | string | null
+    old_values?: NullableJsonNullValueInput | InputJsonValue
+    new_values?: NullableJsonNullValueInput | InputJsonValue
+    ip_address?: NullableStringFieldUpdateOperationsInput | string | null
+    user_agent?: NullableStringFieldUpdateOperationsInput | string | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type RetentionPolicyCreateInput = {
+    id?: string
+    data_category: string
+    retention_days: number
+    legal_basis: string
+    description?: string | null
+    is_active?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type RetentionPolicyUncheckedCreateInput = {
+    id?: string
+    data_category: string
+    retention_days: number
+    legal_basis: string
+    description?: string | null
+    is_active?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type RetentionPolicyUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    data_category?: StringFieldUpdateOperationsInput | string
+    retention_days?: IntFieldUpdateOperationsInput | number
+    legal_basis?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    is_active?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type RetentionPolicyUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    data_category?: StringFieldUpdateOperationsInput | string
+    retention_days?: IntFieldUpdateOperationsInput | number
+    legal_basis?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    is_active?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type RetentionPolicyCreateManyInput = {
+    id?: string
+    data_category: string
+    retention_days: number
+    legal_basis: string
+    description?: string | null
+    is_active?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type RetentionPolicyUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    data_category?: StringFieldUpdateOperationsInput | string
+    retention_days?: IntFieldUpdateOperationsInput | number
+    legal_basis?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    is_active?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type RetentionPolicyUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    data_category?: StringFieldUpdateOperationsInput | string
+    retention_days?: IntFieldUpdateOperationsInput | number
+    legal_basis?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    is_active?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ErasureQueueCreateInput = {
+    id?: string
+    user_id: string
+    request_type: string
+    status?: string
+    requested_at?: Date | string
+    scheduled_for?: Date | string | null
+    completed_at?: Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type ErasureQueueUncheckedCreateInput = {
+    id?: string
+    user_id: string
+    request_type: string
+    status?: string
+    requested_at?: Date | string
+    scheduled_for?: Date | string | null
+    completed_at?: Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type ErasureQueueUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: StringFieldUpdateOperationsInput | string
+    request_type?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    requested_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    scheduled_for?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completed_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ErasureQueueUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: StringFieldUpdateOperationsInput | string
+    request_type?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    requested_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    scheduled_for?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completed_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ErasureQueueCreateManyInput = {
+    id?: string
+    user_id: string
+    request_type: string
+    status?: string
+    requested_at?: Date | string
+    scheduled_for?: Date | string | null
+    completed_at?: Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type ErasureQueueUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: StringFieldUpdateOperationsInput | string
+    request_type?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    requested_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    scheduled_for?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completed_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ErasureQueueUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: StringFieldUpdateOperationsInput | string
+    request_type?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    requested_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    scheduled_for?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completed_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -16336,6 +21104,206 @@ export namespace Prisma {
     approved_at?: SortOrder
     feedback?: SortOrder
     expires_at?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+  export type JsonNullableFilter<$PrismaModel = never> = 
+    | PatchUndefined<
+        Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonNullableFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
+
+  export type ConsentRecordCountOrderByAggregateInput = {
+    id?: SortOrder
+    user_id?: SortOrder
+    consent_type?: SortOrder
+    purpose?: SortOrder
+    granted?: SortOrder
+    granted_at?: SortOrder
+    withdrawn_at?: SortOrder
+    legal_basis?: SortOrder
+    metadata?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type ConsentRecordMaxOrderByAggregateInput = {
+    id?: SortOrder
+    user_id?: SortOrder
+    consent_type?: SortOrder
+    purpose?: SortOrder
+    granted?: SortOrder
+    granted_at?: SortOrder
+    withdrawn_at?: SortOrder
+    legal_basis?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type ConsentRecordMinOrderByAggregateInput = {
+    id?: SortOrder
+    user_id?: SortOrder
+    consent_type?: SortOrder
+    purpose?: SortOrder
+    granted?: SortOrder
+    granted_at?: SortOrder
+    withdrawn_at?: SortOrder
+    legal_basis?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+  export type JsonNullableWithAggregatesFilter<$PrismaModel = never> = 
+    | PatchUndefined<
+        Either<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedJsonNullableFilter<$PrismaModel>
+    _max?: NestedJsonNullableFilter<$PrismaModel>
+  }
+
+  export type AuditLogCountOrderByAggregateInput = {
+    id?: SortOrder
+    user_id?: SortOrder
+    action?: SortOrder
+    resource_type?: SortOrder
+    resource_id?: SortOrder
+    old_values?: SortOrder
+    new_values?: SortOrder
+    ip_address?: SortOrder
+    user_agent?: SortOrder
+    timestamp?: SortOrder
+  }
+
+  export type AuditLogMaxOrderByAggregateInput = {
+    id?: SortOrder
+    user_id?: SortOrder
+    action?: SortOrder
+    resource_type?: SortOrder
+    resource_id?: SortOrder
+    ip_address?: SortOrder
+    user_agent?: SortOrder
+    timestamp?: SortOrder
+  }
+
+  export type AuditLogMinOrderByAggregateInput = {
+    id?: SortOrder
+    user_id?: SortOrder
+    action?: SortOrder
+    resource_type?: SortOrder
+    resource_id?: SortOrder
+    ip_address?: SortOrder
+    user_agent?: SortOrder
+    timestamp?: SortOrder
+  }
+
+  export type RetentionPolicyCountOrderByAggregateInput = {
+    id?: SortOrder
+    data_category?: SortOrder
+    retention_days?: SortOrder
+    legal_basis?: SortOrder
+    description?: SortOrder
+    is_active?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type RetentionPolicyAvgOrderByAggregateInput = {
+    retention_days?: SortOrder
+  }
+
+  export type RetentionPolicyMaxOrderByAggregateInput = {
+    id?: SortOrder
+    data_category?: SortOrder
+    retention_days?: SortOrder
+    legal_basis?: SortOrder
+    description?: SortOrder
+    is_active?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type RetentionPolicyMinOrderByAggregateInput = {
+    id?: SortOrder
+    data_category?: SortOrder
+    retention_days?: SortOrder
+    legal_basis?: SortOrder
+    description?: SortOrder
+    is_active?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type RetentionPolicySumOrderByAggregateInput = {
+    retention_days?: SortOrder
+  }
+
+  export type ErasureQueueCountOrderByAggregateInput = {
+    id?: SortOrder
+    user_id?: SortOrder
+    request_type?: SortOrder
+    status?: SortOrder
+    requested_at?: SortOrder
+    scheduled_for?: SortOrder
+    completed_at?: SortOrder
+    metadata?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type ErasureQueueMaxOrderByAggregateInput = {
+    id?: SortOrder
+    user_id?: SortOrder
+    request_type?: SortOrder
+    status?: SortOrder
+    requested_at?: SortOrder
+    scheduled_for?: SortOrder
+    completed_at?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type ErasureQueueMinOrderByAggregateInput = {
+    id?: SortOrder
+    user_id?: SortOrder
+    request_type?: SortOrder
+    status?: SortOrder
+    requested_at?: SortOrder
+    scheduled_for?: SortOrder
+    completed_at?: SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
   }
@@ -17394,6 +22362,28 @@ export namespace Prisma {
     | OptionalFlat<Omit<Required<NestedJsonFilterBase<$PrismaModel>>, 'path'>>
 
   export type NestedJsonFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
+  export type NestedJsonNullableFilter<$PrismaModel = never> = 
+    | PatchUndefined<
+        Either<Required<NestedJsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>,
+        Required<NestedJsonNullableFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>
+
+  export type NestedJsonNullableFilterBase<$PrismaModel = never> = {
     equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
     path?: string[]
     string_contains?: string | StringFieldRefInput<$PrismaModel>
@@ -20022,6 +25012,22 @@ export namespace Prisma {
      * @deprecated Use HealthSummaryDefaultArgs instead
      */
     export type HealthSummaryArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = HealthSummaryDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use ConsentRecordDefaultArgs instead
+     */
+    export type ConsentRecordArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = ConsentRecordDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use AuditLogDefaultArgs instead
+     */
+    export type AuditLogArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = AuditLogDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use RetentionPolicyDefaultArgs instead
+     */
+    export type RetentionPolicyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = RetentionPolicyDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use ErasureQueueDefaultArgs instead
+     */
+    export type ErasureQueueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = ErasureQueueDefaultArgs<ExtArgs>
 
   /**
    * Batch Payload for updateMany & deleteMany & createMany

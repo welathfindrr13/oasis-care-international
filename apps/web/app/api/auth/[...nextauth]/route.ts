@@ -9,6 +9,10 @@ const handler = NextAuth({
       clientSecret: process.env.COGNITO_CLIENT_SECRET!,
     }),
   ],
+  pages: {
+    signIn: '/login',
+    error: '/login',
+  },
   callbacks: {
     async jwt({ token, profile }) {
       const groups = (profile && (profile as any)["cognito:groups"]) || token.roles || [];

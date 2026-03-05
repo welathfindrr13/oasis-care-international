@@ -71,6 +71,8 @@ model Visit {
   @@index([client_id])
   @@index([scheduled_start, scheduled_end])
   @@index([carer_id, scheduled_start, scheduled_end])
+  @@index([created_at])
+  @@index([actual_end])
   @@map("visit")
 }
 

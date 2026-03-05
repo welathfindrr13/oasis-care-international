@@ -249,12 +249,68 @@ exports.Prisma.HealthSummaryScalarFieldEnum = {
   updated_at: 'updated_at'
 };
 
+exports.Prisma.ConsentRecordScalarFieldEnum = {
+  id: 'id',
+  user_id: 'user_id',
+  consent_type: 'consent_type',
+  purpose: 'purpose',
+  granted: 'granted',
+  granted_at: 'granted_at',
+  withdrawn_at: 'withdrawn_at',
+  legal_basis: 'legal_basis',
+  metadata: 'metadata',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+};
+
+exports.Prisma.AuditLogScalarFieldEnum = {
+  id: 'id',
+  user_id: 'user_id',
+  action: 'action',
+  resource_type: 'resource_type',
+  resource_id: 'resource_id',
+  old_values: 'old_values',
+  new_values: 'new_values',
+  ip_address: 'ip_address',
+  user_agent: 'user_agent',
+  timestamp: 'timestamp'
+};
+
+exports.Prisma.RetentionPolicyScalarFieldEnum = {
+  id: 'id',
+  data_category: 'data_category',
+  retention_days: 'retention_days',
+  legal_basis: 'legal_basis',
+  description: 'description',
+  is_active: 'is_active',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+};
+
+exports.Prisma.ErasureQueueScalarFieldEnum = {
+  id: 'id',
+  user_id: 'user_id',
+  request_type: 'request_type',
+  status: 'status',
+  requested_at: 'requested_at',
+  scheduled_for: 'scheduled_for',
+  completed_at: 'completed_at',
+  metadata: 'metadata',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
 };
 
 exports.Prisma.JsonNullValueInput = {
+  JsonNull: Prisma.JsonNull
+};
+
+exports.Prisma.NullableJsonNullValueInput = {
+  DbNull: Prisma.DbNull,
   JsonNull: Prisma.JsonNull
 };
 
@@ -313,7 +369,11 @@ exports.Prisma.ModelName = {
   MedicationAudit: 'MedicationAudit',
   Organization: 'Organization',
   LogEmbedding: 'LogEmbedding',
-  HealthSummary: 'HealthSummary'
+  HealthSummary: 'HealthSummary',
+  ConsentRecord: 'ConsentRecord',
+  AuditLog: 'AuditLog',
+  RetentionPolicy: 'RetentionPolicy',
+  ErasureQueue: 'ErasureQueue'
 };
 
 /**

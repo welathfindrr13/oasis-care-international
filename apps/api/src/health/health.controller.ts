@@ -4,6 +4,7 @@ import { Controller, Get } from '@nestjs/common';
 export class HealthController {
   @Get()
   health() {
+    console.log('>>> /healthz called at', new Date().toISOString());
     return { status: 'ok' };
   }
 }
@@ -12,6 +13,7 @@ export class HealthController {
 export class StandardHealthController {
   @Get('health')
   standardHealth() {
+    console.log('>>> /health called at', new Date().toISOString());
     return { status: 'ok' };
   }
 }

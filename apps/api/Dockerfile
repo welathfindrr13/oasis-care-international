@@ -1,8 +1,8 @@
 # ---- build stage ----
-FROM node:20-alpine AS build
+FROM node:20-slim AS build
 
 # Install native build dependencies for node-gyp packages
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y python3 make g++ openssl && rm -rf /var/lib/apt/lists/*
 
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
@@ -21,26 +21,24 @@ COPY libs/db/package.json ./libs/db/
 # Install dependencies for all workspaces
 RUN pnpm install --no-frozen-lockfile
 
-# ─── Diagnostic: list all workspaces Turbo detects ─────────────────────────────
-# This prints a JSON array of unique workspace names.  You should see each name
-# only once; if "@oasis/db" (or any other) appears twice, we know duplication is
-# happening after the COPY steps.
-RUN pnpm dlx turbo list --json \
-    | jq '.packages | map(.name) | unique' \
-    || true
-
 # Copy source code
 COPY . .
 
-# Set Prisma schema path and generate client
-ENV PRISMA_SCHEMA=libs/db/prisma/schema.prisma
-# RUN pnpm exec prisma generate --schema=libs/db/prisma/schema.prisma
+# Generate Prisma client
+RUN cd libs/db && npx prisma generate
 
-# Build the application (Turbo first builds dependent libs)
-RUN pnpm turbo run build --filter=@oasis/api
+# Build libs explicitly (not declared as npm deps, just tsconfig paths)
+RUN cd libs/auth && pnpm build
+RUN cd libs/db && pnpm build
+
+# Build the API
+RUN cd apps/api && pnpm build
 
 # ---- production image ----
-FROM node:20-alpine AS production
+FROM node:20-slim AS production
+
+# Install openssl for Prisma and curl for health checks
+RUN apt-get update && apt-get install -y openssl curl && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
 WORKDIR /app
@@ -48,7 +46,7 @@ WORKDIR /app
 # Install pnpm for production
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy workspace files
+# Copy workspace config
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY turbo.json ./
 
@@ -57,20 +55,39 @@ COPY apps/api/package.json ./apps/api/
 COPY libs/auth/package.json ./libs/auth/
 COPY libs/db/package.json ./libs/db/
 
-# Install only production dependencies
-RUN pnpm install --prod
+# Patch libs package.json to point to compiled dist instead of src
+RUN sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|g' ./libs/auth/package.json && \
+    sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|g' ./libs/db/package.json
 
-# Copy built application
+# Install production dependencies only
+RUN pnpm install --prod --no-frozen-lockfile
+
+# Create symlinks for workspace packages (pnpm doesn't do this in prod mode)
+RUN mkdir -p node_modules/@oasis && \
+    ln -sf /app/libs/auth node_modules/@oasis/auth && \
+    ln -sf /app/libs/db node_modules/@oasis/db
+
+# Copy built application from build stage
 COPY --from=build /app/apps/api/dist ./apps/api/dist
-COPY --from=build /app/libs ./libs
 
-# Copy Prisma schema and generated client
+# Copy compiled libs
+COPY --from=build /app/libs/auth/dist ./libs/auth/dist
+COPY --from=build /app/libs/db/dist ./libs/db/dist
+
+# Copy Prisma schema and generated client (includes query engine)
 COPY --from=build /app/libs/db/prisma ./libs/db/prisma
+COPY --from=build /app/libs/db/src/generated ./libs/db/src/generated
+# Also copy to dist/ where the compiled code expects it
+COPY --from=build /app/libs/db/src/generated ./libs/db/dist/generated
+
+# Copy entrypoint script
+COPY apps/api/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
+RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs nestjs
 USER nestjs
 
-EXPOSE 3001
+EXPOSE 3000
 
-CMD ["node", "apps/api/dist/main.js"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

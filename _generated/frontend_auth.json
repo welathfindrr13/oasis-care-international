@@ -1,0 +1,5 @@
+{
+  "hasNextAuth": true,
+  "hasMiddleware": false,
+  "middlewareContainsMatcher": false
+}

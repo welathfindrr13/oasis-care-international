@@ -1,0 +1,69 @@
+{
+  "components": [
+    {
+      "name": "ApprovalControls",
+      "path": "apps/web/components/HealthSummary/ApprovalControls.tsx",
+      "kind": "feature"
+    },
+    {
+      "name": "RiskIndicator",
+      "path": "apps/web/components/HealthSummary/RiskIndicator.tsx",
+      "kind": "feature"
+    },
+    {
+      "name": "SummaryViewer",
+      "path": "apps/web/components/HealthSummary/SummaryViewer.tsx",
+      "kind": "feature"
+    },
+    {
+      "name": "RiskIndicator.test",
+      "path": "apps/web/components/HealthSummary/__tests__/RiskIndicator.test.tsx",
+      "kind": "feature"
+    },
+    {
+      "name": "Index",
+      "path": "apps/web/components/HealthSummary/index.ts",
+      "kind": "feature"
+    },
+    {
+      "name": "MedsTab",
+      "path": "apps/web/components/MedsTab.tsx",
+      "kind": "feature"
+    },
+    {
+      "name": "FilterBar",
+      "path": "apps/web/components/oasis/FilterBar.tsx",
+      "kind": "domain"
+    },
+    {
+      "name": "MetricCard",
+      "path": "apps/web/components/oasis/MetricCard.tsx",
+      "kind": "domain"
+    },
+    {
+      "name": "Nav",
+      "path": "apps/web/components/oasis/Nav.tsx",
+      "kind": "domain"
+    },
+    {
+      "name": "StatusChip",
+      "path": "apps/web/components/oasis/StatusChip.tsx",
+      "kind": "domain"
+    },
+    {
+      "name": "Button",
+      "path": "apps/web/components/ui/Button.tsx",
+      "kind": "ui"
+    },
+    {
+      "name": "Card",
+      "path": "apps/web/components/ui/Card.tsx",
+      "kind": "ui"
+    },
+    {
+      "name": "Index",
+      "path": "apps/web/components/ui/index.ts",
+      "kind": "ui"
+    }
+  ]
+}

@@ -134,7 +134,8 @@ data "aws_iam_policy_document" "lambda_embedding_permissions" {
       "secretsmanager:GetSecretValue"
     ]
     resources = [
-      "arn:aws:secretsmanager:eu-west-2:721689331449:secret:oasis/staging/DATABASE_URL*"
+      "arn:aws:secretsmanager:eu-west-2:721689331449:secret:oasis/staging/DATABASE_URL*",
+      "arn:aws:secretsmanager:eu-west-2:721689331449:secret:oasis/staging/JWT_SECRET*"
     ]
   }
 
