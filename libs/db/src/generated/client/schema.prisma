@@ -7,7 +7,7 @@ generator client {
   provider        = "prisma-client-js"
   output          = "../src/generated/client"
   engineType      = "library"
-  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
+  binaryTargets   = ["native", "linux-musl", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
   previewFeatures = ["postgresqlExtensions"]
 }
 
@@ -71,6 +71,8 @@ model Visit {
   @@index([client_id])
   @@index([scheduled_start, scheduled_end])
   @@index([carer_id, scheduled_start, scheduled_end])
+  @@index([created_at])
+  @@index([actual_end])
   @@map("visit")
 }
 
