@@ -1,7 +1,8 @@
 import NextAuth from "next-auth";
 import Cognito from "next-auth/providers/cognito";
+import { extractRolesFromClaims, normalizeAppRoles } from "../../../../lib/auth/roles";
 
-const handler = NextAuth({
+export const authOptions = {
   providers: [
     Cognito({
       issuer: process.env.COGNITO_ISSUER,
@@ -14,16 +15,27 @@ const handler = NextAuth({
     error: '/login',
   },
   callbacks: {
-    async jwt({ token, profile }) {
-      const groups = (profile && (profile as any)["cognito:groups"]) || token.roles || [];
-      token.roles = groups;
+    async jwt({ token, profile, account }) {
+      const nextRoles =
+        extractRolesFromClaims((profile as Record<string, unknown> | undefined) ?? null) ||
+        normalizeAppRoles((token as any).roles);
+
+      (token as any).roles = nextRoles;
+
+      if (account?.access_token) {
+        (token as any).accessToken = account.access_token;
+      }
+
       return token;
     },
     async session({ session, token }) {
-      (session as any).roles = token.roles ?? [];
+      (session as any).roles = normalizeAppRoles((token as any).roles);
+      (session as any).accessToken = (token as any).accessToken;
       return session;
     },
   },
-});
+};
+
+const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };

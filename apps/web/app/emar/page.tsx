@@ -56,14 +56,15 @@ export default function EmarPage() {
   });
   
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [medicationsError, setMedicationsError] = useState<string | null>(null);
+  const [provisioningError, setProvisioningError] = useState<string | null>(null);
   const [medications, setMedications] = useState<MedicationAdministration[]>([]);
 
   // Fetch medications when date changes
   useEffect(() => {
     async function fetchMedications() {
       setLoading(true);
-      setError(null);
+      setMedicationsError(null);
       
       try {
         const data = await clientQuery<GetTodaysMedicationsResponse>(EMAR_QUERY, {
@@ -72,7 +73,7 @@ export default function EmarPage() {
         setMedications(data.getTodaysMedicationsByClient || []);
       } catch (err) {
         console.error('Failed to fetch medications:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load medications');
+        setMedicationsError(err instanceof Error ? err.message : 'Failed to load medications');
         setMedications([]);
       } finally {
         setLoading(false);
@@ -84,7 +85,7 @@ export default function EmarPage() {
 
   const refetch = () => {
     setLoading(true);
-    setError(null);
+    setMedicationsError(null);
     
     clientQuery<GetTodaysMedicationsResponse>(EMAR_QUERY, { date: selectedDate })
       .then((data) => {
@@ -92,13 +93,17 @@ export default function EmarPage() {
       })
       .catch((err) => {
         console.error('Failed to fetch medications:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load medications');
+        setMedicationsError(err instanceof Error ? err.message : 'Failed to load medications');
         setMedications([]);
       })
       .finally(() => {
         setLoading(false);
       });
   };
+
+  useEffect(() => {
+    setProvisioningError(null);
+  }, [selectedDate]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -162,25 +167,6 @@ export default function EmarPage() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-red-800 mb-2">Error Loading Medications</h2>
-            <p className="text-red-600">{error}</p>
-            <button
-              onClick={() => refetch()}
-              className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-50">
       <Header />
@@ -191,7 +177,6 @@ export default function EmarPage() {
           <p className="text-slate-500 mt-1">Track and manage medication administration</p>
         </div>
         <div className="mb-6">
-          
           <div className="flex items-center space-x-4">
             <label htmlFor="date" className="text-sm font-medium text-slate-700">
               Date:
@@ -208,6 +193,26 @@ export default function EmarPage() {
             </div>
           </div>
         </div>
+
+        {provisioningError && (
+          <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <h2 className="text-sm font-semibold text-amber-900">Provisioning data unavailable</h2>
+            <p className="mt-1 text-sm text-amber-800">{provisioningError}</p>
+          </div>
+        )}
+
+        {medicationsError && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-6">
+            <h2 className="text-lg font-semibold text-red-800 mb-2">Error Loading Medications</h2>
+            <p className="text-red-600">{medicationsError}</p>
+            <button
+              onClick={() => refetch()}
+              className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
 
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">

@@ -229,12 +229,45 @@ export class MedicationService {
     userId: string,
     userRole: string
   ): Promise<MedicationAdministration[]> {
-    this.checkOfficeAccess(userRole);
+    if (Number.isNaN(date.getTime())) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'A valid medication date is required',
+        HttpStatus.BAD_REQUEST
+      );
+    }
     
     const requestId = this.cls.get('requestId');
     this.logger.log(`Fetching today's medications for date ${date.toISOString()}`, { requestId });
 
-    return this.medicationRepository.findTodaysMedicationsByClient(date);
+    const normalizedRole = userRole.toLowerCase();
+    if (!['admin', 'office', 'carer'].includes(normalizedRole)) {
+      throw new BaseHttpException(
+        ErrorCode.FORBIDDEN_OFFICE_ACCESS,
+        'Admin, office, or carer access required',
+        HttpStatus.FORBIDDEN
+      );
+    }
+
+    const administrations = await this.medicationRepository.findTodaysMedicationsByClient(
+      date,
+      normalizedRole === 'carer' ? { carerId: userId } : {}
+    );
+
+    return administrations.filter((administration) => {
+      const hasRequiredRelations =
+        Boolean((administration as any).prescription?.client) &&
+        Boolean((administration as any).prescription?.medication);
+
+      if (!hasRequiredRelations) {
+        this.logger.warn(
+          `Skipping incomplete medication administration ${administration.id}`,
+          { requestId }
+        );
+      }
+
+      return hasRequiredRelations;
+    });
   }
 
   async findMedications(

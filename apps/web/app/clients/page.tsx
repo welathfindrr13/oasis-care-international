@@ -123,13 +123,18 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
               </div>
               <div className="flex items-center gap-3">
                 <form method="get" action="/clients">
-                  <input
-                    type="search"
-                    name="search"
-                    defaultValue={searchParams.search || ''}
-                    placeholder="Search clients..."
-                    className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 w-64"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="search"
+                      name="search"
+                      defaultValue={searchParams.search || ''}
+                      placeholder="Search clients..."
+                      className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 w-64"
+                    />
+                    <Button variant="outline" size="sm" type="submit">
+                      Search
+                    </Button>
+                  </div>
                 </form>
                 <Link href="/clients/new">
                   <Button variant="primary" size="sm">

@@ -213,7 +213,10 @@ export class MedicationRepository {
     });
   }
 
-  async findTodaysMedicationsByClient(date: Date): Promise<MedicationAdministration[]> {
+  async findTodaysMedicationsByClient(
+    date: Date,
+    options: { carerId?: string } = {}
+  ): Promise<MedicationAdministration[]> {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
     
@@ -226,6 +229,16 @@ export class MedicationRepository {
           gte: startOfDay,
           lte: endOfDay
         },
+        ...(options.carerId
+          ? {
+              visit: {
+                is: {
+                  carer_id: options.carerId,
+                  deleted_at: null,
+                },
+              },
+            }
+          : {}),
         deleted_at: null
       },
       include: {

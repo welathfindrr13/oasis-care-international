@@ -1,4 +1,25 @@
-export { default } from "next-auth/middleware"
+import { withAuth } from "next-auth/middleware";
+import { hasRole } from "./lib/auth/roles";
+
+export default withAuth({
+  pages: {
+    signIn: "/login",
+  },
+  callbacks: {
+    authorized: ({ req, token }) => {
+      if (!token) {
+        return false;
+      }
+
+      const pathname = req.nextUrl.pathname;
+      if (pathname.startsWith("/admin")) {
+        return hasRole((token as any).roles, "admin");
+      }
+
+      return true;
+    },
+  },
+});
 
 export const config = {
   matcher: [
@@ -16,5 +37,4 @@ export const config = {
     "/((?!api/auth|api/health|api/graphql|login|_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.svg$).*)",
   ],
 }
-
 

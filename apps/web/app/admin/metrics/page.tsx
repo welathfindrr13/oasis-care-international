@@ -10,12 +10,8 @@ export const metadata: Metadata = {
 
 async function getMetrics(): Promise<string> {
   try {
-    // Try to fetch metrics from API
     const response = await fetch('http://localhost:4000/metrics', {
       cache: 'no-store',
-      headers: {
-        'Authorization': 'Bearer DEMO_ADMIN'
-      }
     });
     
     if (!response.ok) {
@@ -154,10 +150,10 @@ export default async function MetricsPage() {
                 </div>
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-blue-800">
-                    Admin Access Required
+                    Admin Access Verified
                   </h3>
                   <div className="mt-2 text-sm text-blue-700">
-                    <p>This page shows system metrics and is typically restricted to administrators. In demo mode, some metrics may be unavailable or simulated.</p>
+                    <p>This route is now restricted to authenticated admin users before any page content is rendered.</p>
                   </div>
                 </div>
               </div>

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { cn } from '../../lib/utils'
+import { hasRole, normalizeAppRoles } from '../../lib/auth/roles'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
@@ -31,7 +32,9 @@ export function Header({
   // Get user info from session
   const userName = session?.user?.name || session?.user?.email?.split('@')[0] || 'User'
   const userEmail = session?.user?.email || ''
-  const userRole = (session as any)?.roles?.[0] || 'Care Manager'
+  const roles = normalizeAppRoles((session as any)?.roles)
+  const isAdmin = hasRole(roles, 'admin')
+  const userRole = roles[0] ? roles[0].replace('_', ' ') : 'user'
 
   return (
     <header className={cn('bg-white border-b border-slate-200 sticky top-0 z-50', className)}>
@@ -127,12 +130,14 @@ export function Header({
                     </svg>
                     Settings
                   </Link>
-                  <Link href="/admin" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                    </svg>
-                    Admin Panel
-                  </Link>
+                  {isAdmin && (
+                    <Link href="/admin/metrics" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                      </svg>
+                      Admin Panel
+                    </Link>
+                  )}
                   <div className="border-t border-slate-100 mt-2 pt-2">
                     <button 
                       onClick={() => signOut({ callbackUrl: '/login' })}
@@ -198,4 +203,3 @@ export function Header({
     </header>
   )
 }
-

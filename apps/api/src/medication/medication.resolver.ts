@@ -10,6 +10,9 @@ import { MedicationFilterArgs } from './dto/medication-filter.args';
 import { MedicationDto, MedicationListDto } from './dto/medication.dto';
 import { PrescriptionDto } from './dto/prescription.dto';
 import { MedicationAdministrationDto } from './dto/medication-administration.dto';
+import { BaseHttpException } from '../common/errors/base-http.exception';
+import { ErrorCode } from '../common/errors/error-codes';
+import { HttpStatus } from '@nestjs/common';
 
 export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => 
   SetMetadata('roles', roles);
@@ -76,8 +79,17 @@ export class MedicationResolver {
     @Args('date') date: string,
     @Context('req') req: any,
   ): Promise<MedicationAdministrationDto[]> {
+    const parsedDate = new Date(date);
+    if (Number.isNaN(parsedDate.getTime())) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'A valid medication date is required',
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
     const administrations = await this.medicationService.getTodaysMedicationsByClient(
-      new Date(date),
+      parsedDate,
       req.user.id,
       req.user.role,
     );

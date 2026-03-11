@@ -363,19 +363,21 @@ describe('MedicationService', () => {
   });
 
   describe('getTodaysMedicationsByClient', () => {
-    it('should throw error for non-office users', async () => {
-      await expect(
-        service.getTodaysMedicationsByClient(
-          new Date(),
-          mockUser.id,
-          mockUser.role
-        )
-      ).rejects.toThrow(
-        new BaseHttpException(
-          ErrorCode.FORBIDDEN_OFFICE_ACCESS,
-          'Office or admin access required',
-          HttpStatus.FORBIDDEN
-        )
+    it('should return scoped medications for carers', async () => {
+      const todaysMeds = [mockMedicationAdministration];
+
+      repository.findTodaysMedicationsByClient.mockResolvedValue(todaysMeds as any);
+
+      const result = await service.getTodaysMedicationsByClient(
+        new Date(),
+        mockUser.id,
+        mockUser.role
+      );
+
+      expect(result).toEqual(todaysMeds);
+      expect(repository.findTodaysMedicationsByClient).toHaveBeenCalledWith(
+        expect.any(Date),
+        { carerId: mockUser.id }
       );
     });
 
@@ -391,6 +393,10 @@ describe('MedicationService', () => {
       );
 
       expect(result).toEqual(todaysMeds);
+      expect(repository.findTodaysMedicationsByClient).toHaveBeenCalledWith(
+        expect.any(Date),
+        {}
+      );
     });
 
     it('should return medications for admin users', async () => {
@@ -405,6 +411,46 @@ describe('MedicationService', () => {
       );
 
       expect(result).toEqual(todaysMeds);
+      expect(repository.findTodaysMedicationsByClient).toHaveBeenCalledWith(
+        expect.any(Date),
+        {}
+      );
+    });
+
+    it('should reject invalid dates', async () => {
+      await expect(
+        service.getTodaysMedicationsByClient(
+          new Date('invalid'),
+          mockAdminUser.id,
+          mockAdminUser.role
+        )
+      ).rejects.toThrow(
+        new BaseHttpException(
+          ErrorCode.VALIDATION_FAILED,
+          'A valid medication date is required',
+          HttpStatus.BAD_REQUEST
+        )
+      );
+    });
+
+    it('should drop incomplete medication rows instead of throwing', async () => {
+      repository.findTodaysMedicationsByClient.mockResolvedValue([
+        mockMedicationAdministration,
+        {
+          ...mockMedicationAdministration,
+          id: 'missing-relations',
+          prescription: undefined,
+        },
+      ] as any);
+
+      const result = await service.getTodaysMedicationsByClient(
+        new Date(),
+        mockAdminUser.id,
+        mockAdminUser.role
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(mockMedicationAdministration.id);
     });
   });
 
