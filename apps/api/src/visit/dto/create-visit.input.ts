@@ -1,5 +1,5 @@
 import { InputType, Field, ID } from '@nestjs/graphql';
-import { IsUUID, IsDateString, IsEnum, IsOptional, IsString, ValidateNested, IsArray } from 'class-validator';
+import { IsUUID, IsDateString, IsEnum, IsOptional, IsString, ValidateNested, IsArray, IsNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
 import { VisitStatus } from '@oasis/db';
 
@@ -18,7 +18,8 @@ export class CreateVisitTaskInput {
 @InputType()
 export class CreateVisitInput {
   @Field(() => ID)
-  @IsUUID()
+  @IsString()
+  @IsNotEmpty()
   carerId!: string;
 
   @Field(() => ID)

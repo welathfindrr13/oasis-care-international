@@ -36,6 +36,9 @@
   --color-background-accent: #edf5fa;
 
   /* Typography - Font Families */
+  --font-inter: Inter, system-ui, sans-serif;
+  --font-work-sans: "Work Sans", system-ui, sans-serif;
+  --font-source-sans: "Source Sans 3", system-ui, sans-serif;
   --font-family-sans: Inter, system-ui, sans-serif;
   --font-family-heading: "Work Sans", system-ui, sans-serif;
   --font-family-body: "Droid Sans", system-ui, sans-serif;

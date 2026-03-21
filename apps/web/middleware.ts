@@ -12,7 +12,11 @@ export default withAuth({
       }
 
       const pathname = req.nextUrl.pathname;
-      if (pathname.startsWith("/admin")) {
+      if (
+        pathname.startsWith("/admin") ||
+        pathname.startsWith("/clients") ||
+        pathname === "/visits/new"
+      ) {
         return hasRole((token as any).roles, "admin");
       }
 
@@ -37,4 +41,3 @@ export const config = {
     "/((?!api/auth|api/health|api/graphql|login|_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.svg$).*)",
   ],
 }
-

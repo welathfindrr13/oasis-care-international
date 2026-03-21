@@ -240,7 +240,7 @@ export class MedicationService {
     const requestId = this.cls.get('requestId');
     this.logger.log(`Fetching today's medications for date ${date.toISOString()}`, { requestId });
 
-    const normalizedRole = userRole.toLowerCase();
+    const normalizedRole = typeof userRole === 'string' ? userRole.toLowerCase() : '';
     if (!['admin', 'office', 'carer'].includes(normalizedRole)) {
       throw new BaseHttpException(
         ErrorCode.FORBIDDEN_OFFICE_ACCESS,

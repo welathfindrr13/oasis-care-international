@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../../../../lib/auth/auth-options';
 
 // Next.js build: mark as dynamic so /api/stats/today isn't prerendered
 export const dynamic = 'force-dynamic';
@@ -9,6 +11,8 @@ export async function GET() {
     // Extract base API URL without /graphql path for REST endpoints
     const fullApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql';
     const apiUrl = fullApiUrl.replace(/\/graphql$/, '');
+    const session = await getServerSession(authOptions);
+    const accessToken = (session as any)?.accessToken as string | undefined;
     
     // Add timeout to prevent hanging
     const controller = new AbortController();
@@ -17,6 +21,7 @@ export async function GET() {
     const res = await fetch(`${apiUrl}/stats/today`, {
       headers: {
         Cookie: cookies().toString(),
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       cache: 'no-store',
       signal: controller.signal,

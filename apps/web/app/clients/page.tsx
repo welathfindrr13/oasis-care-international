@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import Link from 'next/link'
 import { Header } from '../../components/oasis/Header'
 import { Card, CardContent, CardHeader } from '../../components/ui/Card'
-import { Button } from '../../components/ui/Button'
+import { buttonVariants } from '../../components/ui/Button'
 import { query } from '../../lib/graphql/client'
 import {
   CLIENTS_QUERY,
@@ -16,6 +16,8 @@ export const metadata: Metadata = {
   title: 'Clients - Oasis Care',
   description: 'Manage and view client information',
 }
+
+export const dynamic = 'force-dynamic'
 
 interface ClientsPageProps {
   searchParams: {
@@ -74,10 +76,8 @@ function EmptyState() {
       <p className="text-text-secondary mb-4">
         Get started by adding your first client.
       </p>
-      <Link href="/clients/new">
-        <Button variant="primary">
-          Add Client
-        </Button>
+      <Link href="/clients/new" className={buttonVariants({ variant: 'primary' })}>
+        Add Client
       </Link>
     </div>
   )
@@ -131,15 +131,13 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
                       placeholder="Search clients..."
                       className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 w-64"
                     />
-                    <Button variant="outline" size="sm" type="submit">
+                    <button className={buttonVariants({ variant: 'outline', size: 'sm' })} type="submit">
                       Search
-                    </Button>
+                    </button>
                   </div>
                 </form>
-                <Link href="/clients/new">
-                  <Button variant="primary" size="sm">
-                    Add Client
-                  </Button>
+                <Link href="/clients/new" className={buttonVariants({ variant: 'primary', size: 'sm' })}>
+                  Add Client
                 </Link>
               </div>
             </div>
@@ -212,20 +210,14 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
-                            <Link href={`/clients/${client.id}`}>
-                              <Button variant="ghost" size="sm">
-                                View
-                              </Button>
+                            <Link href={`/clients/${client.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                              View
                             </Link>
-                            <Link href={`/clients/${client.id}/edit`}>
-                              <Button variant="ghost" size="sm">
-                                Edit
-                              </Button>
+                            <Link href={`/clients/${client.id}/edit`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                              Edit
                             </Link>
-                            <Link href={`/visits/new?clientId=${client.id}`}>
-                              <Button variant="ghost" size="sm">
-                                Schedule
-                              </Button>
+                            <Link href={`/visits/new?clientId=${client.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                              Schedule
                             </Link>
                           </div>
                         </td>

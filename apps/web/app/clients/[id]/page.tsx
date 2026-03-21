@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import Link from 'next/link'
 import { Header } from '../../../components/oasis/Header'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
-import { Button } from '../../../components/ui/Button'
+import { buttonVariants } from '../../../components/ui/Button'
 
 // Mock client data - same as clients list, would come from API
 const mockClients: Record<string, {
@@ -111,9 +111,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
             <h1 className="text-2xl font-bold text-slate-900 mb-2">Client Not Found</h1>
             <p className="text-slate-600 mb-4">The client you&apos;re looking for doesn&apos;t exist.</p>
-            <Link href="/clients">
-              <Button variant="primary">Back to Clients</Button>
-            </Link>
+            <Link href="/clients" className={buttonVariants({ variant: 'primary' })}>Back to Clients</Link>
           </div>
         </main>
       </div>
@@ -146,20 +144,14 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
             <p className="text-slate-500 mt-1">Client ID: {client.id}</p>
           </div>
           <div className="flex items-center gap-3">
-            <Link href={`/clients/${client.id}/summary`}>
-              <Button variant="outline" size="sm">
-                🤖 AI Health Summary
-              </Button>
+            <Link href={`/clients/${client.id}/summary`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              🤖 AI Health Summary
             </Link>
-            <Link href={`/clients/${client.id}/edit`}>
-              <Button variant="secondary" size="sm">
-                Edit
-              </Button>
+            <Link href={`/clients/${client.id}/edit`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              Edit
             </Link>
-            <Link href={`/visits/new?clientId=${client.id}`}>
-              <Button variant="primary" size="sm">
-                Schedule Visit
-              </Button>
+            <Link href={`/visits/new?clientId=${client.id}`} className={buttonVariants({ variant: 'primary', size: 'sm' })}>
+              Schedule Visit
             </Link>
           </div>
         </div>
@@ -304,20 +296,23 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  <Link href={`/emar?clientId=${client.id}`} className="block">
-                    <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 rounded-xl text-slate-700 font-medium transition-colors text-left">
-                      💊 View Medications
-                    </button>
+                  <Link
+                    href={`/emar?clientId=${client.id}`}
+                    className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                  >
+                    💊 View Medications
                   </Link>
-                  <Link href={`/clients/${client.id}/summary`} className="block">
-                    <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 rounded-xl text-slate-700 font-medium transition-colors text-left">
-                      🤖 AI Health Summary
-                    </button>
+                  <Link
+                    href={`/clients/${client.id}/summary`}
+                    className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                  >
+                    🤖 AI Health Summary
                   </Link>
-                  <Link href={`/visits/new?clientId=${client.id}`} className="block">
-                    <button className="w-full flex items-center gap-3 px-4 py-3 bg-teal-50 hover:bg-teal-100 rounded-xl text-teal-700 font-medium transition-colors text-left">
-                      📅 Schedule Visit
-                    </button>
+                  <Link
+                    href={`/visits/new?clientId=${client.id}`}
+                    className="block w-full rounded-xl bg-teal-50 px-4 py-3 text-left font-medium text-teal-700 transition-colors hover:bg-teal-100"
+                  >
+                    📅 Schedule Visit
                   </Link>
                 </div>
               </CardContent>
@@ -328,4 +323,3 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     </div>
   )
 }
-

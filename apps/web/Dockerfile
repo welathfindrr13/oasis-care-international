@@ -1,8 +1,9 @@
 FROM node:20-alpine
 WORKDIR /app
 
-# Install curl for health checks
-RUN apk add --no-cache curl
+# Install the native build toolchain needed by a few transitive packages
+# during pnpm install, plus curl for health checks.
+RUN apk add --no-cache curl python3 make g++
 
 # Enable pnpm via Corepack
 RUN corepack enable

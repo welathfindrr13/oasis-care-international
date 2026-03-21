@@ -1,12 +1,13 @@
 import { ArgsType, Field, ID, Int } from '@nestjs/graphql';
-import { IsOptional, IsUUID, IsEnum, IsDateString, IsInt, Min, Max } from 'class-validator';
+import { IsOptional, IsUUID, IsEnum, IsDateString, IsInt, Min, Max, IsString, IsNotEmpty } from 'class-validator';
 import { VisitStatus } from '@oasis/db';
 
 @ArgsType()
 export class VisitFilterArgs {
   @Field(() => ID, { nullable: true })
   @IsOptional()
-  @IsUUID()
+  @IsString()
+  @IsNotEmpty()
   carerId?: string;
 
   @Field(() => ID, { nullable: true })

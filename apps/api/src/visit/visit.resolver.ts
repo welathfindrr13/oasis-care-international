@@ -1,18 +1,17 @@
 import { Resolver, Query, Mutation, Args, Context } from '@nestjs/graphql';
 import { UseGuards, SetMetadata } from '@nestjs/common';
 import { VisitService } from './visit.service';
-import { VisitDTO, VisitPaginatedResponse, VisitTaskDTO } from './dto/visit.dto';
+import { CarerDTO, VisitDTO, VisitPaginatedResponse, VisitTaskDTO } from './dto/visit.dto';
 import { CreateVisitInput } from './dto/create-visit.input';
 import { UpdateVisitInput } from './dto/update-visit.input';
 import { VisitFilterArgs } from './dto/visit-filter.args';
-import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '@oasis/auth';
 
 export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => 
   SetMetadata('roles', roles);
 
 @Resolver(() => VisitDTO)
-@UseGuards(AuthGuard('jwt'), RolesGuard)
+@UseGuards(RolesGuard)
 export class VisitResolver {
   constructor(private readonly visitService: VisitService) {}
 
@@ -44,6 +43,14 @@ export class VisitResolver {
       items: result.items.map(v => this.mapVisitToDTO(v)),
       total: result.total,
     };
+  }
+
+  @Query(() => [CarerDTO])
+  @Roles('admin')
+  async carers(
+    @Args('activeOnly', { type: () => Boolean, nullable: true, defaultValue: true }) activeOnly: boolean,
+  ): Promise<CarerDTO[]> {
+    return this.visitService.findAssignableCarers(activeOnly);
   }
 
   @Mutation(() => VisitDTO)

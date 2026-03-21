@@ -8,14 +8,13 @@ import {
 import { GenerateSummaryInput } from './dto/generate-summary.input';
 import { ApproveSummaryInput } from './dto/approve-summary.input';
 import { HealthSummaryFilterArgs } from './dto/health-summary-filter.args';
-import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '@oasis/auth';
 
 export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => 
   SetMetadata('roles', roles);
 
 @Resolver(() => HealthSummaryDTO)
-@UseGuards(AuthGuard('jwt'), RolesGuard)
+@UseGuards(RolesGuard)
 export class AiSummaryResolver {
   constructor(private readonly aiSummaryService: AiSummaryService) {}
 

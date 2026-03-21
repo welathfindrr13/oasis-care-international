@@ -28,7 +28,8 @@ COPY . .
 RUN cd libs/db && npx prisma generate
 
 # Build libs explicitly (not declared as npm deps, just tsconfig paths)
-RUN cd libs/auth && pnpm build
+# Force a clean auth build so dist JS is emitted inside Docker as well.
+RUN cd libs/auth && rm -rf dist tsconfig.tsbuildinfo && pnpm exec tsc -p tsconfig.json --incremental false && test -f dist/index.js
 RUN cd libs/db && pnpm build
 
 # Build the API

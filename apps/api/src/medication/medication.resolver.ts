@@ -1,6 +1,5 @@
 import { Resolver, Query, Mutation, Args, Context } from '@nestjs/graphql';
 import { UseGuards, SetMetadata } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '@oasis/auth';
 import { MedicationService } from './medication.service';
 import { CreateMedicationInput } from './dto/create-medication.input';
@@ -18,7 +17,7 @@ export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
   SetMetadata('roles', roles);
 
 @Resolver()
-@UseGuards(AuthGuard('jwt'), RolesGuard)
+@UseGuards(RolesGuard)
 export class MedicationResolver {
   constructor(private readonly medicationService: MedicationService) {}
 

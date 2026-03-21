@@ -1,9 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService, Visit, VisitTask, Prisma, VisitStatus } from '@oasis/db';
+import { PrismaService, Visit, VisitTask, Prisma, VisitStatus, Carer } from '@oasis/db';
 
 @Injectable()
 export class VisitRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  async findCarers(activeOnly = true): Promise<Carer[]> {
+    const where: Prisma.CarerWhereInput = this.prisma.whereNotDeleted(
+      activeOnly ? { is_active: true } : {}
+    );
+
+    return this.prisma.carer.findMany({
+      where,
+      orderBy: [
+        { first_name: 'asc' },
+        { last_name: 'asc' },
+      ],
+    });
+  }
 
   async create(data: Prisma.VisitCreateInput): Promise<Visit> {
     return this.prisma.visit.create({

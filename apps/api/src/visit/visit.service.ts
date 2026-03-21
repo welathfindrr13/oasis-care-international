@@ -3,12 +3,13 @@ import { VisitRepository } from './visit.repository';
 import { CreateVisitInput } from './dto/create-visit.input';
 import { UpdateVisitInput } from './dto/update-visit.input';
 import { VisitFilterArgs } from './dto/visit-filter.args';
-import { Visit, VisitTask, VisitStatus } from '@oasis/db';
+import { Visit, VisitTask, VisitStatus, Carer } from '@oasis/db';
 import { ClsService } from 'nestjs-cls';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
 import { Inject } from '@nestjs/common';
 import { Counter } from 'prom-client';
+import { CarerDTO } from './dto/visit.dto';
 
 @Injectable()
 export class VisitService {
@@ -74,6 +75,11 @@ export class VisitService {
     this.createCounter.inc();
     this.logger.log(`Visit ${visit.id} created successfully`, { requestId });
     return visit;
+  }
+
+  async findAssignableCarers(activeOnly = true): Promise<CarerDTO[]> {
+    const carers = await this.visitRepository.findCarers(activeOnly);
+    return carers.map((carer) => this.mapCarerToDTO(carer));
   }
 
   async updateVisit(
@@ -293,5 +299,15 @@ export class VisitService {
         HttpStatus.FORBIDDEN
       );
     }
+  }
+
+  private mapCarerToDTO(carer: Carer): CarerDTO {
+    return {
+      id: carer.id,
+      firstName: carer.first_name,
+      lastName: carer.last_name,
+      email: carer.email,
+      phone: carer.phone,
+    };
   }
 }

@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '../../../components/oasis/Header';
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card';
-import { Button } from '../../../components/ui/Button';
+import { Button, buttonVariants } from '../../../components/ui/Button';
+import { clientQuery } from '../../../lib/graphql/client-side';
 
 const CREATE_CLIENT_MUTATION = `
   mutation CreateClient($input: CreateClientInput!) {
@@ -48,7 +49,24 @@ export default function NewClientPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    const trimmedData = {
+      fullName: formData.fullName.trim(),
+      addressLine1: formData.addressLine1.trim(),
+      addressLine2: formData.addressLine2.trim(),
+      city: formData.city.trim(),
+      postcode: formData.postcode.trim().toUpperCase(),
+    };
+
+    const isMissingRequiredField = !trimmedData.fullName ||
+      !trimmedData.addressLine1 ||
+      !trimmedData.city ||
+      !trimmedData.postcode;
+
+    if (isMissingRequiredField) {
+      setError('Please complete all required fields before creating the client.');
+      return;
+    }
+
     if (!gdprConsent) {
       setError('You must acknowledge the data processing notice to continue.');
       return;
@@ -58,33 +76,24 @@ export default function NewClientPage() {
     setError(null);
 
     try {
-      const response = await fetch(process.env.NEXT_PUBLIC_API_URL || 'https://api.oasis-care.co/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      await clientQuery(CREATE_CLIENT_MUTATION, {
+        input: {
+          fullName: trimmedData.fullName,
+          addressLine1: trimmedData.addressLine1,
+          addressLine2: trimmedData.addressLine2 || null,
+          city: trimmedData.city,
+          postcode: trimmedData.postcode,
         },
-        credentials: 'include',
-        body: JSON.stringify({
-          query: CREATE_CLIENT_MUTATION,
-          variables: {
-            input: {
-              fullName: formData.fullName,
-              addressLine1: formData.addressLine1,
-              addressLine2: formData.addressLine2 || null,
-              city: formData.city,
-              postcode: formData.postcode,
-            },
-          },
-        }),
       });
 
-      const result = await response.json();
-
-      if (result.errors) {
-        throw new Error(result.errors[0]?.message || 'Failed to create client');
-      }
-
-      // Redirect to client list on success
+      setFormData({
+        fullName: '',
+        addressLine1: '',
+        addressLine2: '',
+        city: '',
+        postcode: '',
+      });
+      setGdprConsent(false);
       router.push('/clients');
       router.refresh();
     } catch (err: any) {
@@ -93,6 +102,16 @@ export default function NewClientPage() {
       setIsSubmitting(false);
     }
   };
+
+  const canSubmit =
+    Boolean(
+      formData.fullName.trim() &&
+      formData.addressLine1.trim() &&
+      formData.city.trim() &&
+      formData.postcode.trim()
+    ) &&
+    gdprConsent &&
+    !isSubmitting;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -255,7 +274,7 @@ export default function NewClientPage() {
 
               {/* Error Message */}
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4" role="alert">
                   <div className="flex items-center gap-2">
                     <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
@@ -267,15 +286,13 @@ export default function NewClientPage() {
 
               {/* Actions */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-                <Link href="/clients">
-                  <Button type="button" variant="ghost">
-                    Cancel
-                  </Button>
+                <Link href="/clients" className={buttonVariants({ variant: 'ghost' })}>
+                  Cancel
                 </Link>
                 <Button 
                   type="submit" 
                   variant="primary" 
-                  disabled={isSubmitting || !gdprConsent}
+                  disabled={!canSubmit}
                 >
                   {isSubmitting ? 'Creating...' : 'Create Client'}
                 </Button>
@@ -287,4 +304,3 @@ export default function NewClientPage() {
     </div>
   );
 }
-

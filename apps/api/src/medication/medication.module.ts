@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ClsModule } from 'nestjs-cls';
 import { MedicationService } from './medication.service';
+import { MedicationController } from './medication.controller';
 import { MedicationResolver } from './medication.resolver';
 import { MedicationRepository } from './medication.repository';
 import { PrismaService } from '@oasis/db';
@@ -22,6 +23,7 @@ register.registerMetric(medicationOverlapsTotal);
 
 @Module({
   imports: [ClsModule, MetricsModule],
+  controllers: [MedicationController],
   providers: [
     MedicationService,
     MedicationResolver,

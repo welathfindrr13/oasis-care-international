@@ -1,25 +1,8 @@
 import type { Metadata } from 'next'
-import { Inter, Work_Sans, Source_Sans_3 } from 'next/font/google'
+import { Session, getServerSession } from 'next-auth'
 import { SessionProvider } from '../components/providers/SessionProvider'
+import { authOptions } from '../lib/auth/auth-options'
 import './globals.css'
-
-const inter = Inter({ 
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-})
-
-const workSans = Work_Sans({ 
-  subsets: ['latin'],
-  variable: '--font-work-sans',
-  display: 'swap',
-})
-
-const sourceSans = Source_Sans_3({ 
-  subsets: ['latin'],
-  variable: '--font-source-sans',
-  display: 'swap',
-})
 
 export const metadata: Metadata = {
   title: 'Oasis Care',
@@ -31,10 +14,26 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  const sessionPromise = getServerSession(authOptions)
+
   return (
-    <html lang="en" className={`${inter.variable} ${workSans.variable} ${sourceSans.variable}`}>
-      <body className={inter.className}>
-        <SessionProvider>
+    <RootLayoutContent sessionPromise={sessionPromise}>{children}</RootLayoutContent>
+  )
+}
+
+async function RootLayoutContent({
+  children,
+  sessionPromise,
+}: {
+  children: React.ReactNode
+  sessionPromise: ReturnType<typeof getServerSession>
+}) {
+  const session = (await sessionPromise) as Session | null
+
+  return (
+    <html lang="en">
+      <body>
+        <SessionProvider session={session}>
           {children}
         </SessionProvider>
       </body>

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import { Header } from '../../components/oasis/Header';
-import { clientQuery } from '../../lib/graphql/client-side';
 
 interface MedicationAdministration {
   id: string;
@@ -27,29 +27,15 @@ interface MedicationAdministration {
   };
 }
 
-interface GetTodaysMedicationsResponse {
-  getTodaysMedicationsByClient: MedicationAdministration[];
+interface EmarApiResponse {
+  medications?: MedicationAdministration[];
+  error?: string;
 }
 
-const EMAR_QUERY = `
-  query GetTodaysMedications($date: String!) {
-    getTodaysMedicationsByClient(date: $date) {
-      id
-      scheduledTime
-      administeredTime
-      status
-      notes
-      prescription {
-        specialInstructions
-        client { fullName }
-        medication { name dosage unit }
-      }
-      visit { scheduledStart scheduledEnd }
-    }
-  }
-`;
+const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://api.oasis-care.co/graphql').replace(/\/graphql$/, '');
 
 export default function EmarPage() {
+  const { data: session } = useSession();
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
@@ -60,6 +46,64 @@ export default function EmarPage() {
   const [provisioningError, setProvisioningError] = useState<string | null>(null);
   const [medications, setMedications] = useState<MedicationAdministration[]>([]);
 
+  const accessToken = typeof (session as any)?.accessToken === 'string' ? (session as any).accessToken : null;
+
+  const fetchMedicationsViaProxy = useCallback(async (date: string) => {
+    const response = await fetch(`/api/emar?date=${encodeURIComponent(date)}`, {
+      cache: 'no-store',
+      credentials: 'include',
+    });
+
+    const payload = (await response.json().catch(() => ({}))) as EmarApiResponse;
+
+    if (!response.ok) {
+      throw new Error(payload.error || `Failed to load medications (${response.status})`);
+    }
+
+    if (payload.error) {
+      throw new Error(payload.error);
+    }
+
+    return payload.medications ?? [];
+  }, []);
+
+  const fetchMedicationsDirect = useCallback(async (date: string, token: string) => {
+    const response = await fetch(`${apiBaseUrl}/medication/today?date=${encodeURIComponent(date)}`, {
+      cache: 'no-store',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const payload = (await response.json().catch(() => null)) as unknown;
+
+    if (!response.ok) {
+      const message =
+        payload && typeof payload === 'object' && !Array.isArray(payload) && typeof (payload as any).error === 'string'
+          ? (payload as any).error
+          : `Failed to load medications (${response.status})`;
+      throw new Error(message);
+    }
+
+    if (!Array.isArray(payload)) {
+      throw new Error('Failed to load medications');
+    }
+
+    return payload as MedicationAdministration[];
+  }, []);
+
+  const fetchMedicationsForDate = useCallback(async (date: string) => {
+    if (accessToken) {
+      try {
+        return await fetchMedicationsDirect(date, accessToken);
+      } catch (error) {
+        console.warn('Direct medication fetch failed, falling back to web proxy:', error);
+      }
+    }
+
+    return fetchMedicationsViaProxy(date);
+  }, [accessToken, fetchMedicationsDirect, fetchMedicationsViaProxy]);
+
   // Fetch medications when date changes
   useEffect(() => {
     async function fetchMedications() {
@@ -67,10 +111,8 @@ export default function EmarPage() {
       setMedicationsError(null);
       
       try {
-        const data = await clientQuery<GetTodaysMedicationsResponse>(EMAR_QUERY, {
-          date: selectedDate,
-        });
-        setMedications(data.getTodaysMedicationsByClient || []);
+        const data = await fetchMedicationsForDate(selectedDate);
+        setMedications(data);
       } catch (err) {
         console.error('Failed to fetch medications:', err);
         setMedicationsError(err instanceof Error ? err.message : 'Failed to load medications');
@@ -81,15 +123,15 @@ export default function EmarPage() {
     }
 
     fetchMedications();
-  }, [selectedDate]);
+  }, [fetchMedicationsForDate, selectedDate]);
 
   const refetch = () => {
     setLoading(true);
     setMedicationsError(null);
     
-    clientQuery<GetTodaysMedicationsResponse>(EMAR_QUERY, { date: selectedDate })
+    fetchMedicationsForDate(selectedDate)
       .then((data) => {
-        setMedications(data.getTodaysMedicationsByClient || []);
+        setMedications(data);
       })
       .catch((err) => {
         console.error('Failed to fetch medications:', err);
@@ -231,11 +273,11 @@ export default function EmarPage() {
 
         {/* Medications by Client */}
         <div className="space-y-6">
-          {Object.keys(groupedByClient).length === 0 ? (
+          {!medicationsError && Object.keys(groupedByClient).length === 0 ? (
             <div className="bg-white p-8 rounded-lg shadow text-center">
               <p className="text-gray-500 text-lg">No medications scheduled for {formatDate(selectedDate)}</p>
             </div>
-          ) : (
+          ) : !medicationsError ? (
             Object.entries(groupedByClient).map(([clientName, clientMeds]) => (
               <div key={clientName} className="bg-white rounded-lg shadow overflow-hidden">
                 <div className="bg-gray-50 px-6 py-4 border-b">
@@ -318,7 +360,7 @@ export default function EmarPage() {
                 </div>
               </div>
             ))
-          )}
+          ) : null}
         </div>
       </main>
     </div>

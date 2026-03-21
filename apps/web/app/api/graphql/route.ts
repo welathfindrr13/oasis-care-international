@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../../../lib/auth/auth-options';
 
 // Next.js build: mark as dynamic so /api/graphql isn't prerendered
 export const dynamic = 'force-dynamic';
@@ -8,6 +10,8 @@ export async function POST(request: NextRequest) {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql';
     const body = await request.text();
+    const session = await getServerSession(authOptions);
+    const accessToken = (session as any)?.accessToken as string | undefined;
     
     // Forward the GraphQL request to the backend
     const response = await fetch(apiUrl, {
@@ -15,6 +19,7 @@ export async function POST(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         'Cookie': cookies().toString(),
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body,
       cache: 'no-store',

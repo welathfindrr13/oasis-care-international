@@ -1,10 +1,14 @@
 import { Metadata } from 'next'
+import { Suspense } from 'react'
 import Link from 'next/link'
+import { getServerSession } from 'next-auth'
 import { Header } from '../../components/oasis/Header'
 import { FilterBar } from '../../components/oasis/FilterBar'
 import { StatusChip } from '../../components/oasis/StatusChip'
 import { Card, CardContent, CardHeader } from '../../components/ui/Card'
-import { Button } from '../../components/ui/Button'
+import { buttonVariants } from '../../components/ui/Button'
+import { authOptions } from '../../lib/auth/auth-options'
+import { hasRole } from '../../lib/auth/roles'
 import { query } from '../../lib/graphql/client'
 import { 
   VISITS_QUERY, 
@@ -13,12 +17,14 @@ import {
   type VisitsQueryResponse,
   type Visit 
 } from '../../lib/graphql/queries'
-import { formatTime, formatDate } from '../../lib/time'
+import { formatTime } from '../../lib/time'
 
 export const metadata: Metadata = {
   title: 'Visits - Oasis Care',
   description: 'Manage and track care visits',
 }
+
+export const dynamic = 'force-dynamic'
 
 interface VisitsPageProps {
   searchParams: {
@@ -64,7 +70,7 @@ async function getVisits(searchParams: VisitsPageProps['searchParams']): Promise
   }
 }
 
-function EmptyState() {
+function EmptyState({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="text-center py-12">
       <div className="mb-4">
@@ -88,19 +94,30 @@ function EmptyState() {
       <h3 className="text-lg font-medium text-text-primary mb-2">
         No visits found
       </h3>
-          <p className="text-text-secondary mb-4">
-            Try adjusting your filters or check back later.
-          </p>
-      <Button variant="primary">
-        Schedule New Visit
-      </Button>
+      <p className="text-text-secondary mb-4">
+        {isAdmin
+          ? 'Try adjusting your filters or check back later.'
+          : 'Your scheduled visits will appear here when they are assigned.'}
+      </p>
+      {isAdmin && (
+        <Link href="/visits/new" className={buttonVariants({ variant: 'primary' })}>
+          Schedule New Visit
+        </Link>
+      )}
     </div>
   )
 }
 
 export default async function VisitsPage({ searchParams }: VisitsPageProps) {
+  const session = await getServerSession(authOptions);
   const { visits, total } = await getVisits(searchParams);
   const hasVisits = visits.length > 0;
+  const isAdmin = hasRole((session as any)?.roles, 'admin');
+  const pageTitle = isAdmin ? 'Visits' : 'Your Visits';
+  const pageSubtitle = isAdmin
+    ? 'Manage and track care visits for all clients'
+    : 'Review your schedule and stay on top of today’s care visits';
+  const sectionTitle = isAdmin ? "Today's Visits" : 'Assigned Visits';
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -108,31 +125,33 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="mb-8">
           <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">
-            Visits
+            {pageTitle}
           </h1>
           <p className="text-slate-500 mt-1">
-            Manage and track care visits for all clients
+            {pageSubtitle}
           </p>
         </div>
 
-        <FilterBar className="mb-6" />
+        <Suspense fallback={<div className="mb-6 h-20 rounded-sm border border-base-gray-300 bg-background-secondary" />}>
+          <FilterBar className="mb-6" />
+        </Suspense>
 
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-text-primary font-heading">
-                  Today&apos;s Visits
+                  {sectionTitle}
                 </h2>
                 <p className="text-sm text-text-secondary">
                   {hasVisits ? `${visits.length} of ${total} visits` : 'No visits found'}
                 </p>
               </div>
-              <Link href="/visits/new">
-                <Button variant="primary" size="sm">
+              {isAdmin && (
+                <Link href="/visits/new" className={buttonVariants({ variant: 'primary', size: 'sm' })}>
                   Add Visit
-                </Button>
-              </Link>
+                </Link>
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -210,14 +229,14 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                           <td className="py-3 px-4">
                             <StatusChip status={visit.status.toLowerCase() as any} />
                           </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2">
-                              <Button variant="ghost" size="sm">
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                              <button className={buttonVariants({ variant: 'ghost', size: 'sm' })} type="button">
                                 View
-                              </Button>
-                              <Button variant="ghost" size="sm">
+                              </button>
+                              <button className={buttonVariants({ variant: 'ghost', size: 'sm' })} type="button">
                                 Edit
-                              </Button>
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -227,7 +246,7 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                 </table>
               </div>
             ) : (
-              <EmptyState />
+              <EmptyState isAdmin={isAdmin} />
             )}
           </CardContent>
         </Card>

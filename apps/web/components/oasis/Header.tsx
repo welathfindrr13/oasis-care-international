@@ -25,16 +25,35 @@ export function Header({
   notificationCount = 0 
 }: HeaderProps) {
   const pathname = usePathname()
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const isSessionLoading = status === 'loading'
 
   // Get user info from session
-  const userName = session?.user?.name || session?.user?.email?.split('@')[0] || 'User'
+  const userName = isSessionLoading
+    ? 'Loading…'
+    : session?.user?.name || session?.user?.email?.split('@')[0] || 'User'
   const userEmail = session?.user?.email || ''
   const roles = normalizeAppRoles((session as any)?.roles)
   const isAdmin = hasRole(roles, 'admin')
-  const userRole = roles[0] ? roles[0].replace('_', ' ') : 'user'
+  const userRole = isSessionLoading ? 'loading' : roles[0] ? roles[0].replace('_', ' ') : 'user'
+  const visibleNavItems = navItems.filter((item) => item.href !== '/clients' || isAdmin)
+
+  async function handleSignOut() {
+    if (isSigningOut) {
+      return
+    }
+
+    setIsSigningOut(true)
+
+    try {
+      await signOut({ callbackUrl: '/api/auth/cognito-logout' })
+    } catch {
+      setIsSigningOut(false)
+    }
+  }
 
   return (
     <header className={cn('bg-white border-b border-slate-200 sticky top-0 z-50', className)}>
@@ -57,7 +76,7 @@ export function Header({
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const isActive = pathname === item.href || 
                               (item.href === '/clients' && pathname.startsWith('/clients'))
               
@@ -140,13 +159,14 @@ export function Header({
                   )}
                   <div className="border-t border-slate-100 mt-2 pt-2">
                     <button 
-                      onClick={() => signOut({ callbackUrl: '/login' })}
+                      onClick={handleSignOut}
+                      disabled={isSigningOut}
                       className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                       </svg>
-                      Sign out
+                      {isSigningOut ? 'Signing out…' : 'Sign out'}
                     </button>
                   </div>
                 </div>
@@ -174,7 +194,7 @@ export function Header({
         {mobileMenuOpen && (
           <nav className="md:hidden py-4 border-t border-slate-100">
             <div className="flex flex-col gap-1">
-              {navItems.map((item) => {
+              {visibleNavItems.map((item) => {
                 const isActive = pathname === item.href || 
                                 (item.href === '/clients' && pathname.startsWith('/clients'))
                 

@@ -9,6 +9,7 @@ describe('VisitResolver', () => {
   let service: VisitService;
 
   const mockVisitService = {
+    findAssignableCarers: jest.fn(),
     createVisit: jest.fn(),
     updateVisit: jest.fn(),
     findVisitById: jest.fn(),
@@ -207,6 +208,26 @@ describe('VisitResolver', () => {
         'carer-123',
         'carer'
       );
+    });
+  });
+
+  describe('carers', () => {
+    it('should return assignable carers for admin create flows', async () => {
+      const carers = [
+        {
+          id: 'carer-123',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          email: 'jane@example.com',
+          phone: '1234567890',
+        },
+      ];
+      mockVisitService.findAssignableCarers.mockResolvedValue(carers);
+
+      const result = await resolver.carers(true);
+
+      expect(service.findAssignableCarers).toHaveBeenCalledWith(true);
+      expect(result).toEqual(carers);
     });
   });
 

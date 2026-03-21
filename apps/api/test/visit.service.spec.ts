@@ -12,6 +12,7 @@ describe('VisitService', () => {
   let clsService: ClsService;
 
   const mockVisitRepository = {
+    findCarers: jest.fn(),
     create: jest.fn(),
     findById: jest.fn(),
     findMany: jest.fn(),
@@ -136,6 +137,33 @@ describe('VisitService', () => {
       ).rejects.toMatchObject({
         response: { code: ErrorCode.VISIT_OVERLAP }
       });
+    });
+  });
+
+  describe('findAssignableCarers', () => {
+    it('should return active carers sorted from the repository', async () => {
+      mockVisitRepository.findCarers.mockResolvedValue([
+        {
+          id: 'carer-123',
+          first_name: 'Jane',
+          last_name: 'Doe',
+          email: 'jane@example.com',
+          phone: '1234567890',
+        },
+      ]);
+
+      const result = await service.findAssignableCarers(true);
+
+      expect(repository.findCarers).toHaveBeenCalledWith(true);
+      expect(result).toEqual([
+        {
+          id: 'carer-123',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          email: 'jane@example.com',
+          phone: '1234567890',
+        },
+      ]);
     });
   });
 

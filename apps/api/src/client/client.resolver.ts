@@ -1,13 +1,20 @@
 import { Resolver, Query, Mutation, Args, Int, Context } from '@nestjs/graphql';
+import { SetMetadata, UseGuards } from '@nestjs/common';
+import { RolesGuard } from '@oasis/auth';
 import { ClientDTO, ClientPaginatedResponse } from './dto/client.dto';
 import { CreateClientInput } from './dto/create-client.input';
 import { ClientService } from './client.service';
 
+export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
+  SetMetadata('roles', roles);
+
 @Resolver(() => ClientDTO)
+@UseGuards(RolesGuard)
 export class ClientResolver {
   constructor(private readonly clientService: ClientService) {}
 
   @Query(() => ClientPaginatedResponse)
+  @Roles('admin')
   async clients(
     @Args('skip', { type: () => Int, nullable: true, defaultValue: 0 }) skip: number,
     @Args('take', { type: () => Int, nullable: true, defaultValue: 20 }) take: number,
@@ -17,11 +24,13 @@ export class ClientResolver {
   }
 
   @Query(() => ClientDTO)
+  @Roles('admin')
   async client(@Args('id') id: string): Promise<ClientDTO> {
     return this.clientService.findClientById(id);
   }
 
   @Mutation(() => ClientDTO)
+  @Roles('admin')
   async createClient(
     @Args('input') input: CreateClientInput,
     @Context() ctx: any,

@@ -433,6 +433,22 @@ describe('MedicationService', () => {
       );
     });
 
+    it('should reject requests with an unknown role instead of throwing a TypeError', async () => {
+      await expect(
+        service.getTodaysMedicationsByClient(
+          new Date(),
+          mockAdminUser.id,
+          undefined as any
+        )
+      ).rejects.toThrow(
+        new BaseHttpException(
+          ErrorCode.FORBIDDEN_OFFICE_ACCESS,
+          'Admin, office, or carer access required',
+          HttpStatus.FORBIDDEN
+        )
+      );
+    });
+
     it('should drop incomplete medication rows instead of throwing', async () => {
       repository.findTodaysMedicationsByClient.mockResolvedValue([
         mockMedicationAdministration,

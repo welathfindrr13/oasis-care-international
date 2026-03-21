@@ -18,6 +18,10 @@ export interface Carer {
   phone?: string;
 }
 
+export interface CarersQueryResponse {
+  carers: Carer[];
+}
+
 export interface Client {
   id: string;
   fullName: string;
@@ -189,6 +193,18 @@ export const CLIENTS_QUERY = `
         postcode
       }
       total
+    }
+  }
+`;
+
+export const CARERS_QUERY = `
+  query Carers($activeOnly: Boolean) {
+    carers(activeOnly: $activeOnly) {
+      id
+      firstName
+      lastName
+      email
+      phone
     }
   }
 `;

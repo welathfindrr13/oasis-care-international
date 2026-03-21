@@ -2,6 +2,7 @@ import { Metadata } from 'next'
 import { Nav } from '../../../components/oasis/Nav'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
 import { Button } from '../../../components/ui/Button'
+import { getSiteBaseUrl } from '../../../lib/url'
 
 export const metadata: Metadata = {
   title: 'Metrics - Oasis Care Admin',
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 
 async function getMetrics(): Promise<string> {
   try {
-    const response = await fetch('http://localhost:4000/metrics', {
+    const response = await fetch(`${getSiteBaseUrl()}/api/metrics`, {
       cache: 'no-store',
     });
     
