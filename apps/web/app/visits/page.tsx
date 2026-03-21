@@ -7,6 +7,7 @@ import { FilterBar } from '../../components/oasis/FilterBar'
 import { StatusChip } from '../../components/oasis/StatusChip'
 import { Card, CardContent, CardHeader } from '../../components/ui/Card'
 import { buttonVariants } from '../../components/ui/Button'
+import { VisitActionCell } from './VisitActionCell'
 import { authOptions } from '../../lib/auth/auth-options'
 import { hasRole } from '../../lib/auth/roles'
 import { query } from '../../lib/graphql/client'
@@ -180,7 +181,7 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                         Status
                       </th>
                       <th className="text-left py-3 px-4 font-medium text-text-secondary text-sm">
-                        Actions
+                        {isAdmin ? 'Actions' : 'Visit Progress'}
                       </th>
                     </tr>
                   </thead>
@@ -229,15 +230,16 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                           <td className="py-3 px-4">
                             <StatusChip status={visit.status.toLowerCase() as any} />
                           </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                              <button className={buttonVariants({ variant: 'ghost', size: 'sm' })} type="button">
-                                View
-                              </button>
-                              <button className={buttonVariants({ variant: 'ghost', size: 'sm' })} type="button">
-                                Edit
-                              </button>
-                            </div>
+                          <td className="py-3 px-4">
+                            <VisitActionCell
+                              isAdmin={isAdmin}
+                              visit={{
+                                id: visit.id,
+                                status: visit.status,
+                                actualStart: visit.actualStart,
+                                actualEnd: visit.actualEnd,
+                              }}
+                            />
                           </td>
                         </tr>
                       );

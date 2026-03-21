@@ -208,3 +208,19 @@ export const CARERS_QUERY = `
     }
   }
 `;
+
+export interface UpdateVisitMutationResponse {
+  updateVisit: Pick<Visit, 'id' | 'status' | 'actualStart' | 'actualEnd' | 'updatedAt'>;
+}
+
+export const UPDATE_VISIT_MUTATION = `
+  mutation UpdateVisit($input: UpdateVisitInput!) {
+    updateVisit(input: $input) {
+      id
+      status
+      actualStart
+      actualEnd
+      updatedAt
+    }
+  }
+`;
