@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { buttonVariants } from '../../components/ui/Button'
@@ -18,7 +19,17 @@ export function VisitActionCell({ isAdmin, visit }: VisitActionCellProps) {
   const [isPending, startTransition] = useTransition()
 
   if (isAdmin) {
-    return <span className="text-sm text-text-secondary">No inline actions</span>
+    return (
+      <div className="flex flex-col items-start gap-2">
+        <span className="text-sm text-text-secondary">No inline actions</span>
+        <Link
+          href={`/visits/${visit.id}`}
+          className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+        >
+          View details
+        </Link>
+      </div>
+    )
   }
 
   const runUpdate = (nextStatus: 'IN_PROGRESS' | 'COMPLETED') => {
@@ -70,6 +81,12 @@ export function VisitActionCell({ isAdmin, visit }: VisitActionCellProps) {
       {visit.status !== 'SCHEDULED' && visit.status !== 'IN_PROGRESS' && (
         <span className="text-sm text-text-secondary">No action needed</span>
       )}
+      <Link
+        href={`/visits/${visit.id}`}
+        className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+      >
+        View details
+      </Link>
       {error && (
         <p className={cn('text-xs text-red-600')} role="alert">
           {error}

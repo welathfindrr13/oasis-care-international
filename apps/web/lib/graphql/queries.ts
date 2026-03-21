@@ -68,6 +68,10 @@ export interface VisitsQueryResponse {
   visits: VisitPaginatedResponse;
 }
 
+export interface VisitQueryResponse {
+  visit: Visit;
+}
+
 export interface VisitsQueryVariables {
   scheduledStartFrom?: string;
   scheduledStartTo?: string;
@@ -127,6 +131,47 @@ export const VISITS_QUERY = `
         updatedAt
       }
       total
+    }
+  }
+`;
+
+export const VISIT_QUERY = `
+  query Visit($id: String!) {
+    visit(id: $id) {
+      id
+      scheduledStart
+      scheduledEnd
+      actualStart
+      actualEnd
+      status
+      notes
+      carer {
+        id
+        firstName
+        lastName
+        email
+        phone
+      }
+      client {
+        id
+        fullName
+        addressLine1
+        addressLine2
+        city
+        postcode
+      }
+      tasks {
+        id
+        taskName
+        description
+        isCompleted
+        completedAt
+        notes
+        createdAt
+        updatedAt
+      }
+      createdAt
+      updatedAt
     }
   }
 `;

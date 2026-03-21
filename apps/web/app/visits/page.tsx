@@ -18,7 +18,7 @@ import {
   type VisitsQueryResponse,
   type Visit 
 } from '../../lib/graphql/queries'
-import { formatTime } from '../../lib/time'
+import { formatDateTime, formatTime } from '../../lib/time'
 
 export const metadata: Metadata = {
   title: 'Visits - Oasis Care',
@@ -107,6 +107,22 @@ function EmptyState({ isAdmin }: { isAdmin: boolean }) {
       )}
     </div>
   )
+}
+
+function formatRecordedWindow(actualStart?: string, actualEnd?: string) {
+  if (actualStart && actualEnd) {
+    return `Actual: ${formatDateTime(actualStart)} - ${formatTime(actualEnd)}`
+  }
+
+  if (actualStart) {
+    return `Started: ${formatDateTime(actualStart)}`
+  }
+
+  if (actualEnd) {
+    return `Completed: ${formatDateTime(actualEnd)}`
+  }
+
+  return null
 }
 
 export default async function VisitsPage({ searchParams }: VisitsPageProps) {
@@ -198,12 +214,22 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                           className="border-b border-base-gray-100 hover:bg-background-accent transition-colors"
                         >
                           <td className="py-3 px-4">
-                            <time 
-                              className="font-medium text-text-primary"
-                              dateTime={visit.scheduledStart}
-                            >
-                              {formatTime(visit.scheduledStart)}
-                            </time>
+                            <div>
+                              <time 
+                                className="font-medium text-text-primary"
+                                dateTime={visit.scheduledStart}
+                              >
+                                {formatTime(visit.scheduledStart)}
+                              </time>
+                              <div className="text-xs text-text-secondary">
+                                Scheduled: {formatDateTime(visit.scheduledStart)}
+                              </div>
+                              {formatRecordedWindow(visit.actualStart, visit.actualEnd) && (
+                                <div className="text-xs text-brand-blue-primary">
+                                  {formatRecordedWindow(visit.actualStart, visit.actualEnd)}
+                                </div>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3 px-4">
                             <div>
