@@ -1,128 +1,98 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import { Header } from '../../../components/oasis/Header'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
 import { buttonVariants } from '../../../components/ui/Button'
+import { query } from '../../../lib/graphql/client'
+import {
+  CLIENT_QUERY,
+  VISITS_QUERY,
+  type ClientQueryResponse,
+  type Visit,
+  type VisitsQueryResponse,
+} from '../../../lib/graphql/queries'
+import { formatDateTime, formatTime } from '../../../lib/time'
 
-// Mock client data - same as clients list, would come from API
-const mockClients: Record<string, {
-  id: string
-  name: string
-  email: string
-  phone: string
-  address: string
-  dateOfBirth: string
-  lastVisit: string
-  nextVisit: string
-  status: string
-  emergencyContact: { name: string; phone: string; relationship: string }
-  notes: string
-}> = {
-  'demo-client-1': {
-    id: 'demo-client-1',
-    name: 'Margaret Thompson',
-    email: 'margaret.thompson@example.com',
-    phone: '+44 20 7946 0958',
-    address: '15 Oak Street, London SW1A 1AA',
-    dateOfBirth: '1945-03-15',
-    lastVisit: '2025-08-19T14:30:00Z',
-    nextVisit: '2025-08-21T10:00:00Z',
-    status: 'active',
-    emergencyContact: { name: 'James Thompson', phone: '+44 20 7946 1234', relationship: 'Son' },
-    notes: 'Requires assistance with mobility. Prefers morning visits.'
-  },
-  'demo-client-2': {
-    id: 'demo-client-2',
-    name: 'Robert Smith',
-    email: 'robert.smith@example.com',
-    phone: '+44 20 7946 0959',
-    address: '42 High Road, London W1K 2HL',
-    dateOfBirth: '1938-07-22',
-    lastVisit: '2025-08-19T16:00:00Z',
-    nextVisit: '2025-08-20T15:30:00Z',
-    status: 'active',
-    emergencyContact: { name: 'Sarah Smith', phone: '+44 20 7946 5678', relationship: 'Daughter' },
-    notes: 'Diabetic - requires medication management.'
-  },
-  'demo-client-3': {
-    id: 'demo-client-3',
-    name: 'Emily Davis',
-    email: 'emily.davis@example.com',
-    phone: '+44 20 7946 0960',
-    address: '28 Church Lane, London EC1A 4JU',
-    dateOfBirth: '1950-11-08',
-    lastVisit: '2025-08-18T11:00:00Z',
-    nextVisit: '2025-08-20T14:00:00Z',
-    status: 'active',
-    emergencyContact: { name: 'Michael Davis', phone: '+44 20 7946 9012', relationship: 'Husband' },
-    notes: 'Light housekeeping assistance needed.'
-  },
-  'demo-client-4': {
-    id: 'demo-client-4',
-    name: 'John Williams',
-    email: 'john.williams@example.com',
-    phone: '+44 20 7946 0961',
-    address: '7 Victoria Park, London E9 7BT',
-    dateOfBirth: '1942-02-28',
-    lastVisit: '2025-08-17T13:30:00Z',
-    nextVisit: '2025-08-22T09:00:00Z',
-    status: 'active',
-    emergencyContact: { name: 'Anne Williams', phone: '+44 20 7946 3456', relationship: 'Wife' },
-    notes: 'Enjoys conversation. Has hearing aid - speak clearly.'
-  },
-  'demo-client-5': {
-    id: 'demo-client-5',
-    name: 'Mary Brown',
-    email: 'mary.brown@example.com',
-    phone: '+44 20 7946 0962',
-    address: '33 Green Street, London W1K 7PS',
-    dateOfBirth: '1948-09-03',
-    lastVisit: '2025-08-19T12:00:00Z',
-    nextVisit: '2025-08-21T11:30:00Z',
-    status: 'active',
-    emergencyContact: { name: 'Peter Brown', phone: '+44 20 7946 7890', relationship: 'Son' },
-    notes: 'Vegetarian diet. Enjoys gardening discussions.'
+export const dynamic = 'force-dynamic'
+
+interface ClientDetailPageProps {
+  params: {
+    id: string;
+  };
+}
+
+async function getClient(id: string) {
+  try {
+    const response = await query<ClientQueryResponse>(CLIENT_QUERY, { id });
+    return response.client;
+  } catch (error) {
+    console.error('Failed to fetch client:', error);
+    return null;
   }
 }
 
-// Mock recent visits
-const mockRecentVisits = [
-  { id: 'v1', date: '2025-08-19T14:30:00Z', carer: 'Sarah Johnson', status: 'completed', duration: '45 min' },
-  { id: 'v2', date: '2025-08-17T10:00:00Z', carer: 'Mike Thompson', status: 'completed', duration: '60 min' },
-  { id: 'v3', date: '2025-08-15T14:00:00Z', carer: 'Sarah Johnson', status: 'completed', duration: '45 min' },
-]
+async function getClientVisits(clientId: string): Promise<Visit[]> {
+  try {
+    const response = await query<VisitsQueryResponse>(VISITS_QUERY, {
+      clientId,
+      take: 5,
+      skip: 0,
+    });
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const client = mockClients[params.id]
+    return response.visits.items;
+  } catch (error) {
+    console.error('Failed to fetch client visits:', error);
+    return [];
+  }
+}
+
+function formatVisitStatus(status: Visit['status']) {
+  return status
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function getStatusClasses(status: Visit['status']) {
+  switch (status) {
+    case 'COMPLETED':
+      return 'bg-emerald-50 text-emerald-700';
+    case 'IN_PROGRESS':
+      return 'bg-amber-50 text-amber-700';
+    case 'CANCELLED':
+      return 'bg-rose-50 text-rose-700';
+    default:
+      return 'bg-slate-100 text-slate-700';
+  }
+}
+
+export async function generateMetadata({ params }: ClientDetailPageProps): Promise<Metadata> {
+  const client = await getClient(params.id);
+
   return {
-    title: client ? `${client.name} - Oasis Care` : 'Client Not Found - Oasis Care',
-    description: client ? `Client profile for ${client.name}` : 'Client not found',
-  }
+    title: client ? `${client.fullName} - Oasis Care` : 'Client Not Found - Oasis Care',
+    description: client ? `Client profile for ${client.fullName}` : 'Client not found',
+  };
 }
 
-export default function ClientDetailPage({ params }: { params: { id: string } }) {
-  const client = mockClients[params.id]
+export default async function ClientDetailPage({ params }: ClientDetailPageProps) {
+  const client = await getClient(params.id);
 
   if (!client) {
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <Header />
-        <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">Client Not Found</h1>
-            <p className="text-slate-600 mb-4">The client you&apos;re looking for doesn&apos;t exist.</p>
-            <Link href="/clients" className={buttonVariants({ variant: 'primary' })}>Back to Clients</Link>
-          </div>
-        </main>
-      </div>
-    )
+    notFound();
   }
+
+  const visits = await getClientVisits(client.id);
+  const nextVisit = visits
+    .filter((visit) => new Date(visit.scheduledStart).getTime() >= Date.now())
+    .sort((left, right) => new Date(left.scheduledStart).getTime() - new Date(right.scheduledStart).getTime())[0];
 
   return (
     <div className="min-h-screen bg-slate-50">
       <Header />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        {/* Breadcrumb */}
         <nav className="mb-6">
           <ol className="flex items-center gap-2 text-sm">
             <li>
@@ -131,24 +101,20 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
               </Link>
             </li>
             <li className="text-slate-400">/</li>
-            <li className="text-slate-900 font-medium">{client.name}</li>
+            <li className="text-slate-900 font-medium">{client.fullName}</li>
           </ol>
         </nav>
 
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex items-start justify-between mb-8 gap-4">
           <div>
             <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">
-              {client.name}
+              {client.fullName}
             </h1>
             <p className="text-slate-500 mt-1">Client ID: {client.id}</p>
           </div>
           <div className="flex items-center gap-3">
-            <Link href={`/clients/${client.id}/summary`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              🤖 AI Health Summary
-            </Link>
-            <Link href={`/clients/${client.id}/edit`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-              Edit
+            <Link href={`/visits?clientId=${client.id}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              View Visits
             </Link>
             <Link href={`/visits/new?clientId=${client.id}`} className={buttonVariants({ variant: 'primary', size: 'sm' })}>
               Schedule Visit
@@ -157,139 +123,101 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Info */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Contact Information */}
             <Card>
               <CardHeader>
-                <h2 className="text-lg font-semibold text-slate-900">Contact Information</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Client Overview</h2>
               </CardHeader>
               <CardContent>
                 <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <dt className="text-sm text-slate-500">Email</dt>
-                    <dd className="text-slate-900">{client.email}</dd>
+                    <dt className="text-sm text-slate-500">Full name</dt>
+                    <dd className="text-slate-900">{client.fullName}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm text-slate-500">Phone</dt>
-                    <dd className="text-slate-900">{client.phone}</dd>
+                    <dt className="text-sm text-slate-500">Client ID</dt>
+                    <dd className="text-slate-900 break-all">{client.id}</dd>
                   </div>
                   <div className="sm:col-span-2">
                     <dt className="text-sm text-slate-500">Address</dt>
-                    <dd className="text-slate-900">{client.address}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-slate-500">Date of Birth</dt>
                     <dd className="text-slate-900">
-                      {new Date(client.dateOfBirth).toLocaleDateString('en-GB', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric'
-                      })}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-slate-500">Status</dt>
-                    <dd>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-                        {client.status}
-                      </span>
+                      <div>{client.addressLine1}</div>
+                      {client.addressLine2 && <div>{client.addressLine2}</div>}
+                      <div>{client.city}, {client.postcode}</div>
                     </dd>
                   </div>
                 </dl>
               </CardContent>
             </Card>
 
-            {/* Recent Visits */}
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-slate-900">Recent Visits</h2>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Recent Visits</h2>
+                    <p className="text-sm text-slate-500">
+                      {visits.length ? `${visits.length} recent visits loaded` : 'No visits loaded for this client yet'}
+                    </p>
+                  </div>
                   <Link href={`/visits?clientId=${client.id}`} className="text-sm text-teal-600 hover:text-teal-700">
                     View All →
                   </Link>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="divide-y divide-slate-100">
-                  {mockRecentVisits.map((visit) => (
-                    <div key={visit.id} className="py-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">
-                          {new Date(visit.date).toLocaleDateString('en-GB', {
-                            weekday: 'short',
-                            day: 'numeric',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </p>
-                        <p className="text-sm text-slate-500">Carer: {visit.carer}</p>
+                {visits.length ? (
+                  <div className="divide-y divide-slate-100">
+                    {visits.map((visit) => (
+                      <div key={visit.id} className="py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">
+                            {formatDateTime(visit.scheduledStart)}
+                          </p>
+                          <p className="text-sm text-slate-500">
+                            {visit.actualStart
+                              ? `Actual: ${formatDateTime(visit.actualStart)}${visit.actualEnd ? ` - ${formatTime(visit.actualEnd)}` : ''}`
+                              : 'Not started yet'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClasses(visit.status)}`}>
+                            {formatVisitStatus(visit.status)}
+                          </span>
+                          <Link href={`/visits/${visit.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                            View details
+                          </Link>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-slate-500">{visit.duration}</span>
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
-                          {visit.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Care Notes */}
-            <Card>
-              <CardHeader>
-                <h2 className="text-lg font-semibold text-slate-900">Care Notes</h2>
-              </CardHeader>
-              <CardContent>
-                <p className="text-slate-600">{client.notes}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-500">No visits are available for this client yet.</p>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Emergency Contact */}
-            <Card>
-              <CardHeader>
-                <h2 className="text-lg font-semibold text-slate-900">Emergency Contact</h2>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <p className="font-medium text-slate-900">{client.emergencyContact.name}</p>
-                  <p className="text-sm text-slate-500">{client.emergencyContact.relationship}</p>
-                  <p className="text-sm text-slate-600">{client.emergencyContact.phone}</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Upcoming Visits */}
             <Card>
               <CardHeader>
                 <h2 className="text-lg font-semibold text-slate-900">Next Visit</h2>
               </CardHeader>
               <CardContent>
-                <div className="bg-teal-50 rounded-xl p-4">
-                  <p className="text-lg font-semibold text-teal-900">
-                    {new Date(client.nextVisit).toLocaleDateString('en-GB', {
-                      weekday: 'long',
-                      day: 'numeric',
-                      month: 'long'
-                    })}
-                  </p>
-                  <p className="text-teal-700">
-                    {new Date(client.nextVisit).toLocaleTimeString('en-GB', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
-                </div>
+                {nextVisit ? (
+                  <div className="bg-teal-50 rounded-xl p-4">
+                    <p className="text-lg font-semibold text-teal-900">
+                      {formatDateTime(nextVisit.scheduledStart)}
+                    </p>
+                    <p className="text-teal-700">
+                      Ends at {formatTime(nextVisit.scheduledEnd)}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-slate-500">No future visits are currently scheduled.</p>
+                )}
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
             <Card>
               <CardHeader>
                 <h2 className="text-lg font-semibold text-slate-900">Quick Actions</h2>
@@ -297,16 +225,16 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
               <CardContent>
                 <div className="space-y-2">
                   <Link
-                    href={`/emar?clientId=${client.id}`}
+                    href="/emar"
                     className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"
                   >
-                    💊 View Medications
+                    💊 Open eMAR
                   </Link>
                   <Link
-                    href={`/clients/${client.id}/summary`}
+                    href={`/visits?clientId=${client.id}`}
                     className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"
                   >
-                    🤖 AI Health Summary
+                    📋 Visit History
                   </Link>
                   <Link
                     href={`/visits/new?clientId=${client.id}`}

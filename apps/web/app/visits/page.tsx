@@ -31,6 +31,7 @@ interface VisitsPageProps {
   searchParams: {
     date?: string;
     carerId?: string;
+    clientId?: string;
     status?: string;
     page?: string;
   };
@@ -54,6 +55,7 @@ async function getVisits(searchParams: VisitsPageProps['searchParams']): Promise
       scheduledStartFrom,
       scheduledStartTo,
       carerId: searchParams.carerId || undefined,
+      clientId: searchParams.clientId || undefined,
       status: searchParams.status || undefined,
       take: DEFAULT_PAGE_SIZE,
       skip,

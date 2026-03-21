@@ -1,7 +1,8 @@
 import { Metadata } from 'next'
+import Link from 'next/link'
 import { Nav } from '../../../components/oasis/Nav'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
-import { Button } from '../../../components/ui/Button'
+import { buttonVariants } from '../../../components/ui/Button'
 import { getSiteBaseUrl } from '../../../lib/url'
 
 export const metadata: Metadata = {
@@ -129,9 +130,9 @@ export default async function MetricsPage() {
                   Prometheus-style metrics from the API server
                 </p>
               </div>
-              <Button variant="ghost" size="sm">
+              <Link href="/admin/metrics" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
                 Refresh
-              </Button>
+              </Link>
             </div>
           </CardHeader>
           <CardContent>

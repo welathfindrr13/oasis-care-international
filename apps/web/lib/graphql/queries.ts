@@ -76,6 +76,7 @@ export interface VisitsQueryVariables {
   scheduledStartFrom?: string;
   scheduledStartTo?: string;
   carerId?: string;
+  clientId?: string;
   status?: keyof VisitStatus;
   skip?: number;
   take?: number;
@@ -85,11 +86,12 @@ export interface VisitsQueryVariables {
  * Query to fetch visits with filtering and pagination
  */
 export const VISITS_QUERY = `
-  query Visits($scheduledStartFrom: String, $scheduledStartTo: String, $carerId: ID, $status: VisitStatus, $skip: Int, $take: Int) {
+  query Visits($scheduledStartFrom: String, $scheduledStartTo: String, $carerId: ID, $clientId: ID, $status: VisitStatus, $skip: Int, $take: Int) {
     visits(
       scheduledStartFrom: $scheduledStartFrom
       scheduledStartTo: $scheduledStartTo
       carerId: $carerId 
+      clientId: $clientId
       status: $status
       skip: $skip
       take: $take
@@ -221,6 +223,23 @@ export interface ClientsQueryVariables {
   skip?: number;
   take?: number;
 }
+
+export interface ClientQueryResponse {
+  client: Client;
+}
+
+export const CLIENT_QUERY = `
+  query Client($id: String!) {
+    client(id: $id) {
+      id
+      fullName
+      addressLine1
+      addressLine2
+      city
+      postcode
+    }
+  }
+`;
 
 /**
  * Query to fetch clients with pagination and search
