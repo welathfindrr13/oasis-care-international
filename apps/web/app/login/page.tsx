@@ -1,6 +1,6 @@
 'use client';
 
-import { signIn, signOut } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 
@@ -18,9 +18,6 @@ function LoginContent() {
     setIsSigningIn(true);
 
     try {
-      // Treat the login screen as a hard session reset point so a stale
-      // browser session cannot silently short-circuit back into the prior user.
-      await signOut({ redirect: false, callbackUrl: '/login' });
       await signIn('cognito', { callbackUrl });
     } catch {
       setIsSigningIn(false);

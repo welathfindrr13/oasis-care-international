@@ -55,13 +55,6 @@ export const authOptions: NextAuthOptions = {
       issuer: process.env.COGNITO_ISSUER,
       clientId: process.env.COGNITO_CLIENT_ID!,
       clientSecret: process.env.COGNITO_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          // Force the hosted UI to show a real login prompt so logout can
-          // reliably switch users instead of silently reusing the prior session.
-          prompt: 'login',
-        },
-      },
     }),
   ],
   pages: {
