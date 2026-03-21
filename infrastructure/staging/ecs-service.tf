@@ -142,12 +142,24 @@ resource "aws_ecs_task_definition" "web" {
           value = "https://app.oasis-care.co"
         },
         {
+          name  = "NEXT_PUBLIC_SITE_URL"
+          value = "https://app.oasis-care.co"
+        },
+        {
+          name  = "NEXT_PUBLIC_API_URL"
+          value = "https://api.oasis-care.co/graphql"
+        },
+        {
           name  = "COGNITO_CLIENT_ID"
           value = "3imuihdo5v7lgimq8je6d38std"
         },
         {
           name  = "COGNITO_ISSUER"
           value = "https://cognito-idp.eu-west-2.amazonaws.com/eu-west-2_YPo6sl1zm"
+        },
+        {
+          name  = "COGNITO_HOSTED_UI_DOMAIN"
+          value = "https://eu-west-2ypo6sl1zm.auth.eu-west-2.amazoncognito.com"
         }
       ]
 

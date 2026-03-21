@@ -34,7 +34,7 @@ DEMO_ADMIN_EMAIL=admin@demo.local
 DEMO_ADMIN_PASSWORD=SecurePassword123!
 
 # Optional
-ALLOWED_ORIGINS=http://localhost:3000,https://app.oasis-care.com
+ALLOWED_ORIGINS=http://localhost:3000,https://app.oasis-care.co
 METRICS_ENABLED=true
 GDPR_ENABLED=true
 ```
@@ -199,7 +199,7 @@ pnpm --filter @oasis/db prisma migrate dev  # Create new migration
 ### Using GitHub Actions
 1. Push to `main` or `demo/*` branch
 2. API builds automatically via `.github/workflows/api-ci-cd.yml`
-3. Web app deploys via Amplify (if configured)
+3. Web app deploys to the staging web service defined in `infrastructure/staging/ecs-service.tf`
 
 ### Manual Deployment
 ```bash
