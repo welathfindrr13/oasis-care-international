@@ -1,38 +1,74 @@
 # Data Integration Map
 
 ## Overview
-This document outlines the real data integration for the Oasis Care frontend application, including which endpoints are connected and which are still pending.
+This document tracks the active data paths that the current Oasis Care staging app depends on. It is intentionally brief and focuses on the routes and contracts that are still live.
 
-## Real Data Connections
+## Current Runtime Paths
 
-### Dashboard Metrics
-**Connected:**
-- ✅ **Visits Booked**: `/api/stats/today` → `booked` field
-- ✅ **Visits Finished**: `/api/stats/today` → `finished` field
+### Authentication
+- Hosted Cognito login via NextAuth
+- App session and role checks handled in the web app
+- Hosted Cognito logout route:
+  - `/api/auth/cognito-logout`
 
-**Pending Backend Endpoints:**
-- ⏳ **Carers on Duty**: Requires new backend endpoint 
-- ⏳ **Med Alerts**: Requires new backend endpoint
+### Dashboard
+- Stats loaded through the web proxy:
+  - `GET /api/stats/today`
+- Dashboard still includes some placeholder operational counts for admin-facing summary cards
 
-### Visits Page
-**Connected:**
-- ✅ **Visits List**: GraphQL `/graphql` → `visits` query
-  - Supports filtering by date, carerId, status
-  - Includes pagination (limit/offset)
-  - Returns visit details with carer and client information
+### Visits
+- Visits list and visit detail use GraphQL through the web proxy:
+  - `POST /api/graphql`
+- Current visits query supports:
+  - `scheduledStartFrom`
+  - `scheduledStartTo`
+  - `carerId`
+  - `clientId`
+  - `status`
+  - `skip`
+  - `take`
+- Carer visit progress is backed by `updateVisit`
+  - `SCHEDULED -> IN_PROGRESS`
+  - `IN_PROGRESS -> COMPLETED`
 
-## API Endpoints Used
+### Clients
+- Client list uses GraphQL:
+  - `clients(skip, take, search)`
+- Client detail uses GraphQL:
+  - `client(id)`
+- Client pages are admin-only in the web app
 
-### REST Endpoints
-```
-GET /api/stats/today
-Response: { booked: number, finished: number }
-```
+### eMAR
+- eMAR page fetches medication data by date
+- Current working path prefers direct API access with the session token and falls back to:
+  - `GET /api/emar?date=YYYY-MM-DD`
 
-### GraphQL Endpoints  
+### Metrics
+- Admin metrics page uses:
+  - `GET /api/metrics`
+
+## Active GraphQL Shapes
+
+### Visits
 ```graphql
-query Visits($date: String, $carerId: ID, $status: VisitStatus, $limit: Int, $offset: Int) {
-  visits(date: $date, carerId: $carerId, status: $status, limit: $limit, offset: $offset) {
+query Visits(
+  $scheduledStartFrom: String
+  $scheduledStartTo: String
+  $carerId: ID
+  $clientId: ID
+  $status: VisitStatus
+  $skip: Int
+  $take: Int
+) {
+  visits(
+    scheduledStartFrom: $scheduledStartFrom
+    scheduledStartTo: $scheduledStartTo
+    carerId: $carerId
+    clientId: $clientId
+    status: $status
+    skip: $skip
+    take: $take
+  ) {
     items {
       id
       scheduledStart
@@ -41,31 +77,9 @@ query Visits($date: String, $carerId: ID, $status: VisitStatus, $limit: Int, $of
       actualEnd
       status
       notes
-      carer {
-        id
-        firstName
-        lastName
-        email
-        phone
-      }
-      client {
-        id
-        fullName
-        addressLine1
-        addressLine2
-        city
-        postcode
-      }
-      tasks {
-        id
-        taskName
-        description
-        isCompleted
-        completedAt
-        notes
-        createdAt
-        updatedAt
-      }
+      carer { id firstName lastName email phone }
+      client { id fullName addressLine1 addressLine2 city postcode }
+      tasks { id taskName description isCompleted completedAt notes createdAt updatedAt }
       createdAt
       updatedAt
     }
@@ -74,65 +88,20 @@ query Visits($date: String, $carerId: ID, $status: VisitStatus, $limit: Int, $of
 }
 ```
 
-## Data Types
-
-### Visit Status Values
-From Prisma schema (`VisitStatus` enum):
-- `SCHEDULED` - Visit is scheduled
-- `IN_PROGRESS` - Visit is currently happening  
-- `COMPLETED` - Visit has been completed
-- `CANCELLED` - Visit has been cancelled
-
-### Filter Parameters
-- **date**: ISO date string (YYYY-MM-DD)
-- **carerId**: UUID of the carer
-- **status**: One of the VisitStatus enum values
-- **limit**: Number of items to return (default: 25)
-- **offset**: Number of items to skip for pagination
-
-## Frontend Implementation
-
-### Files Created/Modified
-```
-apps/web/lib/time.ts - London timezone utilities
-apps/web/lib/graphql/client.ts - GraphQL client 
-apps/web/lib/graphql/queries.ts - Query definitions and types
-apps/web/app/api/graphql/route.ts - GraphQL proxy route
-apps/web/app/dashboard/page.tsx - Real stats integration
-apps/web/app/dashboard/loading.tsx - Loading skeleton
-apps/web/app/dashboard/error.tsx - Error boundary
-apps/web/app/visits/page.tsx - Real visits data integration
+### Client
+```graphql
+query Client($id: String!) {
+  client(id: $id) {
+    id
+    fullName
+    addressLine1
+    addressLine2
+    city
+    postcode
+  }
+}
 ```
 
-### Environment Variables Required
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:4000  # Backend GraphQL/REST API URL
-```
-
-## Development Commands
-
-### Start Development Server
-```bash
-pnpm -w dev
-```
-
-### Test Routes
-- Dashboard: http://localhost:3000/dashboard
-- Visits: http://localhost:3000/visits
-
-### Build Application  
-```bash
-pnpm -w build
-```
-
-## Authentication
-All API requests are authenticated via cookies forwarded through Next.js API routes to maintain session state.
-
-## Timezone Handling
-All dates and times are displayed in Europe/London timezone using the utilities in `apps/web/lib/time.ts`.
-
-## Error Handling
-- GraphQL errors are logged and fallback to empty data
-- Dashboard shows placeholder badges for missing backend endpoints
-- Visits page shows empty state when no data is available
-- Server components include loading and error boundaries
+## Notes
+- AI summary UI routes are intentionally disabled in staging until the summary pipeline is rebuilt on the new Bedrock Haiku runtime.
+- Historical connectivity incident notes were removed from this document because they no longer describe the live staging system.

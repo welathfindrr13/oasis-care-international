@@ -5,7 +5,7 @@ import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedroc
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
-const DEFAULT_BEDROCK_SUMMARY_MODEL = 'anthropic.claude-haiku-4-5-20251001-v1:0';
+const DEFAULT_BEDROCK_SUMMARY_MODEL = 'eu.anthropic.claude-haiku-4-5-20251001-v1:0';
 
 interface BatchMetrics {
   startTime: DateTime;

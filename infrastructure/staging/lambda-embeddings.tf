@@ -19,7 +19,7 @@ resource "aws_lambda_function" "embedding_generator" {
   environment {
     variables = {
       DATABASE_URL           = aws_secretsmanager_secret.database_url.arn
-      BEDROCK_MODEL          = "anthropic.claude-haiku-4-5-20251001-v1:0"
+      BEDROCK_MODEL          = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
       NODE_ENV               = "production"
       AI_SUMMARY_ENABLED_ENV = var.ai_summary_enabled ? "true" : "false"
     }
