@@ -27,6 +27,7 @@ export function VisitCareLogPanel({ canEdit, visit }: VisitCareLogPanelProps) {
   const router = useRouter()
   const [notesDraft, setNotesDraft] = useState(visit.notes ?? '')
   const [savedNotes, setSavedNotes] = useState(visit.notes ?? '')
+  const [visitUpdatedAt, setVisitUpdatedAt] = useState(visit.updatedAt)
   const [tasks, setTasks] = useState(visit.tasks)
   const [taskNoteDrafts, setTaskNoteDrafts] = useState<Record<string, string>>(
     Object.fromEntries(visit.tasks.map((task) => [task.id, task.notes ?? '']))
@@ -52,6 +53,7 @@ export function VisitCareLogPanel({ canEdit, visit }: VisitCareLogPanelProps) {
         })
         setSavedNotes(data.updateVisit.notes ?? '')
         setNotesDraft(data.updateVisit.notes ?? '')
+        setVisitUpdatedAt(data.updateVisit.updatedAt)
         setNotesMessage('Visit notes saved.')
         router.refresh()
       } catch (err) {
@@ -152,6 +154,9 @@ export function VisitCareLogPanel({ canEdit, visit }: VisitCareLogPanelProps) {
             {visit.notes?.trim() ? visit.notes : 'No visit notes recorded.'}
           </div>
         )}
+        <p className="mt-3 text-xs text-text-secondary">
+          Last updated {formatDateTime(visitUpdatedAt)}
+        </p>
       </section>
 
       <section>
@@ -210,6 +215,9 @@ export function VisitCareLogPanel({ canEdit, visit }: VisitCareLogPanelProps) {
                           Completed {formatDateTime(task.completedAt)}
                         </p>
                       )}
+                      <p className="mt-1 text-xs text-text-secondary">
+                        Last updated {formatDateTime(task.updatedAt)}
+                      </p>
                     </div>
 
                     {canEdit ? (

@@ -11,7 +11,7 @@ export async function requireAdminSession() {
   }
 
   if (!hasRole((session as any).roles, 'admin')) {
-    redirect('/activity');
+    redirect('/activity?unauthorized=1');
   }
 
   return session;

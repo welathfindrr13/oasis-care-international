@@ -1,27 +1,11 @@
 import { withAuth } from "next-auth/middleware";
-import { hasRole } from "./lib/auth/roles";
 
 export default withAuth({
   pages: {
     signIn: "/login",
   },
   callbacks: {
-    authorized: ({ req, token }) => {
-      if (!token) {
-        return false;
-      }
-
-      const pathname = req.nextUrl.pathname;
-      if (
-        pathname.startsWith("/admin") ||
-        pathname.startsWith("/clients") ||
-        pathname === "/visits/new"
-      ) {
-        return hasRole((token as any).roles, "admin");
-      }
-
-      return true;
-    },
+    authorized: ({ token }) => Boolean(token),
   },
 });
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { Header } from '../../components/oasis/Header';
 
@@ -15,9 +16,11 @@ const statsFetcher = async (url: string): Promise<Stats> => {
 };
 
 export default function ActivityPage() {
+  const searchParams = useSearchParams();
   const { data, error } = useSWR<Stats>('/api/stats/today', statsFetcher, {
     refreshInterval: 30_000, // 30 seconds
   });
+  const showUnauthorizedMessage = searchParams.get('unauthorized') === '1';
 
   if (error) {
     return (
@@ -67,6 +70,11 @@ export default function ActivityPage() {
           </h1>
           <p className="text-slate-500 mt-1">Real-time overview of care activities</p>
         </div>
+        {showUnauthorizedMessage && (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            That page is only available to admin users. You&apos;re still signed in, and we&apos;ve brought you back to your activity view.
+          </div>
+        )}
         <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Visits booked today" value={data.booked} icon="📅" />
           <StatCard label="Visits finished today" value={data.finished} icon="✅" />
