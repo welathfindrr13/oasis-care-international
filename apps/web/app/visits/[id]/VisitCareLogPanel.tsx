@@ -6,10 +6,10 @@ import { StatusChip } from '../../../components/oasis/StatusChip'
 import { buttonVariants } from '../../../components/ui/Button'
 import { clientQuery } from '../../../lib/graphql/client-side'
 import {
-  SET_VISIT_TASK_COMPLETION_MUTATION,
   UPDATE_VISIT_MUTATION,
-  type SetVisitTaskCompletionMutationResponse,
+  UPDATE_VISIT_TASK_MUTATION,
   type UpdateVisitMutationResponse,
+  type UpdateVisitTaskMutationResponse,
   type Visit,
   type VisitTask,
 } from '../../../lib/graphql/queries'
@@ -28,6 +28,9 @@ export function VisitCareLogPanel({ canEdit, visit }: VisitCareLogPanelProps) {
   const [notesDraft, setNotesDraft] = useState(visit.notes ?? '')
   const [savedNotes, setSavedNotes] = useState(visit.notes ?? '')
   const [tasks, setTasks] = useState(visit.tasks)
+  const [taskNoteDrafts, setTaskNoteDrafts] = useState<Record<string, string>>(
+    Object.fromEntries(visit.tasks.map((task) => [task.id, task.notes ?? '']))
+  )
   const [error, setError] = useState<string | null>(null)
   const [notesMessage, setNotesMessage] = useState<string | null>(null)
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
@@ -35,6 +38,8 @@ export function VisitCareLogPanel({ canEdit, visit }: VisitCareLogPanelProps) {
   const [isUpdatingTask, startUpdatingTask] = useTransition()
 
   const hasUnsavedNotes = notesDraft !== savedNotes
+  const hasUnsavedTaskNotes = (taskId: string) =>
+    (taskNoteDrafts[taskId] ?? '') !== (tasks.find((task) => task.id === taskId)?.notes ?? '')
 
   const saveNotes = () => {
     setError(null)
@@ -55,23 +60,28 @@ export function VisitCareLogPanel({ canEdit, visit }: VisitCareLogPanelProps) {
     })
   }
 
-  const toggleTask = (task: VisitTask | VisitCareLogPanelProps['visit']['tasks'][number]) => {
+  const updateTask = (
+    task: VisitTask | VisitCareLogPanelProps['visit']['tasks'][number],
+    updates: { isCompleted?: boolean; notes?: string }
+  ) => {
     setError(null)
     setNotesMessage(null)
     setActiveTaskId(task.id)
 
     startUpdatingTask(async () => {
       try {
-        const data = await clientQuery<SetVisitTaskCompletionMutationResponse>(
-          SET_VISIT_TASK_COMPLETION_MUTATION,
+        const data = await clientQuery<UpdateVisitTaskMutationResponse>(
+          UPDATE_VISIT_TASK_MUTATION,
           {
-            taskId: task.id,
-            isCompleted: !task.isCompleted,
-            notes: task.notes ?? undefined,
+            input: {
+              id: task.id,
+              isCompleted: updates.isCompleted,
+              notes: updates.notes,
+            },
           }
         )
 
-        const updatedTask = data.setVisitTaskCompletion
+        const updatedTask = data.updateVisitTask
         setTasks((current) =>
           current.map((item) =>
             item.id === task.id
@@ -85,9 +95,13 @@ export function VisitCareLogPanel({ canEdit, visit }: VisitCareLogPanelProps) {
               : item
           )
         )
+        setTaskNoteDrafts((current) => ({
+          ...current,
+          [task.id]: updatedTask.notes ?? '',
+        }))
         router.refresh()
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to update task status')
+        setError(err instanceof Error ? err.message : 'Failed to update task')
       } finally {
         setActiveTaskId(null)
       }
@@ -167,8 +181,29 @@ export function VisitCareLogPanel({ canEdit, visit }: VisitCareLogPanelProps) {
                       <p className="mt-2 text-sm text-text-secondary">
                         {task.description || 'No task description'}
                       </p>
-                      {task.notes && (
+                      {canEdit ? (
+                        <div className="mt-3 space-y-2">
+                          <label htmlFor={`task-notes-${task.id}`} className="text-xs font-medium uppercase tracking-wide text-text-secondary">
+                            Task notes
+                          </label>
+                          <textarea
+                            id={`task-notes-${task.id}`}
+                            value={taskNoteDrafts[task.id] ?? ''}
+                            onChange={(event) =>
+                              setTaskNoteDrafts((current) => ({
+                                ...current,
+                                [task.id]: event.target.value,
+                              }))
+                            }
+                            rows={3}
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-text-primary shadow-sm outline-none transition focus:border-brand-blue-primary focus:ring-2 focus:ring-brand-blue-primary/20"
+                            placeholder="Capture any specific care detail for this task."
+                          />
+                        </div>
+                      ) : task.notes ? (
                         <p className="mt-2 text-sm text-text-secondary">Notes: {task.notes}</p>
+                      ) : (
+                        <p className="mt-2 text-sm text-text-secondary">No task notes recorded.</p>
                       )}
                       {task.completedAt && (
                         <p className="mt-2 text-xs text-text-secondary">
@@ -178,18 +213,43 @@ export function VisitCareLogPanel({ canEdit, visit }: VisitCareLogPanelProps) {
                     </div>
 
                     {canEdit ? (
-                      <button
-                        type="button"
-                        className={buttonVariants({
-                          variant: task.isCompleted ? 'outline' : 'secondary',
-                          size: 'sm',
-                          className: 'self-start',
-                        })}
-                        onClick={() => toggleTask(task)}
-                        disabled={isTaskBusy}
-                      >
-                        {isTaskBusy ? 'Updating…' : task.isCompleted ? 'Reopen task' : 'Complete task'}
-                      </button>
+                      <div className="flex flex-col gap-2 sm:items-end">
+                        <button
+                          type="button"
+                          className={buttonVariants({
+                            variant: task.isCompleted ? 'outline' : 'secondary',
+                            size: 'sm',
+                            className: 'self-start',
+                          })}
+                          onClick={() =>
+                            updateTask(task, {
+                              isCompleted: !task.isCompleted,
+                              notes: taskNoteDrafts[task.id] ?? '',
+                            })
+                          }
+                          disabled={isTaskBusy}
+                        >
+                          {isTaskBusy ? 'Updating…' : task.isCompleted ? 'Reopen task' : 'Complete task'}
+                        </button>
+                        <button
+                          type="button"
+                          className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'self-start' })}
+                          onClick={() =>
+                            updateTask(task, {
+                              isCompleted: task.isCompleted,
+                              notes: taskNoteDrafts[task.id] ?? '',
+                            })
+                          }
+                          disabled={isTaskBusy || !hasUnsavedTaskNotes(task.id)}
+                        >
+                          Save task notes
+                        </button>
+                        {!hasUnsavedTaskNotes(task.id) && (
+                          <span className="text-xs text-text-secondary">
+                            Task notes are up to date.
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-sm text-text-secondary">Read only</span>
                     )}

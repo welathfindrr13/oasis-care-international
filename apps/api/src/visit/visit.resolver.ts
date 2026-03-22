@@ -4,6 +4,7 @@ import { VisitService } from './visit.service';
 import { CarerDTO, VisitDTO, VisitPaginatedResponse, VisitTaskDTO } from './dto/visit.dto';
 import { CreateVisitInput } from './dto/create-visit.input';
 import { UpdateVisitInput } from './dto/update-visit.input';
+import { UpdateVisitTaskInput } from './dto/update-visit-task.input';
 import { VisitFilterArgs } from './dto/visit-filter.args';
 import { RolesGuard } from '@oasis/auth';
 
@@ -49,8 +50,9 @@ export class VisitResolver {
   @Roles('admin')
   async carers(
     @Args('activeOnly', { type: () => Boolean, nullable: true, defaultValue: true }) activeOnly: boolean,
+    @Args('search', { type: () => String, nullable: true }) search?: string,
   ): Promise<CarerDTO[]> {
-    return this.visitService.findAssignableCarers(activeOnly);
+    return this.visitService.findAssignableCarers(activeOnly, search);
   }
 
   @Mutation(() => VisitDTO)
@@ -139,6 +141,19 @@ export class VisitResolver {
     return this.mapTaskToDTO(task);
   }
 
+  @Mutation(() => VisitTaskDTO)
+  @Roles('admin', 'carer')
+  async updateVisitTask(
+    @Args('input') input: UpdateVisitTaskInput,
+    @Context() ctx: any
+  ): Promise<VisitTaskDTO> {
+    const { sub: userId, realm_access } = ctx.req.user;
+    const userRole = realm_access?.roles?.[0] || 'carer';
+
+    const task = await this.visitService.updateTask(input, userId, userRole);
+    return this.mapTaskToDTO(task);
+  }
+
   private mapVisitToDTO(visit: any): VisitDTO {
     return {
       id: visit.id,
@@ -156,6 +171,10 @@ export class VisitResolver {
         lastName: visit.carer.last_name,
         email: visit.carer.email,
         phone: visit.carer.phone,
+        isActive: visit.carer.is_active,
+        hireDate: visit.carer.hire_date,
+        upcomingVisitsCount: 0,
+        completedTodayCount: 0,
       } : null,
       client: visit.client ? {
         id: visit.client.id,

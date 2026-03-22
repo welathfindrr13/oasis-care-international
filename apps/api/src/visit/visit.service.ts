@@ -2,6 +2,7 @@ import { Injectable, HttpStatus, Logger } from '@nestjs/common';
 import { VisitRepository } from './visit.repository';
 import { CreateVisitInput } from './dto/create-visit.input';
 import { UpdateVisitInput } from './dto/update-visit.input';
+import { UpdateVisitTaskInput } from './dto/update-visit-task.input';
 import { VisitFilterArgs } from './dto/visit-filter.args';
 import { Visit, VisitTask, VisitStatus, Carer } from '@oasis/db';
 import { ClsService } from 'nestjs-cls';
@@ -77,8 +78,8 @@ export class VisitService {
     return visit;
   }
 
-  async findAssignableCarers(activeOnly = true): Promise<CarerDTO[]> {
-    const carers = await this.visitRepository.findCarers(activeOnly);
+  async findAssignableCarers(activeOnly = true, search?: string): Promise<CarerDTO[]> {
+    const carers = await this.visitRepository.findCarers(activeOnly, search);
     return carers.map((carer) => this.mapCarerToDTO(carer));
   }
 
@@ -269,6 +270,51 @@ export class VisitService {
     });
   }
 
+  async updateTask(
+    input: UpdateVisitTaskInput,
+    userId: string,
+    userRole: string
+  ): Promise<VisitTask> {
+    const requestId = this.cls.get('requestId');
+    const task = await this.visitRepository.findTaskById(input.id);
+
+    if (!task) {
+      throw new BaseHttpException(
+        ErrorCode.TASK_NOT_FOUND,
+        'Task not found',
+        HttpStatus.NOT_FOUND
+      );
+    }
+
+    const visit = await this.visitRepository.findById(task.visit_id);
+    if (!visit) {
+      throw new BaseHttpException(
+        ErrorCode.VISIT_NOT_FOUND,
+        'Visit not found',
+        HttpStatus.NOT_FOUND
+      );
+    }
+
+    this.checkVisitAccess(visit, userId, userRole, 'update');
+
+    const updateData: Record<string, unknown> = {};
+    if (input.isCompleted !== undefined) {
+      updateData.is_completed = input.isCompleted;
+      updateData.completed_at = input.isCompleted ? task.completed_at ?? new Date() : null;
+    }
+
+    if (input.notes !== undefined) {
+      updateData.notes = input.notes;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return task;
+    }
+
+    this.logger.log(`Updating task ${input.id}`, { requestId, updateData });
+    return this.visitRepository.updateTask(input.id, updateData);
+  }
+
   private checkVisitAccess(
     visit: Visit & { carer?: any; client?: any },
     userId: string,
@@ -311,13 +357,19 @@ export class VisitService {
     }
   }
 
-  private mapCarerToDTO(carer: Carer): CarerDTO {
+  private mapCarerToDTO(
+    carer: Carer & { upcomingVisitsCount?: number; completedTodayCount?: number }
+  ): CarerDTO {
     return {
       id: carer.id,
       firstName: carer.first_name,
       lastName: carer.last_name,
       email: carer.email,
       phone: carer.phone,
+      isActive: carer.is_active,
+      hireDate: carer.hire_date,
+      upcomingVisitsCount: carer.upcomingVisitsCount ?? 0,
+      completedTodayCount: carer.completedTodayCount ?? 0,
     };
   }
 }

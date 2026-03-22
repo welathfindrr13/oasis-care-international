@@ -1,4 +1,4 @@
-import { ObjectType, Field, ID, registerEnumType } from '@nestjs/graphql';
+import { ObjectType, Field, ID, Int, registerEnumType } from '@nestjs/graphql';
 import { VisitStatus } from '@oasis/db';
 
 // Register enum for GraphQL
@@ -23,6 +23,18 @@ export class CarerDTO {
 
   @Field(() => String, { nullable: true })
   phone?: string | null;
+
+  @Field()
+  isActive!: boolean;
+
+  @Field(() => Date, { nullable: true })
+  hireDate?: Date | null;
+
+  @Field(() => Int)
+  upcomingVisitsCount!: number;
+
+  @Field(() => Int)
+  completedTodayCount!: number;
 }
 
 @ObjectType()

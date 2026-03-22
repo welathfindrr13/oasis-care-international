@@ -1,22 +1,72 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService, Visit, VisitTask, Prisma, VisitStatus, Carer } from '@oasis/db';
 
+type CarerDirectoryRecord = Carer & {
+  upcomingVisitsCount: number;
+  completedTodayCount: number;
+};
+
 @Injectable()
 export class VisitRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findCarers(activeOnly = true): Promise<Carer[]> {
+  async findCarers(activeOnly = true, search?: string): Promise<CarerDirectoryRecord[]> {
     const where: Prisma.CarerWhereInput = this.prisma.whereNotDeleted(
       activeOnly ? { is_active: true } : {}
     );
 
-    return this.prisma.carer.findMany({
+    const trimmedSearch = search?.trim();
+    if (trimmedSearch) {
+      where.OR = [
+        { first_name: { contains: trimmedSearch, mode: 'insensitive' } },
+        { last_name: { contains: trimmedSearch, mode: 'insensitive' } },
+        { email: { contains: trimmedSearch, mode: 'insensitive' } },
+      ];
+    }
+
+    const carers = await this.prisma.carer.findMany({
       where,
       orderBy: [
         { first_name: 'asc' },
         { last_name: 'asc' },
       ],
     });
+
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(now);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    return Promise.all(
+      carers.map(async (carer) => {
+        const [upcomingVisitsCount, completedTodayCount] = await this.prisma.$transaction([
+          this.prisma.visit.count({
+            where: this.prisma.whereNotDeleted({
+              carer_id: carer.id,
+              status: VisitStatus.SCHEDULED,
+              scheduled_start: { gte: now },
+            }),
+          }),
+          this.prisma.visit.count({
+            where: this.prisma.whereNotDeleted({
+              carer_id: carer.id,
+              status: VisitStatus.COMPLETED,
+              actual_end: {
+                gte: startOfToday,
+                lte: endOfToday,
+              },
+            }),
+          }),
+        ]);
+
+        return {
+          ...carer,
+          upcomingVisitsCount,
+          completedTodayCount,
+        };
+      })
+    );
   }
 
   async create(data: Prisma.VisitCreateInput): Promise<Visit> {

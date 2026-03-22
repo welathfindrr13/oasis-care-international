@@ -16,6 +16,10 @@ export interface Carer {
   lastName: string;
   email: string;
   phone?: string;
+  isActive: boolean;
+  hireDate?: string;
+  upcomingVisitsCount: number;
+  completedTodayCount: number;
 }
 
 export interface CarersQueryResponse {
@@ -40,6 +44,30 @@ export interface VisitTask {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface MedicationAdministration {
+  id: string;
+  prescriptionId: string;
+  visitId?: string;
+  scheduledTime: string;
+  administeredTime?: string;
+  administeredBy?: string;
+  status: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  prescription?: {
+    id: string;
+    specialInstructions?: string;
+    medication?: {
+      id: string;
+      name: string;
+      dosage: string;
+      unit: string;
+      instructions?: string;
+    };
+  };
 }
 
 export interface Visit {
@@ -70,6 +98,10 @@ export interface VisitsQueryResponse {
 
 export interface VisitQueryResponse {
   visit: Visit;
+}
+
+export interface DueMedsQueryResponse {
+  listDueMeds: MedicationAdministration[];
 }
 
 export interface VisitsQueryVariables {
@@ -261,14 +293,23 @@ export const CLIENTS_QUERY = `
   }
 `;
 
+export interface CarersQueryVariables {
+  activeOnly?: boolean;
+  search?: string;
+}
+
 export const CARERS_QUERY = `
-  query Carers($activeOnly: Boolean) {
-    carers(activeOnly: $activeOnly) {
+  query Carers($activeOnly: Boolean, $search: String) {
+    carers(activeOnly: $activeOnly, search: $search) {
       id
       firstName
       lastName
       email
       phone
+      isActive
+      hireDate
+      upcomingVisitsCount
+      completedTodayCount
     }
   }
 `;
@@ -279,6 +320,10 @@ export interface UpdateVisitMutationResponse {
 
 export interface SetVisitTaskCompletionMutationResponse {
   setVisitTaskCompletion: Pick<VisitTask, 'id' | 'isCompleted' | 'completedAt' | 'notes' | 'updatedAt'>;
+}
+
+export interface UpdateVisitTaskMutationResponse {
+  updateVisitTask: Pick<VisitTask, 'id' | 'isCompleted' | 'completedAt' | 'notes' | 'updatedAt'>;
 }
 
 export const UPDATE_VISIT_MUTATION = `
@@ -302,6 +347,46 @@ export const SET_VISIT_TASK_COMPLETION_MUTATION = `
       completedAt
       notes
       updatedAt
+    }
+  }
+`;
+
+export const UPDATE_VISIT_TASK_MUTATION = `
+  mutation UpdateVisitTask($input: UpdateVisitTaskInput!) {
+    updateVisitTask(input: $input) {
+      id
+      isCompleted
+      completedAt
+      notes
+      updatedAt
+    }
+  }
+`;
+
+export const LIST_DUE_MEDS_QUERY = `
+  query ListDueMeds($visitId: String!) {
+    listDueMeds(visitId: $visitId) {
+      id
+      prescriptionId
+      visitId
+      scheduledTime
+      administeredTime
+      administeredBy
+      status
+      notes
+      createdAt
+      updatedAt
+      prescription {
+        id
+        specialInstructions
+        medication {
+          id
+          name
+          dosage
+          unit
+          instructions
+        }
+      }
     }
   }
 `;
