@@ -68,6 +68,23 @@ function getMedicationStatusLabel(status: string) {
     .replace(/\b\w/g, (character) => character.toUpperCase())
 }
 
+function toTimestamp(value?: string | null) {
+  return value ? new Date(value).getTime() : null
+}
+
+function summariseNote(note?: string | null) {
+  const cleaned = note?.trim()
+  if (!cleaned) {
+    return null
+  }
+
+  if (cleaned.length <= 120) {
+    return cleaned
+  }
+
+  return `${cleaned.slice(0, 117)}...`
+}
+
 function deriveTimeline(visit: Awaited<ReturnType<typeof getVisit>>, medications: MedicationAdministration[]) {
   if (!visit) {
     return []
@@ -112,21 +129,28 @@ function deriveTimeline(visit: Awaited<ReturnType<typeof getVisit>>, medications
       : []),
     ...visit.tasks.flatMap((task) => {
       const items = []
+      const taskNote = summariseNote(task.notes)
+      const updatedAt = toTimestamp(task.updatedAt)
+      const completedAt = toTimestamp(task.completedAt)
+
       if (task.completedAt) {
         items.push({
           id: `${task.id}-completed`,
           at: task.completedAt,
           title: `Task completed: ${task.taskName}`,
-          detail: task.notes?.trim() || 'Task marked as completed.',
+          detail: taskNote || 'Task marked as completed.',
         })
-      } else if (task.notes?.trim()) {
+      }
+
+      if (taskNote && updatedAt && updatedAt !== completedAt) {
         items.push({
           id: `${task.id}-notes`,
           at: task.updatedAt,
-          title: `Task updated: ${task.taskName}`,
-          detail: task.notes,
+          title: `Task notes updated: ${task.taskName}`,
+          detail: taskNote,
         })
       }
+
       return items
     }),
     ...medications.map((administration) => ({
