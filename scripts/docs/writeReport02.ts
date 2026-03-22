@@ -217,10 +217,6 @@ ${compBody}
 - Characteristics: Tightly coupled to feature, may have local state
 - Pattern: Organized in folders with index.ts barrel exports
 
-**Standalone Components:**
-- \`MedsTab.tsx\` - Medication tab component
-- Purpose: Specialized components not yet grouped
-
 ### 3.3 Component Composition Pattern
 
 **Layering:**
@@ -229,7 +225,7 @@ UI Primitives (Button, Card, Input)
          ↓
 Domain Components (MetricCard, Nav)
          ↓
-Feature Components (HealthSummary, MedsTab)
+Feature Components (HealthSummary)
          ↓
 Pages (dashboard/page.tsx, visits/page.tsx)
 \`\`\`
@@ -272,7 +268,7 @@ User Request → Next.js Server
                     ↓
               GraphQL Query (via lib/graphql/client.ts)
                        OR
-              REST fetch (via lib/api.ts or SWR)
+              REST fetch (via route-specific fetch helper or SWR)
                        OR
               Route Handler (/api/*)
                     ↓
@@ -492,7 +488,6 @@ pnpm --filter @oasis/web dev
 ### 11.1 Utility Files (\`lib/\`)
 
 **Discovered Utilities:**
-- \`lib/api.ts\` - API client helpers
 - \`lib/graphql/client.ts\` - GraphQL client configuration
 - \`lib/graphql/queries.ts\` - GraphQL query definitions
 - \`lib/time.ts\` - Date/time utilities

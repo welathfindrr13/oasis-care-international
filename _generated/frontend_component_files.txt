@@ -3,7 +3,6 @@ apps/web/components/HealthSummary/ApprovalControls.tsx
 apps/web/components/HealthSummary/index.ts
 apps/web/components/HealthSummary/RiskIndicator.tsx
 apps/web/components/HealthSummary/SummaryViewer.tsx
-apps/web/components/MedsTab.tsx
 apps/web/components/oasis/FilterBar.tsx
 apps/web/components/oasis/MetricCard.tsx
 apps/web/components/oasis/Nav.tsx

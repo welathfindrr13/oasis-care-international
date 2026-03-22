@@ -21,8 +21,7 @@
   - Button.tsx
   - Card.tsx
   - index.ts (exports)
-- **Feature Components**: 5 files
-  - MedsTab.tsx
+- **Feature Components**: 4 files
   - HealthSummary/ApprovalControls.tsx
   - HealthSummary/RiskIndicator.tsx
   - HealthSummary/SummaryViewer.tsx

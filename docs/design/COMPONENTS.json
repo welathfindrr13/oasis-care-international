@@ -15,10 +15,6 @@
   ],
   "feature_components": [
     {
-      "path": "apps/web/components/MedsTab.tsx",
-      "type": "feature"
-    },
-    {
       "path": "apps/web/components/HealthSummary/ApprovalControls.tsx",
       "type": "feature"
     },
@@ -36,6 +32,6 @@
     }
   ],
   "ui_component_count": 3,
-  "feature_component_count": 5,
-  "total_component_count": 8
+  "feature_component_count": 4,
+  "total_component_count": 7
 }

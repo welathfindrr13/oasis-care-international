@@ -162,14 +162,13 @@ graph TD
 | 3 | SummaryViewer | feature | apps/web/components/HealthSummary/SummaryViewer.tsx |
 | 4 | RiskIndicator.test | feature | apps/web/components/HealthSummary/__tests__/RiskIndicator.test.tsx |
 | 5 | Index | feature | apps/web/components/HealthSummary/index.ts |
-| 6 | MedsTab | feature | apps/web/components/MedsTab.tsx |
-| 7 | FilterBar | domain | apps/web/components/oasis/FilterBar.tsx |
-| 8 | MetricCard | domain | apps/web/components/oasis/MetricCard.tsx |
-| 9 | Nav | domain | apps/web/components/oasis/Nav.tsx |
-| 10 | StatusChip | domain | apps/web/components/oasis/StatusChip.tsx |
-| 11 | Button | ui | apps/web/components/ui/Button.tsx |
-| 12 | Card | ui | apps/web/components/ui/Card.tsx |
-| 13 | Index | ui | apps/web/components/ui/index.ts |
+| 6 | FilterBar | domain | apps/web/components/oasis/FilterBar.tsx |
+| 7 | MetricCard | domain | apps/web/components/oasis/MetricCard.tsx |
+| 8 | Nav | domain | apps/web/components/oasis/Nav.tsx |
+| 9 | StatusChip | domain | apps/web/components/oasis/StatusChip.tsx |
+| 10 | Button | ui | apps/web/components/ui/Button.tsx |
+| 11 | Card | ui | apps/web/components/ui/Card.tsx |
+| 12 | Index | ui | apps/web/components/ui/index.ts |
 
 ### 3.2 Component Organization Strategy
 
@@ -189,10 +188,6 @@ graph TD
 - Characteristics: Tightly coupled to feature, may have local state
 - Pattern: Organized in folders with index.ts barrel exports
 
-**Standalone Components:**
-- `MedsTab.tsx` - Medication tab component
-- Purpose: Specialized components not yet grouped
-
 ### 3.3 Component Composition Pattern
 
 **Layering:**
@@ -201,7 +196,7 @@ UI Primitives (Button, Card, Input)
          ↓
 Domain Components (MetricCard, Nav)
          ↓
-Feature Components (HealthSummary, MedsTab)
+Feature Components (HealthSummary)
          ↓
 Pages (dashboard/page.tsx, visits/page.tsx)
 ```
@@ -250,7 +245,7 @@ User Request → Next.js Server
                     ↓
               GraphQL Query (via lib/graphql/client.ts)
                        OR
-              REST fetch (via lib/api.ts or SWR)
+              REST fetch (via route-specific fetch helper or SWR)
                        OR
               Route Handler (/api/*)
                     ↓
@@ -474,7 +469,6 @@ pnpm --filter @oasis/web dev
 ### 11.1 Utility Files (`lib/`)
 
 **Discovered Utilities:**
-- `lib/api.ts` - API client helpers
 - `lib/graphql/client.ts` - GraphQL client configuration
 - `lib/graphql/queries.ts` - GraphQL query definitions
 - `lib/time.ts` - Date/time utilities

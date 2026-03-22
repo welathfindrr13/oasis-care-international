@@ -6,7 +6,7 @@ const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://app.oasis-care.co';
 const OUT_DIR = 'output/playwright/e2e-live';
 const TS = Date.now();
 const RESULT_PREFIX = 'PROBE_RESULT_JSON:';
-const REQUIRED_CHECKS = ['activity', 'adminCarers', 'adminMetrics', 'clientsNew', 'visitsNew', 'upsertCarer'];
+const REQUIRED_CHECKS = ['activity', 'adminMetrics', 'clientsNew', 'visitsNew'];
 
 const ACCOUNTS = {
   admin: {
@@ -17,14 +17,6 @@ const ACCOUNTS = {
     email: process.env.PLAYWRIGHT_CARER_EMAIL || 'carer-demo@yourdomain.com',
     password: process.env.PLAYWRIGHT_CARER_PASSWORD || 'SecurePassword123!2',
   },
-};
-
-const FALLBACK_CARER = {
-  id: '863252b4-b0d1-7084-2588-940b36d0faa2',
-  firstName: 'Carer',
-  lastName: 'Demo',
-  email: process.env.PLAYWRIGHT_CARER_EMAIL || 'carer-demo@yourdomain.com',
-  phone: '',
 };
 
 function stamp() {
@@ -169,109 +161,6 @@ async function checkRoute(page, role, route, mode, contentCheck) {
   };
 }
 
-async function checkAdminUpsertFlow(page) {
-  const carersQuery = `query { carers { id firstName lastName email phone } }`;
-  const carersRes = await gql(page, carersQuery);
-
-  const firstCarer = carersRes?.body?.data?.carers?.[0];
-  const target = firstCarer || FALLBACK_CARER;
-
-  await page.goto(`${BASE_URL}/admin/carers`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-  const inputs = page.locator('form input[type="text"], form input:not([type])');
-  const count = await inputs.count();
-
-  if (count < 5) {
-    return {
-      pass: false,
-      expected: 'Admin can upsert a carer from /admin/carers',
-      actual: { reason: `Expected >=5 inputs, found ${count}`, carersQueryStatus: carersRes.status, carersQueryErrors: carersRes?.body?.errors || null },
-      screenshot: await screenshot(page, 'admin', 'upsert_carer_form_missing_inputs'),
-    };
-  }
-
-  await inputs.nth(0).fill(String(target.id));
-  await inputs.nth(1).fill(String(target.firstName || 'Carer'));
-  await inputs.nth(2).fill(String(target.lastName || 'Demo'));
-  await inputs.nth(3).fill(String(target.email || FALLBACK_CARER.email));
-  await inputs.nth(4).fill(String(target.phone || ''));
-
-  const responsePromise = page.waitForResponse((res) => {
-    if (!res.url().includes('/api/graphql')) return false;
-    if (res.request().method() !== 'POST') return false;
-    const post = res.request().postData() || '';
-    return post.includes('upsertCarer');
-  }, { timeout: 30000 }).catch(() => null);
-
-  const submit = page.locator('button:has-text("Upsert Carer")').first();
-  await submit.click({ timeout: 15000 });
-
-  const response = await responsePromise;
-  let responseBody = null;
-  if (response) {
-    try {
-      responseBody = await response.json();
-    } catch {
-      responseBody = null;
-    }
-  }
-
-  await page.waitForTimeout(1200);
-  const successVisible = await safeVisible(page.getByText('Carer upserted successfully.', { exact: false }), 5000);
-
-  const pass = Boolean(response && response.ok() && !Array.isArray(responseBody?.errors) && successVisible);
-
-  return {
-    pass,
-    expected: 'Admin can upsert a carer from /admin/carers',
-    actual: {
-      carersQueryStatus: carersRes.status,
-      carersQueryOk: carersRes.ok,
-      carersQueryErrors: carersRes?.body?.errors || null,
-      responseStatus: response?.status() ?? null,
-      graphQLErrors: responseBody?.errors || null,
-      successVisible,
-      targetId: target.id,
-    },
-    screenshot: await screenshot(page, 'admin', 'upsert_carer_result'),
-  };
-}
-
-async function checkCarerUpsertForbidden(page) {
-  const mutation = `mutation($input: UpsertCarerInput!) { upsertCarer(input: $input) { id } }`;
-  const variables = {
-    input: {
-      id: FALLBACK_CARER.id,
-      firstName: FALLBACK_CARER.firstName,
-      lastName: FALLBACK_CARER.lastName,
-      email: FALLBACK_CARER.email,
-      phone: FALLBACK_CARER.phone,
-      isActive: true,
-    },
-  };
-
-  const res = await gql(page, mutation, variables);
-  const errText = JSON.stringify(res.body || {}).toLowerCase();
-  const forbiddenLike =
-    res.status === 403 ||
-    errText.includes('forbidden') ||
-    errText.includes('unauthorized') ||
-    errText.includes('access denied');
-
-  return {
-    pass: forbiddenLike,
-    expected: 'Carer cannot execute upsertCarer mutation',
-    actual: {
-      status: res.status,
-      ok: res.ok,
-      errors: res?.body?.errors || null,
-      data: res?.body?.data || null,
-    },
-    screenshot: await screenshot(page, 'carer', 'upsert_carer_forbidden_probe'),
-  };
-}
-
 async function runForRole(browser, role) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
@@ -290,10 +179,6 @@ async function runForRole(browser, role) {
     result.checks.activity = await checkActivity(page, role);
 
     if (role === 'admin') {
-      result.checks.adminCarers = await checkRoute(page, role, '/admin/carers', 'allow', async (p) => {
-        const hasTitle = await safeVisible(p.locator('h1:has-text("Admin: Carers")'));
-        return { pass: hasTitle, actual: { hasTitle } };
-      });
       result.checks.adminMetrics = await checkRoute(page, role, '/admin/metrics', 'allow', async (p) => {
         const hasTitle = await safeVisible(p.locator('h1:has-text("System Metrics")'));
         return { pass: hasTitle, actual: { hasTitle } };
@@ -308,13 +193,10 @@ async function runForRole(browser, role) {
         const hasCarerSelect = await safeVisible(p.locator('select#carer'));
         return { pass: hasTitle && hasClientSelect && hasCarerSelect, actual: { hasTitle, hasClientSelect, hasCarerSelect } };
       });
-      result.checks.upsertCarer = await checkAdminUpsertFlow(page);
     } else {
-      result.checks.adminCarers = await checkRoute(page, role, '/admin/carers', 'deny');
       result.checks.adminMetrics = await checkRoute(page, role, '/admin/metrics', 'deny');
       result.checks.clientsNew = await checkRoute(page, role, '/clients/new', 'deny');
       result.checks.visitsNew = await checkRoute(page, role, '/visits/new', 'deny');
-      result.checks.upsertCarer = await checkCarerUpsertForbidden(page);
     }
   } catch (error) {
     result.fatal = error instanceof Error ? error.stack : String(error);

@@ -26,11 +26,6 @@
       "kind": "feature"
     },
     {
-      "name": "MedsTab",
-      "path": "apps/web/components/MedsTab.tsx",
-      "kind": "feature"
-    },
-    {
       "name": "FilterBar",
       "path": "apps/web/components/oasis/FilterBar.tsx",
       "kind": "domain"
