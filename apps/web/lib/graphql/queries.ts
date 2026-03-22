@@ -274,7 +274,11 @@ export const CARERS_QUERY = `
 `;
 
 export interface UpdateVisitMutationResponse {
-  updateVisit: Pick<Visit, 'id' | 'status' | 'actualStart' | 'actualEnd' | 'updatedAt'>;
+  updateVisit: Pick<Visit, 'id' | 'status' | 'actualStart' | 'actualEnd' | 'notes' | 'updatedAt'>;
+}
+
+export interface SetVisitTaskCompletionMutationResponse {
+  setVisitTaskCompletion: Pick<VisitTask, 'id' | 'isCompleted' | 'completedAt' | 'notes' | 'updatedAt'>;
 }
 
 export const UPDATE_VISIT_MUTATION = `
@@ -284,6 +288,19 @@ export const UPDATE_VISIT_MUTATION = `
       status
       actualStart
       actualEnd
+      notes
+      updatedAt
+    }
+  }
+`;
+
+export const SET_VISIT_TASK_COMPLETION_MUTATION = `
+  mutation SetVisitTaskCompletion($taskId: String!, $isCompleted: Boolean!, $notes: String) {
+    setVisitTaskCompletion(taskId: $taskId, isCompleted: $isCompleted, notes: $notes) {
+      id
+      isCompleted
+      completedAt
+      notes
       updatedAt
     }
   }

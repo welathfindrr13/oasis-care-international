@@ -227,6 +227,16 @@ export class VisitService {
     userId: string,
     userRole: string
   ): Promise<VisitTask> {
+    return this.setTaskCompletion(taskId, true, notes, userId, userRole);
+  }
+
+  async setTaskCompletion(
+    taskId: string,
+    isCompleted: boolean,
+    notes: string | undefined,
+    userId: string,
+    userRole: string
+  ): Promise<VisitTask> {
     const requestId = this.cls.get('requestId');
     const task = await this.visitRepository.findTaskById(taskId);
 
@@ -250,12 +260,12 @@ export class VisitService {
 
     this.checkVisitAccess(visit, userId, userRole, 'update');
 
-    this.logger.log(`Completing task ${taskId}`, { requestId });
+    this.logger.log(`${isCompleted ? 'Completing' : 'Reopening'} task ${taskId}`, { requestId });
 
     return this.visitRepository.updateTask(taskId, {
-      is_completed: true,
-      completed_at: new Date(),
-      notes: notes || task.notes,
+      is_completed: isCompleted,
+      completed_at: isCompleted ? new Date() : null,
+      notes: notes ?? task.notes,
     });
   }
 

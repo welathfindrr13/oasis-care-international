@@ -114,16 +114,29 @@ export class VisitResolver {
       userRole
     );
 
-    return {
-      id: task.id,
-      taskName: task.task_name,
-      description: task.description,
-      isCompleted: task.is_completed,
-      completedAt: task.completed_at,
-      notes: task.notes,
-      createdAt: task.created_at,
-      updatedAt: task.updated_at,
-    };
+    return this.mapTaskToDTO(task);
+  }
+
+  @Mutation(() => VisitTaskDTO)
+  @Roles('admin', 'carer')
+  async setVisitTaskCompletion(
+    @Args('taskId') taskId: string,
+    @Args('isCompleted', { type: () => Boolean }) isCompleted: boolean,
+    @Args('notes', { nullable: true, type: () => String }) notes: string | undefined,
+    @Context() ctx: any
+  ): Promise<VisitTaskDTO> {
+    const { sub: userId, realm_access } = ctx.req.user;
+    const userRole = realm_access?.roles?.[0] || 'carer';
+
+    const task = await this.visitService.setTaskCompletion(
+      taskId,
+      isCompleted,
+      notes,
+      userId,
+      userRole
+    );
+
+    return this.mapTaskToDTO(task);
   }
 
   private mapVisitToDTO(visit: any): VisitDTO {
@@ -152,18 +165,22 @@ export class VisitResolver {
         city: visit.client.city,
         postcode: visit.client.postcode,
       } : null,
-      tasks: visit.tasks?.map((task: any) => ({
-        id: task.id,
-        taskName: task.task_name,
-        description: task.description,
-        isCompleted: task.is_completed,
-        completedAt: task.completed_at,
-        notes: task.notes,
-        createdAt: task.created_at,
-        updatedAt: task.updated_at,
-      })) || [],
+      tasks: visit.tasks?.map((task: any) => this.mapTaskToDTO(task)) || [],
       createdAt: visit.created_at,
       updatedAt: visit.updated_at,
+    };
+  }
+
+  private mapTaskToDTO(task: any): VisitTaskDTO {
+    return {
+      id: task.id,
+      taskName: task.task_name,
+      description: task.description,
+      isCompleted: task.is_completed,
+      completedAt: task.completed_at,
+      notes: task.notes,
+      createdAt: task.created_at,
+      updatedAt: task.updated_at,
     };
   }
 }

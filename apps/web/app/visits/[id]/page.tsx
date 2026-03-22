@@ -1,13 +1,17 @@
 import Link from 'next/link'
 import { Metadata } from 'next'
+import { getServerSession } from 'next-auth'
 import { notFound } from 'next/navigation'
 import { Header } from '../../../components/oasis/Header'
 import { StatusChip } from '../../../components/oasis/StatusChip'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
 import { buttonVariants } from '../../../components/ui/Button'
+import { authOptions } from '../../../lib/auth/auth-options'
+import { hasRole } from '../../../lib/auth/roles'
 import { query } from '../../../lib/graphql/client'
 import { VISIT_QUERY, type VisitQueryResponse } from '../../../lib/graphql/queries'
 import { formatDateTime } from '../../../lib/time'
+import { VisitCareLogPanel } from './VisitCareLogPanel'
 
 export const metadata: Metadata = {
   title: 'Visit Details - Oasis Care',
@@ -42,11 +46,15 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 }
 
 export default async function VisitDetailPage({ params }: VisitDetailPageProps) {
+  const session = await getServerSession(authOptions)
   const visit = await getVisit(params.id)
 
   if (!visit) {
     notFound()
   }
+
+  const isAdmin = hasRole((session as any)?.roles, 'admin')
+  const canEditCareLog = hasRole((session as any)?.roles, 'carer') && !isAdmin
 
   const clientAddress = [visit.client?.addressLine1, visit.client?.addressLine2, visit.client?.city, visit.client?.postcode]
     .filter(Boolean)
@@ -87,7 +95,6 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
               <DetailRow label="Scheduled end" value={formatDateTime(visit.scheduledEnd)} />
               <DetailRow label="Actual start" value={visit.actualStart ? formatDateTime(visit.actualStart) : 'Not recorded'} />
               <DetailRow label="Actual end" value={visit.actualEnd ? formatDateTime(visit.actualEnd) : 'Not recorded'} />
-              <DetailRow label="Notes" value={visit.notes?.trim() ? visit.notes : 'No visit notes recorded'} />
             </CardContent>
           </Card>
 
@@ -109,36 +116,18 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
 
             <Card>
               <CardHeader>
-                <h2 className="text-lg font-semibold text-text-primary font-heading">Tasks</h2>
+                <h2 className="text-lg font-semibold text-text-primary font-heading">Care log</h2>
               </CardHeader>
               <CardContent>
-                {visit.tasks.length > 0 ? (
-                  <ul className="space-y-3">
-                    {visit.tasks.map((task) => (
-                      <li key={task.id} className="rounded-sm border border-base-gray-200 p-3">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <p className="font-medium text-text-primary">{task.taskName}</p>
-                            <p className="mt-1 text-sm text-text-secondary">
-                              {task.description || 'No task description'}
-                            </p>
-                            {task.notes && (
-                              <p className="mt-2 text-sm text-text-secondary">Notes: {task.notes}</p>
-                            )}
-                          </div>
-                          <StatusChip status={task.isCompleted ? 'completed' : 'scheduled'} />
-                        </div>
-                        {task.completedAt && (
-                          <p className="mt-2 text-xs text-text-secondary">
-                            Completed {formatDateTime(task.completedAt)}
-                          </p>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-text-secondary">No tasks were attached to this visit.</p>
-                )}
+                <VisitCareLogPanel
+                  canEdit={canEditCareLog}
+                  visit={{
+                    id: visit.id,
+                    notes: visit.notes,
+                    updatedAt: visit.updatedAt,
+                    tasks: visit.tasks,
+                  }}
+                />
               </CardContent>
             </Card>
           </div>
