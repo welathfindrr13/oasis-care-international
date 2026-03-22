@@ -165,7 +165,7 @@ https://github.com/welathfindrr13/oasis-care-international/actions
 - Creates client: `oasis-staging-web-confidential` with `GenerateSecret=true`
 - Persists secret to: `oasis/staging/cognito_web_client_secret`
 - **Callback URL:** https://app.oasis-care.co/api/auth/callback/cognito
-- **Logout URL:** https://app.oasis-care.co
+- **Logout URL:** https://app.oasis-care.co/login
 
 ### Phase 2: ACM Certificates  
 - Requests certs for: `app.oasis-care.co` and `api.oasis-care.co`

@@ -1,13 +1,21 @@
 'use client';
 
 import useSWR from 'swr';
-import { fetcher } from '@/lib/api';
 import { Header } from '../../components/oasis/Header';
 
 type Stats = { booked: number; finished: number };
+const statsFetcher = async (url: string): Promise<Stats> => {
+  const response = await fetch(url, { credentials: 'include' });
+
+  if (!response.ok) {
+    throw new Error('Failed to load activity stats');
+  }
+
+  return response.json();
+};
 
 export default function ActivityPage() {
-  const { data, error } = useSWR<Stats>('/stats/today', fetcher, {
+  const { data, error } = useSWR<Stats>('/api/stats/today', statsFetcher, {
     refreshInterval: 30_000, // 30 seconds
   });
 

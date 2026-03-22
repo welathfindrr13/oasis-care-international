@@ -1,33 +1,75 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
+import { getServerSession } from 'next-auth'
 import { Nav } from '../../../components/oasis/Nav'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
 import { buttonVariants } from '../../../components/ui/Button'
-import { getSiteBaseUrl } from '../../../lib/url'
+import { authOptions } from '../../../lib/auth/auth-options'
+import { hasRole } from '../../../lib/auth/roles'
 
 export const metadata: Metadata = {
   title: 'Metrics - Oasis Care Admin',
   description: 'System metrics and performance monitoring',
 }
 
-async function getMetrics(): Promise<string> {
-  try {
-    const response = await fetch(`${getSiteBaseUrl()}/api/metrics`, {
-      cache: 'no-store',
-    });
-    
-    if (!response.ok) {
-      return 'Metrics endpoint not available or disabled';
+type MetricsState = {
+  body: string
+  endpointStatus: number | null
+  endpointLabel: string
+  tokenAvailable: boolean
+  source: string
+}
+
+async function getMetrics(): Promise<MetricsState> {
+  const session = await getServerSession(authOptions)
+  const accessToken = (session as any)?.accessToken as string | undefined
+  const roles = (session as any)?.roles
+  const fullApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql'
+  const apiUrl = fullApiUrl.replace(/\/graphql$/, '')
+
+  if (!session || !hasRole(roles, 'admin') || !accessToken) {
+    return {
+      body: 'Admin session required to view metrics.',
+      endpointStatus: 403,
+      endpointLabel: 'Forbidden',
+      tokenAvailable: Boolean(accessToken),
+      source: `${apiUrl}/metrics`,
     }
-    
-    return await response.text();
+  }
+
+  try {
+    const response = await fetch(`${apiUrl}/metrics`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: 'no-store',
+    })
+
+    const body = response.ok
+      ? await response.text()
+      : 'Metrics endpoint not available or disabled'
+
+    return {
+      body,
+      endpointStatus: response.status,
+      endpointLabel: response.ok ? 'Available' : 'Unavailable',
+      tokenAvailable: true,
+      source: `${apiUrl}/metrics`,
+    }
   } catch (error) {
-    return `Metrics unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    return {
+      body: `Metrics unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      endpointStatus: null,
+      endpointLabel: 'Unavailable',
+      tokenAvailable: true,
+      source: `${apiUrl}/metrics`,
+    }
   }
 }
 
 export default async function MetricsPage() {
   const metrics = await getMetrics();
+  const metricsLineCount = metrics.body.split('\n').filter(Boolean).length
 
   return (
     <div className="min-h-screen bg-background-secondary">
@@ -48,22 +90,18 @@ export default async function MetricsPage() {
           <Card>
             <CardHeader>
               <h3 className="text-lg font-semibold text-text-primary">
-                API Status
+                Metrics Endpoint
               </h3>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-text-secondary">Status:</span>
-                  <span className="text-green-600 font-medium">✅ Online</span>
+                  <span className="text-text-secondary">Status</span>
+                  <span className="text-text-primary font-medium">{metrics.endpointLabel}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-text-secondary">Port:</span>
-                  <span className="text-text-primary font-mono">4000</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Environment:</span>
-                  <span className="text-text-primary">Demo</span>
+                  <span className="text-text-secondary">HTTP</span>
+                  <span className="text-text-primary font-mono">{metrics.endpointStatus ?? 'n/a'}</span>
                 </div>
               </div>
             </CardContent>
@@ -72,22 +110,18 @@ export default async function MetricsPage() {
           <Card>
             <CardHeader>
               <h3 className="text-lg font-semibold text-text-primary">
-                Database
+                Session
               </h3>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-text-secondary">Status:</span>
-                  <span className="text-green-600 font-medium">✅ Connected</span>
+                  <span className="text-text-secondary">Access token</span>
+                  <span className="text-text-primary">{metrics.tokenAvailable ? 'Available' : 'Missing'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-text-secondary">Type:</span>
-                  <span className="text-text-primary">PostgreSQL + pgvector</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Port:</span>
-                  <span className="text-text-primary font-mono">5434</span>
+                  <span className="text-text-secondary">Route guard</span>
+                  <span className="text-text-primary">Admin only</span>
                 </div>
               </div>
             </CardContent>
@@ -96,22 +130,18 @@ export default async function MetricsPage() {
           <Card>
             <CardHeader>
               <h3 className="text-lg font-semibold text-text-primary">
-                Demo Mode
+                Payload
               </h3>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-text-secondary">Auth Bypass:</span>
-                  <span className="text-yellow-600 font-medium">⚠️ Enabled</span>
+                  <span className="text-text-secondary">Non-empty lines</span>
+                  <span className="text-text-primary font-mono">{metricsLineCount}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-text-secondary">Seed Data:</span>
-                  <span className="text-green-600 font-medium">✅ Loaded</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Test DB:</span>
-                  <span className="text-green-600 font-medium">✅ Available</span>
+                  <span className="text-text-secondary">Source</span>
+                  <span className="text-text-primary font-mono text-xs">{metrics.source}</span>
                 </div>
               </div>
             </CardContent>
@@ -138,7 +168,7 @@ export default async function MetricsPage() {
           <CardContent>
             <div className="bg-base-gray-50 border border-base-gray-200 rounded-sm p-4 overflow-auto max-h-96">
               <pre className="text-sm font-mono text-text-primary whitespace-pre-wrap">
-                {metrics}
+                {metrics.body}
               </pre>
             </div>
 
