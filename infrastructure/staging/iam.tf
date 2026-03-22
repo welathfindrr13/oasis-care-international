@@ -65,7 +65,9 @@ data "aws_iam_policy_document" "bedrock_access" {
     ]
     resources = [
       "arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-3-haiku-*",
-      "arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-3-sonnet-*"
+      "arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-3-sonnet-*",
+      "arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-haiku-4-*",
+      "arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-sonnet-4-*"
     ]
   }
 }
@@ -146,7 +148,9 @@ data "aws_iam_policy_document" "lambda_embedding_permissions" {
     ]
     resources = [
       "arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-3-haiku-*",
-      "arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-3-sonnet-*"
+      "arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-3-sonnet-*",
+      "arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-haiku-4-*",
+      "arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-sonnet-4-*"
     ]
   }
 }

@@ -5,6 +5,8 @@ import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedroc
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
+const DEFAULT_BEDROCK_SUMMARY_MODEL = 'anthropic.claude-haiku-4-5-20251001-v1:0';
+
 interface BatchMetrics {
   startTime: DateTime;
   clientsProcessed: number;
@@ -297,9 +299,10 @@ ${JSON.stringify(logsForAI, null, 2)}
 
 Please analyze this week's care logs and generate the health summary in the specified JSON format.`;
 
-    // Call Bedrock Claude-3 Haiku
+    // Call the configured Bedrock summary model. Default to Haiku 4.5 so we
+    // stay on a supported low-latency model as Claude 3 Haiku is retired.
     const command = new InvokeModelCommand({
-      modelId: process.env.BEDROCK_MODEL || 'anthropic.claude-3-haiku-20240307-v1:0',
+      modelId: process.env.BEDROCK_MODEL || DEFAULT_BEDROCK_SUMMARY_MODEL,
       body: JSON.stringify({
         anthropic_version: 'bedrock-2023-05-31',
         max_tokens: 2000,
