@@ -10,6 +10,7 @@ interface MedicationAdministration {
   administeredTime?: string;
   status: 'SCHEDULED' | 'ADMINISTERED' | 'MISSED' | 'REFUSED' | 'CANCELLED';
   notes?: string;
+  instructionSnapshot?: string;
   prescription: {
     specialInstructions?: string;
     client: {
@@ -320,8 +321,10 @@ export default function EmarPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">{med.prescription.medication.name}</div>
-                            {med.prescription.specialInstructions && (
-                              <div className="text-xs text-gray-500 mt-1">{med.prescription.specialInstructions}</div>
+                            {(med.instructionSnapshot || med.prescription.specialInstructions) && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {med.instructionSnapshot || med.prescription.specialInstructions}
+                              </div>
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

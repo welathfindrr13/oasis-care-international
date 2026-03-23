@@ -125,9 +125,13 @@ export function VisitMedicationPanel({ canEdit, medications }: VisitMedicationPa
                       Recorded {formatDateTime(administration.administeredTime)}
                     </p>
                   )}
-                  {(administration.prescription?.specialInstructions || administration.prescription?.medication?.instructions) && (
+                  {(administration.instructionSnapshot ||
+                    administration.prescription?.specialInstructions ||
+                    administration.prescription?.medication?.instructions) && (
                     <p className="mt-2 text-sm text-text-secondary">
-                      {administration.prescription?.specialInstructions || administration.prescription?.medication?.instructions}
+                      {administration.instructionSnapshot ||
+                        administration.prescription?.specialInstructions ||
+                        administration.prescription?.medication?.instructions}
                     </p>
                   )}
 

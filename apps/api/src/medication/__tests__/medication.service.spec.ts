@@ -147,6 +147,7 @@ describe('MedicationService', () => {
       repository.findMedicationById.mockResolvedValue({
         id: 'medication-123',
         name: 'Metformin',
+        instructions: 'Take with food',
       } as any);
       repository.findVisitsForClientInRange.mockResolvedValue([
         {
@@ -185,10 +186,12 @@ describe('MedicationService', () => {
             {
               scheduledTime: new Date('2025-01-08T08:00:00.000Z'),
               visitId: 'visit-123',
+              instructionSnapshot: 'Take with food',
             },
             {
               scheduledTime: new Date('2025-01-09T08:00:00.000Z'),
               visitId: null,
+              instructionSnapshot: 'Take with food',
             },
           ],
           actorId: mockAdminUser.id,
@@ -242,6 +245,10 @@ describe('MedicationService', () => {
       frequency_interval_hours: null,
       administration_times: ['08:00'],
       special_instructions: 'Take with food',
+      medication: {
+        id: 'medication-123',
+        instructions: 'Base library instructions',
+      },
       is_active: true,
       created_at: new Date(),
       updated_at: new Date(),
@@ -285,10 +292,12 @@ describe('MedicationService', () => {
             {
               scheduledTime: new Date('2025-01-08T09:00:00.000Z'),
               visitId: 'visit-123',
+              instructionSnapshot: 'Updated instructions',
             },
             {
               scheduledTime: new Date('2025-01-09T09:00:00.000Z'),
               visitId: null,
+              instructionSnapshot: 'Updated instructions',
             },
           ],
           reconciliationReason: 'Prescription schedule updated',
@@ -320,6 +329,8 @@ describe('MedicationService', () => {
       expect(repository.updatePrescriptionWithScheduleReconciliation).toHaveBeenCalledWith(
         expect.objectContaining({
           cancelScheduledFrom: undefined,
+          refreshInstructionSnapshotFrom: new Date('2025-01-08T06:00:00.000Z'),
+          instructionSnapshot: 'Updated narrative only',
           administrations: [],
           reconciliationReason: 'Prescription details updated',
         })
@@ -606,6 +617,11 @@ describe('MedicationService', () => {
           frequency_per_day: 1,
           frequency_interval_hours: null,
           administration_times: ['08:00'],
+          special_instructions: null,
+          medication: {
+            id: 'medication-123',
+            instructions: 'Rolling fallback instructions',
+          },
         },
       ] as any);
       repository.findVisitsForClientInRange.mockResolvedValue([
@@ -643,10 +659,12 @@ describe('MedicationService', () => {
       expect(scheduledAdministrations[0]).toEqual({
         scheduledTime: new Date('2025-02-12T08:00:00.000Z'),
         visitId: 'visit-123',
+        instructionSnapshot: 'Rolling fallback instructions',
       });
       expect(scheduledAdministrations.at(-1)).toEqual({
         scheduledTime: new Date('2025-03-14T08:00:00.000Z'),
         visitId: null,
+        instructionSnapshot: 'Rolling fallback instructions',
       });
       expect(scheduledAdministrations).toHaveLength(31);
     });

@@ -148,6 +148,7 @@ model MedicationAdministration {
   administered_by   String?
   status            MedicationStatus    @default(SCHEDULED)
   notes             String?
+  instruction_snapshot String?
   prescription      Prescription        @relation(fields: [prescription_id], references: [id])
   visit             Visit?              @relation(fields: [visit_id], references: [id])
   audits            MedicationAudit[]

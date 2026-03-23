@@ -198,6 +198,7 @@ exports.Prisma.MedicationAdministrationScalarFieldEnum = {
   administered_by: 'administered_by',
   status: 'status',
   notes: 'notes',
+  instruction_snapshot: 'instruction_snapshot',
   created_at: 'created_at',
   updated_at: 'updated_at',
   deleted_at: 'deleted_at'

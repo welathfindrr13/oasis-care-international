@@ -156,6 +156,7 @@ function deriveTimeline(visit: Awaited<ReturnType<typeof getVisit>>, medications
           : `Medication ${administration.status.toLowerCase()}: ${administration.prescription?.medication?.name || 'Medication'}`,
       detail:
         administration.notes?.trim() ||
+        administration.instructionSnapshot ||
         administration.prescription?.specialInstructions ||
         administration.prescription?.medication?.instructions ||
         'No extra medication notes recorded.',

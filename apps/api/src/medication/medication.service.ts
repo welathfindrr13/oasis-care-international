@@ -64,6 +64,7 @@ interface MedicationSchedulingWindow {
 interface ScheduledAdministrationDraft {
   scheduledTime: Date;
   visitId: string | null;
+  instructionSnapshot?: string | null;
 }
 
 interface PrescriptionScheduleSnapshot {
@@ -83,6 +84,8 @@ interface ActivePrescriptionSchedule {
   frequency_per_day: number;
   frequency_interval_hours: number | null;
   administration_times: string[];
+  special_instructions?: string | null;
+  medication?: Pick<Medication, 'instructions'> | null;
 }
 
 const PRESCRIPTION_SCHEDULING_HORIZON_DAYS = 30;
@@ -148,6 +151,10 @@ export class MedicationService {
 
     const startDate = new Date(data.startDate);
     const endDate = data.endDate ? new Date(data.endDate) : null;
+    const instructionSnapshot = this.deriveInstructionSnapshot(
+      data.specialInstructions,
+      medication.instructions
+    );
     const schedulingWindow = this.getPrescriptionSchedulingWindow(startDate, endDate);
     const visitCandidates = schedulingWindow
       ? await this.medicationRepository.findVisitsForClientInRange(
@@ -165,7 +172,10 @@ export class MedicationService {
         administrationTimes: data.administrationTimes,
       },
       visitCandidates
-    );
+    ).map((administration) => ({
+      ...administration,
+      instructionSnapshot,
+    }));
 
     const prescription = await this.medicationRepository.createPrescriptionWithSchedule({
       prescription: {
@@ -225,6 +235,19 @@ export class MedicationService {
       data.frequencyPerDay,
       data.frequencyIntervalHours
     );
+    const existingMedicationInstructions = (
+      existingPrescription as Prescription & {
+        medication?: Pick<Medication, 'instructions'> | null;
+      }
+    ).medication?.instructions;
+    const previousInstructionSnapshot = this.deriveInstructionSnapshot(
+      existingPrescription.special_instructions,
+      existingMedicationInstructions
+    );
+    const nextInstructionSnapshot = this.deriveInstructionSnapshot(
+      data.specialInstructions,
+      existingMedicationInstructions
+    );
     const now = new Date();
     const previousSchedule = this.buildPrescriptionScheduleSnapshot(existingPrescription);
     const nextSchedule: PrescriptionScheduleSnapshot = {
@@ -258,8 +281,16 @@ export class MedicationService {
         },
         visitCandidates,
         { minimumScheduledTime: now }
-      );
+      ).map((administration) => ({
+        ...administration,
+        instructionSnapshot: nextInstructionSnapshot,
+      }));
     }
+
+    const shouldRefreshFutureInstructionSnapshot =
+      !shouldReconcileFutureSchedule &&
+      data.isActive &&
+      previousInstructionSnapshot !== nextInstructionSnapshot;
 
     const updatedPrescription = await this.medicationRepository.updatePrescriptionWithScheduleReconciliation({
       prescriptionId: existingPrescription.id,
@@ -273,6 +304,10 @@ export class MedicationService {
         is_active: data.isActive,
       },
       cancelScheduledFrom: shouldReconcileFutureSchedule ? now : undefined,
+      refreshInstructionSnapshotFrom: shouldRefreshFutureInstructionSnapshot ? now : undefined,
+      instructionSnapshot: shouldRefreshFutureInstructionSnapshot
+        ? nextInstructionSnapshot
+        : undefined,
       administrations: scheduledAdministrations,
       reconciliationReason: shouldReconcileFutureSchedule
         ? data.isActive
@@ -808,6 +843,19 @@ export class MedicationService {
     return JSON.stringify(previous) !== JSON.stringify(next);
   }
 
+  private deriveInstructionSnapshot(
+    specialInstructions?: string | null,
+    medicationInstructions?: string | null
+  ): string | null {
+    const prescriptionInstructions = specialInstructions?.trim();
+    if (prescriptionInstructions) {
+      return prescriptionInstructions;
+    }
+
+    const libraryInstructions = medicationInstructions?.trim();
+    return libraryInstructions || null;
+  }
+
   private async ensureActivePrescriptionCoverageForOperationalWindow(
     requestedStart: Date,
     requestedEnd: Date,
@@ -871,7 +919,13 @@ export class MedicationService {
         minimumScheduledTime: normalizedAnchor,
         horizonAnchorDate: normalizedAnchor,
       }
-    );
+    ).map((administration) => ({
+      ...administration,
+      instructionSnapshot: this.deriveInstructionSnapshot(
+        prescription.special_instructions,
+        prescription.medication?.instructions
+      ),
+    }));
 
     if (!administrations.length) {
       return;

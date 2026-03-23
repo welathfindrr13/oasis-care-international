@@ -50,6 +50,9 @@ export class MedicationAdministrationDto {
   @Field({ nullable: true })
   notes?: string;
 
+  @Field({ nullable: true })
+  instructionSnapshot?: string;
+
   @Field(() => PrescriptionDto, { nullable: true })
   prescription?: PrescriptionDto;
 
@@ -71,6 +74,7 @@ export class MedicationAdministrationDto {
     this.administeredBy = administration.administered_by ?? undefined;
     this.status = administration.status;
     this.notes = administration.notes ?? undefined;
+    this.instructionSnapshot = administration.instruction_snapshot ?? undefined;
     this.createdAt = administration.created_at;
     this.updatedAt = administration.updated_at;
 

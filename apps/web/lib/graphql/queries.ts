@@ -55,6 +55,7 @@ export interface MedicationAdministration {
   administeredBy?: string;
   status: string;
   notes?: string;
+  instructionSnapshot?: string;
   createdAt: string;
   updatedAt: string;
   prescription?: {
@@ -480,6 +481,7 @@ export const RECORD_ADMINISTRATION_MUTATION = `
       id
       status
       notes
+      instructionSnapshot
       administeredTime
       administeredBy
       updatedAt
@@ -550,6 +552,7 @@ export const LIST_DUE_MEDS_QUERY = `
       administeredBy
       status
       notes
+      instructionSnapshot
       createdAt
       updatedAt
       prescription {
@@ -578,6 +581,7 @@ export const LIST_VISIT_MEDICATIONS_QUERY = `
       administeredBy
       status
       notes
+      instructionSnapshot
       createdAt
       updatedAt
       prescription {

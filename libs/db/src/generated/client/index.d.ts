@@ -8603,6 +8603,7 @@ export namespace Prisma {
     administered_by: string | null
     status: $Enums.MedicationStatus | null
     notes: string | null
+    instruction_snapshot: string | null
     created_at: Date | null
     updated_at: Date | null
     deleted_at: Date | null
@@ -8617,6 +8618,7 @@ export namespace Prisma {
     administered_by: string | null
     status: $Enums.MedicationStatus | null
     notes: string | null
+    instruction_snapshot: string | null
     created_at: Date | null
     updated_at: Date | null
     deleted_at: Date | null
@@ -8631,6 +8633,7 @@ export namespace Prisma {
     administered_by: number
     status: number
     notes: number
+    instruction_snapshot: number
     created_at: number
     updated_at: number
     deleted_at: number
@@ -8647,6 +8650,7 @@ export namespace Prisma {
     administered_by?: true
     status?: true
     notes?: true
+    instruction_snapshot?: true
     created_at?: true
     updated_at?: true
     deleted_at?: true
@@ -8661,6 +8665,7 @@ export namespace Prisma {
     administered_by?: true
     status?: true
     notes?: true
+    instruction_snapshot?: true
     created_at?: true
     updated_at?: true
     deleted_at?: true
@@ -8675,6 +8680,7 @@ export namespace Prisma {
     administered_by?: true
     status?: true
     notes?: true
+    instruction_snapshot?: true
     created_at?: true
     updated_at?: true
     deleted_at?: true
@@ -8762,6 +8768,7 @@ export namespace Prisma {
     administered_by: string | null
     status: $Enums.MedicationStatus
     notes: string | null
+    instruction_snapshot: string | null
     created_at: Date
     updated_at: Date
     deleted_at: Date | null
@@ -8793,6 +8800,7 @@ export namespace Prisma {
     administered_by?: boolean
     status?: boolean
     notes?: boolean
+    instruction_snapshot?: boolean
     created_at?: boolean
     updated_at?: boolean
     deleted_at?: boolean
@@ -8811,6 +8819,7 @@ export namespace Prisma {
     administered_by?: boolean
     status?: boolean
     notes?: boolean
+    instruction_snapshot?: boolean
     created_at?: boolean
     updated_at?: boolean
     deleted_at?: boolean
@@ -8840,6 +8849,7 @@ export namespace Prisma {
       administered_by: string | null
       status: $Enums.MedicationStatus
       notes: string | null
+      instruction_snapshot: string | null
       created_at: Date
       updated_at: Date
       deleted_at: Date | null
@@ -9250,6 +9260,7 @@ export namespace Prisma {
     readonly administered_by: FieldRef<"MedicationAdministration", 'String'>
     readonly status: FieldRef<"MedicationAdministration", 'MedicationStatus'>
     readonly notes: FieldRef<"MedicationAdministration", 'String'>
+    readonly instruction_snapshot: FieldRef<"MedicationAdministration", 'String'>
     readonly created_at: FieldRef<"MedicationAdministration", 'DateTime'>
     readonly updated_at: FieldRef<"MedicationAdministration", 'DateTime'>
     readonly deleted_at: FieldRef<"MedicationAdministration", 'DateTime'>
@@ -17342,6 +17353,7 @@ export namespace Prisma {
     administered_by: 'administered_by',
     status: 'status',
     notes: 'notes',
+    instruction_snapshot: 'instruction_snapshot',
     created_at: 'created_at',
     updated_at: 'updated_at',
     deleted_at: 'deleted_at'
@@ -18186,6 +18198,7 @@ export namespace Prisma {
     administered_by?: StringNullableFilter<"MedicationAdministration"> | string | null
     status?: EnumMedicationStatusFilter<"MedicationAdministration"> | $Enums.MedicationStatus
     notes?: StringNullableFilter<"MedicationAdministration"> | string | null
+    instruction_snapshot?: StringNullableFilter<"MedicationAdministration"> | string | null
     created_at?: DateTimeFilter<"MedicationAdministration"> | Date | string
     updated_at?: DateTimeFilter<"MedicationAdministration"> | Date | string
     deleted_at?: DateTimeNullableFilter<"MedicationAdministration"> | Date | string | null
@@ -18203,6 +18216,7 @@ export namespace Prisma {
     administered_by?: SortOrderInput | SortOrder
     status?: SortOrder
     notes?: SortOrderInput | SortOrder
+    instruction_snapshot?: SortOrderInput | SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
     deleted_at?: SortOrderInput | SortOrder
@@ -18223,6 +18237,7 @@ export namespace Prisma {
     administered_by?: StringNullableFilter<"MedicationAdministration"> | string | null
     status?: EnumMedicationStatusFilter<"MedicationAdministration"> | $Enums.MedicationStatus
     notes?: StringNullableFilter<"MedicationAdministration"> | string | null
+    instruction_snapshot?: StringNullableFilter<"MedicationAdministration"> | string | null
     created_at?: DateTimeFilter<"MedicationAdministration"> | Date | string
     updated_at?: DateTimeFilter<"MedicationAdministration"> | Date | string
     deleted_at?: DateTimeNullableFilter<"MedicationAdministration"> | Date | string | null
@@ -18240,6 +18255,7 @@ export namespace Prisma {
     administered_by?: SortOrderInput | SortOrder
     status?: SortOrder
     notes?: SortOrderInput | SortOrder
+    instruction_snapshot?: SortOrderInput | SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
     deleted_at?: SortOrderInput | SortOrder
@@ -18260,6 +18276,7 @@ export namespace Prisma {
     administered_by?: StringNullableWithAggregatesFilter<"MedicationAdministration"> | string | null
     status?: EnumMedicationStatusWithAggregatesFilter<"MedicationAdministration"> | $Enums.MedicationStatus
     notes?: StringNullableWithAggregatesFilter<"MedicationAdministration"> | string | null
+    instruction_snapshot?: StringNullableWithAggregatesFilter<"MedicationAdministration"> | string | null
     created_at?: DateTimeWithAggregatesFilter<"MedicationAdministration"> | Date | string
     updated_at?: DateTimeWithAggregatesFilter<"MedicationAdministration"> | Date | string
     deleted_at?: DateTimeNullableWithAggregatesFilter<"MedicationAdministration"> | Date | string | null
@@ -19485,6 +19502,7 @@ export namespace Prisma {
     administered_by?: string | null
     status?: $Enums.MedicationStatus
     notes?: string | null
+    instruction_snapshot?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
@@ -19502,6 +19520,7 @@ export namespace Prisma {
     administered_by?: string | null
     status?: $Enums.MedicationStatus
     notes?: string | null
+    instruction_snapshot?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
@@ -19515,6 +19534,7 @@ export namespace Prisma {
     administered_by?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumMedicationStatusFieldUpdateOperationsInput | $Enums.MedicationStatus
     notes?: NullableStringFieldUpdateOperationsInput | string | null
+    instruction_snapshot?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -19532,6 +19552,7 @@ export namespace Prisma {
     administered_by?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumMedicationStatusFieldUpdateOperationsInput | $Enums.MedicationStatus
     notes?: NullableStringFieldUpdateOperationsInput | string | null
+    instruction_snapshot?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -19547,6 +19568,7 @@ export namespace Prisma {
     administered_by?: string | null
     status?: $Enums.MedicationStatus
     notes?: string | null
+    instruction_snapshot?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
@@ -19559,6 +19581,7 @@ export namespace Prisma {
     administered_by?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumMedicationStatusFieldUpdateOperationsInput | $Enums.MedicationStatus
     notes?: NullableStringFieldUpdateOperationsInput | string | null
+    instruction_snapshot?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -19573,6 +19596,7 @@ export namespace Prisma {
     administered_by?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumMedicationStatusFieldUpdateOperationsInput | $Enums.MedicationStatus
     notes?: NullableStringFieldUpdateOperationsInput | string | null
+    instruction_snapshot?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -20844,6 +20868,7 @@ export namespace Prisma {
     administered_by?: SortOrder
     status?: SortOrder
     notes?: SortOrder
+    instruction_snapshot?: SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
     deleted_at?: SortOrder
@@ -20858,6 +20883,7 @@ export namespace Prisma {
     administered_by?: SortOrder
     status?: SortOrder
     notes?: SortOrder
+    instruction_snapshot?: SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
     deleted_at?: SortOrder
@@ -20872,6 +20898,7 @@ export namespace Prisma {
     administered_by?: SortOrder
     status?: SortOrder
     notes?: SortOrder
+    instruction_snapshot?: SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
     deleted_at?: SortOrder
@@ -22911,6 +22938,7 @@ export namespace Prisma {
     administered_by?: string | null
     status?: $Enums.MedicationStatus
     notes?: string | null
+    instruction_snapshot?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
@@ -22926,6 +22954,7 @@ export namespace Prisma {
     administered_by?: string | null
     status?: $Enums.MedicationStatus
     notes?: string | null
+    instruction_snapshot?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
@@ -23112,6 +23141,7 @@ export namespace Prisma {
     administered_by?: StringNullableFilter<"MedicationAdministration"> | string | null
     status?: EnumMedicationStatusFilter<"MedicationAdministration"> | $Enums.MedicationStatus
     notes?: StringNullableFilter<"MedicationAdministration"> | string | null
+    instruction_snapshot?: StringNullableFilter<"MedicationAdministration"> | string | null
     created_at?: DateTimeFilter<"MedicationAdministration"> | Date | string
     updated_at?: DateTimeFilter<"MedicationAdministration"> | Date | string
     deleted_at?: DateTimeNullableFilter<"MedicationAdministration"> | Date | string | null
@@ -23361,6 +23391,7 @@ export namespace Prisma {
     administered_by?: string | null
     status?: $Enums.MedicationStatus
     notes?: string | null
+    instruction_snapshot?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
@@ -23376,6 +23407,7 @@ export namespace Prisma {
     administered_by?: string | null
     status?: $Enums.MedicationStatus
     notes?: string | null
+    instruction_snapshot?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
@@ -23804,6 +23836,7 @@ export namespace Prisma {
     administered_by?: string | null
     status?: $Enums.MedicationStatus
     notes?: string | null
+    instruction_snapshot?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
@@ -23820,6 +23853,7 @@ export namespace Prisma {
     administered_by?: string | null
     status?: $Enums.MedicationStatus
     notes?: string | null
+    instruction_snapshot?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
@@ -23893,6 +23927,7 @@ export namespace Prisma {
     administered_by?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumMedicationStatusFieldUpdateOperationsInput | $Enums.MedicationStatus
     notes?: NullableStringFieldUpdateOperationsInput | string | null
+    instruction_snapshot?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -23909,6 +23944,7 @@ export namespace Prisma {
     administered_by?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumMedicationStatusFieldUpdateOperationsInput | $Enums.MedicationStatus
     notes?: NullableStringFieldUpdateOperationsInput | string | null
+    instruction_snapshot?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -24561,6 +24597,7 @@ export namespace Prisma {
     administered_by?: string | null
     status?: $Enums.MedicationStatus
     notes?: string | null
+    instruction_snapshot?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
@@ -24618,6 +24655,7 @@ export namespace Prisma {
     administered_by?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumMedicationStatusFieldUpdateOperationsInput | $Enums.MedicationStatus
     notes?: NullableStringFieldUpdateOperationsInput | string | null
+    instruction_snapshot?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -24633,6 +24671,7 @@ export namespace Prisma {
     administered_by?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumMedicationStatusFieldUpdateOperationsInput | $Enums.MedicationStatus
     notes?: NullableStringFieldUpdateOperationsInput | string | null
+    instruction_snapshot?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -24647,6 +24686,7 @@ export namespace Prisma {
     administered_by?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumMedicationStatusFieldUpdateOperationsInput | $Enums.MedicationStatus
     notes?: NullableStringFieldUpdateOperationsInput | string | null
+    instruction_snapshot?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -24751,6 +24791,7 @@ export namespace Prisma {
     administered_by?: string | null
     status?: $Enums.MedicationStatus
     notes?: string | null
+    instruction_snapshot?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
@@ -24773,6 +24814,7 @@ export namespace Prisma {
     administered_by?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumMedicationStatusFieldUpdateOperationsInput | $Enums.MedicationStatus
     notes?: NullableStringFieldUpdateOperationsInput | string | null
+    instruction_snapshot?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -24788,6 +24830,7 @@ export namespace Prisma {
     administered_by?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumMedicationStatusFieldUpdateOperationsInput | $Enums.MedicationStatus
     notes?: NullableStringFieldUpdateOperationsInput | string | null
+    instruction_snapshot?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -24802,6 +24845,7 @@ export namespace Prisma {
     administered_by?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumMedicationStatusFieldUpdateOperationsInput | $Enums.MedicationStatus
     notes?: NullableStringFieldUpdateOperationsInput | string | null
+    instruction_snapshot?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null

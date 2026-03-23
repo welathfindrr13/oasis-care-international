@@ -70,6 +70,7 @@ export class MedicationRepository {
       scheduledTime: Date;
       visitId?: string | null;
       notes?: string | null;
+      instructionSnapshot?: string | null;
     }>;
     actorId: string;
     actorRole: string;
@@ -98,6 +99,7 @@ export class MedicationRepository {
             scheduled_time: administration.scheduledTime,
             status: MedicationStatus.SCHEDULED,
             notes: administration.notes ?? undefined,
+            instruction_snapshot: administration.instructionSnapshot ?? undefined,
           },
         });
 
@@ -193,10 +195,13 @@ export class MedicationRepository {
     prescriptionId: string;
     prescriptionData: Prisma.PrescriptionUpdateInput;
     cancelScheduledFrom?: Date;
+    refreshInstructionSnapshotFrom?: Date;
+    instructionSnapshot?: string | null;
     administrations: Array<{
       scheduledTime: Date;
       visitId?: string | null;
       notes?: string | null;
+      instructionSnapshot?: string | null;
     }>;
     reconciliationReason: string;
     actorId: string;
@@ -210,6 +215,7 @@ export class MedicationRepository {
       });
 
       let archivedAdministrationCount = 0;
+      let refreshedInstructionSnapshotCount = 0;
 
       if (args.cancelScheduledFrom) {
         const administrationsToArchive = await tx.medicationAdministration.findMany({
@@ -254,6 +260,24 @@ export class MedicationRepository {
         archivedAdministrationCount = administrationsToArchive.length;
       }
 
+      if (args.refreshInstructionSnapshotFrom) {
+        const updateResult = await tx.medicationAdministration.updateMany({
+          where: {
+            prescription_id: args.prescriptionId,
+            status: MedicationStatus.SCHEDULED,
+            deleted_at: null,
+            scheduled_time: {
+              gte: args.refreshInstructionSnapshotFrom,
+            },
+          },
+          data: {
+            instruction_snapshot: args.instructionSnapshot ?? null,
+          },
+        });
+
+        refreshedInstructionSnapshotCount = updateResult.count;
+      }
+
       for (const administration of args.administrations) {
         const createdAdministration = await tx.medicationAdministration.create({
           data: {
@@ -262,6 +286,7 @@ export class MedicationRepository {
             scheduled_time: administration.scheduledTime,
             status: MedicationStatus.SCHEDULED,
             notes: administration.notes ?? undefined,
+            instruction_snapshot: administration.instructionSnapshot ?? undefined,
           },
         });
 
@@ -290,6 +315,7 @@ export class MedicationRepository {
           changes: JSON.stringify({
             ...args.auditChanges,
             archivedAdministrationCount,
+            refreshedInstructionSnapshotCount,
             generatedAdministrationCount: args.administrations.length,
           }),
         },
@@ -313,7 +339,7 @@ export class MedicationRepository {
     start: Date,
     end: Date,
     options: { clientId?: string } = {}
-  ): Promise<Prescription[]> {
+  ): Promise<Array<Prescription & { medication: Medication }>> {
     return this.prisma.prescription.findMany({
       where: {
         deleted_at: null,
@@ -331,6 +357,9 @@ export class MedicationRepository {
           },
         ],
       },
+      include: {
+        medication: true,
+      },
       orderBy: { start_date: 'asc' },
     });
   }
@@ -341,6 +370,7 @@ export class MedicationRepository {
       scheduledTime: Date;
       visitId?: string | null;
       notes?: string | null;
+      instructionSnapshot?: string | null;
     }>;
     actorId: string;
     actorRole: string;
@@ -385,6 +415,7 @@ export class MedicationRepository {
             scheduled_time: administration.scheduledTime,
             status: MedicationStatus.SCHEDULED,
             notes: administration.notes ?? undefined,
+            instruction_snapshot: administration.instructionSnapshot ?? undefined,
           },
         });
 
@@ -608,6 +639,7 @@ export class MedicationRepository {
         ma.administered_by,
         ma.status,
         ma.notes,
+        ma.instruction_snapshot,
         ma.created_at,
         ma.updated_at,
         p.id AS prescription_row_id,
@@ -669,6 +701,7 @@ export class MedicationRepository {
       administered_by: row.administered_by,
       status: row.status,
       notes: row.notes,
+      instruction_snapshot: row.instruction_snapshot,
       created_at: row.created_at,
       updated_at: row.updated_at,
       deleted_at: null,
