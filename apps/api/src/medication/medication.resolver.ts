@@ -60,6 +60,19 @@ export class MedicationResolver {
     return administrations.map(admin => new MedicationAdministrationDto(admin));
   }
 
+  @Query(() => [MedicationAdministrationDto])
+  async listVisitMedications(
+    @Args('visitId') visitId: string,
+    @Context('req') req: any,
+  ): Promise<MedicationAdministrationDto[]> {
+    const administrations = await this.medicationService.listVisitMedications(
+      visitId,
+      req.user.id,
+      req.user.role,
+    );
+    return administrations.map(admin => new MedicationAdministrationDto(admin));
+  }
+
   @Mutation(() => MedicationAdministrationDto)
   async recordAdministration(
     @Args('input') input: RecordAdministrationInput,

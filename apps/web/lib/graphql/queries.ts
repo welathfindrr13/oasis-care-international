@@ -104,6 +104,10 @@ export interface DueMedsQueryResponse {
   listDueMeds: MedicationAdministration[];
 }
 
+export interface VisitMedicationsQueryResponse {
+  listVisitMedications: MedicationAdministration[];
+}
+
 export interface VisitsQueryVariables {
   scheduledStartFrom?: string;
   scheduledStartTo?: string;
@@ -326,6 +330,13 @@ export interface UpdateVisitTaskMutationResponse {
   updateVisitTask: Pick<VisitTask, 'id' | 'isCompleted' | 'completedAt' | 'notes' | 'updatedAt'>;
 }
 
+export interface RecordAdministrationMutationResponse {
+  recordAdministration: Pick<
+    MedicationAdministration,
+    'id' | 'status' | 'notes' | 'administeredTime' | 'administeredBy' | 'updatedAt'
+  >;
+}
+
 export const UPDATE_VISIT_MUTATION = `
   mutation UpdateVisit($input: UpdateVisitInput!) {
     updateVisit(input: $input) {
@@ -363,9 +374,50 @@ export const UPDATE_VISIT_TASK_MUTATION = `
   }
 `;
 
+export const RECORD_ADMINISTRATION_MUTATION = `
+  mutation RecordAdministration($input: RecordAdministrationInput!) {
+    recordAdministration(input: $input) {
+      id
+      status
+      notes
+      administeredTime
+      administeredBy
+      updatedAt
+    }
+  }
+`;
+
 export const LIST_DUE_MEDS_QUERY = `
   query ListDueMeds($visitId: String!) {
     listDueMeds(visitId: $visitId) {
+      id
+      prescriptionId
+      visitId
+      scheduledTime
+      administeredTime
+      administeredBy
+      status
+      notes
+      createdAt
+      updatedAt
+      prescription {
+        id
+        specialInstructions
+        medication {
+          id
+          name
+          dosage
+          unit
+          instructions
+        }
+      }
+    }
+  }
+`;
+
+export const LIST_VISIT_MEDICATIONS_QUERY = `
+  query ListVisitMedications($visitId: String!) {
+    listVisitMedications(visitId: $visitId) {
       id
       prescriptionId
       visitId

@@ -143,6 +143,23 @@ export class MedicationService {
     return dueMeds;
   }
 
+  async listVisitMedications(
+    visitId: string,
+    userId: string,
+    userRole: string
+  ): Promise<any[]> {
+    const requestId = this.cls.get('requestId');
+    this.logger.log(`Fetching all visit medications for visit ${visitId}`, { requestId });
+
+    const visitMeds = await this.medicationRepository.findVisitMedications(visitId);
+
+    if (userRole === 'carer') {
+      return visitMeds.filter((med) => med.visit && med.visit.carer_id === userId);
+    }
+
+    return visitMeds;
+  }
+
   async recordAdministration(
     data: RecordAdministrationInput,
     userId: string,

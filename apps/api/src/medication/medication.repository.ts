@@ -213,6 +213,25 @@ export class MedicationRepository {
     });
   }
 
+  async findVisitMedications(visitId: string): Promise<any[]> {
+    return this.prisma.medicationAdministration.findMany({
+      where: {
+        visit_id: visitId,
+        deleted_at: null,
+      },
+      include: {
+        prescription: {
+          include: {
+            client: true,
+            medication: true
+          }
+        },
+        visit: true
+      },
+      orderBy: { scheduled_time: 'asc' }
+    });
+  }
+
   async findTodaysMedicationsByClient(
     date: Date,
     options: { carerId?: string } = {}

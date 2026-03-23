@@ -10,14 +10,15 @@ import { authOptions } from '../../../lib/auth/auth-options'
 import { hasRole } from '../../../lib/auth/roles'
 import { query } from '../../../lib/graphql/client'
 import {
-  LIST_DUE_MEDS_QUERY,
+  LIST_VISIT_MEDICATIONS_QUERY,
   VISIT_QUERY,
-  type DueMedsQueryResponse,
   type MedicationAdministration,
+  type VisitMedicationsQueryResponse,
   type VisitQueryResponse,
 } from '../../../lib/graphql/queries'
 import { formatDateTime } from '../../../lib/time'
 import { VisitCareLogPanel } from './VisitCareLogPanel'
+import { VisitMedicationPanel } from './VisitMedicationPanel'
 
 export const metadata: Metadata = {
   title: 'Visit Details - Oasis Care',
@@ -44,8 +45,8 @@ async function getVisit(id: string) {
 
 async function getMedicationContext(visitId: string): Promise<MedicationAdministration[]> {
   try {
-    const data = await query<DueMedsQueryResponse>(LIST_DUE_MEDS_QUERY, { visitId })
-    return data.listDueMeds
+    const data = await query<VisitMedicationsQueryResponse>(LIST_VISIT_MEDICATIONS_QUERY, { visitId })
+    return data.listVisitMedications
   } catch (error) {
     console.error('Failed to load medication context:', error)
     return []
@@ -59,13 +60,6 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <div className="text-sm text-text-primary">{value}</div>
     </div>
   )
-}
-
-function getMedicationStatusLabel(status: string) {
-  return status
-    .toLowerCase()
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase())
 }
 
 function toTimestamp(value?: string | null) {
@@ -185,6 +179,7 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
 
   const isAdmin = hasRole((session as any)?.roles, 'admin')
   const canEditCareLog = hasRole((session as any)?.roles, 'carer') && !isAdmin
+  const canRecordMedication = hasRole((session as any)?.roles, 'carer') && !isAdmin
 
   const clientAddress = [visit.client?.addressLine1, visit.client?.addressLine2, visit.client?.city, visit.client?.postcode]
     .filter(Boolean)
@@ -249,46 +244,7 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
                 <h2 className="text-lg font-semibold text-text-primary font-heading">Medication context</h2>
               </CardHeader>
               <CardContent>
-                {medications.length > 0 ? (
-                  <ul className="space-y-3">
-                    {medications.map((administration) => (
-                      <li key={administration.id} className="rounded-2xl border border-base-gray-200 bg-white p-4 shadow-sm">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="font-medium text-text-primary">
-                              {administration.prescription?.medication?.name || 'Medication'}
-                            </p>
-                            <p className="text-sm text-text-secondary">
-                              {administration.prescription?.medication
-                                ? `${administration.prescription.medication.dosage}${administration.prescription.medication.unit}`
-                                : 'Dose not recorded'}
-                            </p>
-                          </div>
-                          <span className="inline-flex rounded-full border border-base-gray-300 bg-base-gray-100 px-3 py-1 text-xs font-medium text-base-gray-800">
-                            {getMedicationStatusLabel(administration.status)}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm text-text-secondary">
-                          Scheduled {formatDateTime(administration.scheduledTime)}
-                        </p>
-                        {administration.administeredTime && (
-                          <p className="mt-1 text-sm text-text-secondary">
-                            Administered {formatDateTime(administration.administeredTime)}
-                          </p>
-                        )}
-                        {(administration.notes || administration.prescription?.specialInstructions) && (
-                          <p className="mt-2 text-sm text-text-secondary">
-                            {administration.notes || administration.prescription?.specialInstructions}
-                          </p>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-text-secondary">
-                    No visit-linked medication records were returned for this visit.
-                  </div>
-                )}
+                <VisitMedicationPanel canEdit={canRecordMedication} medications={medications} />
               </CardContent>
             </Card>
 
