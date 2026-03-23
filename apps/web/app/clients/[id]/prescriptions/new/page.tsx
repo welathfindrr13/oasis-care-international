@@ -32,7 +32,7 @@ async function getClient(id: string) {
 async function getMedicationLibrary() {
   try {
     const response = await query<MedicationsQueryResponse>(MEDICATIONS_QUERY, {
-      take: 200,
+      take: 100,
       skip: 0,
     })
     return response.medications.items
