@@ -54,52 +54,54 @@ export default function PrescriptionAssignmentForm({
   })
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitAttempted, setSubmitAttempted] = useState(false)
 
-  const parsedAdministrationTimes = useMemo(
-    () =>
-      form.administrationTimes
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean),
-    [form.administrationTimes]
-  )
+  const parseAdministrationTimes = (value: string) =>
+    value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
 
-  const validationError = useMemo(() => {
-    if (!form.medicationId) {
+  const getValidationError = (nextForm: PrescriptionFormState, administrationTimes: string[]) => {
+    if (!nextForm.medicationId) {
       return 'Choose a medication from the library.'
     }
 
-    if (!form.startDate) {
+    if (!nextForm.startDate) {
       return 'Choose a prescription start date.'
     }
 
-    const frequencyPerDay = Number(form.frequencyPerDay)
+    const frequencyPerDay = Number(nextForm.frequencyPerDay)
     if (!Number.isInteger(frequencyPerDay) || frequencyPerDay < 1 || frequencyPerDay > 12) {
       return 'Frequency per day must be between 1 and 12.'
     }
 
-    if (!parsedAdministrationTimes.length) {
+    if (!administrationTimes.length) {
       return 'Add at least one administration time in HH:MM format.'
     }
 
-    const invalidTime = parsedAdministrationTimes.find((value) => !/^([01]\\d|2[0-3]):([0-5]\\d)$/.test(value))
+    const invalidTime = administrationTimes.find((value) => !/^([01]\\d|2[0-3]):([0-5]\\d)$/.test(value))
     if (invalidTime) {
       return `Administration time “${invalidTime}” is not in HH:MM format.`
     }
 
-    if (form.frequencyIntervalHours) {
-      const intervalHours = Number(form.frequencyIntervalHours)
+    if (nextForm.frequencyIntervalHours) {
+      const intervalHours = Number(nextForm.frequencyIntervalHours)
       if (!Number.isInteger(intervalHours) || intervalHours < 1 || intervalHours > 24) {
         return 'Frequency interval must be between 1 and 24 hours.'
       }
     }
 
-    if (form.endDate && new Date(form.endDate) < new Date(form.startDate)) {
+    if (nextForm.endDate && new Date(nextForm.endDate) < new Date(nextForm.startDate)) {
       return 'End date must be after the start date.'
     }
 
     return null
-  }, [form, parsedAdministrationTimes])
+  }
+
+  const parsedAdministrationTimes = useMemo(() => parseAdministrationTimes(form.administrationTimes), [form.administrationTimes])
+
+  const validationError = useMemo(() => getValidationError(form, parsedAdministrationTimes), [form, parsedAdministrationTimes])
 
   const handleChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -113,9 +115,24 @@ export default function PrescriptionAssignmentForm({
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    setSubmitAttempted(true)
 
-    if (validationError) {
-      setError(validationError)
+    const formData = new FormData(event.currentTarget)
+    const submissionForm: PrescriptionFormState = {
+      medicationId: String(formData.get('medicationId') || ''),
+      startDate: String(formData.get('startDate') || ''),
+      endDate: String(formData.get('endDate') || ''),
+      frequencyPerDay: String(formData.get('frequencyPerDay') || ''),
+      frequencyIntervalHours: String(formData.get('frequencyIntervalHours') || ''),
+      administrationTimes: String(formData.get('administrationTimes') || ''),
+      specialInstructions: String(formData.get('specialInstructions') || ''),
+      isActive: formData.get('isActive') === 'on',
+    }
+    const submissionTimes = parseAdministrationTimes(submissionForm.administrationTimes)
+    const submissionValidationError = getValidationError(submissionForm, submissionTimes)
+
+    if (submissionValidationError) {
+      setError(submissionValidationError)
       return
     }
 
@@ -126,14 +143,14 @@ export default function PrescriptionAssignmentForm({
       await clientQuery<CreatePrescriptionMutationResponse>(CREATE_PRESCRIPTION_MUTATION, {
         input: {
           clientId,
-          medicationId: form.medicationId,
-          startDate: new Date(`${form.startDate}T00:00:00`).toISOString(),
-          endDate: form.endDate ? new Date(`${form.endDate}T23:59:59`).toISOString() : null,
-          frequencyPerDay: Number(form.frequencyPerDay),
-          frequencyIntervalHours: form.frequencyIntervalHours ? Number(form.frequencyIntervalHours) : null,
-          administrationTimes: parsedAdministrationTimes,
-          specialInstructions: form.specialInstructions.trim() || null,
-          isActive: form.isActive,
+          medicationId: submissionForm.medicationId,
+          startDate: new Date(`${submissionForm.startDate}T00:00:00`).toISOString(),
+          endDate: submissionForm.endDate ? new Date(`${submissionForm.endDate}T23:59:59`).toISOString() : null,
+          frequencyPerDay: Number(submissionForm.frequencyPerDay),
+          frequencyIntervalHours: submissionForm.frequencyIntervalHours ? Number(submissionForm.frequencyIntervalHours) : null,
+          administrationTimes: submissionTimes,
+          specialInstructions: submissionForm.specialInstructions.trim() || null,
+          isActive: submissionForm.isActive,
         },
       })
 
@@ -281,12 +298,14 @@ export default function PrescriptionAssignmentForm({
             Keep this prescription active
           </label>
 
-          {error && (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+          {(error || (submitAttempted && validationError)) && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {error || validationError}
+            </div>
           )}
 
           <div className="flex items-center gap-3">
-            <Button type="submit" disabled={Boolean(validationError) || isSubmitting}>
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Saving…' : 'Assign Prescription'}
             </Button>
             <Link href={`/clients/${clientId}/prescriptions`} className={buttonVariants({ variant: 'ghost' })}>
