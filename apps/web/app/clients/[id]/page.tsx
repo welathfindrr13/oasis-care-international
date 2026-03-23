@@ -7,8 +7,11 @@ import { buttonVariants } from '../../../components/ui/Button'
 import { query } from '../../../lib/graphql/client'
 import {
   CLIENT_QUERY,
+  CLIENT_PRESCRIPTIONS_QUERY,
   VISITS_QUERY,
   type ClientQueryResponse,
+  type ClientPrescriptionsQueryResponse,
+  type Prescription,
   type Visit,
   type VisitsQueryResponse,
 } from '../../../lib/graphql/queries'
@@ -44,6 +47,19 @@ async function getClientVisits(clientId: string): Promise<Visit[]> {
   } catch (error) {
     console.error('Failed to fetch client visits:', error);
     return [];
+  }
+}
+
+async function getClientPrescriptions(clientId: string): Promise<Prescription[]> {
+  try {
+    const response = await query<ClientPrescriptionsQueryResponse>(CLIENT_PRESCRIPTIONS_QUERY, {
+      clientId,
+      activeOnly: true,
+    })
+    return response.clientPrescriptions
+  } catch (error) {
+    console.error('Failed to fetch client prescriptions:', error)
+    return []
   }
 }
 
@@ -85,6 +101,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
   }
 
   const visits = await getClientVisits(client.id);
+  const prescriptions = await getClientPrescriptions(client.id);
   const nextVisit = visits
     .filter((visit) => new Date(visit.scheduledStart).getTime() >= Date.now())
     .sort((left, right) => new Date(left.scheduledStart).getTime() - new Date(right.scheduledStart).getTime())[0];
@@ -113,6 +130,9 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
             <p className="text-slate-500 mt-1">Client ID: {client.id}</p>
           </div>
           <div className="flex items-center gap-3">
+            <Link href={`/clients/${client.id}/prescriptions`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              Manage Prescriptions
+            </Link>
             <Link href={`/visits?clientId=${client.id}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
               View Visits
             </Link>
@@ -147,6 +167,50 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
                     </dd>
                   </div>
                 </dl>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Active Prescriptions</h2>
+                    <p className="text-sm text-slate-500">
+                      {prescriptions.length ? `${prescriptions.length} active prescriptions loaded` : 'No active prescriptions recorded yet'}
+                    </p>
+                  </div>
+                  <Link href={`/clients/${client.id}/prescriptions`} className="text-sm text-teal-600 hover:text-teal-700">
+                    Manage →
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {prescriptions.length ? (
+                  <div className="divide-y divide-slate-100">
+                    {prescriptions.slice(0, 4).map((prescription) => (
+                      <div key={prescription.id} className="py-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="text-sm font-medium text-slate-900">
+                              {prescription.medication?.name || 'Medication'} · {prescription.medication?.dosage || '—'} {prescription.medication?.unit || ''}
+                            </p>
+                            <p className="text-sm text-slate-500">
+                              {prescription.administrationTimes.join(', ')} · {prescription.frequencyPerDay} times per day
+                            </p>
+                          </div>
+                          <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
+                            Active
+                          </span>
+                        </div>
+                        {prescription.specialInstructions && (
+                          <p className="mt-2 text-sm text-slate-600">{prescription.specialInstructions}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-500">No medication prescriptions have been assigned to this client yet.</p>
+                )}
               </CardContent>
             </Card>
 
@@ -224,6 +288,18 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
+                  <Link
+                    href={`/clients/${client.id}/prescriptions`}
+                    className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                  >
+                    💊 Manage Prescriptions
+                  </Link>
+                  <Link
+                    href="/admin/medications"
+                    className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                  >
+                    🧪 Medication Library
+                  </Link>
                   <Link
                     href="/emar"
                     className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"

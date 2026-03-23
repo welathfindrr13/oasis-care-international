@@ -120,4 +120,19 @@ export class MedicationResolver {
     );
     return new MedicationListDto(result.items, result.total);
   }
+
+  @Query(() => [PrescriptionDto])
+  async clientPrescriptions(
+    @Args('clientId') clientId: string,
+    @Args('activeOnly', { nullable: true }) activeOnly: boolean | undefined,
+    @Context('req') req: any,
+  ): Promise<PrescriptionDto[]> {
+    const prescriptions = await this.medicationService.findClientPrescriptions(
+      { clientId, activeOnly },
+      req.user.id,
+      req.user.role,
+    );
+
+    return prescriptions.map((prescription) => new PrescriptionDto(prescription));
+  }
 }

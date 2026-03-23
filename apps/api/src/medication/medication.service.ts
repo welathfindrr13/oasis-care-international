@@ -39,6 +39,11 @@ interface MedicationFilterArgs {
   take?: number;
 }
 
+interface ClientPrescriptionFilter {
+  clientId: string;
+  activeOnly?: boolean;
+}
+
 @Injectable()
 export class MedicationService {
   private readonly logger = new Logger(MedicationService.name);
@@ -308,6 +313,32 @@ export class MedicationService {
       take: filter.take || 20,
       orderBy: { name: 'asc' },
     });
+  }
+
+  async findClientPrescriptions(
+    filter: ClientPrescriptionFilter,
+    userId: string,
+    userRole: string
+  ): Promise<Prescription[]> {
+    this.checkAdminAccess(userRole);
+
+    const requestId = this.cls.get('requestId');
+    const where: any = {
+      client_id: filter.clientId,
+    };
+
+    if (typeof filter.activeOnly === 'boolean') {
+      where.is_active = filter.activeOnly;
+    }
+
+    this.logger.log(`Finding prescriptions for client ${filter.clientId}`, { requestId, where });
+
+    const result = await this.medicationRepository.findPrescriptions({
+      where,
+      orderBy: { start_date: 'desc' },
+    });
+
+    return result.items;
   }
 
   private checkAdminAccess(userRole: string): void {

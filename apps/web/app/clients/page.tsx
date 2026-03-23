@@ -213,6 +213,9 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
                             <Link href={`/clients/${client.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
                               View
                             </Link>
+                            <Link href={`/clients/${client.id}/prescriptions`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                              Prescriptions
+                            </Link>
                             <Link href={`/visits/new?clientId=${client.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
                               Schedule
                             </Link>

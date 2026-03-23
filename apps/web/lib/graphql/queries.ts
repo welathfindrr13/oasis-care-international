@@ -70,6 +70,49 @@ export interface MedicationAdministration {
   };
 }
 
+export interface Medication {
+  id: string;
+  name: string;
+  dosage: string;
+  unit: string;
+  instructions?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MedicationsQueryResponse {
+  medications: {
+    items: Medication[];
+    total: number;
+  };
+}
+
+export interface MedicationQueryVariables {
+  name?: string;
+  skip?: number;
+  take?: number;
+}
+
+export interface Prescription {
+  id: string;
+  clientId: string;
+  medicationId: string;
+  startDate: string;
+  endDate?: string;
+  frequencyPerDay: number;
+  frequencyIntervalHours?: string | number;
+  administrationTimes: string[];
+  specialInstructions?: string;
+  isActive: boolean;
+  medication?: Medication;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClientPrescriptionsQueryResponse {
+  clientPrescriptions: Prescription[];
+}
+
 export interface Visit {
   id: string;
   carerId: string;
@@ -318,6 +361,51 @@ export const CARERS_QUERY = `
   }
 `;
 
+export const MEDICATIONS_QUERY = `
+  query Medications($name: String, $skip: Int, $take: Int) {
+    medications(name: $name, skip: $skip, take: $take) {
+      items {
+        id
+        name
+        dosage
+        unit
+        instructions
+        createdAt
+        updatedAt
+      }
+      total
+    }
+  }
+`;
+
+export const CLIENT_PRESCRIPTIONS_QUERY = `
+  query ClientPrescriptions($clientId: String!, $activeOnly: Boolean) {
+    clientPrescriptions(clientId: $clientId, activeOnly: $activeOnly) {
+      id
+      clientId
+      medicationId
+      startDate
+      endDate
+      frequencyPerDay
+      frequencyIntervalHours
+      administrationTimes
+      specialInstructions
+      isActive
+      createdAt
+      updatedAt
+      medication {
+        id
+        name
+        dosage
+        unit
+        instructions
+        createdAt
+        updatedAt
+      }
+    }
+  }
+`;
+
 export interface UpdateVisitMutationResponse {
   updateVisit: Pick<Visit, 'id' | 'status' | 'actualStart' | 'actualEnd' | 'notes' | 'updatedAt'>;
 }
@@ -335,6 +423,14 @@ export interface RecordAdministrationMutationResponse {
     MedicationAdministration,
     'id' | 'status' | 'notes' | 'administeredTime' | 'administeredBy' | 'updatedAt'
   >;
+}
+
+export interface CreateMedicationMutationResponse {
+  createMedication: Medication;
+}
+
+export interface CreatePrescriptionMutationResponse {
+  createPrescription: Prescription;
 }
 
 export const UPDATE_VISIT_MUTATION = `
@@ -382,6 +478,39 @@ export const RECORD_ADMINISTRATION_MUTATION = `
       notes
       administeredTime
       administeredBy
+      updatedAt
+    }
+  }
+`;
+
+export const CREATE_MEDICATION_MUTATION = `
+  mutation CreateMedication($input: CreateMedicationInput!) {
+    createMedication(input: $input) {
+      id
+      name
+      dosage
+      unit
+      instructions
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const CREATE_PRESCRIPTION_MUTATION = `
+  mutation CreatePrescription($input: CreatePrescriptionInput!) {
+    createPrescription(input: $input) {
+      id
+      clientId
+      medicationId
+      startDate
+      endDate
+      frequencyPerDay
+      frequencyIntervalHours
+      administrationTimes
+      specialInstructions
+      isActive
+      createdAt
       updatedAt
     }
   }
