@@ -18,6 +18,6 @@ export class MedicationFilterArgs {
   @IsInt()
   @IsOptional()
   @Min(1)
-  @Max(100)
+  @Max(200)
   take?: number;
 }
