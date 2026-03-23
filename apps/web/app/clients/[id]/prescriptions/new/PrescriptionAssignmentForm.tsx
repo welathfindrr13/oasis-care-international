@@ -80,7 +80,7 @@ export default function PrescriptionAssignmentForm({
       return 'Add at least one administration time in HH:MM format.'
     }
 
-    const invalidTime = administrationTimes.find((value) => !/^([01]\\d|2[0-3]):([0-5]\\d)$/.test(value))
+    const invalidTime = administrationTimes.find((value) => !/^([01]\d|2[0-3]):([0-5]\d)$/.test(value))
     if (invalidTime) {
       return `Administration time “${invalidTime}” is not in HH:MM format.`
     }
