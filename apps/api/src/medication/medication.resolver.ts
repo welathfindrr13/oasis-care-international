@@ -124,7 +124,7 @@ export class MedicationResolver {
   @Query(() => [PrescriptionDto])
   async clientPrescriptions(
     @Args('clientId') clientId: string,
-    @Args('activeOnly', { nullable: true }) activeOnly: boolean | undefined,
+    @Args('activeOnly', { nullable: true, type: () => Boolean }) activeOnly: boolean | undefined,
     @Context('req') req: any,
   ): Promise<PrescriptionDto[]> {
     const prescriptions = await this.medicationService.findClientPrescriptions(
