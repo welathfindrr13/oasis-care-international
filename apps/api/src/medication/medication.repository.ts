@@ -6,6 +6,8 @@ import {
   MedicationAdministration, 
   MedicationStatus,
   MedicationAuditAction,
+  Visit,
+  VisitStatus,
   Prisma 
 } from '@oasis/db';
 
@@ -57,6 +59,71 @@ export class MedicationRepository {
         medication: true,
         administrations: true
       }
+    });
+  }
+
+  async createPrescriptionWithSchedule(args: {
+    prescription: Prisma.PrescriptionCreateInput;
+    administrations: Array<{
+      scheduledTime: Date;
+      visitId?: string | null;
+      notes?: string | null;
+    }>;
+    actorId: string;
+    actorRole: string;
+    auditChanges: Record<string, any>;
+  }): Promise<Prescription> {
+    return this.prisma.$transaction(async (tx) => {
+      const prescription = await tx.prescription.create({
+        data: args.prescription,
+      });
+
+      await tx.medicationAudit.create({
+        data: {
+          prescription_id: prescription.id,
+          action: MedicationAuditAction.PRESCRIPTION_CREATED,
+          actor_id: args.actorId,
+          actor_role: args.actorRole,
+          changes: JSON.stringify(args.auditChanges),
+        },
+      });
+
+      for (const administration of args.administrations) {
+        const createdAdministration = await tx.medicationAdministration.create({
+          data: {
+            prescription: { connect: { id: prescription.id } },
+            visit: administration.visitId ? { connect: { id: administration.visitId } } : undefined,
+            scheduled_time: administration.scheduledTime,
+            status: MedicationStatus.SCHEDULED,
+            notes: administration.notes ?? undefined,
+          },
+        });
+
+        await tx.medicationAudit.create({
+          data: {
+            prescription_id: prescription.id,
+            medication_administration_id: createdAdministration.id,
+            action: MedicationAuditAction.MEDICATION_SCHEDULED,
+            actor_id: args.actorId,
+            actor_role: args.actorRole,
+            changes: JSON.stringify({
+              scheduledTime: administration.scheduledTime.toISOString(),
+              visitId: administration.visitId ?? null,
+            }),
+          },
+        });
+      }
+
+      return tx.prescription.findUniqueOrThrow({
+        where: { id: prescription.id },
+        include: {
+          client: true,
+          medication: true,
+          administrations: {
+            orderBy: { scheduled_time: 'asc' },
+          },
+        },
+      });
     });
   }
 
@@ -189,6 +256,55 @@ export class MedicationRepository {
         },
         visit: true
       }
+    });
+  }
+
+  async findVisitsForClientInRange(
+    clientId: string,
+    start: Date,
+    end: Date
+  ): Promise<Visit[]> {
+    return this.prisma.visit.findMany({
+      where: {
+        client_id: clientId,
+        deleted_at: null,
+        status: { not: VisitStatus.CANCELLED },
+        scheduled_start: { lte: end },
+        scheduled_end: { gte: start },
+      },
+      orderBy: { scheduled_start: 'asc' },
+    });
+  }
+
+  async findScheduledMedicationAdministrationsForClientInRange(
+    clientId: string,
+    start: Date,
+    end: Date
+  ): Promise<MedicationAdministration[]> {
+    return this.prisma.medicationAdministration.findMany({
+      where: {
+        deleted_at: null,
+        status: MedicationStatus.SCHEDULED,
+        scheduled_time: {
+          gte: start,
+          lte: end,
+        },
+        prescription: {
+          client_id: clientId,
+          deleted_at: null,
+          is_active: true,
+        },
+      },
+      include: {
+        prescription: {
+          include: {
+            client: true,
+            medication: true,
+          },
+        },
+        visit: true,
+      },
+      orderBy: { scheduled_time: 'asc' },
     });
   }
 

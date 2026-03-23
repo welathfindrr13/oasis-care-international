@@ -6,7 +6,8 @@ import {
   Prescription, 
   MedicationAdministration, 
   MedicationStatus,
-  MedicationAuditAction
+  MedicationAuditAction,
+  Visit,
 } from '@oasis/db';
 import { ClsService } from 'nestjs-cls';
 import { BaseHttpException } from '../common/errors/base-http.exception';
@@ -43,6 +44,19 @@ interface ClientPrescriptionFilter {
   clientId: string;
   activeOnly?: boolean;
 }
+
+interface MedicationSchedulingWindow {
+  start: Date;
+  end: Date;
+}
+
+interface ScheduledAdministrationDraft {
+  scheduledTime: Date;
+  visitId: string | null;
+}
+
+const PRESCRIPTION_SCHEDULING_HORIZON_DAYS = 30;
+const VISIT_MATCH_MAX_DISTANCE_MS = 2 * 60 * 60 * 1000;
 
 @Injectable()
 export class MedicationService {
@@ -102,27 +116,109 @@ export class MedicationService {
       );
     }
 
-    const prescription = await this.medicationRepository.createPrescription({
-      client: { connect: { id: data.clientId } },
-      medication: { connect: { id: data.medicationId } },
-      start_date: new Date(data.startDate),
-      end_date: data.endDate ? new Date(data.endDate) : null,
-      frequency_per_day: data.frequencyPerDay,
-      frequency_interval_hours: data.frequencyIntervalHours,
-      administration_times: data.administrationTimes,
-      special_instructions: data.specialInstructions,
-      is_active: data.isActive ?? true,
-    });
+    const startDate = new Date(data.startDate);
+    const endDate = data.endDate ? new Date(data.endDate) : null;
+    const schedulingWindow = this.getPrescriptionSchedulingWindow(startDate, endDate);
+    const visitCandidates = schedulingWindow
+      ? await this.medicationRepository.findVisitsForClientInRange(
+          data.clientId,
+          schedulingWindow.start,
+          schedulingWindow.end
+        )
+      : [];
+    const scheduledAdministrations = this.buildScheduledAdministrations(
+      {
+        startDate,
+        endDate,
+        frequencyPerDay: data.frequencyPerDay,
+        frequencyIntervalHours: data.frequencyIntervalHours,
+        administrationTimes: data.administrationTimes,
+      },
+      visitCandidates
+    );
 
-    await this.medicationRepository.createMedicationAudit({
-      prescriptionId: prescription.id,
-      action: MedicationAuditAction.PRESCRIPTION_CREATED,
+    const prescription = await this.medicationRepository.createPrescriptionWithSchedule({
+      prescription: {
+        client: { connect: { id: data.clientId } },
+        medication: { connect: { id: data.medicationId } },
+        start_date: startDate,
+        end_date: endDate,
+        frequency_per_day: data.frequencyPerDay,
+        frequency_interval_hours: data.frequencyIntervalHours,
+        administration_times: data.administrationTimes,
+        special_instructions: data.specialInstructions,
+        is_active: data.isActive ?? true,
+      },
+      administrations: scheduledAdministrations,
       actorId: userId,
       actorRole: userRole,
-      changes: data
+      auditChanges: {
+        ...data,
+        generatedAdministrationCount: scheduledAdministrations.length,
+      },
     });
 
+    this.logger.log(
+      `Prescription ${prescription.id} created with ${scheduledAdministrations.length} scheduled administrations`,
+      { requestId }
+    );
+
     return prescription;
+  }
+
+  async reconcileMedicationAdministrationsForVisitWindow(
+    clientId: string,
+    scheduledStart: Date,
+    scheduledEnd: Date
+  ): Promise<void> {
+    const requestId = this.cls.get('requestId');
+    const { start, end } = this.expandToUtcDayRange(scheduledStart, scheduledEnd);
+
+    const [visitCandidates, administrations] = await Promise.all([
+      this.medicationRepository.findVisitsForClientInRange(clientId, start, end),
+      this.medicationRepository.findScheduledMedicationAdministrationsForClientInRange(
+        clientId,
+        start,
+        end
+      ),
+    ]);
+
+    const updates = administrations.filter((administration) => {
+      const matchedVisit = this.selectBestVisitForScheduledTime(
+        visitCandidates,
+        administration.scheduled_time
+      );
+
+      return (administration.visit_id ?? null) !== (matchedVisit?.id ?? null);
+    });
+
+    if (!updates.length) {
+      this.logger.log(
+        `No medication administration relinking needed for client ${clientId}`,
+        { requestId }
+      );
+      return;
+    }
+
+    await Promise.all(
+      updates.map((administration) => {
+        const matchedVisit = this.selectBestVisitForScheduledTime(
+          visitCandidates,
+          administration.scheduled_time
+        );
+
+        return this.medicationRepository.updateMedicationAdministration(administration.id, {
+          visit: matchedVisit
+            ? { connect: { id: matchedVisit.id } }
+            : { disconnect: true },
+        });
+      })
+    );
+
+    this.logger.log(
+      `Relinked ${updates.length} medication administrations for client ${clientId}`,
+      { requestId }
+    );
   }
 
   async listDueMeds(
@@ -374,5 +470,208 @@ export class MedicationService {
       default:
         return MedicationAuditAction.MEDICATION_SCHEDULED;
     }
+  }
+
+  private buildScheduledAdministrations(
+    prescription: Pick<
+      CreatePrescriptionInput,
+      'administrationTimes' | 'frequencyPerDay' | 'frequencyIntervalHours'
+    > & {
+      startDate: Date;
+      endDate: Date | null;
+    },
+    visitCandidates: Visit[]
+  ): ScheduledAdministrationDraft[] {
+    const schedulingWindow = this.getPrescriptionSchedulingWindow(
+      prescription.startDate,
+      prescription.endDate
+    );
+
+    if (!schedulingWindow) {
+      return [];
+    }
+
+    const administrationTimes = this.normalizeAdministrationTimes(
+      prescription.administrationTimes,
+      prescription.frequencyPerDay,
+      prescription.frequencyIntervalHours
+    );
+
+    if (!administrationTimes.length) {
+      return [];
+    }
+
+    const drafts: ScheduledAdministrationDraft[] = [];
+
+    for (
+      let cursor = new Date(schedulingWindow.start);
+      cursor <= schedulingWindow.end;
+      cursor = this.addUtcDays(cursor, 1)
+    ) {
+      for (const administrationTime of administrationTimes) {
+        const scheduledTime = this.combineUtcDateAndTime(cursor, administrationTime);
+
+        if (scheduledTime < prescription.startDate) {
+          continue;
+        }
+
+        if (prescription.endDate && scheduledTime > prescription.endDate) {
+          continue;
+        }
+
+        drafts.push({
+          scheduledTime,
+          visitId: this.selectBestVisitForScheduledTime(visitCandidates, scheduledTime)?.id ?? null,
+        });
+      }
+    }
+
+    return drafts;
+  }
+
+  private getPrescriptionSchedulingWindow(
+    startDate: Date,
+    endDate: Date | null
+  ): MedicationSchedulingWindow | null {
+    const today = this.startOfUtcDay(new Date());
+    const horizonEnd = this.endOfUtcDay(this.addUtcDays(today, PRESCRIPTION_SCHEDULING_HORIZON_DAYS));
+    const rangeStart = this.maxDate(this.startOfUtcDay(startDate), today);
+    const rangeEnd = this.minDate(endDate ? this.endOfUtcDay(endDate) : horizonEnd, horizonEnd);
+
+    if (rangeEnd < rangeStart) {
+      return null;
+    }
+
+    return { start: rangeStart, end: rangeEnd };
+  }
+
+  private normalizeAdministrationTimes(
+    administrationTimes: string[],
+    frequencyPerDay: number,
+    frequencyIntervalHours?: number
+  ): string[] {
+    const normalizedTimes = Array.from(
+      new Set(
+        (administrationTimes ?? [])
+          .map((value) => value.trim())
+          .filter((value) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(value))
+      )
+    ).sort();
+
+    if (normalizedTimes.length > 0) {
+      return normalizedTimes;
+    }
+
+    const totalAdministrations = Math.max(1, Math.min(frequencyPerDay || 1, 12));
+    const intervalHours =
+      frequencyIntervalHours && frequencyIntervalHours > 0
+        ? frequencyIntervalHours
+        : Math.max(1, Math.floor(24 / totalAdministrations));
+    const fallbackStartHour = 8;
+
+    return Array.from({ length: totalAdministrations }, (_, index) => {
+      const hour = (fallbackStartHour + index * intervalHours) % 24;
+      return `${String(hour).padStart(2, '0')}:00`;
+    });
+  }
+
+  private selectBestVisitForScheduledTime(
+    visits: Visit[],
+    scheduledTime: Date
+  ): Visit | null {
+    let bestMatch: { visit: Visit; distanceMs: number } | null = null;
+
+    for (const visit of visits) {
+      if (!this.isVisitRelevantForScheduledTime(visit, scheduledTime)) {
+        continue;
+      }
+
+      const distanceMs = this.getVisitDistanceMs(visit, scheduledTime);
+      if (distanceMs > VISIT_MATCH_MAX_DISTANCE_MS) {
+        continue;
+      }
+
+      if (
+        !bestMatch ||
+        distanceMs < bestMatch.distanceMs ||
+        (distanceMs === bestMatch.distanceMs &&
+          visit.scheduled_start.getTime() < bestMatch.visit.scheduled_start.getTime())
+      ) {
+        bestMatch = { visit, distanceMs };
+      }
+    }
+
+    return bestMatch?.visit ?? null;
+  }
+
+  private isVisitRelevantForScheduledTime(visit: Visit, scheduledTime: Date): boolean {
+    if (scheduledTime >= visit.scheduled_start && scheduledTime <= visit.scheduled_end) {
+      return true;
+    }
+
+    return this.getUtcDateKey(visit.scheduled_start) === this.getUtcDateKey(scheduledTime);
+  }
+
+  private getVisitDistanceMs(visit: Visit, scheduledTime: Date): number {
+    const scheduledTimestamp = scheduledTime.getTime();
+    const visitStart = visit.scheduled_start.getTime();
+    const visitEnd = visit.scheduled_end.getTime();
+
+    if (scheduledTimestamp >= visitStart && scheduledTimestamp <= visitEnd) {
+      return 0;
+    }
+
+    if (scheduledTimestamp < visitStart) {
+      return visitStart - scheduledTimestamp;
+    }
+
+    return scheduledTimestamp - visitEnd;
+  }
+
+  private expandToUtcDayRange(start: Date, end: Date): MedicationSchedulingWindow {
+    const earlier = start.getTime() <= end.getTime() ? start : end;
+    const later = start.getTime() <= end.getTime() ? end : start;
+
+    return {
+      start: this.startOfUtcDay(earlier),
+      end: this.endOfUtcDay(later),
+    };
+  }
+
+  private combineUtcDateAndTime(day: Date, time: string): Date {
+    const [hour, minute] = time.split(':').map(Number);
+    const result = new Date(day);
+    result.setUTCHours(hour, minute, 0, 0);
+    return result;
+  }
+
+  private addUtcDays(date: Date, days: number): Date {
+    const result = new Date(date);
+    result.setUTCDate(result.getUTCDate() + days);
+    return result;
+  }
+
+  private startOfUtcDay(date: Date): Date {
+    const result = new Date(date);
+    result.setUTCHours(0, 0, 0, 0);
+    return result;
+  }
+
+  private endOfUtcDay(date: Date): Date {
+    const result = new Date(date);
+    result.setUTCHours(23, 59, 59, 999);
+    return result;
+  }
+
+  private getUtcDateKey(date: Date): string {
+    return date.toISOString().slice(0, 10);
+  }
+
+  private maxDate(left: Date, right: Date): Date {
+    return left.getTime() >= right.getTime() ? left : right;
+  }
+
+  private minDate(left: Date, right: Date): Date {
+    return left.getTime() <= right.getTime() ? left : right;
   }
 }

@@ -11,6 +11,7 @@ import { ErrorCode } from '../common/errors/error-codes';
 import { Inject } from '@nestjs/common';
 import { Counter } from 'prom-client';
 import { CarerDTO } from './dto/visit.dto';
+import { MedicationService } from '../medication/medication.service';
 
 @Injectable()
 export class VisitService {
@@ -18,6 +19,7 @@ export class VisitService {
 
   constructor(
     private readonly visitRepository: VisitRepository,
+    private readonly medicationService: MedicationService,
     private readonly cls: ClsService,
     @Inject('visit_overlap_total') private readonly overlapCounter: Counter,
     @Inject('visits_created_total') private readonly createCounter: Counter,
@@ -68,13 +70,20 @@ export class VisitService {
           description: task.description,
         });
       }
-
-      // Refetch visit with tasks
-      return this.visitRepository.findById(visit.id) as Promise<Visit>;
     }
+
+    await this.medicationService.reconcileMedicationAdministrationsForVisitWindow(
+      visit.client_id,
+      visit.scheduled_start,
+      visit.scheduled_end
+    );
 
     this.createCounter.inc();
     this.logger.log(`Visit ${visit.id} created successfully`, { requestId });
+    if (data.tasks && data.tasks.length > 0) {
+      return this.visitRepository.findById(visit.id) as Promise<Visit>;
+    }
+
     return visit;
   }
 
@@ -137,7 +146,15 @@ export class VisitService {
     if (data.notes !== undefined) updateData.notes = data.notes;
 
     this.logger.log(`Updating visit ${id}`, { requestId, updateData });
-    return this.visitRepository.update(id, updateData);
+    const updatedVisit = await this.visitRepository.update(id, updateData);
+
+    await this.medicationService.reconcileMedicationAdministrationsForVisitWindow(
+      updatedVisit.client_id,
+      updatedVisit.scheduled_start,
+      updatedVisit.scheduled_end
+    );
+
+    return updatedVisit;
   }
 
   async findVisitById(

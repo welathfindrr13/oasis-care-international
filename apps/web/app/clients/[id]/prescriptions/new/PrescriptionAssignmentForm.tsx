@@ -168,7 +168,7 @@ export default function PrescriptionAssignmentForm({
       <CardHeader>
         <h2 className="font-heading text-xl font-semibold text-slate-900">Assign medication to {clientName}</h2>
         <p className="text-sm text-slate-500">
-          This creates the client’s prescription schedule. Visit-linked administration records still depend on operational scheduling.
+          This creates the client’s prescription schedule and seeds medication records for eMAR and matching visits.
         </p>
       </CardHeader>
       <CardContent>

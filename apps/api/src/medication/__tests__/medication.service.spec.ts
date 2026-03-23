@@ -72,6 +72,8 @@ describe('MedicationService', () => {
   };
 
   beforeEach(async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2025-01-08T06:00:00Z'));
+
     const mockRepository = {
       findMedicationAdministrationById: jest.fn(),
       updateMedicationAdministration: jest.fn(),
@@ -81,6 +83,9 @@ describe('MedicationService', () => {
       findTodaysMedicationsByClient: jest.fn(),
       createMedication: jest.fn(),
       findMedicationById: jest.fn(),
+      createPrescriptionWithSchedule: jest.fn(),
+      findVisitsForClientInRange: jest.fn(),
+      findScheduledMedicationAdministrationsForClientInRange: jest.fn(),
     };
 
     const mockClsService = {
@@ -124,6 +129,99 @@ describe('MedicationService', () => {
     overlapCounter = module.get('medication_overlaps_total');
 
     clsService.get.mockReturnValue('test-request-id');
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  describe('createPrescription', () => {
+    it('should seed scheduled administrations and pre-link matching visits', async () => {
+      repository.findMedicationById.mockResolvedValue({
+        id: 'medication-123',
+        name: 'Metformin',
+      } as any);
+      repository.findVisitsForClientInRange.mockResolvedValue([
+        {
+          id: 'visit-123',
+          client_id: 'client-123',
+          scheduled_start: new Date('2025-01-08T09:00:00Z'),
+          scheduled_end: new Date('2025-01-08T10:00:00Z'),
+          status: 'SCHEDULED',
+        },
+      ] as any);
+      repository.createPrescriptionWithSchedule.mockResolvedValue({
+        id: 'prescription-123',
+      } as any);
+
+      const result = await service.createPrescription(
+        {
+          clientId: 'client-123',
+          medicationId: 'medication-123',
+          startDate: '2025-01-08T00:00:00.000Z',
+          endDate: '2025-01-09T23:59:59.000Z',
+          frequencyPerDay: 1,
+          administrationTimes: ['08:00'],
+          isActive: true,
+        },
+        mockAdminUser.id,
+        'admin'
+      );
+
+      expect(repository.createPrescriptionWithSchedule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prescription: expect.objectContaining({
+            frequency_per_day: 1,
+            administration_times: ['08:00'],
+          }),
+          administrations: [
+            {
+              scheduledTime: new Date('2025-01-08T08:00:00.000Z'),
+              visitId: 'visit-123',
+            },
+            {
+              scheduledTime: new Date('2025-01-09T08:00:00.000Z'),
+              visitId: null,
+            },
+          ],
+          actorId: mockAdminUser.id,
+          actorRole: 'admin',
+        })
+      );
+      expect(result.id).toBe('prescription-123');
+    });
+  });
+
+  describe('reconcileMedicationAdministrationsForVisitWindow', () => {
+    it('should attach scheduled administrations to the nearest matching visit', async () => {
+      repository.findVisitsForClientInRange.mockResolvedValue([
+        {
+          id: 'visit-123',
+          client_id: 'client-123',
+          scheduled_start: new Date('2025-01-08T09:00:00Z'),
+          scheduled_end: new Date('2025-01-08T10:00:00Z'),
+          status: 'SCHEDULED',
+        },
+      ] as any);
+      repository.findScheduledMedicationAdministrationsForClientInRange.mockResolvedValue([
+        {
+          id: 'med-admin-123',
+          visit_id: null,
+          scheduled_time: new Date('2025-01-08T08:00:00Z'),
+        },
+      ] as any);
+      repository.updateMedicationAdministration.mockResolvedValue(mockMedicationAdministration as any);
+
+      await service.reconcileMedicationAdministrationsForVisitWindow(
+        'client-123',
+        new Date('2025-01-08T09:00:00Z'),
+        new Date('2025-01-08T10:00:00Z')
+      );
+
+      expect(repository.updateMedicationAdministration).toHaveBeenCalledWith('med-admin-123', {
+        visit: { connect: { id: 'visit-123' } },
+      });
+    });
   });
 
   describe('recordAdministration', () => {

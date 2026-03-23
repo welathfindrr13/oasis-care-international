@@ -5,6 +5,7 @@ import { ClsService } from 'nestjs-cls';
 import { VisitStatus } from '@oasis/db';
 import { BaseHttpException } from '../src/common/errors/base-http.exception';
 import { ErrorCode } from '../src/common/errors/error-codes';
+import { MedicationService } from '../src/medication/medication.service';
 
 describe('VisitService', () => {
   let service: VisitService;
@@ -26,6 +27,10 @@ describe('VisitService', () => {
 
   const mockClsService = {
     get: jest.fn().mockReturnValue('test-request-id'),
+  };
+
+  const mockMedicationService = {
+    reconcileMedicationAdministrationsForVisitWindow: jest.fn(),
   };
 
   const mockCounter = {
@@ -71,6 +76,10 @@ describe('VisitService', () => {
           useValue: mockClsService,
         },
         {
+          provide: MedicationService,
+          useValue: mockMedicationService,
+        },
+        {
           provide: 'visit_overlap_total',
           useValue: mockCounter,
         },
@@ -111,6 +120,7 @@ describe('VisitService', () => {
         ...mockVisit,
         tasks: [{ id: 'task-1', task_name: 'Task 1' }],
       });
+      mockMedicationService.reconcileMedicationAdministrationsForVisitWindow.mockResolvedValue(undefined);
 
       const result = await service.createVisit(createVisitInput, 'user-123', 'admin');
 
@@ -121,6 +131,11 @@ describe('VisitService', () => {
       );
       expect(repository.create).toHaveBeenCalled();
       expect(repository.createTask).toHaveBeenCalled();
+      expect(mockMedicationService.reconcileMedicationAdministrationsForVisitWindow).toHaveBeenCalledWith(
+        'client-123',
+        mockVisit.scheduled_start,
+        mockVisit.scheduled_end
+      );
       expect(result).toBeDefined();
       expect(result.id).toBe('visit-123');
     });
@@ -154,15 +169,15 @@ describe('VisitService', () => {
 
       const result = await service.findAssignableCarers(true);
 
-      expect(repository.findCarers).toHaveBeenCalledWith(true);
+      expect(repository.findCarers).toHaveBeenCalledWith(true, undefined);
       expect(result).toEqual([
-        {
+        expect.objectContaining({
           id: 'carer-123',
           firstName: 'Jane',
           lastName: 'Doe',
           email: 'jane@example.com',
           phone: '1234567890',
-        },
+        }),
       ]);
     });
   });
@@ -180,8 +195,11 @@ describe('VisitService', () => {
       mockVisitRepository.findOverlappingVisits.mockResolvedValue([]);
       mockVisitRepository.update.mockResolvedValue({
         ...mockVisit,
+        scheduled_start: new Date('2024-01-01T10:00:00Z'),
+        scheduled_end: new Date('2024-01-01T11:00:00Z'),
         status: VisitStatus.IN_PROGRESS,
       });
+      mockMedicationService.reconcileMedicationAdministrationsForVisitWindow.mockResolvedValue(undefined);
 
       const result = await service.updateVisit(
         'visit-123',
@@ -191,6 +209,11 @@ describe('VisitService', () => {
       );
 
       expect(repository.update).toHaveBeenCalledWith('visit-123', expect.any(Object));
+      expect(mockMedicationService.reconcileMedicationAdministrationsForVisitWindow).toHaveBeenCalledWith(
+        'client-123',
+        new Date('2024-01-01T10:00:00Z'),
+        new Date('2024-01-01T11:00:00Z')
+      );
       expect(result.status).toBe(VisitStatus.IN_PROGRESS);
     });
 
