@@ -309,6 +309,108 @@ export class MedicationRepository {
     });
   }
 
+  async findActivePrescriptionsOverlappingWindow(
+    start: Date,
+    end: Date,
+    options: { clientId?: string } = {}
+  ): Promise<Prescription[]> {
+    return this.prisma.prescription.findMany({
+      where: {
+        deleted_at: null,
+        is_active: true,
+        client_id: options.clientId,
+        start_date: {
+          lte: end,
+        },
+        OR: [
+          { end_date: null },
+          {
+            end_date: {
+              gte: start,
+            },
+          },
+        ],
+      },
+      orderBy: { start_date: 'asc' },
+    });
+  }
+
+  async ensureScheduledAdministrationsForPrescription(args: {
+    prescriptionId: string;
+    administrations: Array<{
+      scheduledTime: Date;
+      visitId?: string | null;
+      notes?: string | null;
+    }>;
+    actorId: string;
+    actorRole: string;
+    reason: string;
+  }): Promise<number> {
+    if (!args.administrations.length) {
+      return 0;
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const existingAdministrations = await tx.medicationAdministration.findMany({
+        where: {
+          prescription_id: args.prescriptionId,
+          deleted_at: null,
+          scheduled_time: {
+            in: args.administrations.map((administration) => administration.scheduledTime),
+          },
+        },
+        select: {
+          scheduled_time: true,
+        },
+      });
+
+      const existingKeys = new Set(
+        existingAdministrations.map((administration) =>
+          administration.scheduled_time.toISOString()
+        )
+      );
+
+      let createdCount = 0;
+
+      for (const administration of args.administrations) {
+        const scheduledTimeKey = administration.scheduledTime.toISOString();
+        if (existingKeys.has(scheduledTimeKey)) {
+          continue;
+        }
+
+        const createdAdministration = await tx.medicationAdministration.create({
+          data: {
+            prescription: { connect: { id: args.prescriptionId } },
+            visit: administration.visitId ? { connect: { id: administration.visitId } } : undefined,
+            scheduled_time: administration.scheduledTime,
+            status: MedicationStatus.SCHEDULED,
+            notes: administration.notes ?? undefined,
+          },
+        });
+
+        await tx.medicationAudit.create({
+          data: {
+            prescription_id: args.prescriptionId,
+            medication_administration_id: createdAdministration.id,
+            action: MedicationAuditAction.MEDICATION_SCHEDULED,
+            actor_id: args.actorId,
+            actor_role: args.actorRole,
+            changes: JSON.stringify({
+              scheduledTime: administration.scheduledTime.toISOString(),
+              visitId: administration.visitId ?? null,
+              reason: args.reason,
+            }),
+          },
+        });
+
+        existingKeys.add(scheduledTimeKey);
+        createdCount += 1;
+      }
+
+      return createdCount;
+    });
+  }
+
   // Medication Administration CRUD
   async createMedicationAdministration(data: Prisma.MedicationAdministrationCreateInput): Promise<MedicationAdministration> {
     return this.prisma.medicationAdministration.create({
@@ -401,6 +503,12 @@ export class MedicationRepository {
         scheduled_end: { gte: start },
       },
       orderBy: { scheduled_start: 'asc' },
+    });
+  }
+
+  async findVisitById(id: string): Promise<Visit | null> {
+    return this.prisma.visit.findUnique({
+      where: { id, deleted_at: null },
     });
   }
 

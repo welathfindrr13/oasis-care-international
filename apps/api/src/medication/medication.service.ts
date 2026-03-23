@@ -75,6 +75,16 @@ interface PrescriptionScheduleSnapshot {
   isActive: boolean;
 }
 
+interface ActivePrescriptionSchedule {
+  id: string;
+  client_id: string;
+  start_date: Date;
+  end_date: Date | null;
+  frequency_per_day: number;
+  frequency_interval_hours: number | null;
+  administration_times: string[];
+}
+
 const PRESCRIPTION_SCHEDULING_HORIZON_DAYS = 30;
 const VISIT_MATCH_MAX_DISTANCE_MS = 2 * 60 * 60 * 1000;
 
@@ -297,6 +307,11 @@ export class MedicationService {
     scheduledEnd: Date
   ): Promise<void> {
     const requestId = this.cls.get('requestId');
+    await this.ensureActivePrescriptionCoverageForOperationalWindow(
+      scheduledStart,
+      scheduledEnd,
+      { clientId }
+    );
     const { start, end } = this.expandToUtcDayRange(scheduledStart, scheduledEnd);
 
     const [visitCandidates, administrations] = await Promise.all([
@@ -354,6 +369,15 @@ export class MedicationService {
     const requestId = this.cls.get('requestId');
     this.logger.log(`Fetching due medications for visit ${visitId}`, { requestId });
 
+    const visit = await this.medicationRepository.findVisitById(visitId);
+    if (visit) {
+      await this.reconcileMedicationAdministrationsForVisitWindow(
+        visit.client_id,
+        visit.scheduled_start,
+        visit.scheduled_end
+      );
+    }
+
     // Check if user has access to this visit (implement similar to visit service)
     const dueMeds = await this.medicationRepository.findDueMedicationsForVisit(visitId);
     
@@ -376,6 +400,15 @@ export class MedicationService {
   ): Promise<any[]> {
     const requestId = this.cls.get('requestId');
     this.logger.log(`Fetching all visit medications for visit ${visitId}`, { requestId });
+
+    const visit = await this.medicationRepository.findVisitById(visitId);
+    if (visit) {
+      await this.reconcileMedicationAdministrationsForVisitWindow(
+        visit.client_id,
+        visit.scheduled_start,
+        visit.scheduled_end
+      );
+    }
 
     const visitMeds = await this.medicationRepository.findVisitMedications(visitId);
 
@@ -491,6 +524,8 @@ export class MedicationService {
         HttpStatus.FORBIDDEN
       );
     }
+
+    await this.ensureActivePrescriptionCoverageForOperationalWindow(date, date);
 
     const administrations = await this.medicationRepository.findTodaysMedicationsByClient(
       date,
@@ -608,12 +643,14 @@ export class MedicationService {
     visitCandidates: Visit[],
     options?: {
       minimumScheduledTime?: Date;
+      horizonAnchorDate?: Date;
     }
   ): ScheduledAdministrationDraft[] {
     const schedulingWindow = this.getPrescriptionSchedulingWindow(
       prescription.startDate,
       prescription.endDate,
-      options?.minimumScheduledTime
+      options?.minimumScheduledTime,
+      options?.horizonAnchorDate
     );
 
     if (!schedulingWindow) {
@@ -665,11 +702,14 @@ export class MedicationService {
   private getPrescriptionSchedulingWindow(
     startDate: Date,
     endDate: Date | null,
-    minimumScheduledTime?: Date
+    minimumScheduledTime?: Date,
+    horizonAnchorDate?: Date
   ): MedicationSchedulingWindow | null {
     const minimumDate = minimumScheduledTime ?? new Date();
-    const today = this.startOfUtcDay(new Date());
-    const horizonEnd = this.endOfUtcDay(this.addUtcDays(today, PRESCRIPTION_SCHEDULING_HORIZON_DAYS));
+    const horizonBase = this.startOfUtcDay(horizonAnchorDate ?? minimumDate);
+    const horizonEnd = this.endOfUtcDay(
+      this.addUtcDays(horizonBase, PRESCRIPTION_SCHEDULING_HORIZON_DAYS)
+    );
     const rangeStart = this.maxDate(this.startOfUtcDay(startDate), this.startOfUtcDay(minimumDate));
     const rangeEnd = this.minDate(endDate ? this.endOfUtcDay(endDate) : horizonEnd, horizonEnd);
 
@@ -766,6 +806,92 @@ export class MedicationService {
     next: PrescriptionScheduleSnapshot
   ): boolean {
     return JSON.stringify(previous) !== JSON.stringify(next);
+  }
+
+  private async ensureActivePrescriptionCoverageForOperationalWindow(
+    requestedStart: Date,
+    requestedEnd: Date,
+    options?: { clientId?: string }
+  ): Promise<void> {
+    const operationalWindow = this.expandToUtcDayRange(requestedStart, requestedEnd);
+    const todayStart = this.startOfUtcDay(new Date());
+
+    if (operationalWindow.end < todayStart) {
+      return;
+    }
+
+    const extensionAnchor = this.maxDate(operationalWindow.start, todayStart);
+    const activePrescriptions =
+      await this.medicationRepository.findActivePrescriptionsOverlappingWindow(
+        operationalWindow.start,
+        operationalWindow.end,
+        options
+      );
+
+    for (const prescription of activePrescriptions) {
+      await this.extendPrescriptionCoverageFromAnchor(
+        prescription as ActivePrescriptionSchedule,
+        extensionAnchor
+      );
+    }
+  }
+
+  private async extendPrescriptionCoverageFromAnchor(
+    prescription: ActivePrescriptionSchedule,
+    extensionAnchor: Date
+  ): Promise<void> {
+    const requestId = this.cls.get('requestId');
+    const normalizedAnchor = this.startOfUtcDay(extensionAnchor);
+    const schedulingWindow = this.getPrescriptionSchedulingWindow(
+      prescription.start_date,
+      prescription.end_date,
+      normalizedAnchor,
+      normalizedAnchor
+    );
+
+    if (!schedulingWindow) {
+      return;
+    }
+
+    const visitCandidates = await this.medicationRepository.findVisitsForClientInRange(
+      prescription.client_id,
+      schedulingWindow.start,
+      schedulingWindow.end
+    );
+    const administrations = this.buildScheduledAdministrations(
+      {
+        startDate: prescription.start_date,
+        endDate: prescription.end_date,
+        frequencyPerDay: prescription.frequency_per_day,
+        frequencyIntervalHours: prescription.frequency_interval_hours ?? undefined,
+        administrationTimes: prescription.administration_times,
+      },
+      visitCandidates,
+      {
+        minimumScheduledTime: normalizedAnchor,
+        horizonAnchorDate: normalizedAnchor,
+      }
+    );
+
+    if (!administrations.length) {
+      return;
+    }
+
+    const createdCount =
+      await this.medicationRepository.ensureScheduledAdministrationsForPrescription({
+        prescriptionId: prescription.id,
+        administrations,
+        actorId: 'system',
+        actorRole: 'system',
+        reason: `Rolling schedule extension through ${schedulingWindow.end.toISOString()}`,
+      });
+
+    if (createdCount > 0) {
+      this.logger.log(
+        `Extended prescription ${prescription.id} by ${createdCount} administrations`,
+        { requestId, extensionAnchor: normalizedAnchor.toISOString() }
+      );
+    }
   }
 
   private selectBestVisitForScheduledTime(

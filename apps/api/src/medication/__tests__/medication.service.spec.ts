@@ -89,6 +89,9 @@ describe('MedicationService', () => {
       updatePrescriptionWithScheduleReconciliation: jest.fn(),
       findVisitsForClientInRange: jest.fn(),
       findScheduledMedicationAdministrationsForClientInRange: jest.fn(),
+      findActivePrescriptionsOverlappingWindow: jest.fn().mockResolvedValue([]),
+      ensureScheduledAdministrationsForPrescription: jest.fn().mockResolvedValue(0),
+      findVisitById: jest.fn().mockResolvedValue(null),
       findPrescriptions: jest.fn(),
     };
 
@@ -561,7 +564,93 @@ describe('MedicationService', () => {
     });
   });
 
+  describe('listVisitMedications', () => {
+    it('should top up and relink medication rows for the visit window before reading visit medications', async () => {
+      const reconcileSpy = jest
+        .spyOn(service, 'reconcileMedicationAdministrationsForVisitWindow')
+        .mockResolvedValue(undefined);
+
+      repository.findVisitById.mockResolvedValue({
+        id: 'visit-123',
+        client_id: 'client-123',
+        scheduled_start: new Date('2025-02-12T09:00:00Z'),
+        scheduled_end: new Date('2025-02-12T10:00:00Z'),
+      } as any);
+      repository.findVisitMedications.mockResolvedValue([mockMedicationAdministration] as any);
+
+      const result = await service.listVisitMedications(
+        'visit-123',
+        mockAdminUser.id,
+        mockAdminUser.role
+      );
+
+      expect(reconcileSpy).toHaveBeenCalledWith(
+        'client-123',
+        new Date('2025-02-12T09:00:00Z'),
+        new Date('2025-02-12T10:00:00Z')
+      );
+      expect(result).toEqual([mockMedicationAdministration]);
+
+      reconcileSpy.mockRestore();
+    });
+  });
+
   describe('getTodaysMedicationsByClient', () => {
+    it('should extend active prescriptions for future operational dates before reading eMAR rows', async () => {
+      repository.findActivePrescriptionsOverlappingWindow.mockResolvedValue([
+        {
+          id: 'prescription-rolling-123',
+          client_id: 'client-123',
+          start_date: new Date('2025-01-01T00:00:00.000Z'),
+          end_date: null,
+          frequency_per_day: 1,
+          frequency_interval_hours: null,
+          administration_times: ['08:00'],
+        },
+      ] as any);
+      repository.findVisitsForClientInRange.mockResolvedValue([
+        {
+          id: 'visit-123',
+          client_id: 'client-123',
+          scheduled_start: new Date('2025-02-12T07:45:00Z'),
+          scheduled_end: new Date('2025-02-12T08:30:00Z'),
+          status: 'SCHEDULED',
+        },
+      ] as any);
+      repository.findTodaysMedicationsByClient.mockResolvedValue([mockMedicationAdministration] as any);
+
+      await service.getTodaysMedicationsByClient(
+        new Date('2025-02-12T00:00:00.000Z'),
+        mockAdminUser.id,
+        mockAdminUser.role
+      );
+
+      expect(repository.findActivePrescriptionsOverlappingWindow).toHaveBeenCalledWith(
+        new Date('2025-02-12T00:00:00.000Z'),
+        new Date('2025-02-12T23:59:59.999Z'),
+        undefined
+      );
+      expect(repository.ensureScheduledAdministrationsForPrescription).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prescriptionId: 'prescription-rolling-123',
+          actorId: 'system',
+          actorRole: 'system',
+        })
+      );
+
+      const scheduledAdministrations =
+        repository.ensureScheduledAdministrationsForPrescription.mock.calls[0][0].administrations;
+      expect(scheduledAdministrations[0]).toEqual({
+        scheduledTime: new Date('2025-02-12T08:00:00.000Z'),
+        visitId: 'visit-123',
+      });
+      expect(scheduledAdministrations.at(-1)).toEqual({
+        scheduledTime: new Date('2025-03-14T08:00:00.000Z'),
+        visitId: null,
+      });
+      expect(scheduledAdministrations).toHaveLength(31);
+    });
+
     it('should return scoped medications for carers', async () => {
       const todaysMeds = [mockMedicationAdministration];
 
