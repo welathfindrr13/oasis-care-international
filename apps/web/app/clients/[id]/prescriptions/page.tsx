@@ -126,6 +126,12 @@ export default async function ClientPrescriptionsPage({ params }: ClientPrescrip
                         >
                           {prescription.isActive ? 'Active' : 'Inactive'}
                         </span>
+                        <Link
+                          href={`/clients/${client.id}/prescriptions/${prescription.id}/edit`}
+                          className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                        >
+                          Edit schedule
+                        </Link>
                         <p className="text-xs text-slate-500">Prescription ID: {prescription.id.slice(0, 8)}...</p>
                       </div>
                     </div>

@@ -80,12 +80,16 @@ describe('MedicationService', () => {
       createMedicationAudit: jest.fn(),
       findOverlappingMedicationTimes: jest.fn(),
       findDueMedicationsForVisit: jest.fn(),
+      findVisitMedications: jest.fn(),
       findTodaysMedicationsByClient: jest.fn(),
       createMedication: jest.fn(),
       findMedicationById: jest.fn(),
+      findPrescriptionById: jest.fn(),
       createPrescriptionWithSchedule: jest.fn(),
+      updatePrescriptionWithScheduleReconciliation: jest.fn(),
       findVisitsForClientInRange: jest.fn(),
       findScheduledMedicationAdministrationsForClientInRange: jest.fn(),
+      findPrescriptions: jest.fn(),
     };
 
     const mockClsService = {
@@ -221,6 +225,103 @@ describe('MedicationService', () => {
       expect(repository.updateMedicationAdministration).toHaveBeenCalledWith('med-admin-123', {
         visit: { connect: { id: 'visit-123' } },
       });
+    });
+  });
+
+  describe('updatePrescription', () => {
+    const existingPrescription = {
+      id: 'prescription-123',
+      client_id: 'client-123',
+      medication_id: 'medication-123',
+      start_date: new Date('2025-01-01T00:00:00.000Z'),
+      end_date: new Date('2025-01-09T23:59:59.000Z'),
+      frequency_per_day: 1,
+      frequency_interval_hours: null,
+      administration_times: ['08:00'],
+      special_instructions: 'Take with food',
+      is_active: true,
+      created_at: new Date(),
+      updated_at: new Date(),
+      deleted_at: null,
+    };
+
+    it('should rebuild future scheduled administrations when the live schedule changes', async () => {
+      repository.findPrescriptionById.mockResolvedValue(existingPrescription as any);
+      repository.findVisitsForClientInRange.mockResolvedValue([
+        {
+          id: 'visit-123',
+          client_id: 'client-123',
+          scheduled_start: new Date('2025-01-08T09:00:00Z'),
+          scheduled_end: new Date('2025-01-08T10:00:00Z'),
+          status: 'SCHEDULED',
+        },
+      ] as any);
+      repository.updatePrescriptionWithScheduleReconciliation.mockResolvedValue({
+        id: 'prescription-123',
+      } as any);
+
+      const result = await service.updatePrescription(
+        {
+          id: 'prescription-123',
+          startDate: '2025-01-01T00:00:00.000Z',
+          endDate: '2025-01-09T23:59:59.000Z',
+          frequencyPerDay: 1,
+          administrationTimes: ['09:00'],
+          isActive: true,
+          specialInstructions: 'Updated instructions',
+        },
+        mockAdminUser.id,
+        mockAdminUser.role
+      );
+
+      expect(repository.updatePrescriptionWithScheduleReconciliation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prescriptionId: 'prescription-123',
+          cancelScheduledFrom: new Date('2025-01-08T06:00:00.000Z'),
+          administrations: [
+            {
+              scheduledTime: new Date('2025-01-08T09:00:00.000Z'),
+              visitId: 'visit-123',
+            },
+            {
+              scheduledTime: new Date('2025-01-09T09:00:00.000Z'),
+              visitId: null,
+            },
+          ],
+          reconciliationReason: 'Prescription schedule updated',
+        })
+      );
+      expect(result.id).toBe('prescription-123');
+    });
+
+    it('should preserve future rows when only non-scheduling details change', async () => {
+      repository.findPrescriptionById.mockResolvedValue(existingPrescription as any);
+      repository.updatePrescriptionWithScheduleReconciliation.mockResolvedValue({
+        id: 'prescription-123',
+      } as any);
+
+      await service.updatePrescription(
+        {
+          id: 'prescription-123',
+          startDate: '2025-01-01T00:00:00.000Z',
+          endDate: '2025-01-09T23:59:59.000Z',
+          frequencyPerDay: 1,
+          administrationTimes: ['08:00'],
+          isActive: true,
+          specialInstructions: 'Updated narrative only',
+        },
+        mockAdminUser.id,
+        mockAdminUser.role
+      );
+
+      expect(repository.updatePrescriptionWithScheduleReconciliation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cancelScheduledFrom: undefined,
+          administrations: [],
+          reconciliationReason: 'Prescription details updated',
+        })
+      );
+      expect(repository.findVisitsForClientInRange).not.toHaveBeenCalled();
     });
   });
 

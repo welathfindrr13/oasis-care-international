@@ -4,6 +4,7 @@ import { RolesGuard } from '@oasis/auth';
 import { MedicationService } from './medication.service';
 import { CreateMedicationInput } from './dto/create-medication.input';
 import { CreatePrescriptionInput } from './dto/create-prescription.input';
+import { UpdatePrescriptionInput } from './dto/update-prescription.input';
 import { RecordAdministrationInput } from './dto/record-administration.input';
 import { MedicationFilterArgs } from './dto/medication-filter.args';
 import { MedicationDto, MedicationListDto } from './dto/medication.dto';
@@ -40,6 +41,19 @@ export class MedicationResolver {
     @Context('req') req: any,
   ): Promise<PrescriptionDto> {
     const prescription = await this.medicationService.createPrescription(
+      input,
+      req.user.id,
+      req.user.role,
+    );
+    return new PrescriptionDto(prescription);
+  }
+
+  @Mutation(() => PrescriptionDto)
+  async updatePrescription(
+    @Args('input') input: UpdatePrescriptionInput,
+    @Context('req') req: any,
+  ): Promise<PrescriptionDto> {
+    const prescription = await this.medicationService.updatePrescription(
       input,
       req.user.id,
       req.user.role,

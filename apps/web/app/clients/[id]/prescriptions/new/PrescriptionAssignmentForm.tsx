@@ -8,14 +8,19 @@ import { Card, CardContent, CardHeader } from '../../../../../components/ui/Card
 import { clientQuery } from '../../../../../lib/graphql/client-side'
 import {
   CREATE_PRESCRIPTION_MUTATION,
+  UPDATE_PRESCRIPTION_MUTATION,
   type CreatePrescriptionMutationResponse,
   type Medication,
+  type Prescription,
+  type UpdatePrescriptionMutationResponse,
 } from '../../../../../lib/graphql/queries'
 
 interface PrescriptionAssignmentFormProps {
   clientId: string
   clientName: string
-  medications: Medication[]
+  medications?: Medication[]
+  mode?: 'create' | 'edit'
+  prescription?: Prescription
 }
 
 interface PrescriptionFormState {
@@ -39,18 +44,21 @@ function formatDateInputValue(date: Date) {
 export default function PrescriptionAssignmentForm({
   clientId,
   clientName,
-  medications,
+  medications = [],
+  mode = 'create',
+  prescription,
 }: PrescriptionAssignmentFormProps) {
   const router = useRouter()
+  const isEditMode = mode === 'edit'
   const [form, setForm] = useState<PrescriptionFormState>({
-    medicationId: '',
-    startDate: formatDateInputValue(new Date()),
-    endDate: '',
-    frequencyPerDay: '1',
-    frequencyIntervalHours: '',
-    administrationTimes: '08:00',
-    specialInstructions: '',
-    isActive: true,
+    medicationId: prescription?.medicationId || '',
+    startDate: prescription?.startDate ? formatDateInputValue(new Date(prescription.startDate)) : formatDateInputValue(new Date()),
+    endDate: prescription?.endDate ? formatDateInputValue(new Date(prescription.endDate)) : '',
+    frequencyPerDay: prescription ? String(prescription.frequencyPerDay) : '1',
+    frequencyIntervalHours: prescription?.frequencyIntervalHours ? String(prescription.frequencyIntervalHours) : '',
+    administrationTimes: prescription?.administrationTimes?.join(', ') || '08:00',
+    specialInstructions: prescription?.specialInstructions || '',
+    isActive: prescription?.isActive ?? true,
   })
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -136,62 +144,133 @@ export default function PrescriptionAssignmentForm({
       return
     }
 
+    await submitPrescription(submissionForm, submissionTimes)
+  }
+
+  const submitPrescription = async (
+    submissionForm: PrescriptionFormState,
+    submissionTimes: string[],
+    overrides?: Partial<PrescriptionFormState>
+  ) => {
+    const nextForm = { ...submissionForm, ...overrides }
+    const nextTimes =
+      overrides?.administrationTimes !== undefined
+        ? parseAdministrationTimes(overrides.administrationTimes)
+        : submissionTimes
+    const nextValidationError = getValidationError(nextForm, nextTimes)
+
+    if (nextValidationError) {
+      setError(nextValidationError)
+      return
+    }
+
     setIsSubmitting(true)
     setError(null)
 
     try {
-      await clientQuery<CreatePrescriptionMutationResponse>(CREATE_PRESCRIPTION_MUTATION, {
-        input: {
-          clientId,
-          medicationId: submissionForm.medicationId,
-          startDate: new Date(`${submissionForm.startDate}T00:00:00`).toISOString(),
-          endDate: submissionForm.endDate ? new Date(`${submissionForm.endDate}T23:59:59`).toISOString() : null,
-          frequencyPerDay: Number(submissionForm.frequencyPerDay),
-          frequencyIntervalHours: submissionForm.frequencyIntervalHours ? Number(submissionForm.frequencyIntervalHours) : null,
-          administrationTimes: submissionTimes,
-          specialInstructions: submissionForm.specialInstructions.trim() || null,
-          isActive: submissionForm.isActive,
-        },
-      })
+      if (isEditMode && prescription) {
+        await clientQuery<UpdatePrescriptionMutationResponse>(UPDATE_PRESCRIPTION_MUTATION, {
+          input: {
+            id: prescription.id,
+            startDate: new Date(`${nextForm.startDate}T00:00:00`).toISOString(),
+            endDate: nextForm.endDate ? new Date(`${nextForm.endDate}T23:59:59`).toISOString() : null,
+            frequencyPerDay: Number(nextForm.frequencyPerDay),
+            frequencyIntervalHours: nextForm.frequencyIntervalHours ? Number(nextForm.frequencyIntervalHours) : null,
+            administrationTimes: nextTimes,
+            specialInstructions: nextForm.specialInstructions.trim() || null,
+            isActive: nextForm.isActive,
+          },
+        })
+      } else {
+        await clientQuery<CreatePrescriptionMutationResponse>(CREATE_PRESCRIPTION_MUTATION, {
+          input: {
+            clientId,
+            medicationId: nextForm.medicationId,
+            startDate: new Date(`${nextForm.startDate}T00:00:00`).toISOString(),
+            endDate: nextForm.endDate ? new Date(`${nextForm.endDate}T23:59:59`).toISOString() : null,
+            frequencyPerDay: Number(nextForm.frequencyPerDay),
+            frequencyIntervalHours: nextForm.frequencyIntervalHours ? Number(nextForm.frequencyIntervalHours) : null,
+            administrationTimes: nextTimes,
+            specialInstructions: nextForm.specialInstructions.trim() || null,
+            isActive: nextForm.isActive,
+          },
+        })
+      }
 
       router.push(`/clients/${clientId}/prescriptions`)
       router.refresh()
     } catch (submitError: any) {
-      setError(submitError.message || 'Unable to assign the prescription right now.')
+      setError(
+        submitError.message ||
+          (isEditMode ? 'Unable to update the prescription right now.' : 'Unable to assign the prescription right now.')
+      )
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const handleDeactivate = async () => {
+    if (!prescription) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      'Deactivate this prescription? Future scheduled medication rows will stop appearing for carers, and recorded medication outcomes will stay preserved.'
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    await submitPrescription(form, parsedAdministrationTimes, { isActive: false })
+  }
+
   return (
     <Card>
       <CardHeader>
-        <h2 className="font-heading text-xl font-semibold text-slate-900">Assign medication to {clientName}</h2>
+        <h2 className="font-heading text-xl font-semibold text-slate-900">
+          {isEditMode ? `Edit prescription for ${clientName}` : `Assign medication to ${clientName}`}
+        </h2>
         <p className="text-sm text-slate-500">
-          This creates the client’s prescription schedule and seeds medication records for eMAR and matching visits.
+          {isEditMode
+            ? 'Update future medication scheduling without rewriting recorded care. Deactivation stops future eMAR scheduling but keeps past medication outcomes intact.'
+            : 'This creates the client’s prescription schedule and seeds medication records for eMAR and matching visits.'}
         </p>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label htmlFor="medicationId" className="mb-2 block text-sm font-medium text-slate-700">
-              Medication <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="medicationId"
-              name="medicationId"
-              value={form.medicationId}
-              onChange={handleChange}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
-            >
-              <option value="">Choose a medication...</option>
-              {medications.map((medication) => (
-                <option key={medication.id} value={medication.id}>
-                  {medication.name} · {medication.dosage} {medication.unit}
-                </option>
-              ))}
-            </select>
-          </div>
+          {isEditMode && prescription?.medication ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <input type="hidden" name="medicationId" value={form.medicationId} />
+              <p className="text-sm font-medium text-slate-700">Medication</p>
+              <p className="mt-1 text-base font-semibold text-slate-900">
+                {prescription.medication.name} · {prescription.medication.dosage} {prescription.medication.unit}
+              </p>
+              <p className="mt-1 text-sm text-slate-600">
+                Medication identity stays fixed on an existing prescription so past medication records remain trustworthy. If the medicine itself changes, deactivate this prescription and assign a new one.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <label htmlFor="medicationId" className="mb-2 block text-sm font-medium text-slate-700">
+                Medication <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="medicationId"
+                name="medicationId"
+                value={form.medicationId}
+                onChange={handleChange}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="">Choose a medication...</option>
+                {medications.map((medication) => (
+                  <option key={medication.id} value={medication.id}>
+                    {medication.name} · {medication.dosage} {medication.unit}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
@@ -295,7 +374,7 @@ export default function PrescriptionAssignmentForm({
               onChange={handleChange}
               className="h-4 w-4 rounded border-slate-300 text-brand-blue-primary focus:ring-brand-blue-primary"
             />
-            Keep this prescription active
+            Keep this prescription active and generating future eMAR rows
           </label>
 
           {(error || (submitAttempted && validationError)) && (
@@ -306,8 +385,13 @@ export default function PrescriptionAssignmentForm({
 
           <div className="flex items-center gap-3">
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving…' : 'Assign Prescription'}
+              {isSubmitting ? 'Saving…' : isEditMode ? 'Save Prescription Changes' : 'Assign Prescription'}
             </Button>
+            {isEditMode && prescription?.isActive && (
+              <Button type="button" variant="outline" disabled={isSubmitting} onClick={handleDeactivate}>
+                Deactivate Prescription
+              </Button>
+            )}
             <Link href={`/clients/${clientId}/prescriptions`} className={buttonVariants({ variant: 'ghost' })}>
               Back to prescriptions
             </Link>

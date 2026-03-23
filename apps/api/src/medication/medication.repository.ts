@@ -57,7 +57,9 @@ export class MedicationRepository {
       include: {
         client: true,
         medication: true,
-        administrations: true
+        administrations: {
+          where: { deleted_at: null },
+        }
       }
     });
   }
@@ -120,6 +122,7 @@ export class MedicationRepository {
           client: true,
           medication: true,
           administrations: {
+            where: { deleted_at: null },
             orderBy: { scheduled_time: 'asc' },
           },
         },
@@ -134,6 +137,7 @@ export class MedicationRepository {
         client: true,
         medication: true,
         administrations: {
+          where: { deleted_at: null },
           orderBy: { scheduled_time: 'asc' }
         }
       }
@@ -159,6 +163,7 @@ export class MedicationRepository {
           client: true,
           medication: true,
           administrations: {
+            where: { deleted_at: null },
             orderBy: { scheduled_time: 'asc' }
           }
         }
@@ -176,8 +181,131 @@ export class MedicationRepository {
       include: {
         client: true,
         medication: true,
-        administrations: true
+        administrations: {
+          where: { deleted_at: null },
+          orderBy: { scheduled_time: 'asc' },
+        }
       }
+    });
+  }
+
+  async updatePrescriptionWithScheduleReconciliation(args: {
+    prescriptionId: string;
+    prescriptionData: Prisma.PrescriptionUpdateInput;
+    cancelScheduledFrom?: Date;
+    administrations: Array<{
+      scheduledTime: Date;
+      visitId?: string | null;
+      notes?: string | null;
+    }>;
+    reconciliationReason: string;
+    actorId: string;
+    actorRole: string;
+    auditChanges: Record<string, any>;
+  }): Promise<Prescription> {
+    return this.prisma.$transaction(async (tx) => {
+      const updatedPrescription = await tx.prescription.update({
+        where: { id: args.prescriptionId },
+        data: args.prescriptionData,
+      });
+
+      let archivedAdministrationCount = 0;
+
+      if (args.cancelScheduledFrom) {
+        const administrationsToArchive = await tx.medicationAdministration.findMany({
+          where: {
+            prescription_id: args.prescriptionId,
+            status: MedicationStatus.SCHEDULED,
+            deleted_at: null,
+            scheduled_time: {
+              gte: args.cancelScheduledFrom,
+            },
+          },
+          orderBy: { scheduled_time: 'asc' },
+        });
+
+        const archivedAt = new Date();
+
+        for (const administration of administrationsToArchive) {
+          await tx.medicationAdministration.update({
+            where: { id: administration.id },
+            data: {
+              status: MedicationStatus.CANCELLED,
+              deleted_at: archivedAt,
+            },
+          });
+
+          await tx.medicationAudit.create({
+            data: {
+              prescription_id: args.prescriptionId,
+              medication_administration_id: administration.id,
+              action: MedicationAuditAction.MEDICATION_CANCELLED,
+              actor_id: args.actorId,
+              actor_role: args.actorRole,
+              changes: JSON.stringify({
+                scheduledTime: administration.scheduled_time.toISOString(),
+                reason: args.reconciliationReason,
+                archivedAt: archivedAt.toISOString(),
+              }),
+            },
+          });
+        }
+
+        archivedAdministrationCount = administrationsToArchive.length;
+      }
+
+      for (const administration of args.administrations) {
+        const createdAdministration = await tx.medicationAdministration.create({
+          data: {
+            prescription: { connect: { id: args.prescriptionId } },
+            visit: administration.visitId ? { connect: { id: administration.visitId } } : undefined,
+            scheduled_time: administration.scheduledTime,
+            status: MedicationStatus.SCHEDULED,
+            notes: administration.notes ?? undefined,
+          },
+        });
+
+        await tx.medicationAudit.create({
+          data: {
+            prescription_id: args.prescriptionId,
+            medication_administration_id: createdAdministration.id,
+            action: MedicationAuditAction.MEDICATION_SCHEDULED,
+            actor_id: args.actorId,
+            actor_role: args.actorRole,
+            changes: JSON.stringify({
+              scheduledTime: administration.scheduledTime.toISOString(),
+              visitId: administration.visitId ?? null,
+              reason: args.reconciliationReason,
+            }),
+          },
+        });
+      }
+
+      await tx.medicationAudit.create({
+        data: {
+          prescription_id: args.prescriptionId,
+          action: MedicationAuditAction.PRESCRIPTION_UPDATED,
+          actor_id: args.actorId,
+          actor_role: args.actorRole,
+          changes: JSON.stringify({
+            ...args.auditChanges,
+            archivedAdministrationCount,
+            generatedAdministrationCount: args.administrations.length,
+          }),
+        },
+      });
+
+      return tx.prescription.findUniqueOrThrow({
+        where: { id: updatedPrescription.id },
+        include: {
+          client: true,
+          medication: true,
+          administrations: {
+            where: { deleted_at: null },
+            orderBy: { scheduled_time: 'asc' },
+          },
+        },
+      });
     });
   }
 
@@ -408,7 +536,6 @@ export class MedicationRepository {
       INNER JOIN prescription p
         ON p.id = ma.prescription_id
        AND p.deleted_at IS NULL
-       AND p.is_active = true
       INNER JOIN client c
         ON c.id = p.client_id
        AND c.deleted_at IS NULL

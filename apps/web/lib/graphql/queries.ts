@@ -433,6 +433,10 @@ export interface CreatePrescriptionMutationResponse {
   createPrescription: Prescription;
 }
 
+export interface UpdatePrescriptionMutationResponse {
+  updatePrescription: Prescription;
+}
+
 export const UPDATE_VISIT_MUTATION = `
   mutation UpdateVisit($input: UpdateVisitInput!) {
     updateVisit(input: $input) {
@@ -500,6 +504,25 @@ export const CREATE_MEDICATION_MUTATION = `
 export const CREATE_PRESCRIPTION_MUTATION = `
   mutation CreatePrescription($input: CreatePrescriptionInput!) {
     createPrescription(input: $input) {
+      id
+      clientId
+      medicationId
+      startDate
+      endDate
+      frequencyPerDay
+      frequencyIntervalHours
+      administrationTimes
+      specialInstructions
+      isActive
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const UPDATE_PRESCRIPTION_MUTATION = `
+  mutation UpdatePrescription($input: UpdatePrescriptionInput!) {
+    updatePrescription(input: $input) {
       id
       clientId
       medicationId

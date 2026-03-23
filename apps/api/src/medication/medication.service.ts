@@ -28,6 +28,17 @@ interface CreatePrescriptionInput {
   isActive?: boolean;
 }
 
+interface UpdatePrescriptionInput {
+  id: string;
+  startDate: string;
+  endDate?: string;
+  frequencyPerDay: number;
+  frequencyIntervalHours?: number;
+  administrationTimes: string[];
+  specialInstructions?: string;
+  isActive: boolean;
+}
+
 interface RecordAdministrationInput {
   administrationId: string;
   status: MedicationStatus;
@@ -53,6 +64,15 @@ interface MedicationSchedulingWindow {
 interface ScheduledAdministrationDraft {
   scheduledTime: Date;
   visitId: string | null;
+}
+
+interface PrescriptionScheduleSnapshot {
+  startDate: string;
+  endDate: string | null;
+  frequencyPerDay: number;
+  frequencyIntervalHours: number | null;
+  administrationTimes: string[];
+  isActive: boolean;
 }
 
 const PRESCRIPTION_SCHEDULING_HORIZON_DAYS = 30;
@@ -164,6 +184,111 @@ export class MedicationService {
     );
 
     return prescription;
+  }
+
+  async updatePrescription(
+    data: UpdatePrescriptionInput,
+    userId: string,
+    userRole: string
+  ): Promise<Prescription> {
+    this.checkAdminAccess(userRole);
+
+    const requestId = this.cls.get('requestId');
+    this.logger.log(`Updating prescription ${data.id}`, { requestId });
+
+    const existingPrescription = await this.medicationRepository.findPrescriptionById(data.id);
+    if (!existingPrescription) {
+      throw new BaseHttpException(
+        ErrorCode.PRESCRIPTION_NOT_FOUND,
+        'Prescription not found',
+        HttpStatus.NOT_FOUND
+      );
+    }
+
+    const startDate = new Date(data.startDate);
+    const endDate = data.endDate ? new Date(data.endDate) : null;
+
+    this.validatePrescriptionDates(startDate, endDate);
+
+    const normalizedAdministrationTimes = this.normalizeAdministrationTimes(
+      data.administrationTimes,
+      data.frequencyPerDay,
+      data.frequencyIntervalHours
+    );
+    const now = new Date();
+    const previousSchedule = this.buildPrescriptionScheduleSnapshot(existingPrescription);
+    const nextSchedule: PrescriptionScheduleSnapshot = {
+      startDate: startDate.toISOString(),
+      endDate: endDate ? endDate.toISOString() : null,
+      frequencyPerDay: data.frequencyPerDay,
+      frequencyIntervalHours: data.frequencyIntervalHours ?? null,
+      administrationTimes: normalizedAdministrationTimes,
+      isActive: data.isActive,
+    };
+    const shouldReconcileFutureSchedule = this.hasFutureScheduleImpact(previousSchedule, nextSchedule);
+
+    let scheduledAdministrations: ScheduledAdministrationDraft[] = [];
+    if (shouldReconcileFutureSchedule && data.isActive) {
+      const schedulingWindow = this.getPrescriptionSchedulingWindow(startDate, endDate, now);
+      const visitCandidates = schedulingWindow
+        ? await this.medicationRepository.findVisitsForClientInRange(
+            existingPrescription.client_id,
+            schedulingWindow.start,
+            schedulingWindow.end
+          )
+        : [];
+
+      scheduledAdministrations = this.buildScheduledAdministrations(
+        {
+          startDate,
+          endDate,
+          frequencyPerDay: data.frequencyPerDay,
+          frequencyIntervalHours: data.frequencyIntervalHours,
+          administrationTimes: normalizedAdministrationTimes,
+        },
+        visitCandidates,
+        { minimumScheduledTime: now }
+      );
+    }
+
+    const updatedPrescription = await this.medicationRepository.updatePrescriptionWithScheduleReconciliation({
+      prescriptionId: existingPrescription.id,
+      prescriptionData: {
+        start_date: startDate,
+        end_date: endDate,
+        frequency_per_day: data.frequencyPerDay,
+        frequency_interval_hours: data.frequencyIntervalHours,
+        administration_times: normalizedAdministrationTimes,
+        special_instructions: data.specialInstructions?.trim() || null,
+        is_active: data.isActive,
+      },
+      cancelScheduledFrom: shouldReconcileFutureSchedule ? now : undefined,
+      administrations: scheduledAdministrations,
+      reconciliationReason: shouldReconcileFutureSchedule
+        ? data.isActive
+          ? 'Prescription schedule updated'
+          : 'Prescription deactivated'
+        : 'Prescription details updated',
+      actorId: userId,
+      actorRole: userRole,
+      auditChanges: {
+        previous: {
+          ...previousSchedule,
+          specialInstructions: existingPrescription.special_instructions ?? null,
+        },
+        next: {
+          ...nextSchedule,
+          specialInstructions: data.specialInstructions?.trim() || null,
+        },
+      },
+    });
+
+    this.logger.log(
+      `Prescription ${updatedPrescription.id} updated with ${scheduledAdministrations.length} future administrations regenerated`,
+      { requestId }
+    );
+
+    return updatedPrescription;
   }
 
   async reconcileMedicationAdministrationsForVisitWindow(
@@ -480,11 +605,15 @@ export class MedicationService {
       startDate: Date;
       endDate: Date | null;
     },
-    visitCandidates: Visit[]
+    visitCandidates: Visit[],
+    options?: {
+      minimumScheduledTime?: Date;
+    }
   ): ScheduledAdministrationDraft[] {
     const schedulingWindow = this.getPrescriptionSchedulingWindow(
       prescription.startDate,
-      prescription.endDate
+      prescription.endDate,
+      options?.minimumScheduledTime
     );
 
     if (!schedulingWindow) {
@@ -515,6 +644,10 @@ export class MedicationService {
           continue;
         }
 
+        if (options?.minimumScheduledTime && scheduledTime < options.minimumScheduledTime) {
+          continue;
+        }
+
         if (prescription.endDate && scheduledTime > prescription.endDate) {
           continue;
         }
@@ -531,11 +664,13 @@ export class MedicationService {
 
   private getPrescriptionSchedulingWindow(
     startDate: Date,
-    endDate: Date | null
+    endDate: Date | null,
+    minimumScheduledTime?: Date
   ): MedicationSchedulingWindow | null {
+    const minimumDate = minimumScheduledTime ?? new Date();
     const today = this.startOfUtcDay(new Date());
     const horizonEnd = this.endOfUtcDay(this.addUtcDays(today, PRESCRIPTION_SCHEDULING_HORIZON_DAYS));
-    const rangeStart = this.maxDate(this.startOfUtcDay(startDate), today);
+    const rangeStart = this.maxDate(this.startOfUtcDay(startDate), this.startOfUtcDay(minimumDate));
     const rangeEnd = this.minDate(endDate ? this.endOfUtcDay(endDate) : horizonEnd, horizonEnd);
 
     if (rangeEnd < rangeStart) {
@@ -573,6 +708,64 @@ export class MedicationService {
       const hour = (fallbackStartHour + index * intervalHours) % 24;
       return `${String(hour).padStart(2, '0')}:00`;
     });
+  }
+
+  private validatePrescriptionDates(startDate: Date, endDate: Date | null): void {
+    if (Number.isNaN(startDate.getTime())) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Prescription start date is invalid',
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    if (endDate && Number.isNaN(endDate.getTime())) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Prescription end date is invalid',
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    if (endDate && endDate < startDate) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Prescription end date must be after the start date',
+        HttpStatus.BAD_REQUEST
+      );
+    }
+  }
+
+  private buildPrescriptionScheduleSnapshot(
+    prescription: Pick<
+      Prescription,
+      | 'start_date'
+      | 'end_date'
+      | 'frequency_per_day'
+      | 'frequency_interval_hours'
+      | 'administration_times'
+      | 'is_active'
+    >
+  ): PrescriptionScheduleSnapshot {
+    return {
+      startDate: prescription.start_date.toISOString(),
+      endDate: prescription.end_date ? prescription.end_date.toISOString() : null,
+      frequencyPerDay: prescription.frequency_per_day,
+      frequencyIntervalHours: prescription.frequency_interval_hours ?? null,
+      administrationTimes: this.normalizeAdministrationTimes(
+        prescription.administration_times,
+        prescription.frequency_per_day,
+        prescription.frequency_interval_hours ?? undefined
+      ),
+      isActive: prescription.is_active,
+    };
+  }
+
+  private hasFutureScheduleImpact(
+    previous: PrescriptionScheduleSnapshot,
+    next: PrescriptionScheduleSnapshot
+  ): boolean {
+    return JSON.stringify(previous) !== JSON.stringify(next);
   }
 
   private selectBestVisitForScheduledTime(
