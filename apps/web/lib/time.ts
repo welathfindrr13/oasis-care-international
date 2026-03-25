@@ -48,6 +48,20 @@ export function formatDate(date: Date | string): string {
 }
 
 /**
+ * Format a value for `<input type="date">` in London local date.
+ */
+export function formatDateInputValueInLondon(date: Date | string = new Date()): string {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: LONDON_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(dateObj);
+}
+
+/**
  * Get current date/time in London timezone as ISO string
  */
 export function nowInLondon(): string {

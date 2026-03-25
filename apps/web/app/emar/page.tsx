@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Header } from '../../components/oasis/Header';
+import { formatDateInputValueInLondon, formatDateTime } from '../../lib/time';
 
 interface MedicationAdministration {
   id: string;
@@ -37,10 +38,7 @@ const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://api.oasis-care.c
 
 export default function EmarPage() {
   const { data: session } = useSession();
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  });
+  const [selectedDate, setSelectedDate] = useState(() => formatDateInputValueInLondon());
   
   const [loading, setLoading] = useState(true);
   const [medicationsError, setMedicationsError] = useState<string | null>(null);
@@ -166,18 +164,18 @@ export default function EmarPage() {
   };
 
   const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('en-US', {
+    return formatDateTime(dateString, {
       hour: '2-digit',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
     });
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return formatDateTime(dateString, {
       weekday: 'short',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
 
