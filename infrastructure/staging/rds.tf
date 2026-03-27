@@ -22,8 +22,9 @@ resource "aws_db_instance" "postgres" {
   maintenance_window      = "sun:04:00-sun:05:00"
 
   # Protection settings
-  deletion_protection       = false
-  skip_final_snapshot       = true
+  apply_immediately   = false
+  deletion_protection = false
+  skip_final_snapshot = true
 
   # Other settings
   publicly_accessible = false

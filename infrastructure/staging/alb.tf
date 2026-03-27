@@ -19,7 +19,7 @@ resource "aws_lb_target_group" "api" {
   port        = 3000
   protocol    = "HTTP"
   vpc_id      = data.aws_vpc.main.id
-  target_type = "ip"  # Required for Fargate tasks
+  target_type = "ip" # Required for Fargate tasks
 
   health_check {
     enabled             = true
@@ -34,7 +34,9 @@ resource "aws_lb_target_group" "api" {
   }
 
   # Ensure proper connection draining
-  deregistration_delay = 30
+  deregistration_delay               = 30
+  lambda_multi_value_headers_enabled = false
+  proxy_protocol_v2                  = false
 
   tags = merge(var.default_tags, {
     Name = "${local.name_prefix}-api-tg"
@@ -46,7 +48,7 @@ resource "aws_lb_target_group" "web" {
   port        = 3000
   protocol    = "HTTP"
   vpc_id      = data.aws_vpc.main.id
-  target_type = "ip"  # Required for Fargate tasks
+  target_type = "ip" # Required for Fargate tasks
 
   health_check {
     enabled             = true
@@ -61,7 +63,9 @@ resource "aws_lb_target_group" "web" {
   }
 
   # Ensure proper connection draining
-  deregistration_delay = 30
+  deregistration_delay               = 30
+  lambda_multi_value_headers_enabled = false
+  proxy_protocol_v2                  = false
 
   tags = merge(var.default_tags, {
     Name = "${local.name_prefix}-web-tg"
@@ -98,8 +102,19 @@ resource "aws_lb_listener" "https" {
 
   # Default action - forward to web
   default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.web.arn
+    type = "forward"
+
+    forward {
+      target_group {
+        arn    = aws_lb_target_group.web.arn
+        weight = 1
+      }
+
+      stickiness {
+        enabled  = false
+        duration = 1
+      }
+    }
   }
 
   tags = var.default_tags
@@ -117,8 +132,19 @@ resource "aws_lb_listener_rule" "api" {
   priority     = 100
 
   action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.api.arn
+    type = "forward"
+
+    forward {
+      target_group {
+        arn    = aws_lb_target_group.api.arn
+        weight = 1
+      }
+
+      stickiness {
+        enabled  = false
+        duration = 1
+      }
+    }
   }
 
   condition {
@@ -135,8 +161,19 @@ resource "aws_lb_listener_rule" "web" {
   priority     = 200
 
   action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.web.arn
+    type = "forward"
+
+    forward {
+      target_group {
+        arn    = aws_lb_target_group.web.arn
+        weight = 1
+      }
+
+      stickiness {
+        enabled  = false
+        duration = 1
+      }
+    }
   }
 
   condition {

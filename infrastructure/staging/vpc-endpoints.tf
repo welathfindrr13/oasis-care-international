@@ -3,9 +3,10 @@
 
 # Security group for VPC endpoints
 resource "aws_security_group" "vpc_endpoints" {
-  name        = "${local.name_prefix}-vpc-endpoints"
-  description = "Security group for VPC endpoints"
-  vpc_id      = data.aws_vpc.main.id
+  name                   = "${local.name_prefix}-vpc-endpoints"
+  description            = "Security group for VPC endpoints"
+  vpc_id                 = data.aws_vpc.main.id
+  revoke_rules_on_delete = false
 
   ingress {
     description     = "HTTPS from ECS tasks"
@@ -115,4 +116,3 @@ resource "aws_vpc_endpoint" "logs" {
     Name = "${local.name_prefix}-logs-endpoint"
   })
 }
-

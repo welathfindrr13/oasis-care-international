@@ -9,10 +9,9 @@ resource "aws_sqs_queue" "notifications_dlq" {
   # DLQ settings
   message_retention_seconds = 1209600 # 14 days
 
-  tags = {
-    Name        = "${local.name_prefix}-notifications-dlq"
-    Environment = var.environment
-  }
+  tags = merge(var.default_tags, {
+    Name = "${local.name_prefix}-notifications-dlq"
+  })
 }
 
 # Main SQS Queue with DLQ
@@ -36,10 +35,9 @@ resource "aws_sqs_queue" "notifications" {
     maxReceiveCount     = 3
   })
 
-  tags = {
-    Name        = "${local.name_prefix}-notifications"
-    Environment = var.environment
-  }
+  tags = merge(var.default_tags, {
+    Name = "${local.name_prefix}-notifications"
+  })
 }
 
 # Queue IAM is granted where it is actually needed; keeping an unattached

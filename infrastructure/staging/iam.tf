@@ -61,12 +61,25 @@ data "aws_iam_policy_document" "bedrock_access" {
     effect = "Allow"
     actions = [
       "bedrock:InvokeModel",
-      "bedrock:InvokeModelWithResponseStream"
+      "bedrock:InvokeModelWithResponseStream",
+      "bedrock:Converse",
+      "bedrock:ConverseStream",
+      "bedrock:GetFoundationModel",
+      "bedrock:ListFoundationModels"
     ]
     resources = [
       "arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-haiku-4-*",
       "arn:aws:bedrock:eu-west-2:721689331449:inference-profile/eu.anthropic.claude-haiku-4-5-20251001-v1:0"
     ]
+  }
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "aws-marketplace:Subscribe",
+      "aws-marketplace:ViewSubscriptions"
+    ]
+    resources = ["*"]
   }
 }
 

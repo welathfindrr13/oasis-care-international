@@ -2,10 +2,9 @@
 resource "aws_sns_topic" "alerts" {
   name = "${local.name_prefix}-alerts"
 
-  tags = {
-    Name        = "${local.name_prefix}-alerts"
-    Environment = var.environment
-  }
+  tags = merge(var.default_tags, {
+    Name = "${local.name_prefix}-alerts"
+  })
 }
 
 # Email subscriptions are managed manually so Terraform does not create

@@ -6,6 +6,7 @@ resource "aws_lambda_function" "embedding_generator" {
   runtime       = "nodejs20.x"
   timeout       = 900 # 15 minutes
   memory_size   = 1024
+  publish       = false
 
   # Placeholder code - will be replaced by deployment pipeline
   filename         = "${path.module}/lambda-placeholder.zip"
@@ -31,10 +32,13 @@ resource "aws_lambda_function" "embedding_generator" {
     aws_iam_role_policy.lambda_embedding_permissions
   ]
 
+  lifecycle {
+    ignore_changes = [filename, source_code_hash]
+  }
+
   tags = {
-    Name        = "${local.name_prefix}-embedding-generator"
-    Environment = "staging"
-    Purpose     = "ai-health-summarizer"
+    Name    = "${local.name_prefix}-embedding-generator"
+    Purpose = "ai-health-summarizer"
   }
 }
 
@@ -56,9 +60,10 @@ data "archive_file" "lambda_placeholder" {
 
 # Security group for Lambda in VPC
 resource "aws_security_group" "lambda_embedding" {
-  name_prefix = "${local.name_prefix}-lambda-embedding-"
-  vpc_id      = data.aws_vpc.main.id
-  description = "Security group for embedding generation Lambda"
+  name_prefix            = "${local.name_prefix}-lambda-embedding-"
+  vpc_id                 = data.aws_vpc.main.id
+  description            = "Security group for embedding generation Lambda"
+  revoke_rules_on_delete = false
 
   # Outbound to RDS
   egress {
@@ -78,10 +83,9 @@ resource "aws_security_group" "lambda_embedding" {
     description = "HTTPS for Bedrock and AWS API calls"
   }
 
-  tags = {
-    Name        = "${local.name_prefix}-lambda-embedding-sg"
-    Environment = "staging"
-  }
+  tags = merge(var.default_tags, {
+    Name = "${local.name_prefix}-lambda-embedding-sg"
+  })
 }
 
 # CloudWatch Event Rule - Friday 02:00 UK time (UTC)
@@ -90,11 +94,10 @@ resource "aws_cloudwatch_event_rule" "embedding_schedule" {
   description         = "Trigger embedding generation every Friday at 02:00 UK time"
   schedule_expression = "cron(0 2 ? * FRI *)"
 
-  tags = {
-    Name        = "${local.name_prefix}-embedding-schedule"
-    Environment = "staging"
-    Purpose     = "ai-health-summarizer"
-  }
+  tags = merge(var.default_tags, {
+    Name    = "${local.name_prefix}-embedding-schedule"
+    Purpose = "ai-health-summarizer"
+  })
 }
 
 # CloudWatch Event Target
@@ -127,8 +130,7 @@ resource "aws_cloudwatch_log_group" "embedding_lambda_logs" {
   name              = "/aws/lambda/${aws_lambda_function.embedding_generator.function_name}"
   retention_in_days = 14
 
-  tags = {
-    Name        = "${local.name_prefix}-embedding-lambda-logs"
-    Environment = "staging"
-  }
+  tags = merge(var.default_tags, {
+    Name = "${local.name_prefix}-embedding-lambda-logs"
+  })
 }

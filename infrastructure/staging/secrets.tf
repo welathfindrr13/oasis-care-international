@@ -9,9 +9,10 @@
 
 # Secrets Manager resources for ECS containers and Lambda functions
 resource "aws_secretsmanager_secret" "database_url" {
-  name                    = "oasis/staging/DATABASE_URL"
-  description             = "Database URL for Oasis staging"
-  recovery_window_in_days = 0 # For staging, allow immediate deletion
+  name                           = "oasis/staging/DATABASE_URL"
+  description                    = "Database URL for Oasis staging"
+  force_overwrite_replica_secret = false
+  recovery_window_in_days        = 0 # For staging, allow immediate deletion
 
   tags = var.default_tags
 }
@@ -19,9 +20,10 @@ resource "aws_secretsmanager_secret" "database_url" {
 # JWT Secret for API authentication.
 # Terraform manages the secret container metadata, but not the live secret value.
 resource "aws_secretsmanager_secret" "jwt_secret" {
-  name                    = "oasis/staging/JWT_SECRET"
-  description             = "JWT Secret for Oasis API staging"
-  recovery_window_in_days = 0
+  name                           = "oasis/staging/JWT_SECRET"
+  description                    = "JWT Secret for Oasis API staging"
+  force_overwrite_replica_secret = false
+  recovery_window_in_days        = 0
 
   tags = var.default_tags
 }
