@@ -116,31 +116,3 @@ resource "aws_vpc_endpoint" "logs" {
   })
 }
 
-# SSM Interface Endpoint (for ECS Exec)
-resource "aws_vpc_endpoint" "ssm" {
-  vpc_id              = data.aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.aws_region}.ssm"
-  vpc_endpoint_type   = "Interface"
-  subnet_ids          = local.private_subnet_ids
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-  private_dns_enabled = true
-
-  tags = merge(var.default_tags, {
-    Name = "${local.name_prefix}-ssm-endpoint"
-  })
-}
-
-# SSM Messages Interface Endpoint (for ECS Exec)
-resource "aws_vpc_endpoint" "ssmmessages" {
-  vpc_id              = data.aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.aws_region}.ssmmessages"
-  vpc_endpoint_type   = "Interface"
-  subnet_ids          = local.private_subnet_ids
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-  private_dns_enabled = true
-
-  tags = merge(var.default_tags, {
-    Name = "${local.name_prefix}-ssmmessages-endpoint"
-  })
-}
-

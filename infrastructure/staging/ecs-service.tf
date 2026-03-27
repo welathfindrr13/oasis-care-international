@@ -223,8 +223,8 @@ resource "aws_ecs_service" "api" {
 
   depends_on = [aws_lb_listener.https]
 
-  # Enable ECS Exec for debugging
-  enable_execute_command = true
+  # Keep staging lean: ECS Exec is disabled, so we do not need SSM endpoints.
+  enable_execute_command = false
 
   lifecycle {
     ignore_changes = [task_definition, desired_count]
@@ -255,8 +255,8 @@ resource "aws_ecs_service" "web" {
 
   depends_on = [aws_lb_listener.https]
 
-  # Enable ECS Exec for debugging
-  enable_execute_command = true
+  # Keep staging lean: ECS Exec is disabled, so we do not need SSM endpoints.
+  enable_execute_command = false
 
   lifecycle {
     ignore_changes = [task_definition, desired_count]

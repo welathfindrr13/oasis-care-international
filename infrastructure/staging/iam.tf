@@ -70,26 +70,6 @@ data "aws_iam_policy_document" "bedrock_access" {
   }
 }
 
-# ECS Exec permissions for debugging
-resource "aws_iam_role_policy" "ecs_exec" {
-  name   = "ECSExec"
-  role   = aws_iam_role.ecs_task_role.id
-  policy = data.aws_iam_policy_document.ecs_exec.json
-}
-
-data "aws_iam_policy_document" "ecs_exec" {
-  statement {
-    effect = "Allow"
-    actions = [
-      "ssmmessages:CreateControlChannel",
-      "ssmmessages:CreateDataChannel",
-      "ssmmessages:OpenControlChannel",
-      "ssmmessages:OpenDataChannel"
-    ]
-    resources = ["*"]
-  }
-}
-
 # Lambda execution role for embedding generation
 resource "aws_iam_role" "lambda_embedding_execution" {
   name               = "${local.name_prefix}-lambda-embedding"
