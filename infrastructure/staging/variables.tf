@@ -55,6 +55,12 @@ variable "ai_summary_enabled" {
   type        = bool
 }
 
+variable "manage_acm_validation" {
+  description = "Whether Terraform should manage ACM DNS validation resources. Disable during empty-state imports."
+  type        = bool
+  default     = true
+}
+
 variable "default_tags" {
   default = {
     Environment = "staging"

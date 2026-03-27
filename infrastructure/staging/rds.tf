@@ -1,13 +1,3 @@
-resource "random_password" "db" {
-  length  = 16
-  special = true
-}
-
-resource "random_password" "jwt" {
-  length  = 32
-  special = true
-}
-
 resource "aws_db_subnet_group" "main" {
   name       = "${local.name_prefix}-db-subnet-group"
   subnet_ids = local.private_subnet_ids
@@ -21,9 +11,10 @@ resource "aws_db_instance" "postgres" {
   allocated_storage      = 20
   db_name                = "oasis"
   username               = var.db_username
-  password               = random_password.db.result
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
+
+  # The master password is managed outside Terraform for the existing staging DB.
 
   # Backup and retention settings
   backup_retention_period = 7

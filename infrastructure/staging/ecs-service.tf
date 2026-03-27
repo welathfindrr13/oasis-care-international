@@ -208,6 +208,8 @@ resource "aws_ecs_service" "api" {
   task_definition = aws_ecs_task_definition.api.arn
   desired_count   = 1
   launch_type     = "FARGATE"
+  deployment_minimum_healthy_percent = 50
+  health_check_grace_period_seconds  = 180
 
   network_configuration {
     subnets          = local.private_subnet_ids
@@ -240,6 +242,7 @@ resource "aws_ecs_service" "web" {
   task_definition = aws_ecs_task_definition.web.arn
   desired_count   = 1
   launch_type     = "FARGATE"
+  health_check_grace_period_seconds = 180
 
   network_configuration {
     subnets          = local.private_subnet_ids

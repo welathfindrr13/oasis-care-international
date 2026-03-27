@@ -94,7 +94,7 @@ resource "aws_lb_listener" "https" {
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS-1-2-2017-01"
-  certificate_arn   = aws_acm_certificate_validation.api.certificate_arn
+  certificate_arn   = local.api_listener_certificate_arn
 
   # Default action - forward to web
   default_action {
@@ -108,7 +108,7 @@ resource "aws_lb_listener" "https" {
 # Additional certificate for web domain
 resource "aws_lb_listener_certificate" "web" {
   listener_arn    = aws_lb_listener.https.arn
-  certificate_arn = aws_acm_certificate_validation.web.certificate_arn
+  certificate_arn = local.web_listener_certificate_arn
 }
 
 # Listener rules for host-based routing

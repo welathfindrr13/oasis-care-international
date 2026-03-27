@@ -8,12 +8,8 @@ resource "aws_sns_topic" "alerts" {
   }
 }
 
-# Placeholder SNS subscription (email to be configured manually)
-resource "aws_sns_topic_subscription" "email_alerts" {
-  topic_arn = aws_sns_topic.alerts.arn
-  protocol  = "email"
-  endpoint  = "admin@oasis-care.co" # TODO: Replace with actual admin email
-}
+# Email subscriptions are managed manually so Terraform does not create
+# surprise confirmation flows for staging operators.
 
 # RDS CloudWatch Alarms
 resource "aws_cloudwatch_metric_alarm" "rds_cpu_utilization" {

@@ -42,29 +42,5 @@ resource "aws_sqs_queue" "notifications" {
   }
 }
 
-# IAM policy for SQS access
-resource "aws_iam_policy" "sqs_notifications" {
-  name_prefix = "${local.name_prefix}-sqs-notifications"
-  path        = "/"
-  description = "IAM policy for SQS notifications access"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "sqs:SendMessage",
-          "sqs:ReceiveMessage",
-          "sqs:DeleteMessage",
-          "sqs:GetQueueAttributes",
-          "sqs:ChangeMessageVisibility"
-        ]
-        Resource = [
-          aws_sqs_queue.notifications.arn,
-          aws_sqs_queue.notifications_dlq.arn
-        ]
-      }
-    ]
-  })
-}
+# Queue IAM is granted where it is actually needed; keeping an unattached
+# placeholder policy in Terraform just creates churn.

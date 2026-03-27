@@ -16,24 +16,12 @@ resource "aws_secretsmanager_secret" "database_url" {
   tags = var.default_tags
 }
 
-# Random passwords for secrets (used by Terraform)
-# Note: random_password "db" is defined in rds.tf
-
-resource "random_password" "nextauth" {
-  length  = 64
-  special = true
-}
-
-# JWT Secret for API authentication (reuses random_password.jwt from rds.tf)
+# JWT Secret for API authentication.
+# Terraform manages the secret container metadata, but not the live secret value.
 resource "aws_secretsmanager_secret" "jwt_secret" {
   name                    = "oasis/staging/JWT_SECRET"
   description             = "JWT Secret for Oasis API staging"
   recovery_window_in_days = 0
 
   tags = var.default_tags
-}
-
-resource "aws_secretsmanager_secret_version" "jwt_secret" {
-  secret_id     = aws_secretsmanager_secret.jwt_secret.id
-  secret_string = random_password.jwt.result
 }
