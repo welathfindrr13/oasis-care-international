@@ -19,6 +19,7 @@ import {
 import { formatDateTime } from '../../../lib/time'
 import { VisitCareLogPanel } from './VisitCareLogPanel'
 import { VisitMedicationPanel } from './VisitMedicationPanel'
+import { VisitOperationalPanel } from './VisitOperationalPanel'
 
 export const metadata: Metadata = {
   title: 'Visit Details - Oasis Care',
@@ -179,8 +180,7 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
   const timeline = deriveTimeline(visit, medications)
 
   const isAdmin = hasRole((session as any)?.roles, 'admin')
-  const canEditCareLog = hasRole((session as any)?.roles, 'carer') && !isAdmin
-  const canRecordMedication = hasRole((session as any)?.roles, 'carer') && !isAdmin
+  const canActAsCarer = hasRole((session as any)?.roles, 'carer') && !isAdmin
 
   const clientAddress = [visit.client?.addressLine1, visit.client?.addressLine2, visit.client?.city, visit.client?.postcode]
     .filter(Boolean)
@@ -226,6 +226,27 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
 
           <div className="space-y-6">
             <Card>
+              <CardContent className="pt-6">
+                <VisitOperationalPanel
+                  canEdit={canActAsCarer}
+                  visit={{
+                    id: visit.id,
+                    status: visit.status,
+                    scheduledStart: visit.scheduledStart,
+                    scheduledEnd: visit.scheduledEnd,
+                    actualStart: visit.actualStart,
+                    actualEnd: visit.actualEnd,
+                    updatedAt: visit.updatedAt,
+                    tasks: visit.tasks.map((task) => ({
+                      id: task.id,
+                      isCompleted: task.isCompleted,
+                    })),
+                  }}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
               <CardHeader>
                 <h2 className="text-lg font-semibold text-text-primary font-heading">People</h2>
               </CardHeader>
@@ -245,7 +266,7 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
                 <h2 className="text-lg font-semibold text-text-primary font-heading">Medication context</h2>
               </CardHeader>
               <CardContent>
-                <VisitMedicationPanel canEdit={canRecordMedication} medications={medications} />
+                <VisitMedicationPanel canEdit={canActAsCarer} medications={medications} />
               </CardContent>
             </Card>
 
@@ -255,7 +276,7 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
               </CardHeader>
               <CardContent>
                 <VisitCareLogPanel
-                  canEdit={canEditCareLog}
+                  canEdit={canActAsCarer}
                   visit={{
                     id: visit.id,
                     notes: visit.notes,

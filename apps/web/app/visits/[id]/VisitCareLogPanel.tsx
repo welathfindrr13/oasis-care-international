@@ -37,6 +37,8 @@ export function VisitCareLogPanel({ canEdit, visit }: VisitCareLogPanelProps) {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
   const [isSavingNotes, startSavingNotes] = useTransition()
   const [isUpdatingTask, startUpdatingTask] = useTransition()
+  const completedTasks = tasks.filter((task) => task.isCompleted).length
+  const totalTasks = tasks.length
 
   const hasUnsavedNotes = notesDraft !== savedNotes
   const hasUnsavedTaskNotes = (taskId: string) =>
@@ -169,6 +171,11 @@ export function VisitCareLogPanel({ canEdit, visit }: VisitCareLogPanelProps) {
                 : 'No tasks were attached to this visit.'}
             </p>
           </div>
+          {totalTasks > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-text-secondary">
+              {completedTasks} / {totalTasks} complete
+            </div>
+          )}
         </div>
 
         {tasks.length > 0 ? (
