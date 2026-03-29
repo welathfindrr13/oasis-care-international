@@ -38,6 +38,10 @@ interface VisitFormState {
   startTime: string;
   endTime: string;
   notes: string;
+  tasks: Array<{
+    taskName: string;
+    description: string;
+  }>;
 }
 
 function formatDateTimeLocalValue(date: Date): string {
@@ -125,6 +129,7 @@ export default function VisitCreateForm({
         startTime,
         endTime,
         notes: initialPrefill.notes ?? '',
+        tasks: [],
       },
       warnings,
     };
@@ -149,6 +154,13 @@ export default function VisitCreateForm({
       return 'End time must be after start time.';
     }
 
+    const hasInvalidTask = form.tasks.some(
+      (task) => task.description.trim().length > 0 && task.taskName.trim().length === 0
+    );
+    if (hasInvalidTask) {
+      return 'Each visit task needs a task name.';
+    }
+
     return null;
   }, [form]);
 
@@ -160,6 +172,34 @@ export default function VisitCreateForm({
     const { name, value } = event.target;
     setError(null);
     setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleTaskChange = (
+    index: number,
+    field: 'taskName' | 'description',
+    value: string
+  ) => {
+    setError(null);
+    setForm((prev) => ({
+      ...prev,
+      tasks: prev.tasks.map((task, taskIndex) =>
+        taskIndex === index ? { ...task, [field]: value } : task
+      ),
+    }));
+  };
+
+  const addTask = () => {
+    setForm((prev) => ({
+      ...prev,
+      tasks: [...prev.tasks, { taskName: '', description: '' }],
+    }));
+  };
+
+  const removeTask = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      tasks: prev.tasks.filter((_, taskIndex) => taskIndex !== index),
+    }));
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -174,6 +214,17 @@ export default function VisitCreateForm({
     setError(null);
 
     try {
+      const tasks = form.tasks
+        .map((task) => ({
+          taskName: task.taskName.trim(),
+          description: task.description.trim(),
+        }))
+        .filter((task) => task.taskName.length > 0 || task.description.length > 0)
+        .map((task) => ({
+          taskName: task.taskName,
+          description: task.description || null,
+        }));
+
       await clientQuery(CREATE_VISIT_MUTATION, {
         input: {
           clientId: form.clientId,
@@ -181,6 +232,7 @@ export default function VisitCreateForm({
           scheduledStart: new Date(form.startTime).toISOString(),
           scheduledEnd: new Date(form.endTime).toISOString(),
           notes: form.notes.trim() || null,
+          tasks: tasks.length > 0 ? tasks : null,
         },
       });
 
@@ -291,6 +343,71 @@ export default function VisitCreateForm({
               placeholder="Add any special instructions or notes for this visit..."
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
             />
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">Visit tasks</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Add the care steps the carer should work through on visit detail.
+                </p>
+              </div>
+              <Button type="button" variant="outline" onClick={addTask}>
+                Add task
+              </Button>
+            </div>
+
+            {form.tasks.length > 0 ? (
+              <div className="mt-4 space-y-4">
+                {form.tasks.map((task, index) => (
+                  <div key={`${index}-${task.taskName}`} className="rounded-2xl border border-white bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-medium text-slate-700">Task {index + 1}</p>
+                      <button
+                        type="button"
+                        onClick={() => removeTask(index)}
+                        className="text-sm font-medium text-slate-500 hover:text-slate-700"
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    <div className="mt-3 space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Task name
+                        </label>
+                        <input
+                          type="text"
+                          value={task.taskName}
+                          onChange={(event) => handleTaskChange(index, 'taskName', event.target.value)}
+                          placeholder="For example: Morning medication support"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Task guidance
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={task.description}
+                          onChange={(event) => handleTaskChange(index, 'description', event.target.value)}
+                          placeholder="Add any practical detail the carer should capture or complete."
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500">
+                No tasks added yet. You can still schedule the visit, but carers will only see notes and medication context.
+              </p>
+            )}
           </div>
 
           {loadErrors.length > 0 && (
