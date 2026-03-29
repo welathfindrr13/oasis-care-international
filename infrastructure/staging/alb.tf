@@ -153,6 +153,10 @@ resource "aws_lb_listener_rule" "api" {
     }
   }
 
+  lifecycle {
+    ignore_changes = [action[0].forward[0].stickiness[0].duration]
+  }
+
   tags = var.default_tags
 }
 
@@ -180,6 +184,10 @@ resource "aws_lb_listener_rule" "web" {
     host_header {
       values = [var.web_domain]
     }
+  }
+
+  lifecycle {
+    ignore_changes = [action[0].forward[0].stickiness[0].duration]
   }
 
   tags = var.default_tags
