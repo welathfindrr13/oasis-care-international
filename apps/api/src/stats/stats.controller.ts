@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import { StatsService } from './stats.service';
 import { TodayStatsDto } from './dto/today-stats.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -13,9 +13,14 @@ export class StatsController {
   constructor(private readonly statsService: StatsService) {}
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'carer')
   @Get('today')
-  async today(): Promise<TodayStatsDto> {
-    return this.statsService.getTodayStats();
+  async today(@Req() req: any): Promise<TodayStatsDto> {
+    const user = req.user ?? {};
+    return this.statsService.getTodayStats(
+      user.sub || user.id,
+      user.realm_access?.roles?.[0] || user.role || 'user',
+      user.organizationId,
+    );
   }
 }
