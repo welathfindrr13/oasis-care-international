@@ -20,6 +20,7 @@ import {
   type Visit 
 } from '../../lib/graphql/queries'
 import { formatDate, formatDateInputValueInLondon, formatDateTime, formatTime, getLondonDayRange } from '../../lib/time'
+import { getVisitQueueState, sortVisitsForQueue, type VisitQueueState } from './queue-state'
 
 export const metadata: Metadata = {
   title: 'Visits - Oasis Care',
@@ -58,44 +59,36 @@ function getTaskProgress(visit: Visit) {
   };
 }
 
-function sortVisitsForQueue(visits: Visit[]) {
-  const statusOrder: Record<Visit['status'], number> = {
-    IN_PROGRESS: 0,
-    SCHEDULED: 1,
-    COMPLETED: 2,
-    CANCELLED: 3,
-  };
-
-  return [...visits].sort((left, right) => {
-    const statusDelta = statusOrder[left.status] - statusOrder[right.status];
-    if (statusDelta !== 0) {
-      return statusDelta;
-    }
-
-    if (left.status === 'COMPLETED' || left.status === 'CANCELLED') {
-      const leftCompletedAt = new Date(left.actualEnd ?? left.scheduledEnd).getTime();
-      const rightCompletedAt = new Date(right.actualEnd ?? right.scheduledEnd).getTime();
-      return rightCompletedAt - leftCompletedAt;
-    }
-
-    return new Date(left.scheduledStart).getTime() - new Date(right.scheduledStart).getTime();
-  });
-}
-
-function buildQueueSummary(visits: Visit[]) {
+function buildQueueSummary(visits: Visit[], now: Date) {
   return visits.reduce(
     (summary, visit) => {
-      if (visit.status === 'IN_PROGRESS') summary.inProgress += 1;
-      if (visit.status === 'SCHEDULED') summary.scheduled += 1;
-      if (visit.status === 'COMPLETED') summary.completed += 1;
-      if (visit.status === 'CANCELLED') summary.cancelled += 1;
+      const queueState = getVisitQueueState(visit, now)
+
+      if (queueState === 'needs_action_now') summary.needsActionNow += 1
+      if (queueState === 'overdue') summary.overdue += 1
+      if (queueState === 'upcoming') summary.upcoming += 1
+      if (queueState === 'needs_review') summary.needsReview += 1
+      if (queueState === 'in_progress') summary.inProgress += 1
+      if (queueState === 'completed') summary.completed += 1
+      if (queueState === 'cancelled') summary.cancelled += 1
       return summary;
     },
-    { inProgress: 0, scheduled: 0, completed: 0, cancelled: 0 }
-  );
+    {
+      needsActionNow: 0,
+      overdue: 0,
+      upcoming: 0,
+      needsReview: 0,
+      inProgress: 0,
+      completed: 0,
+      cancelled: 0,
+    }
+  )
 }
 
-async function getVisits(searchParams: VisitsPageProps['searchParams']): Promise<{ visits: Visit[]; total: number }> {
+async function getVisits(
+  searchParams: VisitsPageProps['searchParams'],
+  now: Date
+): Promise<{ visits: Visit[]; total: number }> {
   try {
     const page = parseInt(searchParams.page || '1', 10);
     const skip = getSkipFromPage(page);
@@ -114,7 +107,7 @@ async function getVisits(searchParams: VisitsPageProps['searchParams']): Promise
     const response = await query<VisitsQueryResponse>(VISITS_QUERY, variables);
     
     return {
-      visits: sortVisitsForQueue(response.visits.items),
+      visits: sortVisitsForQueue(response.visits.items, now),
       total: response.visits.total,
     };
   } catch (error) {
@@ -205,17 +198,81 @@ function formatRecordedWindow(actualStart?: string, actualEnd?: string) {
   return null
 }
 
+function getQueueStateLabel(queueState: VisitQueueState) {
+  switch (queueState) {
+    case 'needs_action_now':
+      return 'Needs action now'
+    case 'overdue':
+      return 'Overdue visit'
+    case 'upcoming':
+      return 'Upcoming visit'
+    case 'needs_review':
+      return 'Needs review'
+    case 'in_progress':
+      return 'In progress'
+    case 'completed':
+      return 'Completed'
+    case 'cancelled':
+      return 'Cancelled'
+  }
+}
+
+function getQueueStateTone(queueState: VisitQueueState) {
+  switch (queueState) {
+    case 'needs_action_now':
+      return 'text-brand-blue-primary bg-brand-blue-light/15 border-brand-blue-light'
+    case 'overdue':
+      return 'text-orange-700 bg-orange-50 border-orange-200'
+    case 'upcoming':
+      return 'text-slate-700 bg-slate-100 border-slate-200'
+    case 'needs_review':
+      return 'text-amber-800 bg-amber-50 border-amber-200'
+    case 'in_progress':
+      return 'text-brand-blue-primary bg-brand-blue-light/15 border-brand-blue-light'
+    case 'completed':
+      return 'text-brand-iris-100 bg-brand-iris-60 border-brand-iris-80'
+    case 'cancelled':
+      return 'text-base-gray-700 bg-base-gray-100 border-base-gray-300'
+  }
+}
+
+function getQueueStateMessage(queueState: VisitQueueState, isAdmin: boolean) {
+  switch (queueState) {
+    case 'needs_action_now':
+      return isAdmin
+        ? 'Scheduled window is live and this visit should be underway.'
+        : 'This visit is due now and needs care delivery attention.'
+    case 'overdue':
+      return isAdmin
+        ? 'Scheduled end time has passed and no completion evidence is recorded.'
+        : 'This visit is overdue and still needs care evidence recorded.'
+    case 'upcoming':
+      return isAdmin
+        ? 'Scheduled later in the care day with no recorded evidence yet.'
+        : 'Upcoming work later in the care day.'
+    case 'needs_review':
+      return 'Recorded evidence exists on a scheduled visit. Review before taking further action.'
+    case 'in_progress':
+      return 'Care delivery is actively in progress.'
+    case 'completed':
+      return 'Visit has recorded completion evidence.'
+    case 'cancelled':
+      return 'This visit has been cancelled.'
+  }
+}
+
 export default async function VisitsPage({ searchParams }: VisitsPageProps) {
   const session = await getServerSession(authOptions);
   const isAdmin = hasRole((session as any)?.roles, 'admin');
   const activeDate = getActiveQueueDate(searchParams.date);
   const queueDateLabel = formatQueueDateLabel(activeDate);
+  const queueNow = new Date()
   const [{ visits, total }, carers] = await Promise.all([
-    getVisits({ ...searchParams, date: activeDate }),
+    getVisits({ ...searchParams, date: activeDate }, queueNow),
     isAdmin ? getCarersForFilter() : Promise.resolve([]),
   ]);
   const hasVisits = visits.length > 0;
-  const summary = buildQueueSummary(visits);
+  const summary = buildQueueSummary(visits, queueNow);
   const pageTitle = isAdmin ? 'Visits' : 'Your Visits';
   const pageSubtitle = isAdmin
     ? 'Run the operational queue for the current care day and move into visit detail when needed.'
@@ -255,6 +312,11 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                 <p className="text-sm text-text-secondary">
                   {hasVisits ? `${visits.length} of ${total} visits in the active queue` : `No visits queued for ${queueDateLabel}`}
                 </p>
+                {summary.needsReview > 0 && (
+                  <p className="mt-1 text-sm text-amber-700">
+                    {summary.needsReview} scheduled {summary.needsReview === 1 ? 'visit already has' : 'visits already have'} recorded evidence and should be reviewed.
+                  </p>
+                )}
               </div>
               {isAdmin && (
                 <Link href="/visits/new" className={buttonVariants({ variant: 'primary', size: 'sm' })}>
@@ -264,21 +326,36 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="mb-6 grid gap-3 md:grid-cols-3">
+            <div className="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
               <SummaryTile
-                label="In progress"
-                value={summary.inProgress}
-                hint={isAdmin ? 'Visits currently under way.' : 'Visits you should actively be working through.'}
+                label="Needs Action Now"
+                value={summary.needsActionNow}
+                hint={isAdmin ? 'Visits due in the current care window.' : 'Visits that need attention right now.'}
               />
               <SummaryTile
-                label="Scheduled"
-                value={summary.scheduled}
-                hint={isAdmin ? 'Still waiting to start.' : 'Upcoming visits still to deliver today.'}
+                label="Overdue"
+                value={summary.overdue}
+                hint="Scheduled visits with no completion evidence after their window."
+              />
+              <SummaryTile
+                label="Upcoming"
+                value={summary.upcoming}
+                hint={isAdmin ? 'Still due later in the day.' : 'Upcoming visits still to deliver today.'}
+              />
+              <SummaryTile
+                label="Needs Review"
+                value={summary.needsReview}
+                hint="Scheduled visits with recorded evidence that should be reviewed."
               />
               <SummaryTile
                 label="Completed"
                 value={summary.completed}
                 hint="Visits with recorded completion evidence."
+              />
+              <SummaryTile
+                label="In Progress"
+                value={summary.inProgress}
+                hint={isAdmin ? 'Visits currently under way.' : 'Visits you should actively be working through.'}
               />
             </div>
 
@@ -310,6 +387,7 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                   <tbody>
                     {visits.map((visit) => {
                       const taskProgress = getTaskProgress(visit)
+                      const queueState = getVisitQueueState(visit, queueNow)
                       
                       return (
                         <tr 
@@ -351,7 +429,14 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                           )}
                           <td className="py-3 px-4">
                             <div className="space-y-2">
-                              <StatusChip status={visit.status.toLowerCase() as any} />
+                              <div className="flex flex-wrap items-center gap-2">
+                                <StatusChip status={visit.status.toLowerCase() as any} />
+                                <span
+                                  className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium ${getQueueStateTone(queueState)}`}
+                                >
+                                  {getQueueStateLabel(queueState)}
+                                </span>
+                              </div>
                               {formatRecordedWindow(visit.actualStart, visit.actualEnd) ? (
                                 <div className="text-xs text-brand-blue-primary">
                                   {formatRecordedWindow(visit.actualStart, visit.actualEnd)}
@@ -366,16 +451,15 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                                   ? `${taskProgress.completed} of ${taskProgress.total} tasks complete`
                                   : 'No tasks attached to this visit'}
                               </div>
-                              {taskProgress.total > 0 && taskProgress.remaining > 0 && (
-                                <div className="text-xs text-text-secondary">
-                                  {taskProgress.remaining} still need attention on visit detail.
-                                </div>
-                              )}
+                              <div className="text-xs text-text-secondary">
+                                {getQueueStateMessage(queueState, isAdmin)}
+                              </div>
                             </div>
                           </td>
                           <td className="py-3 px-4">
                             <VisitActionCell
                               isAdmin={isAdmin}
+                              queueState={queueState}
                               visit={{
                                 id: visit.id,
                                 status: visit.status,

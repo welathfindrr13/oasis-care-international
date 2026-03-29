@@ -12,9 +12,11 @@ import {
   type Visit,
   type VisitTask,
 } from '../../lib/graphql/queries'
+import type { VisitQueueState } from './queue-state'
 
 interface VisitActionCellProps {
   isAdmin: boolean
+  queueState: VisitQueueState
   visit: Pick<Visit, 'id' | 'status' | 'actualStart' | 'actualEnd'> & {
     tasks: Array<Pick<VisitTask, 'id' | 'isCompleted'>>
   }
@@ -31,20 +33,27 @@ function getTaskSummary(tasks: VisitActionCellProps['visit']['tasks']) {
   }
 }
 
-export function VisitActionCell({ isAdmin, visit }: VisitActionCellProps) {
+export function VisitActionCell({
+  isAdmin,
+  queueState,
+  visit,
+}: VisitActionCellProps) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const taskSummary = getTaskSummary(visit.tasks)
 
   if (isAdmin) {
+    const adminSummary =
+      queueState === 'needs_review'
+        ? 'Recorded evidence exists on this scheduled visit'
+        : taskSummary.total > 0
+          ? `${taskSummary.completed} of ${taskSummary.total} tasks recorded`
+          : 'Review visit detail for notes, tasks, and medication context'
+
     return (
       <div className="flex flex-col items-start gap-2">
-        <span className="text-sm text-text-secondary">
-          {taskSummary.total > 0
-            ? `${taskSummary.completed} of ${taskSummary.total} tasks recorded`
-            : 'Review visit detail for notes, tasks, and medication context'}
-        </span>
+        <span className="text-sm text-text-secondary">{adminSummary}</span>
         <Link
           href={`/visits/${visit.id}`}
           className={buttonVariants({ variant: 'ghost', size: 'sm' })}
@@ -82,21 +91,31 @@ export function VisitActionCell({ isAdmin, visit }: VisitActionCellProps) {
   return (
     <div className="flex flex-col items-start gap-2">
       <span className="text-sm text-text-secondary">
-        {visit.status === 'SCHEDULED' &&
+        {queueState === 'upcoming' &&
           (taskSummary.total > 0
             ? `${taskSummary.total} tasks queued for this visit`
             : 'Ready to start and record care detail')}
-        {visit.status === 'IN_PROGRESS' &&
+        {queueState === 'needs_action_now' &&
+          (taskSummary.total > 0
+            ? `${taskSummary.remaining} tasks still need attention`
+            : 'Scheduled window is live and ready to start')}
+        {queueState === 'overdue' &&
+          (taskSummary.total > 0
+            ? `${taskSummary.remaining} tasks still need attention`
+            : 'Scheduled window has passed without recorded care evidence')}
+        {queueState === 'needs_review' &&
+          'Recorded evidence exists; review before taking further action'}
+        {queueState === 'in_progress' &&
           (taskSummary.total > 0
             ? `${taskSummary.completed} of ${taskSummary.total} tasks complete`
             : 'Visit in progress')}
-        {visit.status === 'COMPLETED' &&
+        {queueState === 'completed' &&
           (taskSummary.remaining > 0
             ? `${taskSummary.remaining} tasks still open for follow-up`
             : 'Visit already completed')}
-        {visit.status === 'CANCELLED' && 'Visit cancelled'}
+        {queueState === 'cancelled' && 'Visit cancelled'}
       </span>
-      {visit.status === 'SCHEDULED' && (
+      {(queueState === 'upcoming' || queueState === 'needs_action_now') && (
         <button
           type="button"
           className={buttonVariants({ variant: 'primary', size: 'sm' })}
@@ -106,7 +125,17 @@ export function VisitActionCell({ isAdmin, visit }: VisitActionCellProps) {
           {isPending ? 'Starting…' : 'Start Visit'}
         </button>
       )}
-      {visit.status === 'IN_PROGRESS' && (
+      {queueState === 'overdue' && (
+        <button
+          type="button"
+          className={buttonVariants({ variant: 'primary', size: 'sm' })}
+          onClick={() => runUpdate('IN_PROGRESS')}
+          disabled={isPending}
+        >
+          {isPending ? 'Starting…' : 'Start overdue visit'}
+        </button>
+      )}
+      {queueState === 'in_progress' && (
         <button
           type="button"
           className={buttonVariants({ variant: 'secondary', size: 'sm' })}
@@ -116,7 +145,14 @@ export function VisitActionCell({ isAdmin, visit }: VisitActionCellProps) {
           {isPending ? 'Completing…' : 'Complete Visit'}
         </button>
       )}
-      {visit.status !== 'SCHEDULED' && visit.status !== 'IN_PROGRESS' && (
+      {queueState === 'needs_review' && (
+        <span className="text-sm text-text-secondary">Review in workspace</span>
+      )}
+      {queueState !== 'upcoming' &&
+        queueState !== 'needs_action_now' &&
+        queueState !== 'overdue' &&
+        queueState !== 'in_progress' &&
+        queueState !== 'needs_review' && (
         <span className="text-sm text-text-secondary">No action needed</span>
       )}
       <Link
