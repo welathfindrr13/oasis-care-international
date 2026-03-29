@@ -314,6 +314,30 @@ describe('VisitService', () => {
         })
       );
     });
+
+    it('should not let carers override their own scoped queue with a filter carerId', async () => {
+      mockVisitRepository.findMany.mockResolvedValue({
+        items: [mockVisit],
+        total: 1,
+      });
+
+      await service.findVisits(
+        {
+          ...filter,
+          carerId: 'other-carer',
+        },
+        'carer-123',
+        'carer'
+      );
+
+      expect(repository.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            carer_id: 'carer-123',
+          }),
+        })
+      );
+    });
   });
 
   describe('completeTask', () => {

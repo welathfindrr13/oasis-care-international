@@ -1,24 +1,25 @@
 import { Metadata } from 'next'
-import { Suspense } from 'react'
 import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import { Header } from '../../components/oasis/Header'
-import { FilterBar } from '../../components/oasis/FilterBar'
 import { StatusChip } from '../../components/oasis/StatusChip'
 import { Card, CardContent, CardHeader } from '../../components/ui/Card'
 import { buttonVariants } from '../../components/ui/Button'
 import { VisitActionCell } from './VisitActionCell'
+import { VisitsToolbar } from './VisitsToolbar'
 import { authOptions } from '../../lib/auth/auth-options'
 import { hasRole } from '../../lib/auth/roles'
 import { query } from '../../lib/graphql/client'
 import { 
+  CARERS_QUERY,
   VISITS_QUERY, 
   DEFAULT_PAGE_SIZE, 
   getSkipFromPage,
+  type CarersQueryResponse,
   type VisitsQueryResponse,
   type Visit 
 } from '../../lib/graphql/queries'
-import { formatDateTime, formatTime } from '../../lib/time'
+import { formatDate, formatDateInputValueInLondon, formatDateTime, formatTime, getLondonDayRange } from '../../lib/time'
 
 export const metadata: Metadata = {
   title: 'Visits - Oasis Care',
@@ -31,31 +32,80 @@ interface VisitsPageProps {
   searchParams: {
     date?: string;
     carerId?: string;
-    clientId?: string;
     status?: string;
     page?: string;
   };
+}
+
+const VALID_DATE_FILTER = /^\d{4}-\d{2}-\d{2}$/;
+
+function getActiveQueueDate(rawDate?: string) {
+  return rawDate && VALID_DATE_FILTER.test(rawDate) ? rawDate : formatDateInputValueInLondon();
+}
+
+function formatQueueDateLabel(dateInput: string) {
+  return formatDate(`${dateInput}T12:00:00Z`);
+}
+
+function getTaskProgress(visit: Visit) {
+  const total = visit.tasks.length;
+  const completed = visit.tasks.filter((task) => task.isCompleted).length;
+
+  return {
+    total,
+    completed,
+    remaining: Math.max(total - completed, 0),
+  };
+}
+
+function sortVisitsForQueue(visits: Visit[]) {
+  const statusOrder: Record<Visit['status'], number> = {
+    IN_PROGRESS: 0,
+    SCHEDULED: 1,
+    COMPLETED: 2,
+    CANCELLED: 3,
+  };
+
+  return [...visits].sort((left, right) => {
+    const statusDelta = statusOrder[left.status] - statusOrder[right.status];
+    if (statusDelta !== 0) {
+      return statusDelta;
+    }
+
+    if (left.status === 'COMPLETED' || left.status === 'CANCELLED') {
+      const leftCompletedAt = new Date(left.actualEnd ?? left.scheduledEnd).getTime();
+      const rightCompletedAt = new Date(right.actualEnd ?? right.scheduledEnd).getTime();
+      return rightCompletedAt - leftCompletedAt;
+    }
+
+    return new Date(left.scheduledStart).getTime() - new Date(right.scheduledStart).getTime();
+  });
+}
+
+function buildQueueSummary(visits: Visit[]) {
+  return visits.reduce(
+    (summary, visit) => {
+      if (visit.status === 'IN_PROGRESS') summary.inProgress += 1;
+      if (visit.status === 'SCHEDULED') summary.scheduled += 1;
+      if (visit.status === 'COMPLETED') summary.completed += 1;
+      if (visit.status === 'CANCELLED') summary.cancelled += 1;
+      return summary;
+    },
+    { inProgress: 0, scheduled: 0, completed: 0, cancelled: 0 }
+  );
 }
 
 async function getVisits(searchParams: VisitsPageProps['searchParams']): Promise<{ visits: Visit[]; total: number }> {
   try {
     const page = parseInt(searchParams.page || '1', 10);
     const skip = getSkipFromPage(page);
-
-    // Convert date to date range (start of day to end of day)
-    let scheduledStartFrom: string | undefined;
-    let scheduledStartTo: string | undefined;
-    if (searchParams.date) {
-      const dateObj = new Date(searchParams.date);
-      scheduledStartFrom = new Date(dateObj.setHours(0, 0, 0, 0)).toISOString();
-      scheduledStartTo = new Date(dateObj.setHours(23, 59, 59, 999)).toISOString();
-    }
+    const queueDate = getActiveQueueDate(searchParams.date);
+    const { start: scheduledStartFrom, end: scheduledStartTo } = getLondonDayRange(queueDate);
 
     const variables = {
       scheduledStartFrom,
       scheduledStartTo,
       carerId: searchParams.carerId || undefined,
-      clientId: searchParams.clientId || undefined,
       status: searchParams.status || undefined,
       take: DEFAULT_PAGE_SIZE,
       skip,
@@ -64,7 +114,7 @@ async function getVisits(searchParams: VisitsPageProps['searchParams']): Promise
     const response = await query<VisitsQueryResponse>(VISITS_QUERY, variables);
     
     return {
-      visits: response.visits.items,
+      visits: sortVisitsForQueue(response.visits.items),
       total: response.visits.total,
     };
   } catch (error) {
@@ -73,7 +123,35 @@ async function getVisits(searchParams: VisitsPageProps['searchParams']): Promise
   }
 }
 
-function EmptyState({ isAdmin }: { isAdmin: boolean }) {
+async function getCarersForFilter() {
+  try {
+    const response = await query<CarersQueryResponse>(CARERS_QUERY, { activeOnly: true });
+    return response.carers;
+  } catch (error) {
+    console.error('Failed to fetch carers for visits filter:', error);
+    return [];
+  }
+}
+
+function SummaryTile({
+  label,
+  value,
+  hint,
+}: {
+  label: string
+  value: number
+  hint: string
+}) {
+  return (
+    <div className="rounded-2xl border border-base-gray-200 bg-slate-50 p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">{label}</p>
+      <p className="mt-2 text-2xl font-semibold text-text-primary">{value}</p>
+      <p className="mt-1 text-sm text-text-secondary">{hint}</p>
+    </div>
+  )
+}
+
+function EmptyState({ isAdmin, queueDateLabel }: { isAdmin: boolean; queueDateLabel: string }) {
   return (
     <div className="text-center py-12">
       <div className="mb-4">
@@ -99,12 +177,12 @@ function EmptyState({ isAdmin }: { isAdmin: boolean }) {
       </h3>
       <p className="text-text-secondary mb-4">
         {isAdmin
-          ? 'Try adjusting your filters or check back later.'
-          : 'Your scheduled visits will appear here when they are assigned.'}
+          ? `No visits are currently queued for ${queueDateLabel}.`
+          : `No visits are currently assigned to you for ${queueDateLabel}.`}
       </p>
       {isAdmin && (
         <Link href="/visits/new" className={buttonVariants({ variant: 'primary' })}>
-          Schedule New Visit
+          Schedule a visit
         </Link>
       )}
     </div>
@@ -129,14 +207,22 @@ function formatRecordedWindow(actualStart?: string, actualEnd?: string) {
 
 export default async function VisitsPage({ searchParams }: VisitsPageProps) {
   const session = await getServerSession(authOptions);
-  const { visits, total } = await getVisits(searchParams);
-  const hasVisits = visits.length > 0;
   const isAdmin = hasRole((session as any)?.roles, 'admin');
+  const activeDate = getActiveQueueDate(searchParams.date);
+  const queueDateLabel = formatQueueDateLabel(activeDate);
+  const [{ visits, total }, carers] = await Promise.all([
+    getVisits({ ...searchParams, date: activeDate }),
+    isAdmin ? getCarersForFilter() : Promise.resolve([]),
+  ]);
+  const hasVisits = visits.length > 0;
+  const summary = buildQueueSummary(visits);
   const pageTitle = isAdmin ? 'Visits' : 'Your Visits';
   const pageSubtitle = isAdmin
-    ? 'Manage and track care visits for all clients'
-    : 'Review your schedule and stay on top of today’s care visits';
-  const sectionTitle = isAdmin ? "Today's Visits" : 'Assigned Visits';
+    ? 'Run the operational queue for the current care day and move into visit detail when needed.'
+    : 'Work from your assigned queue and move into visit detail when it is time to deliver care.';
+  const sectionTitle = isAdmin
+    ? `Care queue for ${queueDateLabel}`
+    : `Your queue for ${queueDateLabel}`;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -151,29 +237,51 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
           </p>
         </div>
 
-        <Suspense fallback={<div className="mb-6 h-20 rounded-sm border border-base-gray-300 bg-background-secondary" />}>
-          <FilterBar className="mb-6" />
-        </Suspense>
+        <VisitsToolbar
+          isAdmin={isAdmin}
+          carers={carers}
+          selectedDate={activeDate}
+          selectedStatus={searchParams.status}
+          selectedCarerId={searchParams.carerId}
+        />
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold text-text-primary font-heading">
                   {sectionTitle}
                 </h2>
                 <p className="text-sm text-text-secondary">
-                  {hasVisits ? `${visits.length} of ${total} visits` : 'No visits found'}
+                  {hasVisits ? `${visits.length} of ${total} visits in the active queue` : `No visits queued for ${queueDateLabel}`}
                 </p>
               </div>
               {isAdmin && (
                 <Link href="/visits/new" className={buttonVariants({ variant: 'primary', size: 'sm' })}>
-                  Add Visit
+                  Add visit
                 </Link>
               )}
             </div>
           </CardHeader>
           <CardContent>
+            <div className="mb-6 grid gap-3 md:grid-cols-3">
+              <SummaryTile
+                label="In progress"
+                value={summary.inProgress}
+                hint={isAdmin ? 'Visits currently under way.' : 'Visits you should actively be working through.'}
+              />
+              <SummaryTile
+                label="Scheduled"
+                value={summary.scheduled}
+                hint={isAdmin ? 'Still waiting to start.' : 'Upcoming visits still to deliver today.'}
+              />
+              <SummaryTile
+                label="Completed"
+                value={summary.completed}
+                hint="Visits with recorded completion evidence."
+              />
+            </div>
+
             {hasVisits ? (
               <div className="overflow-x-auto">
                 <table 
@@ -184,19 +292,15 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                   <thead>
                     <tr className="border-b border-base-gray-200">
                       <th className="text-left py-3 px-4 font-medium text-text-secondary text-sm">
-                        Time
+                        Visit
                       </th>
+                      {isAdmin && (
+                        <th className="text-left py-3 px-4 font-medium text-text-secondary text-sm">
+                          Carer
+                        </th>
+                      )}
                       <th className="text-left py-3 px-4 font-medium text-text-secondary text-sm">
-                        Client
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-text-secondary text-sm">
-                        Carer
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-text-secondary text-sm">
-                        Duration
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-text-secondary text-sm">
-                        Status
+                        Queue state
                       </th>
                       <th className="text-left py-3 px-4 font-medium text-text-secondary text-sm">
                         {isAdmin ? 'Actions' : 'Visit Progress'}
@@ -205,36 +309,15 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                   </thead>
                   <tbody>
                     {visits.map((visit) => {
-                      const startTime = new Date(visit.scheduledStart);
-                      const endTime = new Date(visit.scheduledEnd);
-                      const durationMs = endTime.getTime() - startTime.getTime();
-                      const durationMin = Math.round(durationMs / (1000 * 60));
+                      const taskProgress = getTaskProgress(visit)
                       
                       return (
                         <tr 
                           key={visit.id}
-                          className="border-b border-base-gray-100 hover:bg-background-accent transition-colors"
+                          className="border-b border-base-gray-100 align-top hover:bg-background-accent transition-colors"
                         >
                           <td className="py-3 px-4">
-                            <div>
-                              <time 
-                                className="font-medium text-text-primary"
-                                dateTime={visit.scheduledStart}
-                              >
-                                {formatTime(visit.scheduledStart)}
-                              </time>
-                              <div className="text-xs text-text-secondary">
-                                Scheduled: {formatDateTime(visit.scheduledStart)}
-                              </div>
-                              {formatRecordedWindow(visit.actualStart, visit.actualEnd) && (
-                                <div className="text-xs text-brand-blue-primary">
-                                  {formatRecordedWindow(visit.actualStart, visit.actualEnd)}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div>
+                            <div className="space-y-1">
                               <div className="font-medium text-text-primary">
                                 {visit.client?.fullName || 'Unknown Client'}
                               </div>
@@ -243,20 +326,52 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                                   `${visit.client.addressLine1}${visit.client.addressLine2 ? ', ' + visit.client.addressLine2 : ''}`
                                 )}
                               </div>
+                              <div className="text-sm text-text-primary">
+                                {formatTime(visit.scheduledStart)} to {formatTime(visit.scheduledEnd)}
+                              </div>
+                              <time 
+                                className="text-xs text-text-secondary"
+                                dateTime={visit.scheduledStart}
+                              >
+                                Scheduled {formatDateTime(visit.scheduledStart)}
+                              </time>
                             </div>
                           </td>
+                          {isAdmin && (
+                            <td className="py-3 px-4">
+                              <div className="space-y-1">
+                                <div className="font-medium text-text-primary">
+                                  {visit.carer ? `${visit.carer.firstName} ${visit.carer.lastName}` : 'Unassigned'}
+                                </div>
+                                <div className="text-sm text-text-secondary">
+                                  {visit.carer?.email ?? 'No email recorded'}
+                                </div>
+                              </div>
+                            </td>
+                          )}
                           <td className="py-3 px-4">
-                            <span className="text-text-primary">
-                              {visit.carer ? `${visit.carer.firstName} ${visit.carer.lastName}` : 'Unassigned'}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="text-text-secondary">
-                              {durationMin} min
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <StatusChip status={visit.status.toLowerCase() as any} />
+                            <div className="space-y-2">
+                              <StatusChip status={visit.status.toLowerCase() as any} />
+                              {formatRecordedWindow(visit.actualStart, visit.actualEnd) ? (
+                                <div className="text-xs text-brand-blue-primary">
+                                  {formatRecordedWindow(visit.actualStart, visit.actualEnd)}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-text-secondary">
+                                  Timing evidence not recorded yet
+                                </div>
+                              )}
+                              <div className="text-sm text-text-secondary">
+                                {taskProgress.total > 0
+                                  ? `${taskProgress.completed} of ${taskProgress.total} tasks complete`
+                                  : 'No tasks attached to this visit'}
+                              </div>
+                              {taskProgress.total > 0 && taskProgress.remaining > 0 && (
+                                <div className="text-xs text-text-secondary">
+                                  {taskProgress.remaining} still need attention on visit detail.
+                                </div>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3 px-4">
                             <VisitActionCell
@@ -266,6 +381,10 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                                 status: visit.status,
                                 actualStart: visit.actualStart,
                                 actualEnd: visit.actualEnd,
+                                tasks: visit.tasks.map((task) => ({
+                                  id: task.id,
+                                  isCompleted: task.isCompleted,
+                                })),
                               }}
                             />
                           </td>
@@ -276,7 +395,7 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                 </table>
               </div>
             ) : (
-              <EmptyState isAdmin={isAdmin} />
+              <EmptyState isAdmin={isAdmin} queueDateLabel={queueDateLabel} />
             )}
           </CardContent>
         </Card>

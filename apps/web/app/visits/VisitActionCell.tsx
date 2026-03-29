@@ -6,27 +6,50 @@ import { useState, useTransition } from 'react'
 import { buttonVariants } from '../../components/ui/Button'
 import { cn } from '../../lib/utils'
 import { clientQuery } from '../../lib/graphql/client-side'
-import { UPDATE_VISIT_MUTATION, type UpdateVisitMutationResponse, type Visit } from '../../lib/graphql/queries'
+import {
+  UPDATE_VISIT_MUTATION,
+  type UpdateVisitMutationResponse,
+  type Visit,
+  type VisitTask,
+} from '../../lib/graphql/queries'
 
 interface VisitActionCellProps {
   isAdmin: boolean
-  visit: Pick<Visit, 'id' | 'status' | 'actualStart' | 'actualEnd'>
+  visit: Pick<Visit, 'id' | 'status' | 'actualStart' | 'actualEnd'> & {
+    tasks: Array<Pick<VisitTask, 'id' | 'isCompleted'>>
+  }
+}
+
+function getTaskSummary(tasks: VisitActionCellProps['visit']['tasks']) {
+  const total = tasks.length
+  const completed = tasks.filter((task) => task.isCompleted).length
+
+  return {
+    total,
+    completed,
+    remaining: Math.max(total - completed, 0),
+  }
 }
 
 export function VisitActionCell({ isAdmin, visit }: VisitActionCellProps) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const taskSummary = getTaskSummary(visit.tasks)
 
   if (isAdmin) {
     return (
       <div className="flex flex-col items-start gap-2">
-        <span className="text-sm text-text-secondary">No inline actions</span>
+        <span className="text-sm text-text-secondary">
+          {taskSummary.total > 0
+            ? `${taskSummary.completed} of ${taskSummary.total} tasks recorded`
+            : 'Review visit detail for notes, tasks, and medication context'}
+        </span>
         <Link
           href={`/visits/${visit.id}`}
           className={buttonVariants({ variant: 'ghost', size: 'sm' })}
         >
-          View details
+          Review visit
         </Link>
       </div>
     )
@@ -58,6 +81,21 @@ export function VisitActionCell({ isAdmin, visit }: VisitActionCellProps) {
 
   return (
     <div className="flex flex-col items-start gap-2">
+      <span className="text-sm text-text-secondary">
+        {visit.status === 'SCHEDULED' &&
+          (taskSummary.total > 0
+            ? `${taskSummary.total} tasks queued for this visit`
+            : 'Ready to start and record care detail')}
+        {visit.status === 'IN_PROGRESS' &&
+          (taskSummary.total > 0
+            ? `${taskSummary.completed} of ${taskSummary.total} tasks complete`
+            : 'Visit in progress')}
+        {visit.status === 'COMPLETED' &&
+          (taskSummary.remaining > 0
+            ? `${taskSummary.remaining} tasks still open for follow-up`
+            : 'Visit already completed')}
+        {visit.status === 'CANCELLED' && 'Visit cancelled'}
+      </span>
       {visit.status === 'SCHEDULED' && (
         <button
           type="button"
@@ -85,7 +123,7 @@ export function VisitActionCell({ isAdmin, visit }: VisitActionCellProps) {
         href={`/visits/${visit.id}`}
         className={buttonVariants({ variant: 'ghost', size: 'sm' })}
       >
-        View details
+        Open workspace
       </Link>
       {error && (
         <p className={cn('text-xs text-red-600')} role="alert">

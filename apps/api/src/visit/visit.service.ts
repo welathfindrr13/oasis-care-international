@@ -192,8 +192,10 @@ export class VisitService {
     }
 
     // Apply additional filters
-    if (filter.carerId) where.carer_id = filter.carerId;
-    if (filter.clientId) where.client_id = filter.clientId;
+    if (userRole === 'admin') {
+      if (filter.carerId) where.carer_id = filter.carerId;
+      if (filter.clientId) where.client_id = filter.clientId;
+    }
     if (filter.status) where.status = filter.status;
     
     if (filter.scheduledStartFrom || filter.scheduledStartTo) {

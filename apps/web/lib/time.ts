@@ -5,6 +5,69 @@
 
 const LONDON_TIMEZONE = 'Europe/London';
 
+function getDateTimePartsInTimeZone(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+
+  const lookup = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value])
+  ) as Record<string, string>;
+
+  return {
+    year: Number.parseInt(lookup.year, 10),
+    month: Number.parseInt(lookup.month, 10),
+    day: Number.parseInt(lookup.day, 10),
+    hour: Number.parseInt(lookup.hour, 10),
+    minute: Number.parseInt(lookup.minute, 10),
+    second: Number.parseInt(lookup.second, 10),
+  };
+}
+
+function getTimeZoneOffsetMilliseconds(date: Date, timeZone: string) {
+  const parts = getDateTimePartsInTimeZone(date, timeZone);
+  const zonedUtcTimestamp = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  );
+
+  return zonedUtcTimestamp - date.getTime();
+}
+
+function getZonedLocalInstant(
+  dateInput: string,
+  timeZone: string,
+  options: { hour: number; minute: number; second: number; millisecond?: number }
+) {
+  const [year, month, day] = dateInput.split('-').map((value) => Number.parseInt(value, 10));
+  const localTimestamp = Date.UTC(
+    year,
+    month - 1,
+    day,
+    options.hour,
+    options.minute,
+    options.second,
+    options.millisecond ?? 0
+  );
+  const approximateUtcDate = new Date(localTimestamp);
+  const offset = getTimeZoneOffsetMilliseconds(approximateUtcDate, timeZone);
+
+  return new Date(localTimestamp - offset);
+}
+
 /**
  * Format date/time for London timezone display
  */
@@ -59,6 +122,26 @@ export function formatDateInputValueInLondon(date: Date | string = new Date()): 
     month: '2-digit',
     day: '2-digit',
   }).format(dateObj);
+}
+
+/**
+ * Get the UTC ISO range that matches a calendar day in London local time.
+ */
+export function getLondonDayRange(dateInput: string): { start: string; end: string } {
+  return {
+    start: getZonedLocalInstant(dateInput, LONDON_TIMEZONE, {
+      hour: 0,
+      minute: 0,
+      second: 0,
+      millisecond: 0,
+    }).toISOString(),
+    end: getZonedLocalInstant(dateInput, LONDON_TIMEZONE, {
+      hour: 23,
+      minute: 59,
+      second: 59,
+      millisecond: 999,
+    }).toISOString(),
+  };
 }
 
 /**
