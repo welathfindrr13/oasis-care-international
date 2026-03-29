@@ -103,11 +103,14 @@ export function formatTime(date: Date | string): string {
  * Format date only for London timezone
  */
 export function formatDate(date: Date | string): string {
-  return formatDateTime(date, {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: LONDON_TIMEZONE,
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-  });
+  }).format(dateObj);
 }
 
 /**
