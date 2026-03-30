@@ -86,6 +86,38 @@ function buildQueueSummary(visits: Visit[], now: Date) {
   )
 }
 
+function getQueueCountCopy(
+  summary: ReturnType<typeof buildQueueSummary>,
+  visitCount: number,
+  total: number,
+  queueDateLabel: string
+) {
+  const activeCount =
+    summary.needsActionNow +
+    summary.overdue +
+    summary.upcoming +
+    summary.needsReview +
+    summary.inProgress
+
+  if (visitCount === 0) {
+    return `No visits queued for ${queueDateLabel}`
+  }
+
+  if (activeCount > 0) {
+    return `${activeCount} of ${total} visits currently need active attention`
+  }
+
+  if (summary.cancelled === visitCount) {
+    return `${summary.cancelled} cancelled ${summary.cancelled === 1 ? 'visit is' : 'visits are'} being retained for oversight`
+  }
+
+  if (summary.completed === visitCount) {
+    return `${summary.completed} completed ${summary.completed === 1 ? 'visit is' : 'visits are'} being retained for review`
+  }
+
+  return `${visitCount} visit${visitCount === 1 ? '' : 's'} matched for ${queueDateLabel}`
+}
+
 async function getVisits(
   searchParams: VisitsPageProps['searchParams'],
   now: Date
@@ -317,7 +349,7 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                   {sectionTitle}
                 </h2>
                 <p className="text-sm text-text-secondary">
-                  {hasVisits ? `${visits.length} of ${total} visits in the active queue` : `No visits queued for ${queueDateLabel}`}
+                  {getQueueCountCopy(summary, visits.length, total, queueDateLabel)}
                 </p>
                 {summary.needsReview > 0 && (
                   <p className="mt-1 text-sm text-amber-700">
@@ -336,7 +368,7 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+            <div className="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-7">
               <SummaryTile
                 label="Needs Action Now"
                 value={summary.needsActionNow}
@@ -366,6 +398,11 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                 label="In Progress"
                 value={summary.inProgress}
                 hint={isAdmin ? 'Visits currently under way.' : 'Visits you should actively be working through.'}
+              />
+              <SummaryTile
+                label="Cancelled"
+                value={summary.cancelled}
+                hint="Visits removed from active work but retained for oversight."
               />
             </div>
 
