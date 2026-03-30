@@ -134,7 +134,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
               Manage Prescriptions
             </Link>
             <Link href={`/visits?clientId=${client.id}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              View Visits
+              Open Visits Queue
             </Link>
             <Link href={`/visits/new?clientId=${client.id}`} className={buttonVariants({ variant: 'primary', size: 'sm' })}>
               Schedule Visit
@@ -224,7 +224,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
                     </p>
                   </div>
                   <Link href={`/visits?clientId=${client.id}`} className="text-sm text-teal-600 hover:text-teal-700">
-                    View All →
+                    Open Queue →
                   </Link>
                 </div>
               </CardHeader>
@@ -310,7 +310,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
                     href={`/visits?clientId=${client.id}`}
                     className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"
                   >
-                    📋 Visit History
+                    📋 Open Visits Queue
                   </Link>
                   <Link
                     href={`/visits/new?clientId=${client.id}`}

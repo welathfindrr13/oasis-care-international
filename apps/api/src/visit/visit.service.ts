@@ -113,16 +113,17 @@ export class VisitService {
     this.checkVisitAccess(visit, userId, userRole, 'update');
 
     // If updating schedule, check for overlaps
-    if (data.scheduledStart || data.scheduledEnd) {
+    if (data.scheduledStart || data.scheduledEnd || data.carerId) {
       const scheduledStart = data.scheduledStart 
         ? new Date(data.scheduledStart) 
         : visit.scheduled_start;
       const scheduledEnd = data.scheduledEnd 
         ? new Date(data.scheduledEnd) 
         : visit.scheduled_end;
+      const carerId = data.carerId ?? visit.carer_id;
 
       const overlappingVisits = await this.visitRepository.findOverlappingVisits(
-        visit.carer_id,
+        carerId,
         scheduledStart,
         scheduledEnd,
         visit.id
@@ -138,6 +139,7 @@ export class VisitService {
     }
 
     const updateData: any = {};
+    if (data.carerId) updateData.carer = { connect: { id: data.carerId } };
     if (data.scheduledStart) updateData.scheduled_start = new Date(data.scheduledStart);
     if (data.scheduledEnd) updateData.scheduled_end = new Date(data.scheduledEnd);
     if (data.actualStart) updateData.actual_start = new Date(data.actualStart);

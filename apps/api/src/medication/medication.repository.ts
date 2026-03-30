@@ -81,42 +81,34 @@ export class MedicationRepository {
         data: args.prescription,
       });
 
+      let createdAdministrationCount = 0;
+
+      for (const administration of args.administrations) {
+        const createdAdministration = await this.createScheduledAdministrationWithAudit(tx, {
+          prescriptionId: prescription.id,
+          administration,
+          actorId: args.actorId,
+          actorRole: args.actorRole,
+          reason: undefined,
+        });
+
+        if (createdAdministration) {
+          createdAdministrationCount += 1;
+        }
+      }
+
       await tx.medicationAudit.create({
         data: {
           prescription_id: prescription.id,
           action: MedicationAuditAction.PRESCRIPTION_CREATED,
           actor_id: args.actorId,
           actor_role: args.actorRole,
-          changes: JSON.stringify(args.auditChanges),
+          changes: JSON.stringify({
+            ...args.auditChanges,
+            generatedAdministrationCount: createdAdministrationCount,
+          }),
         },
       });
-
-      for (const administration of args.administrations) {
-        const createdAdministration = await tx.medicationAdministration.create({
-          data: {
-            prescription: { connect: { id: prescription.id } },
-            visit: administration.visitId ? { connect: { id: administration.visitId } } : undefined,
-            scheduled_time: administration.scheduledTime,
-            status: MedicationStatus.SCHEDULED,
-            notes: administration.notes ?? undefined,
-            instruction_snapshot: administration.instructionSnapshot ?? undefined,
-          },
-        });
-
-        await tx.medicationAudit.create({
-          data: {
-            prescription_id: prescription.id,
-            medication_administration_id: createdAdministration.id,
-            action: MedicationAuditAction.MEDICATION_SCHEDULED,
-            actor_id: args.actorId,
-            actor_role: args.actorRole,
-            changes: JSON.stringify({
-              scheduledTime: administration.scheduledTime.toISOString(),
-              visitId: administration.visitId ?? null,
-            }),
-          },
-        });
-      }
 
       return tx.prescription.findUniqueOrThrow({
         where: { id: prescription.id },
@@ -216,6 +208,7 @@ export class MedicationRepository {
 
       let archivedAdministrationCount = 0;
       let refreshedInstructionSnapshotCount = 0;
+      let createdAdministrationCount = 0;
 
       if (args.cancelScheduledFrom) {
         const administrationsToArchive = await tx.medicationAdministration.findMany({
@@ -279,31 +272,17 @@ export class MedicationRepository {
       }
 
       for (const administration of args.administrations) {
-        const createdAdministration = await tx.medicationAdministration.create({
-          data: {
-            prescription: { connect: { id: args.prescriptionId } },
-            visit: administration.visitId ? { connect: { id: administration.visitId } } : undefined,
-            scheduled_time: administration.scheduledTime,
-            status: MedicationStatus.SCHEDULED,
-            notes: administration.notes ?? undefined,
-            instruction_snapshot: administration.instructionSnapshot ?? undefined,
-          },
+        const createdAdministration = await this.createScheduledAdministrationWithAudit(tx, {
+          prescriptionId: args.prescriptionId,
+          administration,
+          actorId: args.actorId,
+          actorRole: args.actorRole,
+          reason: args.reconciliationReason,
         });
 
-        await tx.medicationAudit.create({
-          data: {
-            prescription_id: args.prescriptionId,
-            medication_administration_id: createdAdministration.id,
-            action: MedicationAuditAction.MEDICATION_SCHEDULED,
-            actor_id: args.actorId,
-            actor_role: args.actorRole,
-            changes: JSON.stringify({
-              scheduledTime: administration.scheduledTime.toISOString(),
-              visitId: administration.visitId ?? null,
-              reason: args.reconciliationReason,
-            }),
-          },
-        });
+        if (createdAdministration) {
+          createdAdministrationCount += 1;
+        }
       }
 
       await tx.medicationAudit.create({
@@ -316,7 +295,7 @@ export class MedicationRepository {
             ...args.auditChanges,
             archivedAdministrationCount,
             refreshedInstructionSnapshotCount,
-            generatedAdministrationCount: args.administrations.length,
+            generatedAdministrationCount: createdAdministrationCount,
           }),
         },
       });
@@ -408,34 +387,18 @@ export class MedicationRepository {
           continue;
         }
 
-        const createdAdministration = await tx.medicationAdministration.create({
-          data: {
-            prescription: { connect: { id: args.prescriptionId } },
-            visit: administration.visitId ? { connect: { id: administration.visitId } } : undefined,
-            scheduled_time: administration.scheduledTime,
-            status: MedicationStatus.SCHEDULED,
-            notes: administration.notes ?? undefined,
-            instruction_snapshot: administration.instructionSnapshot ?? undefined,
-          },
-        });
-
-        await tx.medicationAudit.create({
-          data: {
-            prescription_id: args.prescriptionId,
-            medication_administration_id: createdAdministration.id,
-            action: MedicationAuditAction.MEDICATION_SCHEDULED,
-            actor_id: args.actorId,
-            actor_role: args.actorRole,
-            changes: JSON.stringify({
-              scheduledTime: administration.scheduledTime.toISOString(),
-              visitId: administration.visitId ?? null,
-              reason: args.reason,
-            }),
-          },
+        const createdAdministration = await this.createScheduledAdministrationWithAudit(tx, {
+          prescriptionId: args.prescriptionId,
+          administration,
+          actorId: args.actorId,
+          actorRole: args.actorRole,
+          reason: args.reason,
         });
 
         existingKeys.add(scheduledTimeKey);
-        createdCount += 1;
+        if (createdAdministration) {
+          createdCount += 1;
+        }
       }
 
       return createdCount;
@@ -616,15 +579,10 @@ export class MedicationRepository {
   }
 
   async findTodaysMedicationsByClient(
-    date: Date,
+    startOfDay: Date,
+    endOfDay: Date,
     options: { carerId?: string } = {}
   ): Promise<MedicationAdministration[]> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-
     const carerClause = options.carerId
       ? Prisma.sql`AND v.carer_id = ${options.carerId}`
       : Prisma.empty;
@@ -800,5 +758,66 @@ export class MedicationRepository {
         changes: JSON.stringify(data.changes)
       }
     });
+  }
+
+  private async createScheduledAdministrationWithAudit(
+    tx: Prisma.TransactionClient,
+    args: {
+      prescriptionId: string;
+      administration: {
+        scheduledTime: Date;
+        visitId?: string | null;
+        notes?: string | null;
+        instructionSnapshot?: string | null;
+      };
+      actorId: string;
+      actorRole: string;
+      reason?: string;
+    }
+  ) {
+    try {
+      const createdAdministration = await tx.medicationAdministration.create({
+        data: {
+          prescription: { connect: { id: args.prescriptionId } },
+          visit: args.administration.visitId
+            ? { connect: { id: args.administration.visitId } }
+            : undefined,
+          scheduled_time: args.administration.scheduledTime,
+          status: MedicationStatus.SCHEDULED,
+          notes: args.administration.notes ?? undefined,
+          instruction_snapshot: args.administration.instructionSnapshot ?? undefined,
+        },
+      });
+
+      await tx.medicationAudit.create({
+        data: {
+          prescription_id: args.prescriptionId,
+          medication_administration_id: createdAdministration.id,
+          action: MedicationAuditAction.MEDICATION_SCHEDULED,
+          actor_id: args.actorId,
+          actor_role: args.actorRole,
+          changes: JSON.stringify({
+            scheduledTime: args.administration.scheduledTime.toISOString(),
+            visitId: args.administration.visitId ?? null,
+            reason: args.reason,
+          }),
+        },
+      });
+
+      return createdAdministration;
+    } catch (error) {
+      if (this.isUniqueScheduledAdministrationConflict(error)) {
+        return null;
+      }
+
+      throw error;
+    }
+  }
+
+  private isUniqueScheduledAdministrationConflict(error: unknown) {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    );
   }
 }

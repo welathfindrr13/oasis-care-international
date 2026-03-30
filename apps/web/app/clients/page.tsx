@@ -74,23 +74,10 @@ function EmptyState() {
         No clients found
       </h3>
       <p className="text-text-secondary mb-4">
-        Get started by adding your first client.
+        No live client records are available in this environment yet.
       </p>
-      <Link href="/clients/new" className={buttonVariants({ variant: 'primary' })}>
-        Add Client
-      </Link>
     </div>
   )
-}
-
-function formatVisitDate(dateString: string | undefined | null): string {
-  if (!dateString) return '—';
-  return new Date(dateString).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 export default async function ClientsPage({ searchParams }: ClientsPageProps) {
@@ -106,7 +93,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
             Clients
           </h1>
           <p className="text-slate-500 mt-1">
-            View and manage your care clients
+            View live client records and jump into prescriptions and visit workflows
           </p>
         </div>
 
@@ -121,25 +108,20 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
                   {hasClients ? `${clients.length} of ${total} clients` : 'No clients found'}
                 </p>
               </div>
-              <div className="flex items-center gap-3">
-                <form method="get" action="/clients">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="search"
-                      name="search"
-                      defaultValue={searchParams.search || ''}
-                      placeholder="Search clients..."
-                      className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 w-64"
-                    />
-                    <button className={buttonVariants({ variant: 'outline', size: 'sm' })} type="submit">
-                      Search
-                    </button>
-                  </div>
-                </form>
-                <Link href="/clients/new" className={buttonVariants({ variant: 'primary', size: 'sm' })}>
-                  Add Client
-                </Link>
-              </div>
+              <form method="get" action="/clients">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="search"
+                    name="search"
+                    defaultValue={searchParams.search || ''}
+                    placeholder="Search clients..."
+                    className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 w-64"
+                  />
+                  <button className={buttonVariants({ variant: 'outline', size: 'sm' })} type="submit">
+                    Search
+                  </button>
+                </div>
+              </form>
             </div>
           </CardHeader>
           <CardContent>
@@ -157,12 +139,6 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
                       </th>
                       <th className="text-left py-3 px-4 font-medium text-text-secondary text-sm">
                         Address
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-text-secondary text-sm">
-                        Last Visit
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-text-secondary text-sm">
-                        Next Visit
                       </th>
                       <th className="text-left py-3 px-4 font-medium text-text-secondary text-sm">
                         Actions
@@ -193,28 +169,15 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <time
-                            className="text-sm text-text-secondary"
-                            dateTime={client.lastVisitAt || undefined}
-                          >
-                            {formatVisitDate(client.lastVisitAt)}
-                          </time>
-                        </td>
-                        <td className="py-3 px-4">
-                          <time
-                            className={`text-sm ${client.nextVisitAt ? 'text-text-primary font-medium' : 'text-text-secondary'}`}
-                            dateTime={client.nextVisitAt || undefined}
-                          >
-                            {formatVisitDate(client.nextVisitAt)}
-                          </time>
-                        </td>
-                        <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
                             <Link href={`/clients/${client.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
                               View
                             </Link>
                             <Link href={`/clients/${client.id}/prescriptions`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
                               Prescriptions
+                            </Link>
+                            <Link href={`/visits?clientId=${client.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                              Queue
                             </Link>
                             <Link href={`/visits/new?clientId=${client.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
                               Schedule

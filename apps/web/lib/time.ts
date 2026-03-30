@@ -14,6 +14,7 @@ function getDateTimePartsInTimeZone(date: Date, timeZone: string) {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
+    fractionalSecondDigits: 3,
     hourCycle: 'h23',
   }).formatToParts(date);
 
@@ -30,6 +31,7 @@ function getDateTimePartsInTimeZone(date: Date, timeZone: string) {
     hour: Number.parseInt(lookup.hour, 10),
     minute: Number.parseInt(lookup.minute, 10),
     second: Number.parseInt(lookup.second, 10),
+    millisecond: Number.parseInt(lookup.fractionalSecond || '0', 10),
   };
 }
 
@@ -41,7 +43,8 @@ function getTimeZoneOffsetMilliseconds(date: Date, timeZone: string) {
     parts.day,
     parts.hour,
     parts.minute,
-    parts.second
+    parts.second,
+    parts.millisecond
   );
 
   return zonedUtcTimestamp - date.getTime();

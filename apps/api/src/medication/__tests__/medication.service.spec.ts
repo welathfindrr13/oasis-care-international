@@ -200,6 +200,52 @@ describe('MedicationService', () => {
       );
       expect(result.id).toBe('prescription-123');
     });
+
+    it('should treat date-only prescription inputs as London calendar dates across DST changes', async () => {
+      jest.setSystemTime(new Date('2025-03-30T06:00:00.000Z'));
+
+      repository.findMedicationById.mockResolvedValue({
+        id: 'medication-123',
+        name: 'Metformin',
+        instructions: 'Take with breakfast',
+      } as any);
+      repository.findVisitsForClientInRange.mockResolvedValue([]);
+      repository.createPrescriptionWithSchedule.mockResolvedValue({
+        id: 'prescription-123',
+      } as any);
+
+      await service.createPrescription(
+        {
+          clientId: 'client-123',
+          medicationId: 'medication-123',
+          startDate: '2025-03-30',
+          endDate: '2025-03-31',
+          frequencyPerDay: 1,
+          administrationTimes: ['08:00'],
+          isActive: true,
+        },
+        mockAdminUser.id,
+        'admin'
+      );
+
+      expect(repository.createPrescriptionWithSchedule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prescription: expect.objectContaining({
+            start_date: new Date('2025-03-30T00:00:00.000Z'),
+            end_date: new Date('2025-03-31T22:59:59.999Z'),
+            administration_times: ['08:00'],
+          }),
+          administrations: [
+            expect.objectContaining({
+              scheduledTime: new Date('2025-03-30T07:00:00.000Z'),
+            }),
+            expect.objectContaining({
+              scheduledTime: new Date('2025-03-31T07:00:00.000Z'),
+            }),
+          ],
+        })
+      );
+    });
   });
 
   describe('reconcileMedicationAdministrationsForVisitWindow', () => {
@@ -682,7 +728,8 @@ describe('MedicationService', () => {
 
       expect(result).toEqual(todaysMeds);
       expect(repository.findTodaysMedicationsByClient).toHaveBeenCalledWith(
-        expect.any(Date),
+        new Date('2025-01-08T00:00:00.000Z'),
+        new Date('2025-01-08T23:59:59.999Z'),
         { carerId: mockUser.id }
       );
     });
@@ -700,7 +747,8 @@ describe('MedicationService', () => {
 
       expect(result).toEqual(todaysMeds);
       expect(repository.findTodaysMedicationsByClient).toHaveBeenCalledWith(
-        expect.any(Date),
+        new Date('2025-01-08T00:00:00.000Z'),
+        new Date('2025-01-08T23:59:59.999Z'),
         {}
       );
     });
@@ -718,7 +766,8 @@ describe('MedicationService', () => {
 
       expect(result).toEqual(todaysMeds);
       expect(repository.findTodaysMedicationsByClient).toHaveBeenCalledWith(
-        expect.any(Date),
+        new Date('2025-01-08T00:00:00.000Z'),
+        new Date('2025-01-08T23:59:59.999Z'),
         {}
       );
     });

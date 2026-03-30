@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Button, buttonVariants } from '../../../../../components/ui/Button'
 import { Card, CardContent, CardHeader } from '../../../../../components/ui/Card'
 import { clientQuery } from '../../../../../lib/graphql/client-side'
+import { formatDateInputValueInLondon } from '../../../../../lib/time'
 import {
   CREATE_PRESCRIPTION_MUTATION,
   UPDATE_PRESCRIPTION_MUTATION,
@@ -34,13 +35,6 @@ interface PrescriptionFormState {
   isActive: boolean
 }
 
-function formatDateInputValue(date: Date) {
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, '0')
-  const day = `${date.getDate()}`.padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 export default function PrescriptionAssignmentForm({
   clientId,
   clientName,
@@ -52,8 +46,10 @@ export default function PrescriptionAssignmentForm({
   const isEditMode = mode === 'edit'
   const [form, setForm] = useState<PrescriptionFormState>({
     medicationId: prescription?.medicationId || '',
-    startDate: prescription?.startDate ? formatDateInputValue(new Date(prescription.startDate)) : formatDateInputValue(new Date()),
-    endDate: prescription?.endDate ? formatDateInputValue(new Date(prescription.endDate)) : '',
+    startDate: prescription?.startDate
+      ? formatDateInputValueInLondon(prescription.startDate)
+      : formatDateInputValueInLondon(),
+    endDate: prescription?.endDate ? formatDateInputValueInLondon(prescription.endDate) : '',
     frequencyPerDay: prescription ? String(prescription.frequencyPerDay) : '1',
     frequencyIntervalHours: prescription?.frequencyIntervalHours ? String(prescription.frequencyIntervalHours) : '',
     administrationTimes: prescription?.administrationTimes?.join(', ') || '08:00',
@@ -172,8 +168,8 @@ export default function PrescriptionAssignmentForm({
         await clientQuery<UpdatePrescriptionMutationResponse>(UPDATE_PRESCRIPTION_MUTATION, {
           input: {
             id: prescription.id,
-            startDate: new Date(`${nextForm.startDate}T00:00:00`).toISOString(),
-            endDate: nextForm.endDate ? new Date(`${nextForm.endDate}T23:59:59`).toISOString() : null,
+            startDate: nextForm.startDate,
+            endDate: nextForm.endDate || null,
             frequencyPerDay: Number(nextForm.frequencyPerDay),
             frequencyIntervalHours: nextForm.frequencyIntervalHours ? Number(nextForm.frequencyIntervalHours) : null,
             administrationTimes: nextTimes,
@@ -186,8 +182,8 @@ export default function PrescriptionAssignmentForm({
           input: {
             clientId,
             medicationId: nextForm.medicationId,
-            startDate: new Date(`${nextForm.startDate}T00:00:00`).toISOString(),
-            endDate: nextForm.endDate ? new Date(`${nextForm.endDate}T23:59:59`).toISOString() : null,
+            startDate: nextForm.startDate,
+            endDate: nextForm.endDate || null,
             frequencyPerDay: Number(nextForm.frequencyPerDay),
             frequencyIntervalHours: nextForm.frequencyIntervalHours ? Number(nextForm.frequencyIntervalHours) : null,
             administrationTimes: nextTimes,

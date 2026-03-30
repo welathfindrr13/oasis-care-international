@@ -143,6 +143,8 @@ model MedicationAdministration {
   id                String              @id @default(uuid())
   prescription_id   String
   visit_id          String?
+  // Active scheduled rows are additionally protected by a partial unique index in SQL migration:
+  // (prescription_id, scheduled_time) WHERE deleted_at IS NULL
   scheduled_time    DateTime
   administered_time DateTime?
   administered_by   String?

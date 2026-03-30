@@ -217,6 +217,40 @@ describe('VisitService', () => {
       expect(result.status).toBe(VisitStatus.IN_PROGRESS);
     });
 
+    it('should re-check overlap against the reassigned carer when carerId changes', async () => {
+      mockVisitRepository.findById.mockResolvedValue(mockVisit);
+      mockVisitRepository.findOverlappingVisits.mockResolvedValue([
+        {
+          ...mockVisit,
+          id: 'visit-overlap-456',
+          carer_id: 'carer-999',
+        },
+      ]);
+
+      await expect(
+        service.updateVisit(
+          'visit-123',
+          {
+            id: 'visit-123',
+            carerId: 'carer-999',
+            scheduledStart: '2024-01-01T09:00:00Z',
+            scheduledEnd: '2024-01-01T10:00:00Z',
+          },
+          'admin-123',
+          'admin'
+        )
+      ).rejects.toMatchObject({
+        response: { code: ErrorCode.VISIT_OVERLAP },
+      });
+
+      expect(repository.findOverlappingVisits).toHaveBeenCalledWith(
+        'carer-999',
+        new Date('2024-01-01T09:00:00Z'),
+        new Date('2024-01-01T10:00:00Z'),
+        'visit-123'
+      );
+    });
+
     it('should throw BaseHttpException if visit not found', async () => {
       mockVisitRepository.findById.mockResolvedValue(null);
 

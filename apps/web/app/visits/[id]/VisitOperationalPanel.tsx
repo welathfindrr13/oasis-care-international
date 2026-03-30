@@ -113,7 +113,7 @@ export function VisitOperationalPanel({ canEdit, visit }: VisitOperationalPanelP
         </div>
         <StatusChip
           status={
-            currentVisit.status.toLowerCase() as 'scheduled' | 'in_progress' | 'completed'
+            currentVisit.status.toLowerCase() as 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
           }
         />
       </div>

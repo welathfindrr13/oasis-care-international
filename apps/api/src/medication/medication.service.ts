@@ -57,6 +57,8 @@ interface ClientPrescriptionFilter {
 }
 
 interface MedicationSchedulingWindow {
+  startDateKey: string;
+  endDateKey: string;
   start: Date;
   end: Date;
 }
@@ -90,6 +92,7 @@ interface ActivePrescriptionSchedule {
 
 const PRESCRIPTION_SCHEDULING_HORIZON_DAYS = 30;
 const VISIT_MATCH_MAX_DISTANCE_MS = 2 * 60 * 60 * 1000;
+const LONDON_TIMEZONE = 'Europe/London';
 
 @Injectable()
 export class MedicationService {
@@ -149,8 +152,16 @@ export class MedicationService {
       );
     }
 
-    const startDate = new Date(data.startDate);
-    const endDate = data.endDate ? new Date(data.endDate) : null;
+    const startDate = this.parsePrescriptionDateInput(data.startDate, 'start');
+    const endDate = data.endDate
+      ? this.parsePrescriptionDateInput(data.endDate, 'end')
+      : null;
+    this.validatePrescriptionDates(startDate, endDate);
+    const normalizedAdministrationTimes = this.normalizeAdministrationTimes(
+      data.administrationTimes,
+      data.frequencyPerDay,
+      data.frequencyIntervalHours
+    );
     const instructionSnapshot = this.deriveInstructionSnapshot(
       data.specialInstructions,
       medication.instructions
@@ -169,7 +180,7 @@ export class MedicationService {
         endDate,
         frequencyPerDay: data.frequencyPerDay,
         frequencyIntervalHours: data.frequencyIntervalHours,
-        administrationTimes: data.administrationTimes,
+        administrationTimes: normalizedAdministrationTimes,
       },
       visitCandidates
     ).map((administration) => ({
@@ -185,7 +196,7 @@ export class MedicationService {
         end_date: endDate,
         frequency_per_day: data.frequencyPerDay,
         frequency_interval_hours: data.frequencyIntervalHours,
-        administration_times: data.administrationTimes,
+        administration_times: normalizedAdministrationTimes,
         special_instructions: data.specialInstructions,
         is_active: data.isActive ?? true,
       },
@@ -194,6 +205,7 @@ export class MedicationService {
       actorRole: userRole,
       auditChanges: {
         ...data,
+        administrationTimes: normalizedAdministrationTimes,
         generatedAdministrationCount: scheduledAdministrations.length,
       },
     });
@@ -225,8 +237,10 @@ export class MedicationService {
       );
     }
 
-    const startDate = new Date(data.startDate);
-    const endDate = data.endDate ? new Date(data.endDate) : null;
+    const startDate = this.parsePrescriptionDateInput(data.startDate, 'start');
+    const endDate = data.endDate
+      ? this.parsePrescriptionDateInput(data.endDate, 'end')
+      : null;
 
     this.validatePrescriptionDates(startDate, endDate);
 
@@ -251,8 +265,8 @@ export class MedicationService {
     const now = new Date();
     const previousSchedule = this.buildPrescriptionScheduleSnapshot(existingPrescription);
     const nextSchedule: PrescriptionScheduleSnapshot = {
-      startDate: startDate.toISOString(),
-      endDate: endDate ? endDate.toISOString() : null,
+      startDate: this.getLondonDateKey(startDate),
+      endDate: endDate ? this.getLondonDateKey(endDate) : null,
       frequencyPerDay: data.frequencyPerDay,
       frequencyIntervalHours: data.frequencyIntervalHours ?? null,
       administrationTimes: normalizedAdministrationTimes,
@@ -347,7 +361,7 @@ export class MedicationService {
       scheduledEnd,
       { clientId }
     );
-    const { start, end } = this.expandToUtcDayRange(scheduledStart, scheduledEnd);
+    const { start, end } = this.expandToLondonDayRange(scheduledStart, scheduledEnd);
 
     const [visitCandidates, administrations] = await Promise.all([
       this.medicationRepository.findVisitsForClientInRange(clientId, start, end),
@@ -560,10 +574,12 @@ export class MedicationService {
       );
     }
 
+    const operationalWindow = this.expandToLondonDayRange(date, date);
     await this.ensureActivePrescriptionCoverageForOperationalWindow(date, date);
 
     const administrations = await this.medicationRepository.findTodaysMedicationsByClient(
-      date,
+      operationalWindow.start,
+      operationalWindow.end,
       normalizedRole === 'carer' ? { carerId: userId } : {}
     );
 
@@ -705,12 +721,12 @@ export class MedicationService {
     const drafts: ScheduledAdministrationDraft[] = [];
 
     for (
-      let cursor = new Date(schedulingWindow.start);
-      cursor <= schedulingWindow.end;
-      cursor = this.addUtcDays(cursor, 1)
+      let cursor = schedulingWindow.startDateKey;
+      cursor <= schedulingWindow.endDateKey;
+      cursor = this.addLondonDays(cursor, 1)
     ) {
       for (const administrationTime of administrationTimes) {
-        const scheduledTime = this.combineUtcDateAndTime(cursor, administrationTime);
+        const scheduledTime = this.combineLondonDateAndTime(cursor, administrationTime);
 
         if (scheduledTime < prescription.startDate) {
           continue;
@@ -741,18 +757,26 @@ export class MedicationService {
     horizonAnchorDate?: Date
   ): MedicationSchedulingWindow | null {
     const minimumDate = minimumScheduledTime ?? new Date();
-    const horizonBase = this.startOfUtcDay(horizonAnchorDate ?? minimumDate);
-    const horizonEnd = this.endOfUtcDay(
-      this.addUtcDays(horizonBase, PRESCRIPTION_SCHEDULING_HORIZON_DAYS)
+    const horizonBaseKey = this.getLondonDateKey(horizonAnchorDate ?? minimumDate);
+    const horizonEndKey = this.addLondonDays(horizonBaseKey, PRESCRIPTION_SCHEDULING_HORIZON_DAYS);
+    const rangeStartKey = this.maxDateKey(
+      this.getLondonDateKey(startDate),
+      this.getLondonDateKey(minimumDate)
     );
-    const rangeStart = this.maxDate(this.startOfUtcDay(startDate), this.startOfUtcDay(minimumDate));
-    const rangeEnd = this.minDate(endDate ? this.endOfUtcDay(endDate) : horizonEnd, horizonEnd);
+    const rangeEndKey = this.minDateKey(
+      endDate ? this.getLondonDateKey(endDate) : horizonEndKey,
+      horizonEndKey
+    );
 
-    if (rangeEnd < rangeStart) {
+    if (rangeEndKey < rangeStartKey) {
       return null;
     }
 
-    return { start: rangeStart, end: rangeEnd };
+    return {
+      startDateKey: rangeStartKey,
+      endDateKey: rangeEndKey,
+      ...this.getLondonDayRangeForDateKeyRange(rangeStartKey, rangeEndKey),
+    };
   }
 
   private normalizeAdministrationTimes(
@@ -823,8 +847,8 @@ export class MedicationService {
     >
   ): PrescriptionScheduleSnapshot {
     return {
-      startDate: prescription.start_date.toISOString(),
-      endDate: prescription.end_date ? prescription.end_date.toISOString() : null,
+      startDate: this.getLondonDateKey(prescription.start_date),
+      endDate: prescription.end_date ? this.getLondonDateKey(prescription.end_date) : null,
       frequencyPerDay: prescription.frequency_per_day,
       frequencyIntervalHours: prescription.frequency_interval_hours ?? null,
       administrationTimes: this.normalizeAdministrationTimes(
@@ -861,8 +885,8 @@ export class MedicationService {
     requestedEnd: Date,
     options?: { clientId?: string }
   ): Promise<void> {
-    const operationalWindow = this.expandToUtcDayRange(requestedStart, requestedEnd);
-    const todayStart = this.startOfUtcDay(new Date());
+    const operationalWindow = this.expandToLondonDayRange(requestedStart, requestedEnd);
+    const todayStart = this.getLondonDayRangeForDate(new Date()).start;
 
     if (operationalWindow.end < todayStart) {
       return;
@@ -889,7 +913,7 @@ export class MedicationService {
     extensionAnchor: Date
   ): Promise<void> {
     const requestId = this.cls.get('requestId');
-    const normalizedAnchor = this.startOfUtcDay(extensionAnchor);
+    const normalizedAnchor = this.getLondonDayRangeForDate(extensionAnchor).start;
     const schedulingWindow = this.getPrescriptionSchedulingWindow(
       prescription.start_date,
       prescription.end_date,
@@ -934,9 +958,9 @@ export class MedicationService {
     const createdCount =
       await this.medicationRepository.ensureScheduledAdministrationsForPrescription({
         prescriptionId: prescription.id,
-        administrations,
-        actorId: 'system',
-        actorRole: 'system',
+      administrations,
+      actorId: 'system',
+      actorRole: 'system',
         reason: `Rolling schedule extension through ${schedulingWindow.end.toISOString()}`,
       });
 
@@ -982,7 +1006,7 @@ export class MedicationService {
       return true;
     }
 
-    return this.getUtcDateKey(visit.scheduled_start) === this.getUtcDateKey(scheduledTime);
+    return this.getLondonDateKey(visit.scheduled_start) === this.getLondonDateKey(scheduledTime);
   }
 
   private getVisitDistanceMs(visit: Visit, scheduledTime: Date): number {
@@ -1001,43 +1025,156 @@ export class MedicationService {
     return scheduledTimestamp - visitEnd;
   }
 
-  private expandToUtcDayRange(start: Date, end: Date): MedicationSchedulingWindow {
+  private expandToLondonDayRange(start: Date, end: Date): MedicationSchedulingWindow {
     const earlier = start.getTime() <= end.getTime() ? start : end;
     const later = start.getTime() <= end.getTime() ? end : start;
+    const startDateKey = this.getLondonDateKey(earlier);
+    const endDateKey = this.getLondonDateKey(later);
 
     return {
-      start: this.startOfUtcDay(earlier),
-      end: this.endOfUtcDay(later),
+      startDateKey,
+      endDateKey,
+      ...this.getLondonDayRangeForDateKeyRange(startDateKey, endDateKey),
     };
   }
 
-  private combineUtcDateAndTime(day: Date, time: string): Date {
+  private parsePrescriptionDateInput(value: string, boundary: 'start' | 'end'): Date {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return this.getZonedLocalInstant(value, {
+        hour: boundary === 'start' ? 0 : 23,
+        minute: boundary === 'start' ? 0 : 59,
+        second: boundary === 'start' ? 0 : 59,
+        millisecond: boundary === 'start' ? 0 : 999,
+      });
+    }
+
+    return new Date(value);
+  }
+
+  private getLondonDayRangeForDate(date: Date): { start: Date; end: Date } {
+    return this.getLondonDayRangeForDateKey(this.getLondonDateKey(date));
+  }
+
+  private getLondonDayRangeForDateKeyRange(
+    startDateKey: string,
+    endDateKey: string
+  ): { start: Date; end: Date } {
+    return {
+      start: this.getLondonDayRangeForDateKey(startDateKey).start,
+      end: this.getLondonDayRangeForDateKey(endDateKey).end,
+    };
+  }
+
+  private getLondonDayRangeForDateKey(dateKey: string): { start: Date; end: Date } {
+    return {
+      start: this.getZonedLocalInstant(dateKey, {
+        hour: 0,
+        minute: 0,
+        second: 0,
+        millisecond: 0,
+      }),
+      end: this.getZonedLocalInstant(dateKey, {
+        hour: 23,
+        minute: 59,
+        second: 59,
+        millisecond: 999,
+      }),
+    };
+  }
+
+  private combineLondonDateAndTime(dateKey: string, time: string): Date {
     const [hour, minute] = time.split(':').map(Number);
-    const result = new Date(day);
-    result.setUTCHours(hour, minute, 0, 0);
-    return result;
+    return this.getZonedLocalInstant(dateKey, { hour, minute, second: 0, millisecond: 0 });
   }
 
-  private addUtcDays(date: Date, days: number): Date {
-    const result = new Date(date);
-    result.setUTCDate(result.getUTCDate() + days);
-    return result;
+  private addLondonDays(dateKey: string, days: number): string {
+    const [year, month, day] = dateKey.split('-').map((value) => Number.parseInt(value, 10));
+    const result = new Date(Date.UTC(year, month - 1, day + days, 12, 0, 0, 0));
+    return `${result.getUTCFullYear()}-${String(result.getUTCMonth() + 1).padStart(2, '0')}-${String(
+      result.getUTCDate()
+    ).padStart(2, '0')}`;
   }
 
-  private startOfUtcDay(date: Date): Date {
-    const result = new Date(date);
-    result.setUTCHours(0, 0, 0, 0);
-    return result;
+  private getLondonDateKey(date: Date): string {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: LONDON_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
   }
 
-  private endOfUtcDay(date: Date): Date {
-    const result = new Date(date);
-    result.setUTCHours(23, 59, 59, 999);
-    return result;
+  private getDateTimePartsInTimeZone(date: Date, timeZone: string) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      fractionalSecondDigits: 3,
+      hourCycle: 'h23',
+    }).formatToParts(date);
+
+    const lookup = Object.fromEntries(
+      parts
+        .filter((part) => part.type !== 'literal')
+        .map((part) => [part.type, part.value])
+    ) as Record<string, string>;
+
+    return {
+      year: Number.parseInt(lookup.year, 10),
+      month: Number.parseInt(lookup.month, 10),
+      day: Number.parseInt(lookup.day, 10),
+      hour: Number.parseInt(lookup.hour, 10),
+      minute: Number.parseInt(lookup.minute, 10),
+      second: Number.parseInt(lookup.second, 10),
+      millisecond: Number.parseInt(lookup.fractionalSecond || '0', 10),
+    };
   }
 
-  private getUtcDateKey(date: Date): string {
-    return date.toISOString().slice(0, 10);
+  private getTimeZoneOffsetMilliseconds(date: Date, timeZone: string) {
+    const parts = this.getDateTimePartsInTimeZone(date, timeZone);
+    const zonedUtcTimestamp = Date.UTC(
+      parts.year,
+      parts.month - 1,
+      parts.day,
+      parts.hour,
+      parts.minute,
+      parts.second,
+      parts.millisecond
+    );
+
+    return zonedUtcTimestamp - date.getTime();
+  }
+
+  private getZonedLocalInstant(
+    dateInput: string,
+    options: { hour: number; minute: number; second: number; millisecond?: number }
+  ) {
+    const [year, month, day] = dateInput.split('-').map((value) => Number.parseInt(value, 10));
+    const localTimestamp = Date.UTC(
+      year,
+      month - 1,
+      day,
+      options.hour,
+      options.minute,
+      options.second,
+      options.millisecond ?? 0
+    );
+    const approximateUtcDate = new Date(localTimestamp);
+    const offset = this.getTimeZoneOffsetMilliseconds(approximateUtcDate, LONDON_TIMEZONE);
+
+    return new Date(localTimestamp - offset);
+  }
+
+  private maxDateKey(left: string, right: string): string {
+    return left >= right ? left : right;
+  }
+
+  private minDateKey(left: string, right: string): string {
+    return left <= right ? left : right;
   }
 
   private maxDate(left: Date, right: Date): Date {

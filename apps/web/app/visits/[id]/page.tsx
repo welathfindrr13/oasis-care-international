@@ -207,9 +207,16 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
               Scheduled for {formatDateTime(visit.scheduledStart)}
             </p>
           </div>
-          <Link href="/visits" className={buttonVariants({ variant: 'ghost' })}>
-            Back to visits
-          </Link>
+          <div className="flex items-center gap-3">
+            {isAdmin && (
+              <Link href={`/visits/${visit.id}/edit`} className={buttonVariants({ variant: 'outline' })}>
+                Edit visit
+              </Link>
+            )}
+            <Link href="/visits" className={buttonVariants({ variant: 'ghost' })}>
+              Back to visits
+            </Link>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
@@ -220,7 +227,7 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
                   <h2 className="text-xl font-semibold text-text-primary font-heading">Visit timeline</h2>
                   <p className="text-sm text-text-secondary">Scheduled and actual timings for this visit</p>
                 </div>
-                <StatusChip status={visit.status.toLowerCase() as 'scheduled' | 'in_progress' | 'completed'} />
+                <StatusChip status={visit.status.toLowerCase() as 'scheduled' | 'in_progress' | 'completed' | 'cancelled'} />
               </div>
             </CardHeader>
             <CardContent className="space-y-4">

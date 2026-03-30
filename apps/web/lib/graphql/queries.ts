@@ -286,9 +286,6 @@ export interface ClientListItem {
   addressLine2?: string;
   city: string;
   postcode: string;
-  // Note: lastVisitAt and nextVisitAt are not yet supported by the API
-  lastVisitAt?: string;
-  nextVisitAt?: string;
 }
 
 export interface ClientsQueryResponse {
@@ -322,8 +319,7 @@ export const CLIENT_QUERY = `
 `;
 
 /**
- * Query to fetch clients with pagination and search
- * Note: lastVisitAt and nextVisitAt are not yet supported by the API
+ * Query to fetch clients with pagination and search.
  */
 export const CLIENTS_QUERY = `
   query Clients($skip: Int, $take: Int, $search: String) {

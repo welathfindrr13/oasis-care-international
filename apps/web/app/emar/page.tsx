@@ -1,9 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useTransition } from 'react';
 import { useSession } from 'next-auth/react';
 import { Header } from '../../components/oasis/Header';
+import { buttonVariants } from '../../components/ui/Button';
+import { hasRole } from '../../lib/auth/roles';
+import { clientQuery } from '../../lib/graphql/client-side';
 import { formatDateInputValueInLondon, formatDateTime } from '../../lib/time';
+import { RECORD_ADMINISTRATION_MUTATION, type RecordAdministrationMutationResponse } from '../../lib/graphql/queries';
 
 interface MedicationAdministration {
   id: string;
@@ -44,8 +48,14 @@ export default function EmarPage() {
   const [medicationsError, setMedicationsError] = useState<string | null>(null);
   const [provisioningError, setProvisioningError] = useState<string | null>(null);
   const [medications, setMedications] = useState<MedicationAdministration[]>([]);
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [activeMedicationId, setActiveMedicationId] = useState<string | null>(null);
+  const [isSaving, startSaving] = useTransition();
 
   const accessToken = typeof (session as any)?.accessToken === 'string' ? (session as any).accessToken : null;
+  const isAdmin = hasRole((session as any)?.roles, 'admin');
+  const canActAsCarer = hasRole((session as any)?.roles, 'carer') && !isAdmin;
 
   const fetchMedicationsViaProxy = useCallback(async (date: string) => {
     const response = await fetch(`/api/emar?date=${encodeURIComponent(date)}`, {
@@ -112,6 +122,7 @@ export default function EmarPage() {
       try {
         const data = await fetchMedicationsForDate(selectedDate);
         setMedications(data);
+        setNoteDrafts(Object.fromEntries(data.map((medication) => [medication.id, medication.notes ?? ''])));
       } catch (err) {
         console.error('Failed to fetch medications:', err);
         setMedicationsError(err instanceof Error ? err.message : 'Failed to load medications');
@@ -131,6 +142,7 @@ export default function EmarPage() {
     fetchMedicationsForDate(selectedDate)
       .then((data) => {
         setMedications(data);
+        setNoteDrafts(Object.fromEntries(data.map((medication) => [medication.id, medication.notes ?? ''])));
       })
       .catch((err) => {
         console.error('Failed to fetch medications:', err);
@@ -144,7 +156,52 @@ export default function EmarPage() {
 
   useEffect(() => {
     setProvisioningError(null);
+    setActionError(null);
   }, [selectedDate]);
+
+  const updateAdministration = (administration: MedicationAdministration, status: 'ADMINISTERED' | 'MISSED' | 'REFUSED') => {
+    const notes = noteDrafts[administration.id] ?? '';
+    setActionError(null);
+    setActiveMedicationId(administration.id);
+
+    startSaving(async () => {
+      try {
+        const data = await clientQuery<RecordAdministrationMutationResponse>(
+          RECORD_ADMINISTRATION_MUTATION,
+          {
+            input: {
+              administrationId: administration.id,
+              status,
+              notes: notes.trim() || undefined,
+            },
+          }
+        );
+
+        const updatedAdministration = data.recordAdministration;
+        setMedications((current) =>
+          current.map((item) =>
+            item.id === administration.id
+              ? {
+                  ...item,
+                  status: updatedAdministration.status as MedicationAdministration['status'],
+                  notes: updatedAdministration.notes,
+                  administeredTime: updatedAdministration.administeredTime,
+                }
+              : item
+          )
+        );
+        setNoteDrafts((current) => ({
+          ...current,
+          [administration.id]: updatedAdministration.notes ?? '',
+        }));
+        refetch();
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : 'Failed to update medication outcome');
+      } finally {
+        setActiveMedicationId(null);
+      }
+    });
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -255,6 +312,12 @@ export default function EmarPage() {
           </div>
         )}
 
+        {actionError && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
+            <p className="text-sm text-red-700">{actionError}</p>
+          </div>
+        )}
+
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
           {['SCHEDULED', 'ADMINISTERED', 'MISSED', 'REFUSED', 'CANCELLED'].map((status) => {
@@ -309,6 +372,11 @@ export default function EmarPage() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Notes
                         </th>
+                        {canActAsCarer && (
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -346,7 +414,22 @@ export default function EmarPage() {
                             )}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-900">
-                            {med.notes ? (
+                            {canActAsCarer && med.status === 'SCHEDULED' && med.visit ? (
+                              <div className="space-y-2">
+                                <textarea
+                                  value={noteDrafts[med.id] ?? ''}
+                                  onChange={(event) =>
+                                    setNoteDrafts((current) => ({
+                                      ...current,
+                                      [med.id]: event.target.value,
+                                    }))
+                                  }
+                                  rows={3}
+                                  className="w-full min-w-[220px] rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+                                  placeholder="Capture medication-specific detail."
+                                />
+                              </div>
+                            ) : med.notes ? (
                               <div className="max-w-xs truncate" title={med.notes}>
                                 {med.notes}
                               </div>
@@ -354,6 +437,42 @@ export default function EmarPage() {
                               '-'
                             )}
                           </td>
+                          {canActAsCarer && (
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              {med.status === 'SCHEDULED' && med.visit ? (
+                                <div className="flex min-w-[180px] flex-col items-start gap-2">
+                                  <button
+                                    type="button"
+                                    className={buttonVariants({ variant: 'primary', size: 'sm' })}
+                                    onClick={() => updateAdministration(med, 'ADMINISTERED')}
+                                    disabled={isSaving && activeMedicationId === med.id}
+                                  >
+                                    {isSaving && activeMedicationId === med.id ? 'Saving…' : 'Mark administered'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                                    onClick={() => updateAdministration(med, 'MISSED')}
+                                    disabled={isSaving && activeMedicationId === med.id}
+                                  >
+                                    Mark missed
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                                    onClick={() => updateAdministration(med, 'REFUSED')}
+                                    disabled={isSaving && activeMedicationId === med.id}
+                                  >
+                                    Mark refused
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-slate-500">
+                                  {med.visit ? 'Outcome recorded' : 'No linked visit'}
+                                </span>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>

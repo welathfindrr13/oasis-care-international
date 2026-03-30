@@ -13,6 +13,7 @@ interface VisitsToolbarProps {
   selectedDate: string
   selectedStatus?: string
   selectedCarerId?: string
+  selectedClientId?: string
 }
 
 function getCarerLabel(carer: Carer) {
@@ -25,6 +26,7 @@ export function VisitsToolbar({
   selectedDate,
   selectedStatus = '',
   selectedCarerId = '',
+  selectedClientId = '',
 }: VisitsToolbarProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -45,8 +47,9 @@ export function VisitsToolbar({
       date ? `Day: ${formatDate(`${date}T12:00:00Z`)}` : null,
       status ? `Status: ${status.replace('_', ' ').toLowerCase()}` : null,
       isAdmin && selectedCarer ? `Carer: ${getCarerLabel(selectedCarer)}` : null,
+      selectedClientId ? 'Client queue scope active' : null,
     ].filter(Boolean) as string[]
-  }, [date, isAdmin, selectedCarer, status])
+  }, [date, isAdmin, selectedCarer, selectedClientId, status])
 
   const hasPendingChanges =
     date !== selectedDate ||
@@ -72,7 +75,12 @@ export function VisitsToolbar({
     setDate(todayInLondon)
     setStatus('')
     setCarerId('')
-    router.push(`${pathname}?date=${todayInLondon}`)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('date', todayInLondon)
+    params.delete('status')
+    params.delete('carerId')
+    params.delete('page')
+    router.push(`${pathname}?${params.toString()}`)
   }
 
   return (

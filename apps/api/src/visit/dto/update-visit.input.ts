@@ -10,6 +10,11 @@ export class UpdateVisitInput {
 
   @Field({ nullable: true })
   @IsOptional()
+  @IsUUID()
+  carerId?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
   @IsDateString()
   scheduledStart?: string;
 

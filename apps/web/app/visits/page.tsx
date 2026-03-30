@@ -33,6 +33,7 @@ interface VisitsPageProps {
   searchParams: {
     date?: string;
     carerId?: string;
+    clientId?: string;
     status?: string;
     page?: string;
   };
@@ -99,6 +100,7 @@ async function getVisits(
       scheduledStartFrom,
       scheduledStartTo,
       carerId: searchParams.carerId || undefined,
+      clientId: searchParams.clientId || undefined,
       status: searchParams.status || undefined,
       take: DEFAULT_PAGE_SIZE,
       skip,
@@ -275,10 +277,14 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
   const summary = buildQueueSummary(visits, queueNow);
   const pageTitle = isAdmin ? 'Visits' : 'Your Visits';
   const pageSubtitle = isAdmin
-    ? 'Run the operational queue for the current care day and move into visit detail when needed.'
+    ? searchParams.clientId
+      ? 'Run the operational queue for this client on the active care day and move into visit detail when needed.'
+      : 'Run the operational queue for the current care day and move into visit detail when needed.'
     : 'Work from your assigned queue and move into visit detail when it is time to deliver care.';
   const sectionTitle = isAdmin
-    ? `Care queue for ${queueDateLabel}`
+    ? searchParams.clientId
+      ? `Client care queue for ${queueDateLabel}`
+      : `Care queue for ${queueDateLabel}`
     : `Your queue for ${queueDateLabel}`;
 
   return (
@@ -300,6 +306,7 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
           selectedDate={activeDate}
           selectedStatus={searchParams.status}
           selectedCarerId={searchParams.carerId}
+          selectedClientId={searchParams.clientId}
         />
 
         <Card>
@@ -319,7 +326,10 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                 )}
               </div>
               {isAdmin && (
-                <Link href="/visits/new" className={buttonVariants({ variant: 'primary', size: 'sm' })}>
+                <Link
+                  href={searchParams.clientId ? `/visits/new?clientId=${searchParams.clientId}` : '/visits/new'}
+                  className={buttonVariants({ variant: 'primary', size: 'sm' })}
+                >
                   Add visit
                 </Link>
               )}
