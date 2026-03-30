@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { StatusChip } from '../../../components/oasis/StatusChip'
 import { buttonVariants } from '../../../components/ui/Button'
@@ -34,6 +34,10 @@ export function VisitOperationalPanel({ canEdit, visit }: VisitOperationalPanelP
   const [message, setMessage] = useState<string | null>(null)
   const [activeAction, setActiveAction] = useState<'start' | 'complete' | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  useEffect(() => {
+    setCurrentVisit(visit)
+  }, [visit])
 
   const taskProgress = useMemo(() => getTaskProgress(currentVisit.tasks), [currentVisit.tasks])
   const hasStarted = Boolean(currentVisit.actualStart)
