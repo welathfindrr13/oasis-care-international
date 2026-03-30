@@ -53,14 +53,14 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           set -euo pipefail
-          if [[ -n "${AWS_DEPLOY_ROLE_ARN_STAGING}" ]]; then
-            echo "mode=oidc" >> "$GITHUB_OUTPUT"
-            echo "Using OIDC role auth for staging deploy."
-            exit 0
-          fi
           if [[ -n "${AWS_ACCESS_KEY_ID}" && -n "${AWS_SECRET_ACCESS_KEY}" ]]; then
             echo "mode=keys" >> "$GITHUB_OUTPUT"
             echo "Using static key fallback for staging deploy."
+            exit 0
+          fi
+          if [[ -n "${AWS_DEPLOY_ROLE_ARN_STAGING}" ]]; then
+            echo "mode=oidc" >> "$GITHUB_OUTPUT"
+            echo "Using OIDC role auth for staging deploy."
             exit 0
           fi
           echo "mode=none" >> "$GITHUB_OUTPUT"
