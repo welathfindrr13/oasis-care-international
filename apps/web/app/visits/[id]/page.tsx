@@ -17,9 +17,11 @@ import {
   type VisitQueryResponse,
 } from '../../../lib/graphql/queries'
 import { formatDateTime } from '../../../lib/time'
+import { getVisitReviewSummary } from '../queue-state'
 import { VisitCareLogPanel } from './VisitCareLogPanel'
 import { VisitMedicationPanel } from './VisitMedicationPanel'
 import { VisitOperationalPanel } from './VisitOperationalPanel'
+import { VisitReconciliationPanel } from './VisitReconciliationPanel'
 
 export const metadata: Metadata = {
   title: 'Visit Details - Oasis Care',
@@ -178,9 +180,14 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
 
   const medications = await getMedicationContext(visit.id)
   const timeline = deriveTimeline(visit, medications)
+  const reviewSummary = getVisitReviewSummary(visit, new Date())
 
   const isAdmin = hasRole((session as any)?.roles, 'admin')
   const canActAsCarer = hasRole((session as any)?.roles, 'carer') && !isAdmin
+  const showReconciliationPanel =
+    isAdmin &&
+    visit.status === 'SCHEDULED' &&
+    reviewSummary.queueState === 'needs_review'
 
   const clientAddress = [visit.client?.addressLine1, visit.client?.addressLine2, visit.client?.city, visit.client?.postcode]
     .filter(Boolean)
@@ -225,6 +232,20 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
           </Card>
 
           <div className="space-y-6">
+            {showReconciliationPanel && (
+              <Card>
+                <CardContent className="pt-6">
+                  <VisitReconciliationPanel
+                    visitId={visit.id}
+                    hasActualStart={reviewSummary.hasActualStart}
+                    hasActualEnd={reviewSummary.hasActualEnd}
+                    completedTaskCount={reviewSummary.completedTaskCount}
+                    totalTaskCount={reviewSummary.totalTaskCount}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardContent className="pt-6">
                 <VisitOperationalPanel

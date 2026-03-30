@@ -46,7 +46,7 @@ export function VisitActionCell({
   if (isAdmin) {
     const adminSummary =
       queueState === 'needs_review'
-        ? 'Recorded evidence exists on this scheduled visit'
+        ? 'Scheduled visit has recorded evidence and needs reconciliation'
         : taskSummary.total > 0
           ? `${taskSummary.completed} of ${taskSummary.total} tasks recorded`
           : 'Review visit detail for notes, tasks, and medication context'
@@ -58,7 +58,7 @@ export function VisitActionCell({
           href={`/visits/${visit.id}`}
           className={buttonVariants({ variant: 'ghost', size: 'sm' })}
         >
-          Review visit
+          {queueState === 'needs_review' ? 'Resolve visit' : 'Review visit'}
         </Link>
       </div>
     )

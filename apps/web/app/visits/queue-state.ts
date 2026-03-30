@@ -16,6 +16,15 @@ type QueueVisit = Pick<
   tasks: Array<Pick<VisitTask, 'isCompleted'>>
 }
 
+export interface VisitReviewSummary {
+  queueState: VisitQueueState
+  isReviewNeeded: boolean
+  hasActualStart: boolean
+  hasActualEnd: boolean
+  completedTaskCount: number
+  totalTaskCount: number
+}
+
 const queueStateOrder: Record<VisitQueueState, number> = {
   in_progress: 0,
   needs_action_now: 1,
@@ -32,6 +41,34 @@ export function hasStrongCompletionEvidence(visit: QueueVisit) {
       visit.actualEnd ||
       visit.tasks.some((task) => task.isCompleted)
   )
+}
+
+export function getVisitReviewSummary(
+  visit: QueueVisit,
+  now: Date
+): VisitReviewSummary {
+  const totalTaskCount = visit.tasks.length
+  const completedTaskCount = visit.tasks.filter((task) => task.isCompleted).length
+  const hasActualStart = Boolean(visit.actualStart)
+  const hasActualEnd = Boolean(visit.actualEnd)
+  const isReviewNeeded = hasActualStart || hasActualEnd || completedTaskCount > 0
+
+  return {
+    queueState: getVisitQueueState(visit, now),
+    isReviewNeeded,
+    hasActualStart,
+    hasActualEnd,
+    completedTaskCount,
+    totalTaskCount,
+  }
+}
+
+export function getVisitReconciliationActions(summary: VisitReviewSummary) {
+  return {
+    canMarkInProgress:
+      summary.isReviewNeeded && summary.hasActualStart && !summary.hasActualEnd,
+    canMarkCompleted: summary.isReviewNeeded,
+  }
 }
 
 export function getVisitQueueState(
