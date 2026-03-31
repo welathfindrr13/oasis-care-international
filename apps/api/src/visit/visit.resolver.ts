@@ -7,6 +7,7 @@ import { UpdateVisitInput } from './dto/update-visit.input';
 import { UpdateVisitTaskInput } from './dto/update-visit-task.input';
 import { VisitFilterArgs } from './dto/visit-filter.args';
 import { RolesGuard } from '@oasis/auth';
+import { CarePlanService } from '../care-plan/care-plan.service';
 
 export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => 
   SetMetadata('roles', roles);
@@ -14,7 +15,10 @@ export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
 @Resolver(() => VisitDTO)
 @UseGuards(RolesGuard)
 export class VisitResolver {
-  constructor(private readonly visitService: VisitService) {}
+  constructor(
+    private readonly visitService: VisitService,
+    private readonly carePlanService: CarePlanService,
+  ) {}
 
   @Query(() => VisitDTO)
   @Roles('admin', 'carer', 'client')
@@ -26,7 +30,8 @@ export class VisitResolver {
     const userRole = realm_access?.roles?.[0] || 'client';
 
     const visit = await this.visitService.findVisitById(id, userId, userRole);
-    return this.mapVisitToDTO(visit);
+    const carePlan = userRole === 'client' ? null : await this.carePlanService.getActiveVersionForClient(visit.client_id);
+    return this.mapVisitToDTO(visit, carePlan);
   }
 
   @Query(() => VisitPaginatedResponse)
@@ -154,7 +159,7 @@ export class VisitResolver {
     return this.mapTaskToDTO(task);
   }
 
-  private mapVisitToDTO(visit: any): VisitDTO {
+  private mapVisitToDTO(visit: any, carePlan: any = null): VisitDTO {
     return {
       id: visit.id,
       carerId: visit.carer_id,
@@ -179,12 +184,23 @@ export class VisitResolver {
       client: visit.client ? {
         id: visit.client.id,
         fullName: visit.client.full_name,
+        preferredName: visit.client.preferred_name,
+        pronouns: visit.client.pronouns,
         addressLine1: visit.client.address_line1,
         addressLine2: visit.client.address_line2,
         city: visit.client.city,
         postcode: visit.client.postcode,
+        dateOfBirth: visit.client.date_of_birth,
+        preferredLanguage: visit.client.preferred_language,
+        communicationNeeds: visit.client.communication_needs,
+        accessibilityAdjustments: visit.client.accessibility_adjustments,
+        representativeName: visit.client.representative_name,
+        representativeRelationship: visit.client.representative_relationship,
+        representativePhone: visit.client.representative_phone,
+        representativeEmail: visit.client.representative_email,
       } : null,
       tasks: visit.tasks?.map((task: any) => this.mapTaskToDTO(task)) || [],
+      carePlan,
       createdAt: visit.created_at,
       updatedAt: visit.updated_at,
     };

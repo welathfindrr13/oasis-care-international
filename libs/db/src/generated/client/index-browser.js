@@ -123,12 +123,47 @@ exports.Prisma.CarerScalarFieldEnum = {
 exports.Prisma.ClientScalarFieldEnum = {
   id: 'id',
   full_name: 'full_name',
+  preferred_name: 'preferred_name',
+  pronouns: 'pronouns',
   address_line1: 'address_line1',
   address_line2: 'address_line2',
   city: 'city',
   postcode: 'postcode',
   date_of_birth: 'date_of_birth',
+  preferred_language: 'preferred_language',
+  communication_needs: 'communication_needs',
+  accessibility_adjustments: 'accessibility_adjustments',
+  representative_name: 'representative_name',
+  representative_relationship: 'representative_relationship',
+  representative_phone: 'representative_phone',
+  representative_email: 'representative_email',
   organization_id: 'organization_id',
+  created_at: 'created_at',
+  updated_at: 'updated_at',
+  deleted_at: 'deleted_at'
+};
+
+exports.Prisma.CarePlanScalarFieldEnum = {
+  id: 'id',
+  client_id: 'client_id',
+  active_version_id: 'active_version_id',
+  draft_version_id: 'draft_version_id',
+  created_at: 'created_at',
+  updated_at: 'updated_at',
+  deleted_at: 'deleted_at'
+};
+
+exports.Prisma.CarePlanVersionScalarFieldEnum = {
+  id: 'id',
+  care_plan_id: 'care_plan_id',
+  version_number: 'version_number',
+  status: 'status',
+  review_due_at: 'review_due_at',
+  effective_from: 'effective_from',
+  authored_by: 'authored_by',
+  approved_by: 'approved_by',
+  approved_at: 'approved_at',
+  content: 'content',
   created_at: 'created_at',
   updated_at: 'updated_at',
   deleted_at: 'deleted_at'
@@ -330,6 +365,12 @@ exports.Prisma.JsonNullValueFilter = {
   JsonNull: Prisma.JsonNull,
   AnyNull: Prisma.AnyNull
 };
+exports.CarePlanStatus = exports.$Enums.CarePlanStatus = {
+  DRAFT: 'DRAFT',
+  ACTIVE: 'ACTIVE',
+  SUPERSEDED: 'SUPERSEDED'
+};
+
 exports.VisitStatus = exports.$Enums.VisitStatus = {
   SCHEDULED: 'SCHEDULED',
   IN_PROGRESS: 'IN_PROGRESS',
@@ -362,6 +403,8 @@ exports.MedicationAuditAction = exports.$Enums.MedicationAuditAction = {
 exports.Prisma.ModelName = {
   Carer: 'Carer',
   Client: 'Client',
+  CarePlan: 'CarePlan',
+  CarePlanVersion: 'CarePlanVersion',
   Visit: 'Visit',
   VisitTask: 'VisitTask',
   Medication: 'Medication',

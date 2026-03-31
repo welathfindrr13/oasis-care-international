@@ -3,6 +3,7 @@ import { SetMetadata, UseGuards } from '@nestjs/common';
 import { RolesGuard } from '@oasis/auth';
 import { ClientDTO, ClientPaginatedResponse } from './dto/client.dto';
 import { CreateClientInput } from './dto/create-client.input';
+import { UpdateClientInput } from './dto/update-client.input';
 import { ClientService } from './client.service';
 
 export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
@@ -38,5 +39,15 @@ export class ClientResolver {
     // GDPR: Pass user ID for audit logging
     const userId = ctx.req?.user?.sub || ctx.req?.user?.id || 'anonymous';
     return this.clientService.createClient(input, userId);
+  }
+
+  @Mutation(() => ClientDTO)
+  @Roles('admin')
+  async updateClient(
+    @Args('input') input: UpdateClientInput,
+    @Context() ctx: any,
+  ): Promise<ClientDTO> {
+    const userId = ctx.req?.user?.sub || ctx.req?.user?.id || 'anonymous';
+    return this.clientService.updateClient(input, userId);
   }
 }

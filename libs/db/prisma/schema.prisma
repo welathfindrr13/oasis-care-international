@@ -29,23 +29,79 @@ model Carer {
 }
 
 model Client {
-  id               String          @id @default(uuid())
-  full_name        String
-  address_line1    String
-  address_line2    String?
-  city             String
-  postcode         String
-  date_of_birth    DateTime?
-  organization_id  String?
-  visits           Visit[]
-  prescriptions    Prescription[]
-  organization     Organization?   @relation(fields: [organization_id], references: [id])
-  health_summaries HealthSummary[]
-  created_at       DateTime        @default(now())
-  updated_at       DateTime        @updatedAt
-  deleted_at       DateTime?
+  id                        String          @id @default(uuid())
+  full_name                 String
+  preferred_name            String?
+  pronouns                  String?
+  address_line1             String
+  address_line2             String?
+  city                      String
+  postcode                  String
+  date_of_birth             DateTime?
+  preferred_language        String?
+  communication_needs       String?
+  accessibility_adjustments String?
+  representative_name       String?
+  representative_relationship String?
+  representative_phone      String?
+  representative_email      String?
+  organization_id           String?
+  visits                    Visit[]
+  prescriptions             Prescription[]
+  care_plan                 CarePlan?
+  organization              Organization?   @relation(fields: [organization_id], references: [id])
+  health_summaries          HealthSummary[]
+  created_at                DateTime        @default(now())
+  updated_at                DateTime        @updatedAt
+  deleted_at                DateTime?
 
   @@map("client")
+}
+
+model CarePlan {
+  id                String            @id @default(uuid())
+  client_id         String            @unique
+  active_version_id String?           @unique
+  draft_version_id  String?           @unique
+  client            Client            @relation(fields: [client_id], references: [id])
+  active_version    CarePlanVersion?  @relation("care_plan_active_version", fields: [active_version_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  draft_version     CarePlanVersion?  @relation("care_plan_draft_version", fields: [draft_version_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  versions          CarePlanVersion[] @relation("care_plan_versions")
+  created_at        DateTime          @default(now())
+  updated_at        DateTime          @updatedAt
+  deleted_at        DateTime?
+
+  @@map("care_plan")
+}
+
+model CarePlanVersion {
+  id             String         @id @default(uuid())
+  care_plan_id   String
+  version_number Int
+  status         CarePlanStatus @default(DRAFT)
+  review_due_at  DateTime?
+  effective_from DateTime?
+  authored_by    String
+  approved_by    String?
+  approved_at    DateTime?
+  content        Json
+  care_plan      CarePlan       @relation("care_plan_versions", fields: [care_plan_id], references: [id])
+  active_for     CarePlan?      @relation("care_plan_active_version")
+  draft_for      CarePlan?      @relation("care_plan_draft_version")
+  created_at     DateTime       @default(now())
+  updated_at     DateTime       @updatedAt
+  deleted_at     DateTime?
+
+  @@unique([care_plan_id, version_number])
+  @@index([care_plan_id, status])
+  @@index([approved_at])
+  @@map("care_plan_version")
+}
+
+enum CarePlanStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
 }
 
 model Visit {

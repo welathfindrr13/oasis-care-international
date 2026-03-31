@@ -19,6 +19,7 @@ import {
 import { formatDateTime } from '../../../lib/time'
 import { getVisitReviewSummary } from '../queue-state'
 import { VisitCareLogPanel } from './VisitCareLogPanel'
+import { VisitCareGuidancePanel } from './VisitCareGuidancePanel'
 import { VisitMedicationPanel } from './VisitMedicationPanel'
 import { VisitOperationalPanel } from './VisitOperationalPanel'
 import { VisitReconciliationPanel } from './VisitReconciliationPanel'
@@ -286,6 +287,22 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
                   value={visit.carer ? `${visit.carer.firstName} ${visit.carer.lastName}` : 'Unassigned'}
                 />
                 <DetailRow label="Carer email" value={visit.carer?.email ?? 'Not recorded'} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <h2 className="text-lg font-semibold text-text-primary font-heading">Care guidance</h2>
+                <p className="text-sm text-text-secondary">
+                  Read-only excerpts from the client&apos;s active care plan.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <VisitCareGuidancePanel
+                  carePlan={visit.carePlan}
+                  clientId={visit.client?.id}
+                  isAdmin={isAdmin}
+                />
               </CardContent>
             </Card>
 

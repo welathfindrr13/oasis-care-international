@@ -1,5 +1,6 @@
 import { ObjectType, Field, ID, Int, registerEnumType } from '@nestjs/graphql';
 import { VisitStatus } from '@oasis/db';
+import { CarePlanVersionDTO } from '../../care-plan/dto/care-plan.dto';
 
 // Register enum for GraphQL
 registerEnumType(VisitStatus, {
@@ -45,6 +46,12 @@ export class ClientDTO {
   @Field()
   fullName!: string;
 
+  @Field(() => String, { nullable: true })
+  preferredName?: string | null;
+
+  @Field(() => String, { nullable: true })
+  pronouns?: string | null;
+
   @Field()
   addressLine1!: string;
 
@@ -56,6 +63,30 @@ export class ClientDTO {
 
   @Field()
   postcode!: string;
+
+  @Field(() => Date, { nullable: true })
+  dateOfBirth?: Date | null;
+
+  @Field(() => String, { nullable: true })
+  preferredLanguage?: string | null;
+
+  @Field(() => String, { nullable: true })
+  communicationNeeds?: string | null;
+
+  @Field(() => String, { nullable: true })
+  accessibilityAdjustments?: string | null;
+
+  @Field(() => String, { nullable: true })
+  representativeName?: string | null;
+
+  @Field(() => String, { nullable: true })
+  representativeRelationship?: string | null;
+
+  @Field(() => String, { nullable: true })
+  representativePhone?: string | null;
+
+  @Field(() => String, { nullable: true })
+  representativeEmail?: string | null;
 }
 
 @ObjectType()
@@ -122,6 +153,9 @@ export class VisitDTO {
 
   @Field(() => [VisitTaskDTO])
   tasks!: VisitTaskDTO[];
+
+  @Field(() => CarePlanVersionDTO, { nullable: true })
+  carePlan?: CarePlanVersionDTO | null;
 
   @Field()
   createdAt!: Date;

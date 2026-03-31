@@ -165,6 +165,7 @@ export default function VisitCreateForm({
   }, [form]);
 
   const canSubmit = !isSubmitting && !validationError && clients.length > 0 && carers.length > 0;
+  const selectedClient = clients.find((client) => client.id === form.clientId);
 
   const handleChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -257,6 +258,23 @@ export default function VisitCreateForm({
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
+          {selectedClient && (
+            <div className="rounded-xl border border-teal-200 bg-teal-50 p-4">
+              <p className="text-sm font-semibold text-teal-900">Client care-plan checkpoint</p>
+              <p className="mt-2 text-sm text-teal-800">
+                Visit tasks stay manual in this release. Review the active care plan for {selectedClient.fullName} before finalising the visit record.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-3">
+                <Link href={`/clients/${selectedClient.id}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                  Open client record
+                </Link>
+                <Link href={`/clients/${selectedClient.id}/care-plan`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                  Open care plan
+                </Link>
+              </div>
+            </div>
+          )}
+
           <div>
             <label htmlFor="clientId" className="block text-sm font-medium text-slate-700 mb-2">
               Client <span className="text-red-500">*</span>

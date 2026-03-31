@@ -11,6 +11,7 @@ describe('ClientResolver', () => {
     findClients: jest.fn(),
     findClientById: jest.fn(),
     createClient: jest.fn(),
+    updateClient: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -65,5 +66,31 @@ describe('ClientResolver', () => {
 
     expect(service.createClient).toHaveBeenCalledWith(input, 'admin-123');
     expect(result).toEqual(createdClient);
+  });
+
+  it('marks updateClient mutation as admin-only', () => {
+    expect(Reflect.getMetadata('roles', resolver.updateClient)).toEqual(['admin']);
+  });
+
+  it('passes the authenticated user id into updateClient for audit logging', async () => {
+    const input = {
+      id: 'client-123',
+      preferredName: 'Maggie',
+      communicationNeeds: 'Speak slowly and face the client.',
+    };
+    const ctx = {
+      req: {
+        user: {
+          sub: 'admin-123',
+        },
+      },
+    };
+    const updatedClient = { fullName: 'Margaret Thompson', ...input };
+    mockClientService.updateClient.mockResolvedValue(updatedClient);
+
+    const result = await resolver.updateClient(input as any, ctx);
+
+    expect(service.updateClient).toHaveBeenCalledWith(input, 'admin-123');
+    expect(result).toEqual(updatedClient);
   });
 });

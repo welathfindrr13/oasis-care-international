@@ -15,6 +15,7 @@ import { VisitModule } from './visit/visit.module';
 import { StatsModule } from './stats/stats.module';
 import { MedicationModule } from './medication/medication.module';
 import { ClientModule } from './client/client.module';
+import { CarePlanModule } from './care-plan/care-plan.module';
 import { formatGraphQLError } from './common/filters/graphql-error.filter';
 import { GdprModule } from './gdpr/gdpr.module';
 import { DemoModule } from './demo/demo.module';
@@ -55,6 +56,7 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
     StatsModule,
     MedicationModule,
     ClientModule,
+    CarePlanModule,
     DemoModule,
     // GDPR module (feature-flagged)
     ...(process.env.GDPR_ENABLED === 'true' ? [GdprModule] : []),

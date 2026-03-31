@@ -29,10 +29,128 @@ export interface CarersQueryResponse {
 export interface Client {
   id: string;
   fullName: string;
+  preferredName?: string;
+  pronouns?: string;
   addressLine1: string;
   addressLine2?: string;
   city: string;
   postcode: string;
+  dateOfBirth?: string;
+  preferredLanguage?: string;
+  communicationNeeds?: string;
+  accessibilityAdjustments?: string;
+  representativeName?: string;
+  representativeRelationship?: string;
+  representativePhone?: string;
+  representativeEmail?: string;
+}
+
+export interface CarePlanOverview {
+  summary: string;
+  strengths: string[];
+  preferences: string[];
+}
+
+export interface CarePlanGoalsAndOutcomes {
+  goals: string[];
+  desiredOutcomes: string[];
+}
+
+export interface CarePlanDailyRoutines {
+  morning: string;
+  midday: string;
+  evening: string;
+  overnight: string;
+}
+
+export interface CarePlanPersonalCareSupport {
+  bathing: string;
+  dressing: string;
+  toileting: string;
+  grooming: string;
+}
+
+export interface CarePlanMobilityAndTransfers {
+  mobilitySummary: string;
+  transferGuidance: string;
+  equipment: string[];
+}
+
+export interface CarePlanNutritionAndHydration {
+  nutritionSummary: string;
+  hydrationSupport: string;
+  dietaryNeeds: string[];
+}
+
+export interface CarePlanMedicationSupport {
+  levelOfSupport: string;
+  keyInstructions: string;
+  refusalEscalation: string;
+}
+
+export interface CarePlanCommunicationAndAccessibility {
+  communicationApproach: string;
+  communicationNeeds: string[];
+  accessibilityAdjustments: string[];
+}
+
+export interface CarePlanRiskAndRedFlagItem {
+  title: string;
+  guidance: string;
+  escalationTrigger?: string;
+}
+
+export interface CarePlanRisksAndRedFlags {
+  items: CarePlanRiskAndRedFlagItem[];
+}
+
+export interface CarePlanContingencyAndEscalation {
+  summary: string;
+  actions: string[];
+  escalationTriggers: string[];
+}
+
+export interface CarePlanRepresentativesAndInvolvement {
+  summary: string;
+  involvedPeople: string[];
+}
+
+export interface CarePlanContent {
+  overview: CarePlanOverview;
+  goalsAndOutcomes: CarePlanGoalsAndOutcomes;
+  dailyRoutines: CarePlanDailyRoutines;
+  personalCareSupport: CarePlanPersonalCareSupport;
+  mobilityAndTransfers: CarePlanMobilityAndTransfers;
+  nutritionAndHydration: CarePlanNutritionAndHydration;
+  medicationSupport: CarePlanMedicationSupport;
+  communicationAndAccessibility: CarePlanCommunicationAndAccessibility;
+  risksAndRedFlags: CarePlanRisksAndRedFlags;
+  contingencyAndEscalation: CarePlanContingencyAndEscalation;
+  representativesAndInvolvement: CarePlanRepresentativesAndInvolvement;
+}
+
+export interface CarePlanVersion {
+  id: string;
+  carePlanId: string;
+  versionNumber: number;
+  status: 'DRAFT' | 'ACTIVE' | 'SUPERSEDED';
+  reviewDueAt?: string;
+  effectiveFrom?: string;
+  authoredBy: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  content: CarePlanContent;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CarePlan {
+  id: string;
+  clientId: string;
+  activeVersion?: CarePlanVersion | null;
+  draftVersion?: CarePlanVersion | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface VisitTask {
@@ -127,6 +245,7 @@ export interface Visit {
   carer?: Carer;
   client?: Client;
   tasks: VisitTask[];
+  carePlan?: CarePlanVersion | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -237,10 +356,20 @@ export const VISIT_QUERY = `
       client {
         id
         fullName
+        preferredName
+        pronouns
         addressLine1
         addressLine2
         city
         postcode
+        dateOfBirth
+        preferredLanguage
+        communicationNeeds
+        accessibilityAdjustments
+        representativeName
+        representativeRelationship
+        representativePhone
+        representativeEmail
       }
       tasks {
         id
@@ -249,6 +378,78 @@ export const VISIT_QUERY = `
         isCompleted
         completedAt
         notes
+        createdAt
+        updatedAt
+      }
+      carePlan {
+        id
+        carePlanId
+        versionNumber
+        status
+        reviewDueAt
+        effectiveFrom
+        authoredBy
+        approvedBy
+        approvedAt
+        content {
+          overview {
+            summary
+            strengths
+            preferences
+          }
+          goalsAndOutcomes {
+            goals
+            desiredOutcomes
+          }
+          dailyRoutines {
+            morning
+            midday
+            evening
+            overnight
+          }
+          personalCareSupport {
+            bathing
+            dressing
+            toileting
+            grooming
+          }
+          mobilityAndTransfers {
+            mobilitySummary
+            transferGuidance
+            equipment
+          }
+          nutritionAndHydration {
+            nutritionSummary
+            hydrationSupport
+            dietaryNeeds
+          }
+          medicationSupport {
+            levelOfSupport
+            keyInstructions
+            refusalEscalation
+          }
+          communicationAndAccessibility {
+            communicationApproach
+            communicationNeeds
+            accessibilityAdjustments
+          }
+          risksAndRedFlags {
+            items {
+              title
+              guidance
+              escalationTrigger
+            }
+          }
+          contingencyAndEscalation {
+            summary
+            actions
+            escalationTriggers
+          }
+          representativesAndInvolvement {
+            summary
+            involvedPeople
+          }
+        }
         createdAt
         updatedAt
       }
@@ -305,15 +506,33 @@ export interface ClientQueryResponse {
   client: Client;
 }
 
+export interface ClientCarePlanQueryResponse {
+  clientCarePlan: CarePlan | null;
+}
+
+export interface ClientCarePlanHistoryQueryResponse {
+  clientCarePlanHistory: CarePlanVersion[];
+}
+
 export const CLIENT_QUERY = `
   query Client($id: String!) {
     client(id: $id) {
       id
       fullName
+      preferredName
+      pronouns
       addressLine1
       addressLine2
       city
       postcode
+      dateOfBirth
+      preferredLanguage
+      communicationNeeds
+      accessibilityAdjustments
+      representativeName
+      representativeRelationship
+      representativePhone
+      representativeEmail
     }
   }
 `;
@@ -333,6 +552,179 @@ export const CLIENTS_QUERY = `
         postcode
       }
       total
+    }
+  }
+`;
+
+export const CLIENT_CARE_PLAN_QUERY = `
+  query ClientCarePlan($clientId: ID!) {
+    clientCarePlan(clientId: $clientId) {
+      id
+      clientId
+      activeVersion {
+        id
+        carePlanId
+        versionNumber
+        status
+        reviewDueAt
+        effectiveFrom
+        authoredBy
+        approvedBy
+        approvedAt
+        content {
+          overview {
+            summary
+            strengths
+            preferences
+          }
+          goalsAndOutcomes {
+            goals
+            desiredOutcomes
+          }
+          dailyRoutines {
+            morning
+            midday
+            evening
+            overnight
+          }
+          personalCareSupport {
+            bathing
+            dressing
+            toileting
+            grooming
+          }
+          mobilityAndTransfers {
+            mobilitySummary
+            transferGuidance
+            equipment
+          }
+          nutritionAndHydration {
+            nutritionSummary
+            hydrationSupport
+            dietaryNeeds
+          }
+          medicationSupport {
+            levelOfSupport
+            keyInstructions
+            refusalEscalation
+          }
+          communicationAndAccessibility {
+            communicationApproach
+            communicationNeeds
+            accessibilityAdjustments
+          }
+          risksAndRedFlags {
+            items {
+              title
+              guidance
+              escalationTrigger
+            }
+          }
+          contingencyAndEscalation {
+            summary
+            actions
+            escalationTriggers
+          }
+          representativesAndInvolvement {
+            summary
+            involvedPeople
+          }
+        }
+        createdAt
+        updatedAt
+      }
+      draftVersion {
+        id
+        carePlanId
+        versionNumber
+        status
+        reviewDueAt
+        effectiveFrom
+        authoredBy
+        approvedBy
+        approvedAt
+        content {
+          overview {
+            summary
+            strengths
+            preferences
+          }
+          goalsAndOutcomes {
+            goals
+            desiredOutcomes
+          }
+          dailyRoutines {
+            morning
+            midday
+            evening
+            overnight
+          }
+          personalCareSupport {
+            bathing
+            dressing
+            toileting
+            grooming
+          }
+          mobilityAndTransfers {
+            mobilitySummary
+            transferGuidance
+            equipment
+          }
+          nutritionAndHydration {
+            nutritionSummary
+            hydrationSupport
+            dietaryNeeds
+          }
+          medicationSupport {
+            levelOfSupport
+            keyInstructions
+            refusalEscalation
+          }
+          communicationAndAccessibility {
+            communicationApproach
+            communicationNeeds
+            accessibilityAdjustments
+          }
+          risksAndRedFlags {
+            items {
+              title
+              guidance
+              escalationTrigger
+            }
+          }
+          contingencyAndEscalation {
+            summary
+            actions
+            escalationTriggers
+          }
+          representativesAndInvolvement {
+            summary
+            involvedPeople
+          }
+        }
+        createdAt
+        updatedAt
+      }
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const CLIENT_CARE_PLAN_HISTORY_QUERY = `
+  query ClientCarePlanHistory($clientId: ID!) {
+    clientCarePlanHistory(clientId: $clientId) {
+      id
+      carePlanId
+      versionNumber
+      status
+      reviewDueAt
+      effectiveFrom
+      authoredBy
+      approvedBy
+      approvedAt
+      createdAt
+      updatedAt
     }
   }
 `;

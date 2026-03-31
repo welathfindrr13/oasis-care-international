@@ -24,6 +24,16 @@ export type Carer = $Result.DefaultSelection<Prisma.$CarerPayload>
  */
 export type Client = $Result.DefaultSelection<Prisma.$ClientPayload>
 /**
+ * Model CarePlan
+ * 
+ */
+export type CarePlan = $Result.DefaultSelection<Prisma.$CarePlanPayload>
+/**
+ * Model CarePlanVersion
+ * 
+ */
+export type CarePlanVersion = $Result.DefaultSelection<Prisma.$CarePlanVersionPayload>
+/**
  * Model Visit
  * 
  */
@@ -93,7 +103,16 @@ export type ErasureQueue = $Result.DefaultSelection<Prisma.$ErasureQueuePayload>
  * Enums
  */
 export namespace $Enums {
-  export const VisitStatus: {
+  export const CarePlanStatus: {
+  DRAFT: 'DRAFT',
+  ACTIVE: 'ACTIVE',
+  SUPERSEDED: 'SUPERSEDED'
+};
+
+export type CarePlanStatus = (typeof CarePlanStatus)[keyof typeof CarePlanStatus]
+
+
+export const VisitStatus: {
   SCHEDULED: 'SCHEDULED',
   IN_PROGRESS: 'IN_PROGRESS',
   COMPLETED: 'COMPLETED',
@@ -131,6 +150,10 @@ export const MedicationAuditAction: {
 export type MedicationAuditAction = (typeof MedicationAuditAction)[keyof typeof MedicationAuditAction]
 
 }
+
+export type CarePlanStatus = $Enums.CarePlanStatus
+
+export const CarePlanStatus: typeof $Enums.CarePlanStatus
 
 export type VisitStatus = $Enums.VisitStatus
 
@@ -285,6 +308,26 @@ export class PrismaClient<
     * ```
     */
   get client(): Prisma.ClientDelegate<ExtArgs>;
+
+  /**
+   * `prisma.carePlan`: Exposes CRUD operations for the **CarePlan** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more CarePlans
+    * const carePlans = await prisma.carePlan.findMany()
+    * ```
+    */
+  get carePlan(): Prisma.CarePlanDelegate<ExtArgs>;
+
+  /**
+   * `prisma.carePlanVersion`: Exposes CRUD operations for the **CarePlanVersion** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more CarePlanVersions
+    * const carePlanVersions = await prisma.carePlanVersion.findMany()
+    * ```
+    */
+  get carePlanVersion(): Prisma.CarePlanVersionDelegate<ExtArgs>;
 
   /**
    * `prisma.visit`: Exposes CRUD operations for the **Visit** model.
@@ -887,6 +930,8 @@ export namespace Prisma {
   export const ModelName: {
     Carer: 'Carer',
     Client: 'Client',
+    CarePlan: 'CarePlan',
+    CarePlanVersion: 'CarePlanVersion',
     Visit: 'Visit',
     VisitTask: 'VisitTask',
     Medication: 'Medication',
@@ -916,7 +961,7 @@ export namespace Prisma {
 
   export type TypeMap<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     meta: {
-      modelProps: 'carer' | 'client' | 'visit' | 'visitTask' | 'medication' | 'prescription' | 'medicationAdministration' | 'medicationAudit' | 'organization' | 'logEmbedding' | 'healthSummary' | 'consentRecord' | 'auditLog' | 'retentionPolicy' | 'erasureQueue'
+      modelProps: 'carer' | 'client' | 'carePlan' | 'carePlanVersion' | 'visit' | 'visitTask' | 'medication' | 'prescription' | 'medicationAdministration' | 'medicationAudit' | 'organization' | 'logEmbedding' | 'healthSummary' | 'consentRecord' | 'auditLog' | 'retentionPolicy' | 'erasureQueue'
       txIsolationLevel: Prisma.TransactionIsolationLevel
     },
     model: {
@@ -1049,6 +1094,138 @@ export namespace Prisma {
           count: {
             args: Prisma.ClientCountArgs<ExtArgs>,
             result: $Utils.Optional<ClientCountAggregateOutputType> | number
+          }
+        }
+      }
+      CarePlan: {
+        payload: Prisma.$CarePlanPayload<ExtArgs>
+        fields: Prisma.CarePlanFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.CarePlanFindUniqueArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.CarePlanFindUniqueOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanPayload>
+          }
+          findFirst: {
+            args: Prisma.CarePlanFindFirstArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.CarePlanFindFirstOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanPayload>
+          }
+          findMany: {
+            args: Prisma.CarePlanFindManyArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanPayload>[]
+          }
+          create: {
+            args: Prisma.CarePlanCreateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanPayload>
+          }
+          createMany: {
+            args: Prisma.CarePlanCreateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          delete: {
+            args: Prisma.CarePlanDeleteArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanPayload>
+          }
+          update: {
+            args: Prisma.CarePlanUpdateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanPayload>
+          }
+          deleteMany: {
+            args: Prisma.CarePlanDeleteManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          updateMany: {
+            args: Prisma.CarePlanUpdateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          upsert: {
+            args: Prisma.CarePlanUpsertArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanPayload>
+          }
+          aggregate: {
+            args: Prisma.CarePlanAggregateArgs<ExtArgs>,
+            result: $Utils.Optional<AggregateCarePlan>
+          }
+          groupBy: {
+            args: Prisma.CarePlanGroupByArgs<ExtArgs>,
+            result: $Utils.Optional<CarePlanGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.CarePlanCountArgs<ExtArgs>,
+            result: $Utils.Optional<CarePlanCountAggregateOutputType> | number
+          }
+        }
+      }
+      CarePlanVersion: {
+        payload: Prisma.$CarePlanVersionPayload<ExtArgs>
+        fields: Prisma.CarePlanVersionFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.CarePlanVersionFindUniqueArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanVersionPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.CarePlanVersionFindUniqueOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanVersionPayload>
+          }
+          findFirst: {
+            args: Prisma.CarePlanVersionFindFirstArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanVersionPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.CarePlanVersionFindFirstOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanVersionPayload>
+          }
+          findMany: {
+            args: Prisma.CarePlanVersionFindManyArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanVersionPayload>[]
+          }
+          create: {
+            args: Prisma.CarePlanVersionCreateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanVersionPayload>
+          }
+          createMany: {
+            args: Prisma.CarePlanVersionCreateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          delete: {
+            args: Prisma.CarePlanVersionDeleteArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanVersionPayload>
+          }
+          update: {
+            args: Prisma.CarePlanVersionUpdateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanVersionPayload>
+          }
+          deleteMany: {
+            args: Prisma.CarePlanVersionDeleteManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          updateMany: {
+            args: Prisma.CarePlanVersionUpdateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          upsert: {
+            args: Prisma.CarePlanVersionUpsertArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$CarePlanVersionPayload>
+          }
+          aggregate: {
+            args: Prisma.CarePlanVersionAggregateArgs<ExtArgs>,
+            result: $Utils.Optional<AggregateCarePlanVersion>
+          }
+          groupBy: {
+            args: Prisma.CarePlanVersionGroupByArgs<ExtArgs>,
+            result: $Utils.Optional<CarePlanVersionGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.CarePlanVersionCountArgs<ExtArgs>,
+            result: $Utils.Optional<CarePlanVersionCountAggregateOutputType> | number
           }
         }
       }
@@ -2148,6 +2325,40 @@ export namespace Prisma {
    */
   export type ClientCountOutputTypeCountHealth_summariesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: HealthSummaryWhereInput
+  }
+
+
+
+  /**
+   * Count Type CarePlanCountOutputType
+   */
+
+  export type CarePlanCountOutputType = {
+    versions: number
+  }
+
+  export type CarePlanCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    versions?: boolean | CarePlanCountOutputTypeCountVersionsArgs
+  }
+
+  // Custom InputTypes
+
+  /**
+   * CarePlanCountOutputType without action
+   */
+  export type CarePlanCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlanCountOutputType
+     */
+    select?: CarePlanCountOutputTypeSelect<ExtArgs> | null
+  }
+
+
+  /**
+   * CarePlanCountOutputType without action
+   */
+  export type CarePlanCountOutputTypeCountVersionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CarePlanVersionWhereInput
   }
 
 
@@ -3391,11 +3602,20 @@ export namespace Prisma {
   export type ClientMinAggregateOutputType = {
     id: string | null
     full_name: string | null
+    preferred_name: string | null
+    pronouns: string | null
     address_line1: string | null
     address_line2: string | null
     city: string | null
     postcode: string | null
     date_of_birth: Date | null
+    preferred_language: string | null
+    communication_needs: string | null
+    accessibility_adjustments: string | null
+    representative_name: string | null
+    representative_relationship: string | null
+    representative_phone: string | null
+    representative_email: string | null
     organization_id: string | null
     created_at: Date | null
     updated_at: Date | null
@@ -3405,11 +3625,20 @@ export namespace Prisma {
   export type ClientMaxAggregateOutputType = {
     id: string | null
     full_name: string | null
+    preferred_name: string | null
+    pronouns: string | null
     address_line1: string | null
     address_line2: string | null
     city: string | null
     postcode: string | null
     date_of_birth: Date | null
+    preferred_language: string | null
+    communication_needs: string | null
+    accessibility_adjustments: string | null
+    representative_name: string | null
+    representative_relationship: string | null
+    representative_phone: string | null
+    representative_email: string | null
     organization_id: string | null
     created_at: Date | null
     updated_at: Date | null
@@ -3419,11 +3648,20 @@ export namespace Prisma {
   export type ClientCountAggregateOutputType = {
     id: number
     full_name: number
+    preferred_name: number
+    pronouns: number
     address_line1: number
     address_line2: number
     city: number
     postcode: number
     date_of_birth: number
+    preferred_language: number
+    communication_needs: number
+    accessibility_adjustments: number
+    representative_name: number
+    representative_relationship: number
+    representative_phone: number
+    representative_email: number
     organization_id: number
     created_at: number
     updated_at: number
@@ -3435,11 +3673,20 @@ export namespace Prisma {
   export type ClientMinAggregateInputType = {
     id?: true
     full_name?: true
+    preferred_name?: true
+    pronouns?: true
     address_line1?: true
     address_line2?: true
     city?: true
     postcode?: true
     date_of_birth?: true
+    preferred_language?: true
+    communication_needs?: true
+    accessibility_adjustments?: true
+    representative_name?: true
+    representative_relationship?: true
+    representative_phone?: true
+    representative_email?: true
     organization_id?: true
     created_at?: true
     updated_at?: true
@@ -3449,11 +3696,20 @@ export namespace Prisma {
   export type ClientMaxAggregateInputType = {
     id?: true
     full_name?: true
+    preferred_name?: true
+    pronouns?: true
     address_line1?: true
     address_line2?: true
     city?: true
     postcode?: true
     date_of_birth?: true
+    preferred_language?: true
+    communication_needs?: true
+    accessibility_adjustments?: true
+    representative_name?: true
+    representative_relationship?: true
+    representative_phone?: true
+    representative_email?: true
     organization_id?: true
     created_at?: true
     updated_at?: true
@@ -3463,11 +3719,20 @@ export namespace Prisma {
   export type ClientCountAggregateInputType = {
     id?: true
     full_name?: true
+    preferred_name?: true
+    pronouns?: true
     address_line1?: true
     address_line2?: true
     city?: true
     postcode?: true
     date_of_birth?: true
+    preferred_language?: true
+    communication_needs?: true
+    accessibility_adjustments?: true
+    representative_name?: true
+    representative_relationship?: true
+    representative_phone?: true
+    representative_email?: true
     organization_id?: true
     created_at?: true
     updated_at?: true
@@ -3550,11 +3815,20 @@ export namespace Prisma {
   export type ClientGroupByOutputType = {
     id: string
     full_name: string
+    preferred_name: string | null
+    pronouns: string | null
     address_line1: string
     address_line2: string | null
     city: string
     postcode: string
     date_of_birth: Date | null
+    preferred_language: string | null
+    communication_needs: string | null
+    accessibility_adjustments: string | null
+    representative_name: string | null
+    representative_relationship: string | null
+    representative_phone: string | null
+    representative_email: string | null
     organization_id: string | null
     created_at: Date
     updated_at: Date
@@ -3581,17 +3855,27 @@ export namespace Prisma {
   export type ClientSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     full_name?: boolean
+    preferred_name?: boolean
+    pronouns?: boolean
     address_line1?: boolean
     address_line2?: boolean
     city?: boolean
     postcode?: boolean
     date_of_birth?: boolean
+    preferred_language?: boolean
+    communication_needs?: boolean
+    accessibility_adjustments?: boolean
+    representative_name?: boolean
+    representative_relationship?: boolean
+    representative_phone?: boolean
+    representative_email?: boolean
     organization_id?: boolean
     created_at?: boolean
     updated_at?: boolean
     deleted_at?: boolean
     visits?: boolean | Client$visitsArgs<ExtArgs>
     prescriptions?: boolean | Client$prescriptionsArgs<ExtArgs>
+    care_plan?: boolean | Client$care_planArgs<ExtArgs>
     organization?: boolean | Client$organizationArgs<ExtArgs>
     health_summaries?: boolean | Client$health_summariesArgs<ExtArgs>
     _count?: boolean | ClientCountOutputTypeDefaultArgs<ExtArgs>
@@ -3600,11 +3884,20 @@ export namespace Prisma {
   export type ClientSelectScalar = {
     id?: boolean
     full_name?: boolean
+    preferred_name?: boolean
+    pronouns?: boolean
     address_line1?: boolean
     address_line2?: boolean
     city?: boolean
     postcode?: boolean
     date_of_birth?: boolean
+    preferred_language?: boolean
+    communication_needs?: boolean
+    accessibility_adjustments?: boolean
+    representative_name?: boolean
+    representative_relationship?: boolean
+    representative_phone?: boolean
+    representative_email?: boolean
     organization_id?: boolean
     created_at?: boolean
     updated_at?: boolean
@@ -3614,6 +3907,7 @@ export namespace Prisma {
   export type ClientInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     visits?: boolean | Client$visitsArgs<ExtArgs>
     prescriptions?: boolean | Client$prescriptionsArgs<ExtArgs>
+    care_plan?: boolean | Client$care_planArgs<ExtArgs>
     organization?: boolean | Client$organizationArgs<ExtArgs>
     health_summaries?: boolean | Client$health_summariesArgs<ExtArgs>
     _count?: boolean | ClientCountOutputTypeDefaultArgs<ExtArgs>
@@ -3625,17 +3919,27 @@ export namespace Prisma {
     objects: {
       visits: Prisma.$VisitPayload<ExtArgs>[]
       prescriptions: Prisma.$PrescriptionPayload<ExtArgs>[]
+      care_plan: Prisma.$CarePlanPayload<ExtArgs> | null
       organization: Prisma.$OrganizationPayload<ExtArgs> | null
       health_summaries: Prisma.$HealthSummaryPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
       full_name: string
+      preferred_name: string | null
+      pronouns: string | null
       address_line1: string
       address_line2: string | null
       city: string
       postcode: string
       date_of_birth: Date | null
+      preferred_language: string | null
+      communication_needs: string | null
+      accessibility_adjustments: string | null
+      representative_name: string | null
+      representative_relationship: string | null
+      representative_phone: string | null
+      representative_email: string | null
       organization_id: string | null
       created_at: Date
       updated_at: Date
@@ -4009,6 +4313,8 @@ export namespace Prisma {
 
     prescriptions<T extends Client$prescriptionsArgs<ExtArgs> = {}>(args?: Subset<T, Client$prescriptionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PrescriptionPayload<ExtArgs>, T, 'findMany'> | Null>;
 
+    care_plan<T extends Client$care_planArgs<ExtArgs> = {}>(args?: Subset<T, Client$care_planArgs<ExtArgs>>): Prisma__CarePlanClient<$Result.GetResult<Prisma.$CarePlanPayload<ExtArgs>, T, 'findUniqueOrThrow'> | null, null, ExtArgs>;
+
     organization<T extends Client$organizationArgs<ExtArgs> = {}>(args?: Subset<T, Client$organizationArgs<ExtArgs>>): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'findUniqueOrThrow'> | null, null, ExtArgs>;
 
     health_summaries<T extends Client$health_summariesArgs<ExtArgs> = {}>(args?: Subset<T, Client$health_summariesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$HealthSummaryPayload<ExtArgs>, T, 'findMany'> | Null>;
@@ -4043,11 +4349,20 @@ export namespace Prisma {
   interface ClientFieldRefs {
     readonly id: FieldRef<"Client", 'String'>
     readonly full_name: FieldRef<"Client", 'String'>
+    readonly preferred_name: FieldRef<"Client", 'String'>
+    readonly pronouns: FieldRef<"Client", 'String'>
     readonly address_line1: FieldRef<"Client", 'String'>
     readonly address_line2: FieldRef<"Client", 'String'>
     readonly city: FieldRef<"Client", 'String'>
     readonly postcode: FieldRef<"Client", 'String'>
     readonly date_of_birth: FieldRef<"Client", 'DateTime'>
+    readonly preferred_language: FieldRef<"Client", 'String'>
+    readonly communication_needs: FieldRef<"Client", 'String'>
+    readonly accessibility_adjustments: FieldRef<"Client", 'String'>
+    readonly representative_name: FieldRef<"Client", 'String'>
+    readonly representative_relationship: FieldRef<"Client", 'String'>
+    readonly representative_phone: FieldRef<"Client", 'String'>
+    readonly representative_email: FieldRef<"Client", 'String'>
     readonly organization_id: FieldRef<"Client", 'String'>
     readonly created_at: FieldRef<"Client", 'DateTime'>
     readonly updated_at: FieldRef<"Client", 'DateTime'>
@@ -4406,6 +4721,22 @@ export namespace Prisma {
 
 
   /**
+   * Client.care_plan
+   */
+  export type Client$care_planArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlan
+     */
+    select?: CarePlanSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanInclude<ExtArgs> | null
+    where?: CarePlanWhereInput
+  }
+
+
+  /**
    * Client.organization
    */
   export type Client$organizationArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -4454,6 +4785,2094 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well.
      */
     include?: ClientInclude<ExtArgs> | null
+  }
+
+
+
+  /**
+   * Model CarePlan
+   */
+
+  export type AggregateCarePlan = {
+    _count: CarePlanCountAggregateOutputType | null
+    _min: CarePlanMinAggregateOutputType | null
+    _max: CarePlanMaxAggregateOutputType | null
+  }
+
+  export type CarePlanMinAggregateOutputType = {
+    id: string | null
+    client_id: string | null
+    active_version_id: string | null
+    draft_version_id: string | null
+    created_at: Date | null
+    updated_at: Date | null
+    deleted_at: Date | null
+  }
+
+  export type CarePlanMaxAggregateOutputType = {
+    id: string | null
+    client_id: string | null
+    active_version_id: string | null
+    draft_version_id: string | null
+    created_at: Date | null
+    updated_at: Date | null
+    deleted_at: Date | null
+  }
+
+  export type CarePlanCountAggregateOutputType = {
+    id: number
+    client_id: number
+    active_version_id: number
+    draft_version_id: number
+    created_at: number
+    updated_at: number
+    deleted_at: number
+    _all: number
+  }
+
+
+  export type CarePlanMinAggregateInputType = {
+    id?: true
+    client_id?: true
+    active_version_id?: true
+    draft_version_id?: true
+    created_at?: true
+    updated_at?: true
+    deleted_at?: true
+  }
+
+  export type CarePlanMaxAggregateInputType = {
+    id?: true
+    client_id?: true
+    active_version_id?: true
+    draft_version_id?: true
+    created_at?: true
+    updated_at?: true
+    deleted_at?: true
+  }
+
+  export type CarePlanCountAggregateInputType = {
+    id?: true
+    client_id?: true
+    active_version_id?: true
+    draft_version_id?: true
+    created_at?: true
+    updated_at?: true
+    deleted_at?: true
+    _all?: true
+  }
+
+  export type CarePlanAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CarePlan to aggregate.
+     */
+    where?: CarePlanWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CarePlans to fetch.
+     */
+    orderBy?: CarePlanOrderByWithRelationInput | CarePlanOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: CarePlanWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CarePlans from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CarePlans.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned CarePlans
+    **/
+    _count?: true | CarePlanCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: CarePlanMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: CarePlanMaxAggregateInputType
+  }
+
+  export type GetCarePlanAggregateType<T extends CarePlanAggregateArgs> = {
+        [P in keyof T & keyof AggregateCarePlan]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateCarePlan[P]>
+      : GetScalarType<T[P], AggregateCarePlan[P]>
+  }
+
+
+
+
+  export type CarePlanGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CarePlanWhereInput
+    orderBy?: CarePlanOrderByWithAggregationInput | CarePlanOrderByWithAggregationInput[]
+    by: CarePlanScalarFieldEnum[] | CarePlanScalarFieldEnum
+    having?: CarePlanScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: CarePlanCountAggregateInputType | true
+    _min?: CarePlanMinAggregateInputType
+    _max?: CarePlanMaxAggregateInputType
+  }
+
+  export type CarePlanGroupByOutputType = {
+    id: string
+    client_id: string
+    active_version_id: string | null
+    draft_version_id: string | null
+    created_at: Date
+    updated_at: Date
+    deleted_at: Date | null
+    _count: CarePlanCountAggregateOutputType | null
+    _min: CarePlanMinAggregateOutputType | null
+    _max: CarePlanMaxAggregateOutputType | null
+  }
+
+  type GetCarePlanGroupByPayload<T extends CarePlanGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<CarePlanGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof CarePlanGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], CarePlanGroupByOutputType[P]>
+            : GetScalarType<T[P], CarePlanGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type CarePlanSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    client_id?: boolean
+    active_version_id?: boolean
+    draft_version_id?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+    deleted_at?: boolean
+    client?: boolean | ClientDefaultArgs<ExtArgs>
+    active_version?: boolean | CarePlan$active_versionArgs<ExtArgs>
+    draft_version?: boolean | CarePlan$draft_versionArgs<ExtArgs>
+    versions?: boolean | CarePlan$versionsArgs<ExtArgs>
+    _count?: boolean | CarePlanCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["carePlan"]>
+
+  export type CarePlanSelectScalar = {
+    id?: boolean
+    client_id?: boolean
+    active_version_id?: boolean
+    draft_version_id?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+    deleted_at?: boolean
+  }
+
+  export type CarePlanInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    client?: boolean | ClientDefaultArgs<ExtArgs>
+    active_version?: boolean | CarePlan$active_versionArgs<ExtArgs>
+    draft_version?: boolean | CarePlan$draft_versionArgs<ExtArgs>
+    versions?: boolean | CarePlan$versionsArgs<ExtArgs>
+    _count?: boolean | CarePlanCountOutputTypeDefaultArgs<ExtArgs>
+  }
+
+
+  export type $CarePlanPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "CarePlan"
+    objects: {
+      client: Prisma.$ClientPayload<ExtArgs>
+      active_version: Prisma.$CarePlanVersionPayload<ExtArgs> | null
+      draft_version: Prisma.$CarePlanVersionPayload<ExtArgs> | null
+      versions: Prisma.$CarePlanVersionPayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      client_id: string
+      active_version_id: string | null
+      draft_version_id: string | null
+      created_at: Date
+      updated_at: Date
+      deleted_at: Date | null
+    }, ExtArgs["result"]["carePlan"]>
+    composites: {}
+  }
+
+
+  type CarePlanGetPayload<S extends boolean | null | undefined | CarePlanDefaultArgs> = $Result.GetResult<Prisma.$CarePlanPayload, S>
+
+  type CarePlanCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<CarePlanFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: CarePlanCountAggregateInputType | true
+    }
+
+  export interface CarePlanDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['CarePlan'], meta: { name: 'CarePlan' } }
+    /**
+     * Find zero or one CarePlan that matches the filter.
+     * @param {CarePlanFindUniqueArgs} args - Arguments to find a CarePlan
+     * @example
+     * // Get one CarePlan
+     * const carePlan = await prisma.carePlan.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUnique<T extends CarePlanFindUniqueArgs<ExtArgs>>(
+      args: SelectSubset<T, CarePlanFindUniqueArgs<ExtArgs>>
+    ): Prisma__CarePlanClient<$Result.GetResult<Prisma.$CarePlanPayload<ExtArgs>, T, 'findUnique'> | null, null, ExtArgs>
+
+    /**
+     * Find one CarePlan that matches the filter or throw an error  with `error.code='P2025'` 
+     *     if no matches were found.
+     * @param {CarePlanFindUniqueOrThrowArgs} args - Arguments to find a CarePlan
+     * @example
+     * // Get one CarePlan
+     * const carePlan = await prisma.carePlan.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUniqueOrThrow<T extends CarePlanFindUniqueOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, CarePlanFindUniqueOrThrowArgs<ExtArgs>>
+    ): Prisma__CarePlanClient<$Result.GetResult<Prisma.$CarePlanPayload<ExtArgs>, T, 'findUniqueOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find the first CarePlan that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CarePlanFindFirstArgs} args - Arguments to find a CarePlan
+     * @example
+     * // Get one CarePlan
+     * const carePlan = await prisma.carePlan.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirst<T extends CarePlanFindFirstArgs<ExtArgs>>(
+      args?: SelectSubset<T, CarePlanFindFirstArgs<ExtArgs>>
+    ): Prisma__CarePlanClient<$Result.GetResult<Prisma.$CarePlanPayload<ExtArgs>, T, 'findFirst'> | null, null, ExtArgs>
+
+    /**
+     * Find the first CarePlan that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CarePlanFindFirstOrThrowArgs} args - Arguments to find a CarePlan
+     * @example
+     * // Get one CarePlan
+     * const carePlan = await prisma.carePlan.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirstOrThrow<T extends CarePlanFindFirstOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, CarePlanFindFirstOrThrowArgs<ExtArgs>>
+    ): Prisma__CarePlanClient<$Result.GetResult<Prisma.$CarePlanPayload<ExtArgs>, T, 'findFirstOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find zero or more CarePlans that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CarePlanFindManyArgs=} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all CarePlans
+     * const carePlans = await prisma.carePlan.findMany()
+     * 
+     * // Get first 10 CarePlans
+     * const carePlans = await prisma.carePlan.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const carePlanWithIdOnly = await prisma.carePlan.findMany({ select: { id: true } })
+     * 
+    **/
+    findMany<T extends CarePlanFindManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, CarePlanFindManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CarePlanPayload<ExtArgs>, T, 'findMany'>>
+
+    /**
+     * Create a CarePlan.
+     * @param {CarePlanCreateArgs} args - Arguments to create a CarePlan.
+     * @example
+     * // Create one CarePlan
+     * const CarePlan = await prisma.carePlan.create({
+     *   data: {
+     *     // ... data to create a CarePlan
+     *   }
+     * })
+     * 
+    **/
+    create<T extends CarePlanCreateArgs<ExtArgs>>(
+      args: SelectSubset<T, CarePlanCreateArgs<ExtArgs>>
+    ): Prisma__CarePlanClient<$Result.GetResult<Prisma.$CarePlanPayload<ExtArgs>, T, 'create'>, never, ExtArgs>
+
+    /**
+     * Create many CarePlans.
+     *     @param {CarePlanCreateManyArgs} args - Arguments to create many CarePlans.
+     *     @example
+     *     // Create many CarePlans
+     *     const carePlan = await prisma.carePlan.createMany({
+     *       data: {
+     *         // ... provide data here
+     *       }
+     *     })
+     *     
+    **/
+    createMany<T extends CarePlanCreateManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, CarePlanCreateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Delete a CarePlan.
+     * @param {CarePlanDeleteArgs} args - Arguments to delete one CarePlan.
+     * @example
+     * // Delete one CarePlan
+     * const CarePlan = await prisma.carePlan.delete({
+     *   where: {
+     *     // ... filter to delete one CarePlan
+     *   }
+     * })
+     * 
+    **/
+    delete<T extends CarePlanDeleteArgs<ExtArgs>>(
+      args: SelectSubset<T, CarePlanDeleteArgs<ExtArgs>>
+    ): Prisma__CarePlanClient<$Result.GetResult<Prisma.$CarePlanPayload<ExtArgs>, T, 'delete'>, never, ExtArgs>
+
+    /**
+     * Update one CarePlan.
+     * @param {CarePlanUpdateArgs} args - Arguments to update one CarePlan.
+     * @example
+     * // Update one CarePlan
+     * const carePlan = await prisma.carePlan.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    update<T extends CarePlanUpdateArgs<ExtArgs>>(
+      args: SelectSubset<T, CarePlanUpdateArgs<ExtArgs>>
+    ): Prisma__CarePlanClient<$Result.GetResult<Prisma.$CarePlanPayload<ExtArgs>, T, 'update'>, never, ExtArgs>
+
+    /**
+     * Delete zero or more CarePlans.
+     * @param {CarePlanDeleteManyArgs} args - Arguments to filter CarePlans to delete.
+     * @example
+     * // Delete a few CarePlans
+     * const { count } = await prisma.carePlan.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+    **/
+    deleteMany<T extends CarePlanDeleteManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, CarePlanDeleteManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CarePlans.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CarePlanUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many CarePlans
+     * const carePlan = await prisma.carePlan.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    updateMany<T extends CarePlanUpdateManyArgs<ExtArgs>>(
+      args: SelectSubset<T, CarePlanUpdateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one CarePlan.
+     * @param {CarePlanUpsertArgs} args - Arguments to update or create a CarePlan.
+     * @example
+     * // Update or create a CarePlan
+     * const carePlan = await prisma.carePlan.upsert({
+     *   create: {
+     *     // ... data to create a CarePlan
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the CarePlan we want to update
+     *   }
+     * })
+    **/
+    upsert<T extends CarePlanUpsertArgs<ExtArgs>>(
+      args: SelectSubset<T, CarePlanUpsertArgs<ExtArgs>>
+    ): Prisma__CarePlanClient<$Result.GetResult<Prisma.$CarePlanPayload<ExtArgs>, T, 'upsert'>, never, ExtArgs>
+
+    /**
+     * Count the number of CarePlans.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CarePlanCountArgs} args - Arguments to filter CarePlans to count.
+     * @example
+     * // Count the number of CarePlans
+     * const count = await prisma.carePlan.count({
+     *   where: {
+     *     // ... the filter for the CarePlans we want to count
+     *   }
+     * })
+    **/
+    count<T extends CarePlanCountArgs>(
+      args?: Subset<T, CarePlanCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], CarePlanCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a CarePlan.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CarePlanAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends CarePlanAggregateArgs>(args: Subset<T, CarePlanAggregateArgs>): Prisma.PrismaPromise<GetCarePlanAggregateType<T>>
+
+    /**
+     * Group by CarePlan.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CarePlanGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends CarePlanGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: CarePlanGroupByArgs['orderBy'] }
+        : { orderBy?: CarePlanGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, CarePlanGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetCarePlanGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the CarePlan model
+   */
+  readonly fields: CarePlanFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for CarePlan.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__CarePlanClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: 'PrismaPromise';
+
+    client<T extends ClientDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ClientDefaultArgs<ExtArgs>>): Prisma__ClientClient<$Result.GetResult<Prisma.$ClientPayload<ExtArgs>, T, 'findUniqueOrThrow'> | Null, Null, ExtArgs>;
+
+    active_version<T extends CarePlan$active_versionArgs<ExtArgs> = {}>(args?: Subset<T, CarePlan$active_versionArgs<ExtArgs>>): Prisma__CarePlanVersionClient<$Result.GetResult<Prisma.$CarePlanVersionPayload<ExtArgs>, T, 'findUniqueOrThrow'> | null, null, ExtArgs>;
+
+    draft_version<T extends CarePlan$draft_versionArgs<ExtArgs> = {}>(args?: Subset<T, CarePlan$draft_versionArgs<ExtArgs>>): Prisma__CarePlanVersionClient<$Result.GetResult<Prisma.$CarePlanVersionPayload<ExtArgs>, T, 'findUniqueOrThrow'> | null, null, ExtArgs>;
+
+    versions<T extends CarePlan$versionsArgs<ExtArgs> = {}>(args?: Subset<T, CarePlan$versionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CarePlanVersionPayload<ExtArgs>, T, 'findMany'> | Null>;
+
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>;
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>;
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>;
+  }
+
+
+
+  /**
+   * Fields of the CarePlan model
+   */ 
+  interface CarePlanFieldRefs {
+    readonly id: FieldRef<"CarePlan", 'String'>
+    readonly client_id: FieldRef<"CarePlan", 'String'>
+    readonly active_version_id: FieldRef<"CarePlan", 'String'>
+    readonly draft_version_id: FieldRef<"CarePlan", 'String'>
+    readonly created_at: FieldRef<"CarePlan", 'DateTime'>
+    readonly updated_at: FieldRef<"CarePlan", 'DateTime'>
+    readonly deleted_at: FieldRef<"CarePlan", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+
+  /**
+   * CarePlan findUnique
+   */
+  export type CarePlanFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlan
+     */
+    select?: CarePlanSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanInclude<ExtArgs> | null
+    /**
+     * Filter, which CarePlan to fetch.
+     */
+    where: CarePlanWhereUniqueInput
+  }
+
+
+  /**
+   * CarePlan findUniqueOrThrow
+   */
+  export type CarePlanFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlan
+     */
+    select?: CarePlanSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanInclude<ExtArgs> | null
+    /**
+     * Filter, which CarePlan to fetch.
+     */
+    where: CarePlanWhereUniqueInput
+  }
+
+
+  /**
+   * CarePlan findFirst
+   */
+  export type CarePlanFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlan
+     */
+    select?: CarePlanSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanInclude<ExtArgs> | null
+    /**
+     * Filter, which CarePlan to fetch.
+     */
+    where?: CarePlanWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CarePlans to fetch.
+     */
+    orderBy?: CarePlanOrderByWithRelationInput | CarePlanOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CarePlans.
+     */
+    cursor?: CarePlanWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CarePlans from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CarePlans.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CarePlans.
+     */
+    distinct?: CarePlanScalarFieldEnum | CarePlanScalarFieldEnum[]
+  }
+
+
+  /**
+   * CarePlan findFirstOrThrow
+   */
+  export type CarePlanFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlan
+     */
+    select?: CarePlanSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanInclude<ExtArgs> | null
+    /**
+     * Filter, which CarePlan to fetch.
+     */
+    where?: CarePlanWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CarePlans to fetch.
+     */
+    orderBy?: CarePlanOrderByWithRelationInput | CarePlanOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CarePlans.
+     */
+    cursor?: CarePlanWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CarePlans from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CarePlans.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CarePlans.
+     */
+    distinct?: CarePlanScalarFieldEnum | CarePlanScalarFieldEnum[]
+  }
+
+
+  /**
+   * CarePlan findMany
+   */
+  export type CarePlanFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlan
+     */
+    select?: CarePlanSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanInclude<ExtArgs> | null
+    /**
+     * Filter, which CarePlans to fetch.
+     */
+    where?: CarePlanWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CarePlans to fetch.
+     */
+    orderBy?: CarePlanOrderByWithRelationInput | CarePlanOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing CarePlans.
+     */
+    cursor?: CarePlanWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CarePlans from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CarePlans.
+     */
+    skip?: number
+    distinct?: CarePlanScalarFieldEnum | CarePlanScalarFieldEnum[]
+  }
+
+
+  /**
+   * CarePlan create
+   */
+  export type CarePlanCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlan
+     */
+    select?: CarePlanSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanInclude<ExtArgs> | null
+    /**
+     * The data needed to create a CarePlan.
+     */
+    data: XOR<CarePlanCreateInput, CarePlanUncheckedCreateInput>
+  }
+
+
+  /**
+   * CarePlan createMany
+   */
+  export type CarePlanCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many CarePlans.
+     */
+    data: CarePlanCreateManyInput | CarePlanCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+
+  /**
+   * CarePlan update
+   */
+  export type CarePlanUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlan
+     */
+    select?: CarePlanSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanInclude<ExtArgs> | null
+    /**
+     * The data needed to update a CarePlan.
+     */
+    data: XOR<CarePlanUpdateInput, CarePlanUncheckedUpdateInput>
+    /**
+     * Choose, which CarePlan to update.
+     */
+    where: CarePlanWhereUniqueInput
+  }
+
+
+  /**
+   * CarePlan updateMany
+   */
+  export type CarePlanUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update CarePlans.
+     */
+    data: XOR<CarePlanUpdateManyMutationInput, CarePlanUncheckedUpdateManyInput>
+    /**
+     * Filter which CarePlans to update
+     */
+    where?: CarePlanWhereInput
+  }
+
+
+  /**
+   * CarePlan upsert
+   */
+  export type CarePlanUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlan
+     */
+    select?: CarePlanSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanInclude<ExtArgs> | null
+    /**
+     * The filter to search for the CarePlan to update in case it exists.
+     */
+    where: CarePlanWhereUniqueInput
+    /**
+     * In case the CarePlan found by the `where` argument doesn't exist, create a new CarePlan with this data.
+     */
+    create: XOR<CarePlanCreateInput, CarePlanUncheckedCreateInput>
+    /**
+     * In case the CarePlan was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<CarePlanUpdateInput, CarePlanUncheckedUpdateInput>
+  }
+
+
+  /**
+   * CarePlan delete
+   */
+  export type CarePlanDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlan
+     */
+    select?: CarePlanSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanInclude<ExtArgs> | null
+    /**
+     * Filter which CarePlan to delete.
+     */
+    where: CarePlanWhereUniqueInput
+  }
+
+
+  /**
+   * CarePlan deleteMany
+   */
+  export type CarePlanDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CarePlans to delete
+     */
+    where?: CarePlanWhereInput
+  }
+
+
+  /**
+   * CarePlan.active_version
+   */
+  export type CarePlan$active_versionArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlanVersion
+     */
+    select?: CarePlanVersionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanVersionInclude<ExtArgs> | null
+    where?: CarePlanVersionWhereInput
+  }
+
+
+  /**
+   * CarePlan.draft_version
+   */
+  export type CarePlan$draft_versionArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlanVersion
+     */
+    select?: CarePlanVersionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanVersionInclude<ExtArgs> | null
+    where?: CarePlanVersionWhereInput
+  }
+
+
+  /**
+   * CarePlan.versions
+   */
+  export type CarePlan$versionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlanVersion
+     */
+    select?: CarePlanVersionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanVersionInclude<ExtArgs> | null
+    where?: CarePlanVersionWhereInput
+    orderBy?: CarePlanVersionOrderByWithRelationInput | CarePlanVersionOrderByWithRelationInput[]
+    cursor?: CarePlanVersionWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: CarePlanVersionScalarFieldEnum | CarePlanVersionScalarFieldEnum[]
+  }
+
+
+  /**
+   * CarePlan without action
+   */
+  export type CarePlanDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlan
+     */
+    select?: CarePlanSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanInclude<ExtArgs> | null
+  }
+
+
+
+  /**
+   * Model CarePlanVersion
+   */
+
+  export type AggregateCarePlanVersion = {
+    _count: CarePlanVersionCountAggregateOutputType | null
+    _avg: CarePlanVersionAvgAggregateOutputType | null
+    _sum: CarePlanVersionSumAggregateOutputType | null
+    _min: CarePlanVersionMinAggregateOutputType | null
+    _max: CarePlanVersionMaxAggregateOutputType | null
+  }
+
+  export type CarePlanVersionAvgAggregateOutputType = {
+    version_number: number | null
+  }
+
+  export type CarePlanVersionSumAggregateOutputType = {
+    version_number: number | null
+  }
+
+  export type CarePlanVersionMinAggregateOutputType = {
+    id: string | null
+    care_plan_id: string | null
+    version_number: number | null
+    status: $Enums.CarePlanStatus | null
+    review_due_at: Date | null
+    effective_from: Date | null
+    authored_by: string | null
+    approved_by: string | null
+    approved_at: Date | null
+    created_at: Date | null
+    updated_at: Date | null
+    deleted_at: Date | null
+  }
+
+  export type CarePlanVersionMaxAggregateOutputType = {
+    id: string | null
+    care_plan_id: string | null
+    version_number: number | null
+    status: $Enums.CarePlanStatus | null
+    review_due_at: Date | null
+    effective_from: Date | null
+    authored_by: string | null
+    approved_by: string | null
+    approved_at: Date | null
+    created_at: Date | null
+    updated_at: Date | null
+    deleted_at: Date | null
+  }
+
+  export type CarePlanVersionCountAggregateOutputType = {
+    id: number
+    care_plan_id: number
+    version_number: number
+    status: number
+    review_due_at: number
+    effective_from: number
+    authored_by: number
+    approved_by: number
+    approved_at: number
+    content: number
+    created_at: number
+    updated_at: number
+    deleted_at: number
+    _all: number
+  }
+
+
+  export type CarePlanVersionAvgAggregateInputType = {
+    version_number?: true
+  }
+
+  export type CarePlanVersionSumAggregateInputType = {
+    version_number?: true
+  }
+
+  export type CarePlanVersionMinAggregateInputType = {
+    id?: true
+    care_plan_id?: true
+    version_number?: true
+    status?: true
+    review_due_at?: true
+    effective_from?: true
+    authored_by?: true
+    approved_by?: true
+    approved_at?: true
+    created_at?: true
+    updated_at?: true
+    deleted_at?: true
+  }
+
+  export type CarePlanVersionMaxAggregateInputType = {
+    id?: true
+    care_plan_id?: true
+    version_number?: true
+    status?: true
+    review_due_at?: true
+    effective_from?: true
+    authored_by?: true
+    approved_by?: true
+    approved_at?: true
+    created_at?: true
+    updated_at?: true
+    deleted_at?: true
+  }
+
+  export type CarePlanVersionCountAggregateInputType = {
+    id?: true
+    care_plan_id?: true
+    version_number?: true
+    status?: true
+    review_due_at?: true
+    effective_from?: true
+    authored_by?: true
+    approved_by?: true
+    approved_at?: true
+    content?: true
+    created_at?: true
+    updated_at?: true
+    deleted_at?: true
+    _all?: true
+  }
+
+  export type CarePlanVersionAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CarePlanVersion to aggregate.
+     */
+    where?: CarePlanVersionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CarePlanVersions to fetch.
+     */
+    orderBy?: CarePlanVersionOrderByWithRelationInput | CarePlanVersionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: CarePlanVersionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CarePlanVersions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CarePlanVersions.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned CarePlanVersions
+    **/
+    _count?: true | CarePlanVersionCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: CarePlanVersionAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: CarePlanVersionSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: CarePlanVersionMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: CarePlanVersionMaxAggregateInputType
+  }
+
+  export type GetCarePlanVersionAggregateType<T extends CarePlanVersionAggregateArgs> = {
+        [P in keyof T & keyof AggregateCarePlanVersion]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateCarePlanVersion[P]>
+      : GetScalarType<T[P], AggregateCarePlanVersion[P]>
+  }
+
+
+
+
+  export type CarePlanVersionGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CarePlanVersionWhereInput
+    orderBy?: CarePlanVersionOrderByWithAggregationInput | CarePlanVersionOrderByWithAggregationInput[]
+    by: CarePlanVersionScalarFieldEnum[] | CarePlanVersionScalarFieldEnum
+    having?: CarePlanVersionScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: CarePlanVersionCountAggregateInputType | true
+    _avg?: CarePlanVersionAvgAggregateInputType
+    _sum?: CarePlanVersionSumAggregateInputType
+    _min?: CarePlanVersionMinAggregateInputType
+    _max?: CarePlanVersionMaxAggregateInputType
+  }
+
+  export type CarePlanVersionGroupByOutputType = {
+    id: string
+    care_plan_id: string
+    version_number: number
+    status: $Enums.CarePlanStatus
+    review_due_at: Date | null
+    effective_from: Date | null
+    authored_by: string
+    approved_by: string | null
+    approved_at: Date | null
+    content: JsonValue
+    created_at: Date
+    updated_at: Date
+    deleted_at: Date | null
+    _count: CarePlanVersionCountAggregateOutputType | null
+    _avg: CarePlanVersionAvgAggregateOutputType | null
+    _sum: CarePlanVersionSumAggregateOutputType | null
+    _min: CarePlanVersionMinAggregateOutputType | null
+    _max: CarePlanVersionMaxAggregateOutputType | null
+  }
+
+  type GetCarePlanVersionGroupByPayload<T extends CarePlanVersionGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<CarePlanVersionGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof CarePlanVersionGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], CarePlanVersionGroupByOutputType[P]>
+            : GetScalarType<T[P], CarePlanVersionGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type CarePlanVersionSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    care_plan_id?: boolean
+    version_number?: boolean
+    status?: boolean
+    review_due_at?: boolean
+    effective_from?: boolean
+    authored_by?: boolean
+    approved_by?: boolean
+    approved_at?: boolean
+    content?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+    deleted_at?: boolean
+    care_plan?: boolean | CarePlanDefaultArgs<ExtArgs>
+    active_for?: boolean | CarePlanVersion$active_forArgs<ExtArgs>
+    draft_for?: boolean | CarePlanVersion$draft_forArgs<ExtArgs>
+  }, ExtArgs["result"]["carePlanVersion"]>
+
+  export type CarePlanVersionSelectScalar = {
+    id?: boolean
+    care_plan_id?: boolean
+    version_number?: boolean
+    status?: boolean
+    review_due_at?: boolean
+    effective_from?: boolean
+    authored_by?: boolean
+    approved_by?: boolean
+    approved_at?: boolean
+    content?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+    deleted_at?: boolean
+  }
+
+  export type CarePlanVersionInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    care_plan?: boolean | CarePlanDefaultArgs<ExtArgs>
+    active_for?: boolean | CarePlanVersion$active_forArgs<ExtArgs>
+    draft_for?: boolean | CarePlanVersion$draft_forArgs<ExtArgs>
+  }
+
+
+  export type $CarePlanVersionPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "CarePlanVersion"
+    objects: {
+      care_plan: Prisma.$CarePlanPayload<ExtArgs>
+      active_for: Prisma.$CarePlanPayload<ExtArgs> | null
+      draft_for: Prisma.$CarePlanPayload<ExtArgs> | null
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      care_plan_id: string
+      version_number: number
+      status: $Enums.CarePlanStatus
+      review_due_at: Date | null
+      effective_from: Date | null
+      authored_by: string
+      approved_by: string | null
+      approved_at: Date | null
+      content: Prisma.JsonValue
+      created_at: Date
+      updated_at: Date
+      deleted_at: Date | null
+    }, ExtArgs["result"]["carePlanVersion"]>
+    composites: {}
+  }
+
+
+  type CarePlanVersionGetPayload<S extends boolean | null | undefined | CarePlanVersionDefaultArgs> = $Result.GetResult<Prisma.$CarePlanVersionPayload, S>
+
+  type CarePlanVersionCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<CarePlanVersionFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: CarePlanVersionCountAggregateInputType | true
+    }
+
+  export interface CarePlanVersionDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['CarePlanVersion'], meta: { name: 'CarePlanVersion' } }
+    /**
+     * Find zero or one CarePlanVersion that matches the filter.
+     * @param {CarePlanVersionFindUniqueArgs} args - Arguments to find a CarePlanVersion
+     * @example
+     * // Get one CarePlanVersion
+     * const carePlanVersion = await prisma.carePlanVersion.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUnique<T extends CarePlanVersionFindUniqueArgs<ExtArgs>>(
+      args: SelectSubset<T, CarePlanVersionFindUniqueArgs<ExtArgs>>
+    ): Prisma__CarePlanVersionClient<$Result.GetResult<Prisma.$CarePlanVersionPayload<ExtArgs>, T, 'findUnique'> | null, null, ExtArgs>
+
+    /**
+     * Find one CarePlanVersion that matches the filter or throw an error  with `error.code='P2025'` 
+     *     if no matches were found.
+     * @param {CarePlanVersionFindUniqueOrThrowArgs} args - Arguments to find a CarePlanVersion
+     * @example
+     * // Get one CarePlanVersion
+     * const carePlanVersion = await prisma.carePlanVersion.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUniqueOrThrow<T extends CarePlanVersionFindUniqueOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, CarePlanVersionFindUniqueOrThrowArgs<ExtArgs>>
+    ): Prisma__CarePlanVersionClient<$Result.GetResult<Prisma.$CarePlanVersionPayload<ExtArgs>, T, 'findUniqueOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find the first CarePlanVersion that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CarePlanVersionFindFirstArgs} args - Arguments to find a CarePlanVersion
+     * @example
+     * // Get one CarePlanVersion
+     * const carePlanVersion = await prisma.carePlanVersion.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirst<T extends CarePlanVersionFindFirstArgs<ExtArgs>>(
+      args?: SelectSubset<T, CarePlanVersionFindFirstArgs<ExtArgs>>
+    ): Prisma__CarePlanVersionClient<$Result.GetResult<Prisma.$CarePlanVersionPayload<ExtArgs>, T, 'findFirst'> | null, null, ExtArgs>
+
+    /**
+     * Find the first CarePlanVersion that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CarePlanVersionFindFirstOrThrowArgs} args - Arguments to find a CarePlanVersion
+     * @example
+     * // Get one CarePlanVersion
+     * const carePlanVersion = await prisma.carePlanVersion.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirstOrThrow<T extends CarePlanVersionFindFirstOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, CarePlanVersionFindFirstOrThrowArgs<ExtArgs>>
+    ): Prisma__CarePlanVersionClient<$Result.GetResult<Prisma.$CarePlanVersionPayload<ExtArgs>, T, 'findFirstOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find zero or more CarePlanVersions that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CarePlanVersionFindManyArgs=} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all CarePlanVersions
+     * const carePlanVersions = await prisma.carePlanVersion.findMany()
+     * 
+     * // Get first 10 CarePlanVersions
+     * const carePlanVersions = await prisma.carePlanVersion.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const carePlanVersionWithIdOnly = await prisma.carePlanVersion.findMany({ select: { id: true } })
+     * 
+    **/
+    findMany<T extends CarePlanVersionFindManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, CarePlanVersionFindManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CarePlanVersionPayload<ExtArgs>, T, 'findMany'>>
+
+    /**
+     * Create a CarePlanVersion.
+     * @param {CarePlanVersionCreateArgs} args - Arguments to create a CarePlanVersion.
+     * @example
+     * // Create one CarePlanVersion
+     * const CarePlanVersion = await prisma.carePlanVersion.create({
+     *   data: {
+     *     // ... data to create a CarePlanVersion
+     *   }
+     * })
+     * 
+    **/
+    create<T extends CarePlanVersionCreateArgs<ExtArgs>>(
+      args: SelectSubset<T, CarePlanVersionCreateArgs<ExtArgs>>
+    ): Prisma__CarePlanVersionClient<$Result.GetResult<Prisma.$CarePlanVersionPayload<ExtArgs>, T, 'create'>, never, ExtArgs>
+
+    /**
+     * Create many CarePlanVersions.
+     *     @param {CarePlanVersionCreateManyArgs} args - Arguments to create many CarePlanVersions.
+     *     @example
+     *     // Create many CarePlanVersions
+     *     const carePlanVersion = await prisma.carePlanVersion.createMany({
+     *       data: {
+     *         // ... provide data here
+     *       }
+     *     })
+     *     
+    **/
+    createMany<T extends CarePlanVersionCreateManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, CarePlanVersionCreateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Delete a CarePlanVersion.
+     * @param {CarePlanVersionDeleteArgs} args - Arguments to delete one CarePlanVersion.
+     * @example
+     * // Delete one CarePlanVersion
+     * const CarePlanVersion = await prisma.carePlanVersion.delete({
+     *   where: {
+     *     // ... filter to delete one CarePlanVersion
+     *   }
+     * })
+     * 
+    **/
+    delete<T extends CarePlanVersionDeleteArgs<ExtArgs>>(
+      args: SelectSubset<T, CarePlanVersionDeleteArgs<ExtArgs>>
+    ): Prisma__CarePlanVersionClient<$Result.GetResult<Prisma.$CarePlanVersionPayload<ExtArgs>, T, 'delete'>, never, ExtArgs>
+
+    /**
+     * Update one CarePlanVersion.
+     * @param {CarePlanVersionUpdateArgs} args - Arguments to update one CarePlanVersion.
+     * @example
+     * // Update one CarePlanVersion
+     * const carePlanVersion = await prisma.carePlanVersion.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    update<T extends CarePlanVersionUpdateArgs<ExtArgs>>(
+      args: SelectSubset<T, CarePlanVersionUpdateArgs<ExtArgs>>
+    ): Prisma__CarePlanVersionClient<$Result.GetResult<Prisma.$CarePlanVersionPayload<ExtArgs>, T, 'update'>, never, ExtArgs>
+
+    /**
+     * Delete zero or more CarePlanVersions.
+     * @param {CarePlanVersionDeleteManyArgs} args - Arguments to filter CarePlanVersions to delete.
+     * @example
+     * // Delete a few CarePlanVersions
+     * const { count } = await prisma.carePlanVersion.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+    **/
+    deleteMany<T extends CarePlanVersionDeleteManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, CarePlanVersionDeleteManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CarePlanVersions.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CarePlanVersionUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many CarePlanVersions
+     * const carePlanVersion = await prisma.carePlanVersion.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+    **/
+    updateMany<T extends CarePlanVersionUpdateManyArgs<ExtArgs>>(
+      args: SelectSubset<T, CarePlanVersionUpdateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one CarePlanVersion.
+     * @param {CarePlanVersionUpsertArgs} args - Arguments to update or create a CarePlanVersion.
+     * @example
+     * // Update or create a CarePlanVersion
+     * const carePlanVersion = await prisma.carePlanVersion.upsert({
+     *   create: {
+     *     // ... data to create a CarePlanVersion
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the CarePlanVersion we want to update
+     *   }
+     * })
+    **/
+    upsert<T extends CarePlanVersionUpsertArgs<ExtArgs>>(
+      args: SelectSubset<T, CarePlanVersionUpsertArgs<ExtArgs>>
+    ): Prisma__CarePlanVersionClient<$Result.GetResult<Prisma.$CarePlanVersionPayload<ExtArgs>, T, 'upsert'>, never, ExtArgs>
+
+    /**
+     * Count the number of CarePlanVersions.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CarePlanVersionCountArgs} args - Arguments to filter CarePlanVersions to count.
+     * @example
+     * // Count the number of CarePlanVersions
+     * const count = await prisma.carePlanVersion.count({
+     *   where: {
+     *     // ... the filter for the CarePlanVersions we want to count
+     *   }
+     * })
+    **/
+    count<T extends CarePlanVersionCountArgs>(
+      args?: Subset<T, CarePlanVersionCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], CarePlanVersionCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a CarePlanVersion.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CarePlanVersionAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends CarePlanVersionAggregateArgs>(args: Subset<T, CarePlanVersionAggregateArgs>): Prisma.PrismaPromise<GetCarePlanVersionAggregateType<T>>
+
+    /**
+     * Group by CarePlanVersion.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CarePlanVersionGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends CarePlanVersionGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: CarePlanVersionGroupByArgs['orderBy'] }
+        : { orderBy?: CarePlanVersionGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, CarePlanVersionGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetCarePlanVersionGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the CarePlanVersion model
+   */
+  readonly fields: CarePlanVersionFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for CarePlanVersion.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__CarePlanVersionClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: 'PrismaPromise';
+
+    care_plan<T extends CarePlanDefaultArgs<ExtArgs> = {}>(args?: Subset<T, CarePlanDefaultArgs<ExtArgs>>): Prisma__CarePlanClient<$Result.GetResult<Prisma.$CarePlanPayload<ExtArgs>, T, 'findUniqueOrThrow'> | Null, Null, ExtArgs>;
+
+    active_for<T extends CarePlanVersion$active_forArgs<ExtArgs> = {}>(args?: Subset<T, CarePlanVersion$active_forArgs<ExtArgs>>): Prisma__CarePlanClient<$Result.GetResult<Prisma.$CarePlanPayload<ExtArgs>, T, 'findUniqueOrThrow'> | null, null, ExtArgs>;
+
+    draft_for<T extends CarePlanVersion$draft_forArgs<ExtArgs> = {}>(args?: Subset<T, CarePlanVersion$draft_forArgs<ExtArgs>>): Prisma__CarePlanClient<$Result.GetResult<Prisma.$CarePlanPayload<ExtArgs>, T, 'findUniqueOrThrow'> | null, null, ExtArgs>;
+
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>;
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>;
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>;
+  }
+
+
+
+  /**
+   * Fields of the CarePlanVersion model
+   */ 
+  interface CarePlanVersionFieldRefs {
+    readonly id: FieldRef<"CarePlanVersion", 'String'>
+    readonly care_plan_id: FieldRef<"CarePlanVersion", 'String'>
+    readonly version_number: FieldRef<"CarePlanVersion", 'Int'>
+    readonly status: FieldRef<"CarePlanVersion", 'CarePlanStatus'>
+    readonly review_due_at: FieldRef<"CarePlanVersion", 'DateTime'>
+    readonly effective_from: FieldRef<"CarePlanVersion", 'DateTime'>
+    readonly authored_by: FieldRef<"CarePlanVersion", 'String'>
+    readonly approved_by: FieldRef<"CarePlanVersion", 'String'>
+    readonly approved_at: FieldRef<"CarePlanVersion", 'DateTime'>
+    readonly content: FieldRef<"CarePlanVersion", 'Json'>
+    readonly created_at: FieldRef<"CarePlanVersion", 'DateTime'>
+    readonly updated_at: FieldRef<"CarePlanVersion", 'DateTime'>
+    readonly deleted_at: FieldRef<"CarePlanVersion", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+
+  /**
+   * CarePlanVersion findUnique
+   */
+  export type CarePlanVersionFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlanVersion
+     */
+    select?: CarePlanVersionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanVersionInclude<ExtArgs> | null
+    /**
+     * Filter, which CarePlanVersion to fetch.
+     */
+    where: CarePlanVersionWhereUniqueInput
+  }
+
+
+  /**
+   * CarePlanVersion findUniqueOrThrow
+   */
+  export type CarePlanVersionFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlanVersion
+     */
+    select?: CarePlanVersionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanVersionInclude<ExtArgs> | null
+    /**
+     * Filter, which CarePlanVersion to fetch.
+     */
+    where: CarePlanVersionWhereUniqueInput
+  }
+
+
+  /**
+   * CarePlanVersion findFirst
+   */
+  export type CarePlanVersionFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlanVersion
+     */
+    select?: CarePlanVersionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanVersionInclude<ExtArgs> | null
+    /**
+     * Filter, which CarePlanVersion to fetch.
+     */
+    where?: CarePlanVersionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CarePlanVersions to fetch.
+     */
+    orderBy?: CarePlanVersionOrderByWithRelationInput | CarePlanVersionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CarePlanVersions.
+     */
+    cursor?: CarePlanVersionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CarePlanVersions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CarePlanVersions.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CarePlanVersions.
+     */
+    distinct?: CarePlanVersionScalarFieldEnum | CarePlanVersionScalarFieldEnum[]
+  }
+
+
+  /**
+   * CarePlanVersion findFirstOrThrow
+   */
+  export type CarePlanVersionFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlanVersion
+     */
+    select?: CarePlanVersionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanVersionInclude<ExtArgs> | null
+    /**
+     * Filter, which CarePlanVersion to fetch.
+     */
+    where?: CarePlanVersionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CarePlanVersions to fetch.
+     */
+    orderBy?: CarePlanVersionOrderByWithRelationInput | CarePlanVersionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CarePlanVersions.
+     */
+    cursor?: CarePlanVersionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CarePlanVersions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CarePlanVersions.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CarePlanVersions.
+     */
+    distinct?: CarePlanVersionScalarFieldEnum | CarePlanVersionScalarFieldEnum[]
+  }
+
+
+  /**
+   * CarePlanVersion findMany
+   */
+  export type CarePlanVersionFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlanVersion
+     */
+    select?: CarePlanVersionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanVersionInclude<ExtArgs> | null
+    /**
+     * Filter, which CarePlanVersions to fetch.
+     */
+    where?: CarePlanVersionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CarePlanVersions to fetch.
+     */
+    orderBy?: CarePlanVersionOrderByWithRelationInput | CarePlanVersionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing CarePlanVersions.
+     */
+    cursor?: CarePlanVersionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CarePlanVersions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CarePlanVersions.
+     */
+    skip?: number
+    distinct?: CarePlanVersionScalarFieldEnum | CarePlanVersionScalarFieldEnum[]
+  }
+
+
+  /**
+   * CarePlanVersion create
+   */
+  export type CarePlanVersionCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlanVersion
+     */
+    select?: CarePlanVersionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanVersionInclude<ExtArgs> | null
+    /**
+     * The data needed to create a CarePlanVersion.
+     */
+    data: XOR<CarePlanVersionCreateInput, CarePlanVersionUncheckedCreateInput>
+  }
+
+
+  /**
+   * CarePlanVersion createMany
+   */
+  export type CarePlanVersionCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many CarePlanVersions.
+     */
+    data: CarePlanVersionCreateManyInput | CarePlanVersionCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+
+  /**
+   * CarePlanVersion update
+   */
+  export type CarePlanVersionUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlanVersion
+     */
+    select?: CarePlanVersionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanVersionInclude<ExtArgs> | null
+    /**
+     * The data needed to update a CarePlanVersion.
+     */
+    data: XOR<CarePlanVersionUpdateInput, CarePlanVersionUncheckedUpdateInput>
+    /**
+     * Choose, which CarePlanVersion to update.
+     */
+    where: CarePlanVersionWhereUniqueInput
+  }
+
+
+  /**
+   * CarePlanVersion updateMany
+   */
+  export type CarePlanVersionUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update CarePlanVersions.
+     */
+    data: XOR<CarePlanVersionUpdateManyMutationInput, CarePlanVersionUncheckedUpdateManyInput>
+    /**
+     * Filter which CarePlanVersions to update
+     */
+    where?: CarePlanVersionWhereInput
+  }
+
+
+  /**
+   * CarePlanVersion upsert
+   */
+  export type CarePlanVersionUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlanVersion
+     */
+    select?: CarePlanVersionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanVersionInclude<ExtArgs> | null
+    /**
+     * The filter to search for the CarePlanVersion to update in case it exists.
+     */
+    where: CarePlanVersionWhereUniqueInput
+    /**
+     * In case the CarePlanVersion found by the `where` argument doesn't exist, create a new CarePlanVersion with this data.
+     */
+    create: XOR<CarePlanVersionCreateInput, CarePlanVersionUncheckedCreateInput>
+    /**
+     * In case the CarePlanVersion was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<CarePlanVersionUpdateInput, CarePlanVersionUncheckedUpdateInput>
+  }
+
+
+  /**
+   * CarePlanVersion delete
+   */
+  export type CarePlanVersionDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlanVersion
+     */
+    select?: CarePlanVersionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanVersionInclude<ExtArgs> | null
+    /**
+     * Filter which CarePlanVersion to delete.
+     */
+    where: CarePlanVersionWhereUniqueInput
+  }
+
+
+  /**
+   * CarePlanVersion deleteMany
+   */
+  export type CarePlanVersionDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CarePlanVersions to delete
+     */
+    where?: CarePlanVersionWhereInput
+  }
+
+
+  /**
+   * CarePlanVersion.active_for
+   */
+  export type CarePlanVersion$active_forArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlan
+     */
+    select?: CarePlanSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanInclude<ExtArgs> | null
+    where?: CarePlanWhereInput
+  }
+
+
+  /**
+   * CarePlanVersion.draft_for
+   */
+  export type CarePlanVersion$draft_forArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlan
+     */
+    select?: CarePlanSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanInclude<ExtArgs> | null
+    where?: CarePlanWhereInput
+  }
+
+
+  /**
+   * CarePlanVersion without action
+   */
+  export type CarePlanVersionDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CarePlanVersion
+     */
+    select?: CarePlanVersionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: CarePlanVersionInclude<ExtArgs> | null
   }
 
 
@@ -17263,11 +19682,20 @@ export namespace Prisma {
   export const ClientScalarFieldEnum: {
     id: 'id',
     full_name: 'full_name',
+    preferred_name: 'preferred_name',
+    pronouns: 'pronouns',
     address_line1: 'address_line1',
     address_line2: 'address_line2',
     city: 'city',
     postcode: 'postcode',
     date_of_birth: 'date_of_birth',
+    preferred_language: 'preferred_language',
+    communication_needs: 'communication_needs',
+    accessibility_adjustments: 'accessibility_adjustments',
+    representative_name: 'representative_name',
+    representative_relationship: 'representative_relationship',
+    representative_phone: 'representative_phone',
+    representative_email: 'representative_email',
     organization_id: 'organization_id',
     created_at: 'created_at',
     updated_at: 'updated_at',
@@ -17275,6 +19703,38 @@ export namespace Prisma {
   };
 
   export type ClientScalarFieldEnum = (typeof ClientScalarFieldEnum)[keyof typeof ClientScalarFieldEnum]
+
+
+  export const CarePlanScalarFieldEnum: {
+    id: 'id',
+    client_id: 'client_id',
+    active_version_id: 'active_version_id',
+    draft_version_id: 'draft_version_id',
+    created_at: 'created_at',
+    updated_at: 'updated_at',
+    deleted_at: 'deleted_at'
+  };
+
+  export type CarePlanScalarFieldEnum = (typeof CarePlanScalarFieldEnum)[keyof typeof CarePlanScalarFieldEnum]
+
+
+  export const CarePlanVersionScalarFieldEnum: {
+    id: 'id',
+    care_plan_id: 'care_plan_id',
+    version_number: 'version_number',
+    status: 'status',
+    review_due_at: 'review_due_at',
+    effective_from: 'effective_from',
+    authored_by: 'authored_by',
+    approved_by: 'approved_by',
+    approved_at: 'approved_at',
+    content: 'content',
+    created_at: 'created_at',
+    updated_at: 'updated_at',
+    deleted_at: 'deleted_at'
+  };
+
+  export type CarePlanVersionScalarFieldEnum = (typeof CarePlanVersionScalarFieldEnum)[keyof typeof CarePlanVersionScalarFieldEnum]
 
 
   export const VisitScalarFieldEnum: {
@@ -17572,20 +20032,6 @@ export namespace Prisma {
 
 
   /**
-   * Reference to a field of type 'VisitStatus'
-   */
-  export type EnumVisitStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VisitStatus'>
-    
-
-
-  /**
-   * Reference to a field of type 'VisitStatus[]'
-   */
-  export type ListEnumVisitStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VisitStatus[]'>
-    
-
-
-  /**
    * Reference to a field of type 'Int'
    */
   export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
@@ -17596,6 +20042,41 @@ export namespace Prisma {
    * Reference to a field of type 'Int[]'
    */
   export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'CarePlanStatus'
+   */
+  export type EnumCarePlanStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CarePlanStatus'>
+    
+
+
+  /**
+   * Reference to a field of type 'CarePlanStatus[]'
+   */
+  export type ListEnumCarePlanStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CarePlanStatus[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'Json'
+   */
+  export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
+    
+
+
+  /**
+   * Reference to a field of type 'VisitStatus'
+   */
+  export type EnumVisitStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VisitStatus'>
+    
+
+
+  /**
+   * Reference to a field of type 'VisitStatus[]'
+   */
+  export type ListEnumVisitStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VisitStatus[]'>
     
 
 
@@ -17624,13 +20105,6 @@ export namespace Prisma {
    * Reference to a field of type 'MedicationAuditAction[]'
    */
   export type ListEnumMedicationAuditActionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MedicationAuditAction[]'>
-    
-
-
-  /**
-   * Reference to a field of type 'Json'
-   */
-  export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
     
 
 
@@ -17740,17 +20214,27 @@ export namespace Prisma {
     NOT?: ClientWhereInput | ClientWhereInput[]
     id?: StringFilter<"Client"> | string
     full_name?: StringFilter<"Client"> | string
+    preferred_name?: StringNullableFilter<"Client"> | string | null
+    pronouns?: StringNullableFilter<"Client"> | string | null
     address_line1?: StringFilter<"Client"> | string
     address_line2?: StringNullableFilter<"Client"> | string | null
     city?: StringFilter<"Client"> | string
     postcode?: StringFilter<"Client"> | string
     date_of_birth?: DateTimeNullableFilter<"Client"> | Date | string | null
+    preferred_language?: StringNullableFilter<"Client"> | string | null
+    communication_needs?: StringNullableFilter<"Client"> | string | null
+    accessibility_adjustments?: StringNullableFilter<"Client"> | string | null
+    representative_name?: StringNullableFilter<"Client"> | string | null
+    representative_relationship?: StringNullableFilter<"Client"> | string | null
+    representative_phone?: StringNullableFilter<"Client"> | string | null
+    representative_email?: StringNullableFilter<"Client"> | string | null
     organization_id?: StringNullableFilter<"Client"> | string | null
     created_at?: DateTimeFilter<"Client"> | Date | string
     updated_at?: DateTimeFilter<"Client"> | Date | string
     deleted_at?: DateTimeNullableFilter<"Client"> | Date | string | null
     visits?: VisitListRelationFilter
     prescriptions?: PrescriptionListRelationFilter
+    care_plan?: XOR<CarePlanNullableRelationFilter, CarePlanWhereInput> | null
     organization?: XOR<OrganizationNullableRelationFilter, OrganizationWhereInput> | null
     health_summaries?: HealthSummaryListRelationFilter
   }
@@ -17758,17 +20242,27 @@ export namespace Prisma {
   export type ClientOrderByWithRelationInput = {
     id?: SortOrder
     full_name?: SortOrder
+    preferred_name?: SortOrderInput | SortOrder
+    pronouns?: SortOrderInput | SortOrder
     address_line1?: SortOrder
     address_line2?: SortOrderInput | SortOrder
     city?: SortOrder
     postcode?: SortOrder
     date_of_birth?: SortOrderInput | SortOrder
+    preferred_language?: SortOrderInput | SortOrder
+    communication_needs?: SortOrderInput | SortOrder
+    accessibility_adjustments?: SortOrderInput | SortOrder
+    representative_name?: SortOrderInput | SortOrder
+    representative_relationship?: SortOrderInput | SortOrder
+    representative_phone?: SortOrderInput | SortOrder
+    representative_email?: SortOrderInput | SortOrder
     organization_id?: SortOrderInput | SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
     deleted_at?: SortOrderInput | SortOrder
     visits?: VisitOrderByRelationAggregateInput
     prescriptions?: PrescriptionOrderByRelationAggregateInput
+    care_plan?: CarePlanOrderByWithRelationInput
     organization?: OrganizationOrderByWithRelationInput
     health_summaries?: HealthSummaryOrderByRelationAggregateInput
   }
@@ -17779,17 +20273,27 @@ export namespace Prisma {
     OR?: ClientWhereInput[]
     NOT?: ClientWhereInput | ClientWhereInput[]
     full_name?: StringFilter<"Client"> | string
+    preferred_name?: StringNullableFilter<"Client"> | string | null
+    pronouns?: StringNullableFilter<"Client"> | string | null
     address_line1?: StringFilter<"Client"> | string
     address_line2?: StringNullableFilter<"Client"> | string | null
     city?: StringFilter<"Client"> | string
     postcode?: StringFilter<"Client"> | string
     date_of_birth?: DateTimeNullableFilter<"Client"> | Date | string | null
+    preferred_language?: StringNullableFilter<"Client"> | string | null
+    communication_needs?: StringNullableFilter<"Client"> | string | null
+    accessibility_adjustments?: StringNullableFilter<"Client"> | string | null
+    representative_name?: StringNullableFilter<"Client"> | string | null
+    representative_relationship?: StringNullableFilter<"Client"> | string | null
+    representative_phone?: StringNullableFilter<"Client"> | string | null
+    representative_email?: StringNullableFilter<"Client"> | string | null
     organization_id?: StringNullableFilter<"Client"> | string | null
     created_at?: DateTimeFilter<"Client"> | Date | string
     updated_at?: DateTimeFilter<"Client"> | Date | string
     deleted_at?: DateTimeNullableFilter<"Client"> | Date | string | null
     visits?: VisitListRelationFilter
     prescriptions?: PrescriptionListRelationFilter
+    care_plan?: XOR<CarePlanNullableRelationFilter, CarePlanWhereInput> | null
     organization?: XOR<OrganizationNullableRelationFilter, OrganizationWhereInput> | null
     health_summaries?: HealthSummaryListRelationFilter
   }, "id">
@@ -17797,11 +20301,20 @@ export namespace Prisma {
   export type ClientOrderByWithAggregationInput = {
     id?: SortOrder
     full_name?: SortOrder
+    preferred_name?: SortOrderInput | SortOrder
+    pronouns?: SortOrderInput | SortOrder
     address_line1?: SortOrder
     address_line2?: SortOrderInput | SortOrder
     city?: SortOrder
     postcode?: SortOrder
     date_of_birth?: SortOrderInput | SortOrder
+    preferred_language?: SortOrderInput | SortOrder
+    communication_needs?: SortOrderInput | SortOrder
+    accessibility_adjustments?: SortOrderInput | SortOrder
+    representative_name?: SortOrderInput | SortOrder
+    representative_relationship?: SortOrderInput | SortOrder
+    representative_phone?: SortOrderInput | SortOrder
+    representative_email?: SortOrderInput | SortOrder
     organization_id?: SortOrderInput | SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
@@ -17817,15 +20330,202 @@ export namespace Prisma {
     NOT?: ClientScalarWhereWithAggregatesInput | ClientScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"Client"> | string
     full_name?: StringWithAggregatesFilter<"Client"> | string
+    preferred_name?: StringNullableWithAggregatesFilter<"Client"> | string | null
+    pronouns?: StringNullableWithAggregatesFilter<"Client"> | string | null
     address_line1?: StringWithAggregatesFilter<"Client"> | string
     address_line2?: StringNullableWithAggregatesFilter<"Client"> | string | null
     city?: StringWithAggregatesFilter<"Client"> | string
     postcode?: StringWithAggregatesFilter<"Client"> | string
     date_of_birth?: DateTimeNullableWithAggregatesFilter<"Client"> | Date | string | null
+    preferred_language?: StringNullableWithAggregatesFilter<"Client"> | string | null
+    communication_needs?: StringNullableWithAggregatesFilter<"Client"> | string | null
+    accessibility_adjustments?: StringNullableWithAggregatesFilter<"Client"> | string | null
+    representative_name?: StringNullableWithAggregatesFilter<"Client"> | string | null
+    representative_relationship?: StringNullableWithAggregatesFilter<"Client"> | string | null
+    representative_phone?: StringNullableWithAggregatesFilter<"Client"> | string | null
+    representative_email?: StringNullableWithAggregatesFilter<"Client"> | string | null
     organization_id?: StringNullableWithAggregatesFilter<"Client"> | string | null
     created_at?: DateTimeWithAggregatesFilter<"Client"> | Date | string
     updated_at?: DateTimeWithAggregatesFilter<"Client"> | Date | string
     deleted_at?: DateTimeNullableWithAggregatesFilter<"Client"> | Date | string | null
+  }
+
+  export type CarePlanWhereInput = {
+    AND?: CarePlanWhereInput | CarePlanWhereInput[]
+    OR?: CarePlanWhereInput[]
+    NOT?: CarePlanWhereInput | CarePlanWhereInput[]
+    id?: StringFilter<"CarePlan"> | string
+    client_id?: StringFilter<"CarePlan"> | string
+    active_version_id?: StringNullableFilter<"CarePlan"> | string | null
+    draft_version_id?: StringNullableFilter<"CarePlan"> | string | null
+    created_at?: DateTimeFilter<"CarePlan"> | Date | string
+    updated_at?: DateTimeFilter<"CarePlan"> | Date | string
+    deleted_at?: DateTimeNullableFilter<"CarePlan"> | Date | string | null
+    client?: XOR<ClientRelationFilter, ClientWhereInput>
+    active_version?: XOR<CarePlanVersionNullableRelationFilter, CarePlanVersionWhereInput> | null
+    draft_version?: XOR<CarePlanVersionNullableRelationFilter, CarePlanVersionWhereInput> | null
+    versions?: CarePlanVersionListRelationFilter
+  }
+
+  export type CarePlanOrderByWithRelationInput = {
+    id?: SortOrder
+    client_id?: SortOrder
+    active_version_id?: SortOrderInput | SortOrder
+    draft_version_id?: SortOrderInput | SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    deleted_at?: SortOrderInput | SortOrder
+    client?: ClientOrderByWithRelationInput
+    active_version?: CarePlanVersionOrderByWithRelationInput
+    draft_version?: CarePlanVersionOrderByWithRelationInput
+    versions?: CarePlanVersionOrderByRelationAggregateInput
+  }
+
+  export type CarePlanWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    client_id?: string
+    active_version_id?: string
+    draft_version_id?: string
+    AND?: CarePlanWhereInput | CarePlanWhereInput[]
+    OR?: CarePlanWhereInput[]
+    NOT?: CarePlanWhereInput | CarePlanWhereInput[]
+    created_at?: DateTimeFilter<"CarePlan"> | Date | string
+    updated_at?: DateTimeFilter<"CarePlan"> | Date | string
+    deleted_at?: DateTimeNullableFilter<"CarePlan"> | Date | string | null
+    client?: XOR<ClientRelationFilter, ClientWhereInput>
+    active_version?: XOR<CarePlanVersionNullableRelationFilter, CarePlanVersionWhereInput> | null
+    draft_version?: XOR<CarePlanVersionNullableRelationFilter, CarePlanVersionWhereInput> | null
+    versions?: CarePlanVersionListRelationFilter
+  }, "id" | "client_id" | "active_version_id" | "draft_version_id">
+
+  export type CarePlanOrderByWithAggregationInput = {
+    id?: SortOrder
+    client_id?: SortOrder
+    active_version_id?: SortOrderInput | SortOrder
+    draft_version_id?: SortOrderInput | SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    deleted_at?: SortOrderInput | SortOrder
+    _count?: CarePlanCountOrderByAggregateInput
+    _max?: CarePlanMaxOrderByAggregateInput
+    _min?: CarePlanMinOrderByAggregateInput
+  }
+
+  export type CarePlanScalarWhereWithAggregatesInput = {
+    AND?: CarePlanScalarWhereWithAggregatesInput | CarePlanScalarWhereWithAggregatesInput[]
+    OR?: CarePlanScalarWhereWithAggregatesInput[]
+    NOT?: CarePlanScalarWhereWithAggregatesInput | CarePlanScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"CarePlan"> | string
+    client_id?: StringWithAggregatesFilter<"CarePlan"> | string
+    active_version_id?: StringNullableWithAggregatesFilter<"CarePlan"> | string | null
+    draft_version_id?: StringNullableWithAggregatesFilter<"CarePlan"> | string | null
+    created_at?: DateTimeWithAggregatesFilter<"CarePlan"> | Date | string
+    updated_at?: DateTimeWithAggregatesFilter<"CarePlan"> | Date | string
+    deleted_at?: DateTimeNullableWithAggregatesFilter<"CarePlan"> | Date | string | null
+  }
+
+  export type CarePlanVersionWhereInput = {
+    AND?: CarePlanVersionWhereInput | CarePlanVersionWhereInput[]
+    OR?: CarePlanVersionWhereInput[]
+    NOT?: CarePlanVersionWhereInput | CarePlanVersionWhereInput[]
+    id?: StringFilter<"CarePlanVersion"> | string
+    care_plan_id?: StringFilter<"CarePlanVersion"> | string
+    version_number?: IntFilter<"CarePlanVersion"> | number
+    status?: EnumCarePlanStatusFilter<"CarePlanVersion"> | $Enums.CarePlanStatus
+    review_due_at?: DateTimeNullableFilter<"CarePlanVersion"> | Date | string | null
+    effective_from?: DateTimeNullableFilter<"CarePlanVersion"> | Date | string | null
+    authored_by?: StringFilter<"CarePlanVersion"> | string
+    approved_by?: StringNullableFilter<"CarePlanVersion"> | string | null
+    approved_at?: DateTimeNullableFilter<"CarePlanVersion"> | Date | string | null
+    content?: JsonFilter<"CarePlanVersion">
+    created_at?: DateTimeFilter<"CarePlanVersion"> | Date | string
+    updated_at?: DateTimeFilter<"CarePlanVersion"> | Date | string
+    deleted_at?: DateTimeNullableFilter<"CarePlanVersion"> | Date | string | null
+    care_plan?: XOR<CarePlanRelationFilter, CarePlanWhereInput>
+    active_for?: XOR<CarePlanNullableRelationFilter, CarePlanWhereInput> | null
+    draft_for?: XOR<CarePlanNullableRelationFilter, CarePlanWhereInput> | null
+  }
+
+  export type CarePlanVersionOrderByWithRelationInput = {
+    id?: SortOrder
+    care_plan_id?: SortOrder
+    version_number?: SortOrder
+    status?: SortOrder
+    review_due_at?: SortOrderInput | SortOrder
+    effective_from?: SortOrderInput | SortOrder
+    authored_by?: SortOrder
+    approved_by?: SortOrderInput | SortOrder
+    approved_at?: SortOrderInput | SortOrder
+    content?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    deleted_at?: SortOrderInput | SortOrder
+    care_plan?: CarePlanOrderByWithRelationInput
+    active_for?: CarePlanOrderByWithRelationInput
+    draft_for?: CarePlanOrderByWithRelationInput
+  }
+
+  export type CarePlanVersionWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    care_plan_id_version_number?: CarePlanVersionCare_plan_idVersion_numberCompoundUniqueInput
+    AND?: CarePlanVersionWhereInput | CarePlanVersionWhereInput[]
+    OR?: CarePlanVersionWhereInput[]
+    NOT?: CarePlanVersionWhereInput | CarePlanVersionWhereInput[]
+    care_plan_id?: StringFilter<"CarePlanVersion"> | string
+    version_number?: IntFilter<"CarePlanVersion"> | number
+    status?: EnumCarePlanStatusFilter<"CarePlanVersion"> | $Enums.CarePlanStatus
+    review_due_at?: DateTimeNullableFilter<"CarePlanVersion"> | Date | string | null
+    effective_from?: DateTimeNullableFilter<"CarePlanVersion"> | Date | string | null
+    authored_by?: StringFilter<"CarePlanVersion"> | string
+    approved_by?: StringNullableFilter<"CarePlanVersion"> | string | null
+    approved_at?: DateTimeNullableFilter<"CarePlanVersion"> | Date | string | null
+    content?: JsonFilter<"CarePlanVersion">
+    created_at?: DateTimeFilter<"CarePlanVersion"> | Date | string
+    updated_at?: DateTimeFilter<"CarePlanVersion"> | Date | string
+    deleted_at?: DateTimeNullableFilter<"CarePlanVersion"> | Date | string | null
+    care_plan?: XOR<CarePlanRelationFilter, CarePlanWhereInput>
+    active_for?: XOR<CarePlanNullableRelationFilter, CarePlanWhereInput> | null
+    draft_for?: XOR<CarePlanNullableRelationFilter, CarePlanWhereInput> | null
+  }, "id" | "care_plan_id_version_number">
+
+  export type CarePlanVersionOrderByWithAggregationInput = {
+    id?: SortOrder
+    care_plan_id?: SortOrder
+    version_number?: SortOrder
+    status?: SortOrder
+    review_due_at?: SortOrderInput | SortOrder
+    effective_from?: SortOrderInput | SortOrder
+    authored_by?: SortOrder
+    approved_by?: SortOrderInput | SortOrder
+    approved_at?: SortOrderInput | SortOrder
+    content?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    deleted_at?: SortOrderInput | SortOrder
+    _count?: CarePlanVersionCountOrderByAggregateInput
+    _avg?: CarePlanVersionAvgOrderByAggregateInput
+    _max?: CarePlanVersionMaxOrderByAggregateInput
+    _min?: CarePlanVersionMinOrderByAggregateInput
+    _sum?: CarePlanVersionSumOrderByAggregateInput
+  }
+
+  export type CarePlanVersionScalarWhereWithAggregatesInput = {
+    AND?: CarePlanVersionScalarWhereWithAggregatesInput | CarePlanVersionScalarWhereWithAggregatesInput[]
+    OR?: CarePlanVersionScalarWhereWithAggregatesInput[]
+    NOT?: CarePlanVersionScalarWhereWithAggregatesInput | CarePlanVersionScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"CarePlanVersion"> | string
+    care_plan_id?: StringWithAggregatesFilter<"CarePlanVersion"> | string
+    version_number?: IntWithAggregatesFilter<"CarePlanVersion"> | number
+    status?: EnumCarePlanStatusWithAggregatesFilter<"CarePlanVersion"> | $Enums.CarePlanStatus
+    review_due_at?: DateTimeNullableWithAggregatesFilter<"CarePlanVersion"> | Date | string | null
+    effective_from?: DateTimeNullableWithAggregatesFilter<"CarePlanVersion"> | Date | string | null
+    authored_by?: StringWithAggregatesFilter<"CarePlanVersion"> | string
+    approved_by?: StringNullableWithAggregatesFilter<"CarePlanVersion"> | string | null
+    approved_at?: DateTimeNullableWithAggregatesFilter<"CarePlanVersion"> | Date | string | null
+    content?: JsonWithAggregatesFilter<"CarePlanVersion">
+    created_at?: DateTimeWithAggregatesFilter<"CarePlanVersion"> | Date | string
+    updated_at?: DateTimeWithAggregatesFilter<"CarePlanVersion"> | Date | string
+    deleted_at?: DateTimeNullableWithAggregatesFilter<"CarePlanVersion"> | Date | string | null
   }
 
   export type VisitWhereInput = {
@@ -18985,16 +21685,26 @@ export namespace Prisma {
   export type ClientCreateInput = {
     id?: string
     full_name: string
+    preferred_name?: string | null
+    pronouns?: string | null
     address_line1: string
     address_line2?: string | null
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    preferred_language?: string | null
+    communication_needs?: string | null
+    accessibility_adjustments?: string | null
+    representative_name?: string | null
+    representative_relationship?: string | null
+    representative_phone?: string | null
+    representative_email?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
     visits?: VisitCreateNestedManyWithoutClientInput
     prescriptions?: PrescriptionCreateNestedManyWithoutClientInput
+    care_plan?: CarePlanCreateNestedOneWithoutClientInput
     organization?: OrganizationCreateNestedOneWithoutClientsInput
     health_summaries?: HealthSummaryCreateNestedManyWithoutClientInput
   }
@@ -19002,33 +21712,53 @@ export namespace Prisma {
   export type ClientUncheckedCreateInput = {
     id?: string
     full_name: string
+    preferred_name?: string | null
+    pronouns?: string | null
     address_line1: string
     address_line2?: string | null
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    preferred_language?: string | null
+    communication_needs?: string | null
+    accessibility_adjustments?: string | null
+    representative_name?: string | null
+    representative_relationship?: string | null
+    representative_phone?: string | null
+    representative_email?: string | null
     organization_id?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
     visits?: VisitUncheckedCreateNestedManyWithoutClientInput
     prescriptions?: PrescriptionUncheckedCreateNestedManyWithoutClientInput
+    care_plan?: CarePlanUncheckedCreateNestedOneWithoutClientInput
     health_summaries?: HealthSummaryUncheckedCreateNestedManyWithoutClientInput
   }
 
   export type ClientUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     full_name?: StringFieldUpdateOperationsInput | string
+    preferred_name?: NullableStringFieldUpdateOperationsInput | string | null
+    pronouns?: NullableStringFieldUpdateOperationsInput | string | null
     address_line1?: StringFieldUpdateOperationsInput | string
     address_line2?: NullableStringFieldUpdateOperationsInput | string | null
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    preferred_language?: NullableStringFieldUpdateOperationsInput | string | null
+    communication_needs?: NullableStringFieldUpdateOperationsInput | string | null
+    accessibility_adjustments?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_name?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_relationship?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_phone?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_email?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     visits?: VisitUpdateManyWithoutClientNestedInput
     prescriptions?: PrescriptionUpdateManyWithoutClientNestedInput
+    care_plan?: CarePlanUpdateOneWithoutClientNestedInput
     organization?: OrganizationUpdateOneWithoutClientsNestedInput
     health_summaries?: HealthSummaryUpdateManyWithoutClientNestedInput
   }
@@ -19036,28 +21766,47 @@ export namespace Prisma {
   export type ClientUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     full_name?: StringFieldUpdateOperationsInput | string
+    preferred_name?: NullableStringFieldUpdateOperationsInput | string | null
+    pronouns?: NullableStringFieldUpdateOperationsInput | string | null
     address_line1?: StringFieldUpdateOperationsInput | string
     address_line2?: NullableStringFieldUpdateOperationsInput | string | null
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    preferred_language?: NullableStringFieldUpdateOperationsInput | string | null
+    communication_needs?: NullableStringFieldUpdateOperationsInput | string | null
+    accessibility_adjustments?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_name?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_relationship?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_phone?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_email?: NullableStringFieldUpdateOperationsInput | string | null
     organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     visits?: VisitUncheckedUpdateManyWithoutClientNestedInput
     prescriptions?: PrescriptionUncheckedUpdateManyWithoutClientNestedInput
+    care_plan?: CarePlanUncheckedUpdateOneWithoutClientNestedInput
     health_summaries?: HealthSummaryUncheckedUpdateManyWithoutClientNestedInput
   }
 
   export type ClientCreateManyInput = {
     id?: string
     full_name: string
+    preferred_name?: string | null
+    pronouns?: string | null
     address_line1: string
     address_line2?: string | null
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    preferred_language?: string | null
+    communication_needs?: string | null
+    accessibility_adjustments?: string | null
+    representative_name?: string | null
+    representative_relationship?: string | null
+    representative_phone?: string | null
+    representative_email?: string | null
     organization_id?: string | null
     created_at?: Date | string
     updated_at?: Date | string
@@ -19067,11 +21816,20 @@ export namespace Prisma {
   export type ClientUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
     full_name?: StringFieldUpdateOperationsInput | string
+    preferred_name?: NullableStringFieldUpdateOperationsInput | string | null
+    pronouns?: NullableStringFieldUpdateOperationsInput | string | null
     address_line1?: StringFieldUpdateOperationsInput | string
     address_line2?: NullableStringFieldUpdateOperationsInput | string | null
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    preferred_language?: NullableStringFieldUpdateOperationsInput | string | null
+    communication_needs?: NullableStringFieldUpdateOperationsInput | string | null
+    accessibility_adjustments?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_name?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_relationship?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_phone?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_email?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -19080,12 +21838,211 @@ export namespace Prisma {
   export type ClientUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
     full_name?: StringFieldUpdateOperationsInput | string
+    preferred_name?: NullableStringFieldUpdateOperationsInput | string | null
+    pronouns?: NullableStringFieldUpdateOperationsInput | string | null
     address_line1?: StringFieldUpdateOperationsInput | string
     address_line2?: NullableStringFieldUpdateOperationsInput | string | null
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    preferred_language?: NullableStringFieldUpdateOperationsInput | string | null
+    communication_needs?: NullableStringFieldUpdateOperationsInput | string | null
+    accessibility_adjustments?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_name?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_relationship?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_phone?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_email?: NullableStringFieldUpdateOperationsInput | string | null
     organization_id?: NullableStringFieldUpdateOperationsInput | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type CarePlanCreateInput = {
+    id?: string
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    client: ClientCreateNestedOneWithoutCare_planInput
+    active_version?: CarePlanVersionCreateNestedOneWithoutActive_forInput
+    draft_version?: CarePlanVersionCreateNestedOneWithoutDraft_forInput
+    versions?: CarePlanVersionCreateNestedManyWithoutCare_planInput
+  }
+
+  export type CarePlanUncheckedCreateInput = {
+    id?: string
+    client_id: string
+    active_version_id?: string | null
+    draft_version_id?: string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    versions?: CarePlanVersionUncheckedCreateNestedManyWithoutCare_planInput
+  }
+
+  export type CarePlanUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    client?: ClientUpdateOneRequiredWithoutCare_planNestedInput
+    active_version?: CarePlanVersionUpdateOneWithoutActive_forNestedInput
+    draft_version?: CarePlanVersionUpdateOneWithoutDraft_forNestedInput
+    versions?: CarePlanVersionUpdateManyWithoutCare_planNestedInput
+  }
+
+  export type CarePlanUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    client_id?: StringFieldUpdateOperationsInput | string
+    active_version_id?: NullableStringFieldUpdateOperationsInput | string | null
+    draft_version_id?: NullableStringFieldUpdateOperationsInput | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    versions?: CarePlanVersionUncheckedUpdateManyWithoutCare_planNestedInput
+  }
+
+  export type CarePlanCreateManyInput = {
+    id?: string
+    client_id: string
+    active_version_id?: string | null
+    draft_version_id?: string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+  }
+
+  export type CarePlanUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type CarePlanUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    client_id?: StringFieldUpdateOperationsInput | string
+    active_version_id?: NullableStringFieldUpdateOperationsInput | string | null
+    draft_version_id?: NullableStringFieldUpdateOperationsInput | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type CarePlanVersionCreateInput = {
+    id?: string
+    version_number: number
+    status?: $Enums.CarePlanStatus
+    review_due_at?: Date | string | null
+    effective_from?: Date | string | null
+    authored_by: string
+    approved_by?: string | null
+    approved_at?: Date | string | null
+    content: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    care_plan: CarePlanCreateNestedOneWithoutVersionsInput
+    active_for?: CarePlanCreateNestedOneWithoutActive_versionInput
+    draft_for?: CarePlanCreateNestedOneWithoutDraft_versionInput
+  }
+
+  export type CarePlanVersionUncheckedCreateInput = {
+    id?: string
+    care_plan_id: string
+    version_number: number
+    status?: $Enums.CarePlanStatus
+    review_due_at?: Date | string | null
+    effective_from?: Date | string | null
+    authored_by: string
+    approved_by?: string | null
+    approved_at?: Date | string | null
+    content: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    active_for?: CarePlanUncheckedCreateNestedOneWithoutActive_versionInput
+    draft_for?: CarePlanUncheckedCreateNestedOneWithoutDraft_versionInput
+  }
+
+  export type CarePlanVersionUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    version_number?: IntFieldUpdateOperationsInput | number
+    status?: EnumCarePlanStatusFieldUpdateOperationsInput | $Enums.CarePlanStatus
+    review_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    effective_from?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    authored_by?: StringFieldUpdateOperationsInput | string
+    approved_by?: NullableStringFieldUpdateOperationsInput | string | null
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    content?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    care_plan?: CarePlanUpdateOneRequiredWithoutVersionsNestedInput
+    active_for?: CarePlanUpdateOneWithoutActive_versionNestedInput
+    draft_for?: CarePlanUpdateOneWithoutDraft_versionNestedInput
+  }
+
+  export type CarePlanVersionUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    care_plan_id?: StringFieldUpdateOperationsInput | string
+    version_number?: IntFieldUpdateOperationsInput | number
+    status?: EnumCarePlanStatusFieldUpdateOperationsInput | $Enums.CarePlanStatus
+    review_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    effective_from?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    authored_by?: StringFieldUpdateOperationsInput | string
+    approved_by?: NullableStringFieldUpdateOperationsInput | string | null
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    content?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    active_for?: CarePlanUncheckedUpdateOneWithoutActive_versionNestedInput
+    draft_for?: CarePlanUncheckedUpdateOneWithoutDraft_versionNestedInput
+  }
+
+  export type CarePlanVersionCreateManyInput = {
+    id?: string
+    care_plan_id: string
+    version_number: number
+    status?: $Enums.CarePlanStatus
+    review_due_at?: Date | string | null
+    effective_from?: Date | string | null
+    authored_by: string
+    approved_by?: string | null
+    approved_at?: Date | string | null
+    content: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+  }
+
+  export type CarePlanVersionUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    version_number?: IntFieldUpdateOperationsInput | number
+    status?: EnumCarePlanStatusFieldUpdateOperationsInput | $Enums.CarePlanStatus
+    review_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    effective_from?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    authored_by?: StringFieldUpdateOperationsInput | string
+    approved_by?: NullableStringFieldUpdateOperationsInput | string | null
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    content?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type CarePlanVersionUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    care_plan_id?: StringFieldUpdateOperationsInput | string
+    version_number?: IntFieldUpdateOperationsInput | number
+    status?: EnumCarePlanStatusFieldUpdateOperationsInput | $Enums.CarePlanStatus
+    review_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    effective_from?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    authored_by?: StringFieldUpdateOperationsInput | string
+    approved_by?: NullableStringFieldUpdateOperationsInput | string | null
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    content?: JsonNullValueInput | InputJsonValue
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -20479,6 +23436,11 @@ export namespace Prisma {
     none?: PrescriptionWhereInput
   }
 
+  export type CarePlanNullableRelationFilter = {
+    is?: CarePlanWhereInput | null
+    isNot?: CarePlanWhereInput | null
+  }
+
   export type OrganizationNullableRelationFilter = {
     is?: OrganizationWhereInput | null
     isNot?: OrganizationWhereInput | null
@@ -20491,11 +23453,20 @@ export namespace Prisma {
   export type ClientCountOrderByAggregateInput = {
     id?: SortOrder
     full_name?: SortOrder
+    preferred_name?: SortOrder
+    pronouns?: SortOrder
     address_line1?: SortOrder
     address_line2?: SortOrder
     city?: SortOrder
     postcode?: SortOrder
     date_of_birth?: SortOrder
+    preferred_language?: SortOrder
+    communication_needs?: SortOrder
+    accessibility_adjustments?: SortOrder
+    representative_name?: SortOrder
+    representative_relationship?: SortOrder
+    representative_phone?: SortOrder
+    representative_email?: SortOrder
     organization_id?: SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
@@ -20505,11 +23476,20 @@ export namespace Prisma {
   export type ClientMaxOrderByAggregateInput = {
     id?: SortOrder
     full_name?: SortOrder
+    preferred_name?: SortOrder
+    pronouns?: SortOrder
     address_line1?: SortOrder
     address_line2?: SortOrder
     city?: SortOrder
     postcode?: SortOrder
     date_of_birth?: SortOrder
+    preferred_language?: SortOrder
+    communication_needs?: SortOrder
+    accessibility_adjustments?: SortOrder
+    representative_name?: SortOrder
+    representative_relationship?: SortOrder
+    representative_phone?: SortOrder
+    representative_email?: SortOrder
     organization_id?: SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
@@ -20519,15 +23499,229 @@ export namespace Prisma {
   export type ClientMinOrderByAggregateInput = {
     id?: SortOrder
     full_name?: SortOrder
+    preferred_name?: SortOrder
+    pronouns?: SortOrder
     address_line1?: SortOrder
     address_line2?: SortOrder
     city?: SortOrder
     postcode?: SortOrder
     date_of_birth?: SortOrder
+    preferred_language?: SortOrder
+    communication_needs?: SortOrder
+    accessibility_adjustments?: SortOrder
+    representative_name?: SortOrder
+    representative_relationship?: SortOrder
+    representative_phone?: SortOrder
+    representative_email?: SortOrder
     organization_id?: SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
     deleted_at?: SortOrder
+  }
+
+  export type ClientRelationFilter = {
+    is?: ClientWhereInput
+    isNot?: ClientWhereInput
+  }
+
+  export type CarePlanVersionNullableRelationFilter = {
+    is?: CarePlanVersionWhereInput | null
+    isNot?: CarePlanVersionWhereInput | null
+  }
+
+  export type CarePlanVersionListRelationFilter = {
+    every?: CarePlanVersionWhereInput
+    some?: CarePlanVersionWhereInput
+    none?: CarePlanVersionWhereInput
+  }
+
+  export type CarePlanVersionOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type CarePlanCountOrderByAggregateInput = {
+    id?: SortOrder
+    client_id?: SortOrder
+    active_version_id?: SortOrder
+    draft_version_id?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    deleted_at?: SortOrder
+  }
+
+  export type CarePlanMaxOrderByAggregateInput = {
+    id?: SortOrder
+    client_id?: SortOrder
+    active_version_id?: SortOrder
+    draft_version_id?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    deleted_at?: SortOrder
+  }
+
+  export type CarePlanMinOrderByAggregateInput = {
+    id?: SortOrder
+    client_id?: SortOrder
+    active_version_id?: SortOrder
+    draft_version_id?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    deleted_at?: SortOrder
+  }
+
+  export type IntFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntFilter<$PrismaModel> | number
+  }
+
+  export type EnumCarePlanStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.CarePlanStatus | EnumCarePlanStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CarePlanStatus[] | ListEnumCarePlanStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CarePlanStatus[] | ListEnumCarePlanStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCarePlanStatusFilter<$PrismaModel> | $Enums.CarePlanStatus
+  }
+  export type JsonFilter<$PrismaModel = never> = 
+    | PatchUndefined<
+        Either<Required<JsonFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
+
+  export type CarePlanRelationFilter = {
+    is?: CarePlanWhereInput
+    isNot?: CarePlanWhereInput
+  }
+
+  export type CarePlanVersionCare_plan_idVersion_numberCompoundUniqueInput = {
+    care_plan_id: string
+    version_number: number
+  }
+
+  export type CarePlanVersionCountOrderByAggregateInput = {
+    id?: SortOrder
+    care_plan_id?: SortOrder
+    version_number?: SortOrder
+    status?: SortOrder
+    review_due_at?: SortOrder
+    effective_from?: SortOrder
+    authored_by?: SortOrder
+    approved_by?: SortOrder
+    approved_at?: SortOrder
+    content?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    deleted_at?: SortOrder
+  }
+
+  export type CarePlanVersionAvgOrderByAggregateInput = {
+    version_number?: SortOrder
+  }
+
+  export type CarePlanVersionMaxOrderByAggregateInput = {
+    id?: SortOrder
+    care_plan_id?: SortOrder
+    version_number?: SortOrder
+    status?: SortOrder
+    review_due_at?: SortOrder
+    effective_from?: SortOrder
+    authored_by?: SortOrder
+    approved_by?: SortOrder
+    approved_at?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    deleted_at?: SortOrder
+  }
+
+  export type CarePlanVersionMinOrderByAggregateInput = {
+    id?: SortOrder
+    care_plan_id?: SortOrder
+    version_number?: SortOrder
+    status?: SortOrder
+    review_due_at?: SortOrder
+    effective_from?: SortOrder
+    authored_by?: SortOrder
+    approved_by?: SortOrder
+    approved_at?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    deleted_at?: SortOrder
+  }
+
+  export type CarePlanVersionSumOrderByAggregateInput = {
+    version_number?: SortOrder
+  }
+
+  export type IntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedIntFilter<$PrismaModel>
+    _min?: NestedIntFilter<$PrismaModel>
+    _max?: NestedIntFilter<$PrismaModel>
+  }
+
+  export type EnumCarePlanStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.CarePlanStatus | EnumCarePlanStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CarePlanStatus[] | ListEnumCarePlanStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CarePlanStatus[] | ListEnumCarePlanStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCarePlanStatusWithAggregatesFilter<$PrismaModel> | $Enums.CarePlanStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumCarePlanStatusFilter<$PrismaModel>
+    _max?: NestedEnumCarePlanStatusFilter<$PrismaModel>
+  }
+  export type JsonWithAggregatesFilter<$PrismaModel = never> = 
+    | PatchUndefined<
+        Either<Required<JsonWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonWithAggregatesFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonWithAggregatesFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedJsonFilter<$PrismaModel>
+    _max?: NestedJsonFilter<$PrismaModel>
   }
 
   export type EnumVisitStatusFilter<$PrismaModel = never> = {
@@ -20540,11 +23734,6 @@ export namespace Prisma {
   export type CarerRelationFilter = {
     is?: CarerWhereInput
     isNot?: CarerWhereInput
-  }
-
-  export type ClientRelationFilter = {
-    is?: ClientWhereInput
-    isNot?: ClientWhereInput
   }
 
   export type VisitTaskListRelationFilter = {
@@ -20709,17 +23898,6 @@ export namespace Prisma {
     deleted_at?: SortOrder
   }
 
-  export type IntFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel>
-    in?: number[] | ListIntFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntFilter<$PrismaModel> | number
-  }
-
   export type IntNullableFilter<$PrismaModel = never> = {
     equals?: number | IntFieldRefInput<$PrismaModel> | null
     in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
@@ -20808,22 +23986,6 @@ export namespace Prisma {
   export type PrescriptionSumOrderByAggregateInput = {
     frequency_per_day?: SortOrder
     frequency_interval_hours?: SortOrder
-  }
-
-  export type IntWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel>
-    in?: number[] | ListIntFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
-    _count?: NestedIntFilter<$PrismaModel>
-    _avg?: NestedFloatFilter<$PrismaModel>
-    _sum?: NestedIntFilter<$PrismaModel>
-    _min?: NestedIntFilter<$PrismaModel>
-    _max?: NestedIntFilter<$PrismaModel>
   }
 
   export type IntNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -21007,28 +24169,6 @@ export namespace Prisma {
     created_at?: SortOrder
     updated_at?: SortOrder
   }
-  export type JsonFilter<$PrismaModel = never> = 
-    | PatchUndefined<
-        Either<Required<JsonFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonFilterBase<$PrismaModel>>, 'path'>>,
-        Required<JsonFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<JsonFilterBase<$PrismaModel>>, 'path'>>
-
-  export type JsonFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-  }
 
   export type LogEmbeddingCountOrderByAggregateInput = {
     id?: SortOrder
@@ -21056,31 +24196,6 @@ export namespace Prisma {
     log_timestamp?: SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
-  }
-  export type JsonWithAggregatesFilter<$PrismaModel = never> = 
-    | PatchUndefined<
-        Either<Required<JsonWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
-        Required<JsonWithAggregatesFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<JsonWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
-
-  export type JsonWithAggregatesFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedJsonFilter<$PrismaModel>
-    _max?: NestedJsonFilter<$PrismaModel>
   }
 
   export type CarerNullableRelationFilter = {
@@ -21453,6 +24568,12 @@ export namespace Prisma {
     connect?: PrescriptionWhereUniqueInput | PrescriptionWhereUniqueInput[]
   }
 
+  export type CarePlanCreateNestedOneWithoutClientInput = {
+    create?: XOR<CarePlanCreateWithoutClientInput, CarePlanUncheckedCreateWithoutClientInput>
+    connectOrCreate?: CarePlanCreateOrConnectWithoutClientInput
+    connect?: CarePlanWhereUniqueInput
+  }
+
   export type OrganizationCreateNestedOneWithoutClientsInput = {
     create?: XOR<OrganizationCreateWithoutClientsInput, OrganizationUncheckedCreateWithoutClientsInput>
     connectOrCreate?: OrganizationCreateOrConnectWithoutClientsInput
@@ -21478,6 +24599,12 @@ export namespace Prisma {
     connectOrCreate?: PrescriptionCreateOrConnectWithoutClientInput | PrescriptionCreateOrConnectWithoutClientInput[]
     createMany?: PrescriptionCreateManyClientInputEnvelope
     connect?: PrescriptionWhereUniqueInput | PrescriptionWhereUniqueInput[]
+  }
+
+  export type CarePlanUncheckedCreateNestedOneWithoutClientInput = {
+    create?: XOR<CarePlanCreateWithoutClientInput, CarePlanUncheckedCreateWithoutClientInput>
+    connectOrCreate?: CarePlanCreateOrConnectWithoutClientInput
+    connect?: CarePlanWhereUniqueInput
   }
 
   export type HealthSummaryUncheckedCreateNestedManyWithoutClientInput = {
@@ -21513,6 +24640,16 @@ export namespace Prisma {
     update?: PrescriptionUpdateWithWhereUniqueWithoutClientInput | PrescriptionUpdateWithWhereUniqueWithoutClientInput[]
     updateMany?: PrescriptionUpdateManyWithWhereWithoutClientInput | PrescriptionUpdateManyWithWhereWithoutClientInput[]
     deleteMany?: PrescriptionScalarWhereInput | PrescriptionScalarWhereInput[]
+  }
+
+  export type CarePlanUpdateOneWithoutClientNestedInput = {
+    create?: XOR<CarePlanCreateWithoutClientInput, CarePlanUncheckedCreateWithoutClientInput>
+    connectOrCreate?: CarePlanCreateOrConnectWithoutClientInput
+    upsert?: CarePlanUpsertWithoutClientInput
+    disconnect?: CarePlanWhereInput | boolean
+    delete?: CarePlanWhereInput | boolean
+    connect?: CarePlanWhereUniqueInput
+    update?: XOR<XOR<CarePlanUpdateToOneWithWhereWithoutClientInput, CarePlanUpdateWithoutClientInput>, CarePlanUncheckedUpdateWithoutClientInput>
   }
 
   export type OrganizationUpdateOneWithoutClientsNestedInput = {
@@ -21567,6 +24704,16 @@ export namespace Prisma {
     deleteMany?: PrescriptionScalarWhereInput | PrescriptionScalarWhereInput[]
   }
 
+  export type CarePlanUncheckedUpdateOneWithoutClientNestedInput = {
+    create?: XOR<CarePlanCreateWithoutClientInput, CarePlanUncheckedCreateWithoutClientInput>
+    connectOrCreate?: CarePlanCreateOrConnectWithoutClientInput
+    upsert?: CarePlanUpsertWithoutClientInput
+    disconnect?: CarePlanWhereInput | boolean
+    delete?: CarePlanWhereInput | boolean
+    connect?: CarePlanWhereUniqueInput
+    update?: XOR<XOR<CarePlanUpdateToOneWithWhereWithoutClientInput, CarePlanUpdateWithoutClientInput>, CarePlanUncheckedUpdateWithoutClientInput>
+  }
+
   export type HealthSummaryUncheckedUpdateManyWithoutClientNestedInput = {
     create?: XOR<HealthSummaryCreateWithoutClientInput, HealthSummaryUncheckedCreateWithoutClientInput> | HealthSummaryCreateWithoutClientInput[] | HealthSummaryUncheckedCreateWithoutClientInput[]
     connectOrCreate?: HealthSummaryCreateOrConnectWithoutClientInput | HealthSummaryCreateOrConnectWithoutClientInput[]
@@ -21579,6 +24726,184 @@ export namespace Prisma {
     update?: HealthSummaryUpdateWithWhereUniqueWithoutClientInput | HealthSummaryUpdateWithWhereUniqueWithoutClientInput[]
     updateMany?: HealthSummaryUpdateManyWithWhereWithoutClientInput | HealthSummaryUpdateManyWithWhereWithoutClientInput[]
     deleteMany?: HealthSummaryScalarWhereInput | HealthSummaryScalarWhereInput[]
+  }
+
+  export type ClientCreateNestedOneWithoutCare_planInput = {
+    create?: XOR<ClientCreateWithoutCare_planInput, ClientUncheckedCreateWithoutCare_planInput>
+    connectOrCreate?: ClientCreateOrConnectWithoutCare_planInput
+    connect?: ClientWhereUniqueInput
+  }
+
+  export type CarePlanVersionCreateNestedOneWithoutActive_forInput = {
+    create?: XOR<CarePlanVersionCreateWithoutActive_forInput, CarePlanVersionUncheckedCreateWithoutActive_forInput>
+    connectOrCreate?: CarePlanVersionCreateOrConnectWithoutActive_forInput
+    connect?: CarePlanVersionWhereUniqueInput
+  }
+
+  export type CarePlanVersionCreateNestedOneWithoutDraft_forInput = {
+    create?: XOR<CarePlanVersionCreateWithoutDraft_forInput, CarePlanVersionUncheckedCreateWithoutDraft_forInput>
+    connectOrCreate?: CarePlanVersionCreateOrConnectWithoutDraft_forInput
+    connect?: CarePlanVersionWhereUniqueInput
+  }
+
+  export type CarePlanVersionCreateNestedManyWithoutCare_planInput = {
+    create?: XOR<CarePlanVersionCreateWithoutCare_planInput, CarePlanVersionUncheckedCreateWithoutCare_planInput> | CarePlanVersionCreateWithoutCare_planInput[] | CarePlanVersionUncheckedCreateWithoutCare_planInput[]
+    connectOrCreate?: CarePlanVersionCreateOrConnectWithoutCare_planInput | CarePlanVersionCreateOrConnectWithoutCare_planInput[]
+    createMany?: CarePlanVersionCreateManyCare_planInputEnvelope
+    connect?: CarePlanVersionWhereUniqueInput | CarePlanVersionWhereUniqueInput[]
+  }
+
+  export type CarePlanVersionUncheckedCreateNestedManyWithoutCare_planInput = {
+    create?: XOR<CarePlanVersionCreateWithoutCare_planInput, CarePlanVersionUncheckedCreateWithoutCare_planInput> | CarePlanVersionCreateWithoutCare_planInput[] | CarePlanVersionUncheckedCreateWithoutCare_planInput[]
+    connectOrCreate?: CarePlanVersionCreateOrConnectWithoutCare_planInput | CarePlanVersionCreateOrConnectWithoutCare_planInput[]
+    createMany?: CarePlanVersionCreateManyCare_planInputEnvelope
+    connect?: CarePlanVersionWhereUniqueInput | CarePlanVersionWhereUniqueInput[]
+  }
+
+  export type ClientUpdateOneRequiredWithoutCare_planNestedInput = {
+    create?: XOR<ClientCreateWithoutCare_planInput, ClientUncheckedCreateWithoutCare_planInput>
+    connectOrCreate?: ClientCreateOrConnectWithoutCare_planInput
+    upsert?: ClientUpsertWithoutCare_planInput
+    connect?: ClientWhereUniqueInput
+    update?: XOR<XOR<ClientUpdateToOneWithWhereWithoutCare_planInput, ClientUpdateWithoutCare_planInput>, ClientUncheckedUpdateWithoutCare_planInput>
+  }
+
+  export type CarePlanVersionUpdateOneWithoutActive_forNestedInput = {
+    create?: XOR<CarePlanVersionCreateWithoutActive_forInput, CarePlanVersionUncheckedCreateWithoutActive_forInput>
+    connectOrCreate?: CarePlanVersionCreateOrConnectWithoutActive_forInput
+    upsert?: CarePlanVersionUpsertWithoutActive_forInput
+    disconnect?: CarePlanVersionWhereInput | boolean
+    delete?: CarePlanVersionWhereInput | boolean
+    connect?: CarePlanVersionWhereUniqueInput
+    update?: XOR<XOR<CarePlanVersionUpdateToOneWithWhereWithoutActive_forInput, CarePlanVersionUpdateWithoutActive_forInput>, CarePlanVersionUncheckedUpdateWithoutActive_forInput>
+  }
+
+  export type CarePlanVersionUpdateOneWithoutDraft_forNestedInput = {
+    create?: XOR<CarePlanVersionCreateWithoutDraft_forInput, CarePlanVersionUncheckedCreateWithoutDraft_forInput>
+    connectOrCreate?: CarePlanVersionCreateOrConnectWithoutDraft_forInput
+    upsert?: CarePlanVersionUpsertWithoutDraft_forInput
+    disconnect?: CarePlanVersionWhereInput | boolean
+    delete?: CarePlanVersionWhereInput | boolean
+    connect?: CarePlanVersionWhereUniqueInput
+    update?: XOR<XOR<CarePlanVersionUpdateToOneWithWhereWithoutDraft_forInput, CarePlanVersionUpdateWithoutDraft_forInput>, CarePlanVersionUncheckedUpdateWithoutDraft_forInput>
+  }
+
+  export type CarePlanVersionUpdateManyWithoutCare_planNestedInput = {
+    create?: XOR<CarePlanVersionCreateWithoutCare_planInput, CarePlanVersionUncheckedCreateWithoutCare_planInput> | CarePlanVersionCreateWithoutCare_planInput[] | CarePlanVersionUncheckedCreateWithoutCare_planInput[]
+    connectOrCreate?: CarePlanVersionCreateOrConnectWithoutCare_planInput | CarePlanVersionCreateOrConnectWithoutCare_planInput[]
+    upsert?: CarePlanVersionUpsertWithWhereUniqueWithoutCare_planInput | CarePlanVersionUpsertWithWhereUniqueWithoutCare_planInput[]
+    createMany?: CarePlanVersionCreateManyCare_planInputEnvelope
+    set?: CarePlanVersionWhereUniqueInput | CarePlanVersionWhereUniqueInput[]
+    disconnect?: CarePlanVersionWhereUniqueInput | CarePlanVersionWhereUniqueInput[]
+    delete?: CarePlanVersionWhereUniqueInput | CarePlanVersionWhereUniqueInput[]
+    connect?: CarePlanVersionWhereUniqueInput | CarePlanVersionWhereUniqueInput[]
+    update?: CarePlanVersionUpdateWithWhereUniqueWithoutCare_planInput | CarePlanVersionUpdateWithWhereUniqueWithoutCare_planInput[]
+    updateMany?: CarePlanVersionUpdateManyWithWhereWithoutCare_planInput | CarePlanVersionUpdateManyWithWhereWithoutCare_planInput[]
+    deleteMany?: CarePlanVersionScalarWhereInput | CarePlanVersionScalarWhereInput[]
+  }
+
+  export type CarePlanVersionUncheckedUpdateManyWithoutCare_planNestedInput = {
+    create?: XOR<CarePlanVersionCreateWithoutCare_planInput, CarePlanVersionUncheckedCreateWithoutCare_planInput> | CarePlanVersionCreateWithoutCare_planInput[] | CarePlanVersionUncheckedCreateWithoutCare_planInput[]
+    connectOrCreate?: CarePlanVersionCreateOrConnectWithoutCare_planInput | CarePlanVersionCreateOrConnectWithoutCare_planInput[]
+    upsert?: CarePlanVersionUpsertWithWhereUniqueWithoutCare_planInput | CarePlanVersionUpsertWithWhereUniqueWithoutCare_planInput[]
+    createMany?: CarePlanVersionCreateManyCare_planInputEnvelope
+    set?: CarePlanVersionWhereUniqueInput | CarePlanVersionWhereUniqueInput[]
+    disconnect?: CarePlanVersionWhereUniqueInput | CarePlanVersionWhereUniqueInput[]
+    delete?: CarePlanVersionWhereUniqueInput | CarePlanVersionWhereUniqueInput[]
+    connect?: CarePlanVersionWhereUniqueInput | CarePlanVersionWhereUniqueInput[]
+    update?: CarePlanVersionUpdateWithWhereUniqueWithoutCare_planInput | CarePlanVersionUpdateWithWhereUniqueWithoutCare_planInput[]
+    updateMany?: CarePlanVersionUpdateManyWithWhereWithoutCare_planInput | CarePlanVersionUpdateManyWithWhereWithoutCare_planInput[]
+    deleteMany?: CarePlanVersionScalarWhereInput | CarePlanVersionScalarWhereInput[]
+  }
+
+  export type CarePlanCreateNestedOneWithoutVersionsInput = {
+    create?: XOR<CarePlanCreateWithoutVersionsInput, CarePlanUncheckedCreateWithoutVersionsInput>
+    connectOrCreate?: CarePlanCreateOrConnectWithoutVersionsInput
+    connect?: CarePlanWhereUniqueInput
+  }
+
+  export type CarePlanCreateNestedOneWithoutActive_versionInput = {
+    create?: XOR<CarePlanCreateWithoutActive_versionInput, CarePlanUncheckedCreateWithoutActive_versionInput>
+    connectOrCreate?: CarePlanCreateOrConnectWithoutActive_versionInput
+    connect?: CarePlanWhereUniqueInput
+  }
+
+  export type CarePlanCreateNestedOneWithoutDraft_versionInput = {
+    create?: XOR<CarePlanCreateWithoutDraft_versionInput, CarePlanUncheckedCreateWithoutDraft_versionInput>
+    connectOrCreate?: CarePlanCreateOrConnectWithoutDraft_versionInput
+    connect?: CarePlanWhereUniqueInput
+  }
+
+  export type CarePlanUncheckedCreateNestedOneWithoutActive_versionInput = {
+    create?: XOR<CarePlanCreateWithoutActive_versionInput, CarePlanUncheckedCreateWithoutActive_versionInput>
+    connectOrCreate?: CarePlanCreateOrConnectWithoutActive_versionInput
+    connect?: CarePlanWhereUniqueInput
+  }
+
+  export type CarePlanUncheckedCreateNestedOneWithoutDraft_versionInput = {
+    create?: XOR<CarePlanCreateWithoutDraft_versionInput, CarePlanUncheckedCreateWithoutDraft_versionInput>
+    connectOrCreate?: CarePlanCreateOrConnectWithoutDraft_versionInput
+    connect?: CarePlanWhereUniqueInput
+  }
+
+  export type IntFieldUpdateOperationsInput = {
+    set?: number
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
+  }
+
+  export type EnumCarePlanStatusFieldUpdateOperationsInput = {
+    set?: $Enums.CarePlanStatus
+  }
+
+  export type CarePlanUpdateOneRequiredWithoutVersionsNestedInput = {
+    create?: XOR<CarePlanCreateWithoutVersionsInput, CarePlanUncheckedCreateWithoutVersionsInput>
+    connectOrCreate?: CarePlanCreateOrConnectWithoutVersionsInput
+    upsert?: CarePlanUpsertWithoutVersionsInput
+    connect?: CarePlanWhereUniqueInput
+    update?: XOR<XOR<CarePlanUpdateToOneWithWhereWithoutVersionsInput, CarePlanUpdateWithoutVersionsInput>, CarePlanUncheckedUpdateWithoutVersionsInput>
+  }
+
+  export type CarePlanUpdateOneWithoutActive_versionNestedInput = {
+    create?: XOR<CarePlanCreateWithoutActive_versionInput, CarePlanUncheckedCreateWithoutActive_versionInput>
+    connectOrCreate?: CarePlanCreateOrConnectWithoutActive_versionInput
+    upsert?: CarePlanUpsertWithoutActive_versionInput
+    disconnect?: CarePlanWhereInput | boolean
+    delete?: CarePlanWhereInput | boolean
+    connect?: CarePlanWhereUniqueInput
+    update?: XOR<XOR<CarePlanUpdateToOneWithWhereWithoutActive_versionInput, CarePlanUpdateWithoutActive_versionInput>, CarePlanUncheckedUpdateWithoutActive_versionInput>
+  }
+
+  export type CarePlanUpdateOneWithoutDraft_versionNestedInput = {
+    create?: XOR<CarePlanCreateWithoutDraft_versionInput, CarePlanUncheckedCreateWithoutDraft_versionInput>
+    connectOrCreate?: CarePlanCreateOrConnectWithoutDraft_versionInput
+    upsert?: CarePlanUpsertWithoutDraft_versionInput
+    disconnect?: CarePlanWhereInput | boolean
+    delete?: CarePlanWhereInput | boolean
+    connect?: CarePlanWhereUniqueInput
+    update?: XOR<XOR<CarePlanUpdateToOneWithWhereWithoutDraft_versionInput, CarePlanUpdateWithoutDraft_versionInput>, CarePlanUncheckedUpdateWithoutDraft_versionInput>
+  }
+
+  export type CarePlanUncheckedUpdateOneWithoutActive_versionNestedInput = {
+    create?: XOR<CarePlanCreateWithoutActive_versionInput, CarePlanUncheckedCreateWithoutActive_versionInput>
+    connectOrCreate?: CarePlanCreateOrConnectWithoutActive_versionInput
+    upsert?: CarePlanUpsertWithoutActive_versionInput
+    disconnect?: CarePlanWhereInput | boolean
+    delete?: CarePlanWhereInput | boolean
+    connect?: CarePlanWhereUniqueInput
+    update?: XOR<XOR<CarePlanUpdateToOneWithWhereWithoutActive_versionInput, CarePlanUpdateWithoutActive_versionInput>, CarePlanUncheckedUpdateWithoutActive_versionInput>
+  }
+
+  export type CarePlanUncheckedUpdateOneWithoutDraft_versionNestedInput = {
+    create?: XOR<CarePlanCreateWithoutDraft_versionInput, CarePlanUncheckedCreateWithoutDraft_versionInput>
+    connectOrCreate?: CarePlanCreateOrConnectWithoutDraft_versionInput
+    upsert?: CarePlanUpsertWithoutDraft_versionInput
+    disconnect?: CarePlanWhereInput | boolean
+    delete?: CarePlanWhereInput | boolean
+    connect?: CarePlanWhereUniqueInput
+    update?: XOR<XOR<CarePlanUpdateToOneWithWhereWithoutDraft_versionInput, CarePlanUpdateWithoutDraft_versionInput>, CarePlanUncheckedUpdateWithoutDraft_versionInput>
   }
 
   export type CarerCreateNestedOneWithoutVisitsInput = {
@@ -21837,14 +25162,6 @@ export namespace Prisma {
     connectOrCreate?: MedicationAuditCreateOrConnectWithoutPrescriptionInput | MedicationAuditCreateOrConnectWithoutPrescriptionInput[]
     createMany?: MedicationAuditCreateManyPrescriptionInputEnvelope
     connect?: MedicationAuditWhereUniqueInput | MedicationAuditWhereUniqueInput[]
-  }
-
-  export type IntFieldUpdateOperationsInput = {
-    set?: number
-    increment?: number
-    decrement?: number
-    multiply?: number
-    divide?: number
   }
 
   export type NullableIntFieldUpdateOperationsInput = {
@@ -22277,21 +25594,11 @@ export namespace Prisma {
     _max?: NestedDateTimeNullableFilter<$PrismaModel>
   }
 
-  export type NestedEnumVisitStatusFilter<$PrismaModel = never> = {
-    equals?: $Enums.VisitStatus | EnumVisitStatusFieldRefInput<$PrismaModel>
-    in?: $Enums.VisitStatus[] | ListEnumVisitStatusFieldRefInput<$PrismaModel>
-    notIn?: $Enums.VisitStatus[] | ListEnumVisitStatusFieldRefInput<$PrismaModel>
-    not?: NestedEnumVisitStatusFilter<$PrismaModel> | $Enums.VisitStatus
-  }
-
-  export type NestedEnumVisitStatusWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: $Enums.VisitStatus | EnumVisitStatusFieldRefInput<$PrismaModel>
-    in?: $Enums.VisitStatus[] | ListEnumVisitStatusFieldRefInput<$PrismaModel>
-    notIn?: $Enums.VisitStatus[] | ListEnumVisitStatusFieldRefInput<$PrismaModel>
-    not?: NestedEnumVisitStatusWithAggregatesFilter<$PrismaModel> | $Enums.VisitStatus
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedEnumVisitStatusFilter<$PrismaModel>
-    _max?: NestedEnumVisitStatusFilter<$PrismaModel>
+  export type NestedEnumCarePlanStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.CarePlanStatus | EnumCarePlanStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CarePlanStatus[] | ListEnumCarePlanStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CarePlanStatus[] | ListEnumCarePlanStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCarePlanStatusFilter<$PrismaModel> | $Enums.CarePlanStatus
   }
 
   export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
@@ -22319,6 +25626,55 @@ export namespace Prisma {
     gt?: number | FloatFieldRefInput<$PrismaModel>
     gte?: number | FloatFieldRefInput<$PrismaModel>
     not?: NestedFloatFilter<$PrismaModel> | number
+  }
+
+  export type NestedEnumCarePlanStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.CarePlanStatus | EnumCarePlanStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CarePlanStatus[] | ListEnumCarePlanStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CarePlanStatus[] | ListEnumCarePlanStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCarePlanStatusWithAggregatesFilter<$PrismaModel> | $Enums.CarePlanStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumCarePlanStatusFilter<$PrismaModel>
+    _max?: NestedEnumCarePlanStatusFilter<$PrismaModel>
+  }
+  export type NestedJsonFilter<$PrismaModel = never> = 
+    | PatchUndefined<
+        Either<Required<NestedJsonFilterBase<$PrismaModel>>, Exclude<keyof Required<NestedJsonFilterBase<$PrismaModel>>, 'path'>>,
+        Required<NestedJsonFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<NestedJsonFilterBase<$PrismaModel>>, 'path'>>
+
+  export type NestedJsonFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
+
+  export type NestedEnumVisitStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.VisitStatus | EnumVisitStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.VisitStatus[] | ListEnumVisitStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.VisitStatus[] | ListEnumVisitStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumVisitStatusFilter<$PrismaModel> | $Enums.VisitStatus
+  }
+
+  export type NestedEnumVisitStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.VisitStatus | EnumVisitStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.VisitStatus[] | ListEnumVisitStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.VisitStatus[] | ListEnumVisitStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumVisitStatusWithAggregatesFilter<$PrismaModel> | $Enums.VisitStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumVisitStatusFilter<$PrismaModel>
+    _max?: NestedEnumVisitStatusFilter<$PrismaModel>
   }
 
   export type NestedIntNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -22380,28 +25736,6 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumMedicationAuditActionFilter<$PrismaModel>
     _max?: NestedEnumMedicationAuditActionFilter<$PrismaModel>
-  }
-  export type NestedJsonFilter<$PrismaModel = never> = 
-    | PatchUndefined<
-        Either<Required<NestedJsonFilterBase<$PrismaModel>>, Exclude<keyof Required<NestedJsonFilterBase<$PrismaModel>>, 'path'>>,
-        Required<NestedJsonFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<NestedJsonFilterBase<$PrismaModel>>, 'path'>>
-
-  export type NestedJsonFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
   }
   export type NestedJsonNullableFilter<$PrismaModel = never> = 
     | PatchUndefined<
@@ -22670,6 +26004,31 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type CarePlanCreateWithoutClientInput = {
+    id?: string
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    active_version?: CarePlanVersionCreateNestedOneWithoutActive_forInput
+    draft_version?: CarePlanVersionCreateNestedOneWithoutDraft_forInput
+    versions?: CarePlanVersionCreateNestedManyWithoutCare_planInput
+  }
+
+  export type CarePlanUncheckedCreateWithoutClientInput = {
+    id?: string
+    active_version_id?: string | null
+    draft_version_id?: string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    versions?: CarePlanVersionUncheckedCreateNestedManyWithoutCare_planInput
+  }
+
+  export type CarePlanCreateOrConnectWithoutClientInput = {
+    where: CarePlanWhereUniqueInput
+    create: XOR<CarePlanCreateWithoutClientInput, CarePlanUncheckedCreateWithoutClientInput>
+  }
+
   export type OrganizationCreateWithoutClientsInput = {
     id?: string
     name: string
@@ -22784,6 +26143,37 @@ export namespace Prisma {
     deleted_at?: DateTimeNullableFilter<"Prescription"> | Date | string | null
   }
 
+  export type CarePlanUpsertWithoutClientInput = {
+    update: XOR<CarePlanUpdateWithoutClientInput, CarePlanUncheckedUpdateWithoutClientInput>
+    create: XOR<CarePlanCreateWithoutClientInput, CarePlanUncheckedCreateWithoutClientInput>
+    where?: CarePlanWhereInput
+  }
+
+  export type CarePlanUpdateToOneWithWhereWithoutClientInput = {
+    where?: CarePlanWhereInput
+    data: XOR<CarePlanUpdateWithoutClientInput, CarePlanUncheckedUpdateWithoutClientInput>
+  }
+
+  export type CarePlanUpdateWithoutClientInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    active_version?: CarePlanVersionUpdateOneWithoutActive_forNestedInput
+    draft_version?: CarePlanVersionUpdateOneWithoutDraft_forNestedInput
+    versions?: CarePlanVersionUpdateManyWithoutCare_planNestedInput
+  }
+
+  export type CarePlanUncheckedUpdateWithoutClientInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    active_version_id?: NullableStringFieldUpdateOperationsInput | string | null
+    draft_version_id?: NullableStringFieldUpdateOperationsInput | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    versions?: CarePlanVersionUncheckedUpdateManyWithoutCare_planNestedInput
+  }
+
   export type OrganizationUpsertWithoutClientsInput = {
     update: XOR<OrganizationUpdateWithoutClientsInput, OrganizationUncheckedUpdateWithoutClientsInput>
     create: XOR<OrganizationCreateWithoutClientsInput, OrganizationUncheckedCreateWithoutClientsInput>
@@ -22827,6 +26217,541 @@ export namespace Prisma {
     data: XOR<HealthSummaryUpdateManyMutationInput, HealthSummaryUncheckedUpdateManyWithoutClientInput>
   }
 
+  export type ClientCreateWithoutCare_planInput = {
+    id?: string
+    full_name: string
+    preferred_name?: string | null
+    pronouns?: string | null
+    address_line1: string
+    address_line2?: string | null
+    city: string
+    postcode: string
+    date_of_birth?: Date | string | null
+    preferred_language?: string | null
+    communication_needs?: string | null
+    accessibility_adjustments?: string | null
+    representative_name?: string | null
+    representative_relationship?: string | null
+    representative_phone?: string | null
+    representative_email?: string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    visits?: VisitCreateNestedManyWithoutClientInput
+    prescriptions?: PrescriptionCreateNestedManyWithoutClientInput
+    organization?: OrganizationCreateNestedOneWithoutClientsInput
+    health_summaries?: HealthSummaryCreateNestedManyWithoutClientInput
+  }
+
+  export type ClientUncheckedCreateWithoutCare_planInput = {
+    id?: string
+    full_name: string
+    preferred_name?: string | null
+    pronouns?: string | null
+    address_line1: string
+    address_line2?: string | null
+    city: string
+    postcode: string
+    date_of_birth?: Date | string | null
+    preferred_language?: string | null
+    communication_needs?: string | null
+    accessibility_adjustments?: string | null
+    representative_name?: string | null
+    representative_relationship?: string | null
+    representative_phone?: string | null
+    representative_email?: string | null
+    organization_id?: string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    visits?: VisitUncheckedCreateNestedManyWithoutClientInput
+    prescriptions?: PrescriptionUncheckedCreateNestedManyWithoutClientInput
+    health_summaries?: HealthSummaryUncheckedCreateNestedManyWithoutClientInput
+  }
+
+  export type ClientCreateOrConnectWithoutCare_planInput = {
+    where: ClientWhereUniqueInput
+    create: XOR<ClientCreateWithoutCare_planInput, ClientUncheckedCreateWithoutCare_planInput>
+  }
+
+  export type CarePlanVersionCreateWithoutActive_forInput = {
+    id?: string
+    version_number: number
+    status?: $Enums.CarePlanStatus
+    review_due_at?: Date | string | null
+    effective_from?: Date | string | null
+    authored_by: string
+    approved_by?: string | null
+    approved_at?: Date | string | null
+    content: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    care_plan: CarePlanCreateNestedOneWithoutVersionsInput
+    draft_for?: CarePlanCreateNestedOneWithoutDraft_versionInput
+  }
+
+  export type CarePlanVersionUncheckedCreateWithoutActive_forInput = {
+    id?: string
+    care_plan_id: string
+    version_number: number
+    status?: $Enums.CarePlanStatus
+    review_due_at?: Date | string | null
+    effective_from?: Date | string | null
+    authored_by: string
+    approved_by?: string | null
+    approved_at?: Date | string | null
+    content: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    draft_for?: CarePlanUncheckedCreateNestedOneWithoutDraft_versionInput
+  }
+
+  export type CarePlanVersionCreateOrConnectWithoutActive_forInput = {
+    where: CarePlanVersionWhereUniqueInput
+    create: XOR<CarePlanVersionCreateWithoutActive_forInput, CarePlanVersionUncheckedCreateWithoutActive_forInput>
+  }
+
+  export type CarePlanVersionCreateWithoutDraft_forInput = {
+    id?: string
+    version_number: number
+    status?: $Enums.CarePlanStatus
+    review_due_at?: Date | string | null
+    effective_from?: Date | string | null
+    authored_by: string
+    approved_by?: string | null
+    approved_at?: Date | string | null
+    content: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    care_plan: CarePlanCreateNestedOneWithoutVersionsInput
+    active_for?: CarePlanCreateNestedOneWithoutActive_versionInput
+  }
+
+  export type CarePlanVersionUncheckedCreateWithoutDraft_forInput = {
+    id?: string
+    care_plan_id: string
+    version_number: number
+    status?: $Enums.CarePlanStatus
+    review_due_at?: Date | string | null
+    effective_from?: Date | string | null
+    authored_by: string
+    approved_by?: string | null
+    approved_at?: Date | string | null
+    content: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    active_for?: CarePlanUncheckedCreateNestedOneWithoutActive_versionInput
+  }
+
+  export type CarePlanVersionCreateOrConnectWithoutDraft_forInput = {
+    where: CarePlanVersionWhereUniqueInput
+    create: XOR<CarePlanVersionCreateWithoutDraft_forInput, CarePlanVersionUncheckedCreateWithoutDraft_forInput>
+  }
+
+  export type CarePlanVersionCreateWithoutCare_planInput = {
+    id?: string
+    version_number: number
+    status?: $Enums.CarePlanStatus
+    review_due_at?: Date | string | null
+    effective_from?: Date | string | null
+    authored_by: string
+    approved_by?: string | null
+    approved_at?: Date | string | null
+    content: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    active_for?: CarePlanCreateNestedOneWithoutActive_versionInput
+    draft_for?: CarePlanCreateNestedOneWithoutDraft_versionInput
+  }
+
+  export type CarePlanVersionUncheckedCreateWithoutCare_planInput = {
+    id?: string
+    version_number: number
+    status?: $Enums.CarePlanStatus
+    review_due_at?: Date | string | null
+    effective_from?: Date | string | null
+    authored_by: string
+    approved_by?: string | null
+    approved_at?: Date | string | null
+    content: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    active_for?: CarePlanUncheckedCreateNestedOneWithoutActive_versionInput
+    draft_for?: CarePlanUncheckedCreateNestedOneWithoutDraft_versionInput
+  }
+
+  export type CarePlanVersionCreateOrConnectWithoutCare_planInput = {
+    where: CarePlanVersionWhereUniqueInput
+    create: XOR<CarePlanVersionCreateWithoutCare_planInput, CarePlanVersionUncheckedCreateWithoutCare_planInput>
+  }
+
+  export type CarePlanVersionCreateManyCare_planInputEnvelope = {
+    data: CarePlanVersionCreateManyCare_planInput | CarePlanVersionCreateManyCare_planInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type ClientUpsertWithoutCare_planInput = {
+    update: XOR<ClientUpdateWithoutCare_planInput, ClientUncheckedUpdateWithoutCare_planInput>
+    create: XOR<ClientCreateWithoutCare_planInput, ClientUncheckedCreateWithoutCare_planInput>
+    where?: ClientWhereInput
+  }
+
+  export type ClientUpdateToOneWithWhereWithoutCare_planInput = {
+    where?: ClientWhereInput
+    data: XOR<ClientUpdateWithoutCare_planInput, ClientUncheckedUpdateWithoutCare_planInput>
+  }
+
+  export type ClientUpdateWithoutCare_planInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    full_name?: StringFieldUpdateOperationsInput | string
+    preferred_name?: NullableStringFieldUpdateOperationsInput | string | null
+    pronouns?: NullableStringFieldUpdateOperationsInput | string | null
+    address_line1?: StringFieldUpdateOperationsInput | string
+    address_line2?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: StringFieldUpdateOperationsInput | string
+    postcode?: StringFieldUpdateOperationsInput | string
+    date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    preferred_language?: NullableStringFieldUpdateOperationsInput | string | null
+    communication_needs?: NullableStringFieldUpdateOperationsInput | string | null
+    accessibility_adjustments?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_name?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_relationship?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_phone?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_email?: NullableStringFieldUpdateOperationsInput | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    visits?: VisitUpdateManyWithoutClientNestedInput
+    prescriptions?: PrescriptionUpdateManyWithoutClientNestedInput
+    organization?: OrganizationUpdateOneWithoutClientsNestedInput
+    health_summaries?: HealthSummaryUpdateManyWithoutClientNestedInput
+  }
+
+  export type ClientUncheckedUpdateWithoutCare_planInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    full_name?: StringFieldUpdateOperationsInput | string
+    preferred_name?: NullableStringFieldUpdateOperationsInput | string | null
+    pronouns?: NullableStringFieldUpdateOperationsInput | string | null
+    address_line1?: StringFieldUpdateOperationsInput | string
+    address_line2?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: StringFieldUpdateOperationsInput | string
+    postcode?: StringFieldUpdateOperationsInput | string
+    date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    preferred_language?: NullableStringFieldUpdateOperationsInput | string | null
+    communication_needs?: NullableStringFieldUpdateOperationsInput | string | null
+    accessibility_adjustments?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_name?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_relationship?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_phone?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_email?: NullableStringFieldUpdateOperationsInput | string | null
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    visits?: VisitUncheckedUpdateManyWithoutClientNestedInput
+    prescriptions?: PrescriptionUncheckedUpdateManyWithoutClientNestedInput
+    health_summaries?: HealthSummaryUncheckedUpdateManyWithoutClientNestedInput
+  }
+
+  export type CarePlanVersionUpsertWithoutActive_forInput = {
+    update: XOR<CarePlanVersionUpdateWithoutActive_forInput, CarePlanVersionUncheckedUpdateWithoutActive_forInput>
+    create: XOR<CarePlanVersionCreateWithoutActive_forInput, CarePlanVersionUncheckedCreateWithoutActive_forInput>
+    where?: CarePlanVersionWhereInput
+  }
+
+  export type CarePlanVersionUpdateToOneWithWhereWithoutActive_forInput = {
+    where?: CarePlanVersionWhereInput
+    data: XOR<CarePlanVersionUpdateWithoutActive_forInput, CarePlanVersionUncheckedUpdateWithoutActive_forInput>
+  }
+
+  export type CarePlanVersionUpdateWithoutActive_forInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    version_number?: IntFieldUpdateOperationsInput | number
+    status?: EnumCarePlanStatusFieldUpdateOperationsInput | $Enums.CarePlanStatus
+    review_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    effective_from?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    authored_by?: StringFieldUpdateOperationsInput | string
+    approved_by?: NullableStringFieldUpdateOperationsInput | string | null
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    content?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    care_plan?: CarePlanUpdateOneRequiredWithoutVersionsNestedInput
+    draft_for?: CarePlanUpdateOneWithoutDraft_versionNestedInput
+  }
+
+  export type CarePlanVersionUncheckedUpdateWithoutActive_forInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    care_plan_id?: StringFieldUpdateOperationsInput | string
+    version_number?: IntFieldUpdateOperationsInput | number
+    status?: EnumCarePlanStatusFieldUpdateOperationsInput | $Enums.CarePlanStatus
+    review_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    effective_from?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    authored_by?: StringFieldUpdateOperationsInput | string
+    approved_by?: NullableStringFieldUpdateOperationsInput | string | null
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    content?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    draft_for?: CarePlanUncheckedUpdateOneWithoutDraft_versionNestedInput
+  }
+
+  export type CarePlanVersionUpsertWithoutDraft_forInput = {
+    update: XOR<CarePlanVersionUpdateWithoutDraft_forInput, CarePlanVersionUncheckedUpdateWithoutDraft_forInput>
+    create: XOR<CarePlanVersionCreateWithoutDraft_forInput, CarePlanVersionUncheckedCreateWithoutDraft_forInput>
+    where?: CarePlanVersionWhereInput
+  }
+
+  export type CarePlanVersionUpdateToOneWithWhereWithoutDraft_forInput = {
+    where?: CarePlanVersionWhereInput
+    data: XOR<CarePlanVersionUpdateWithoutDraft_forInput, CarePlanVersionUncheckedUpdateWithoutDraft_forInput>
+  }
+
+  export type CarePlanVersionUpdateWithoutDraft_forInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    version_number?: IntFieldUpdateOperationsInput | number
+    status?: EnumCarePlanStatusFieldUpdateOperationsInput | $Enums.CarePlanStatus
+    review_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    effective_from?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    authored_by?: StringFieldUpdateOperationsInput | string
+    approved_by?: NullableStringFieldUpdateOperationsInput | string | null
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    content?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    care_plan?: CarePlanUpdateOneRequiredWithoutVersionsNestedInput
+    active_for?: CarePlanUpdateOneWithoutActive_versionNestedInput
+  }
+
+  export type CarePlanVersionUncheckedUpdateWithoutDraft_forInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    care_plan_id?: StringFieldUpdateOperationsInput | string
+    version_number?: IntFieldUpdateOperationsInput | number
+    status?: EnumCarePlanStatusFieldUpdateOperationsInput | $Enums.CarePlanStatus
+    review_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    effective_from?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    authored_by?: StringFieldUpdateOperationsInput | string
+    approved_by?: NullableStringFieldUpdateOperationsInput | string | null
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    content?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    active_for?: CarePlanUncheckedUpdateOneWithoutActive_versionNestedInput
+  }
+
+  export type CarePlanVersionUpsertWithWhereUniqueWithoutCare_planInput = {
+    where: CarePlanVersionWhereUniqueInput
+    update: XOR<CarePlanVersionUpdateWithoutCare_planInput, CarePlanVersionUncheckedUpdateWithoutCare_planInput>
+    create: XOR<CarePlanVersionCreateWithoutCare_planInput, CarePlanVersionUncheckedCreateWithoutCare_planInput>
+  }
+
+  export type CarePlanVersionUpdateWithWhereUniqueWithoutCare_planInput = {
+    where: CarePlanVersionWhereUniqueInput
+    data: XOR<CarePlanVersionUpdateWithoutCare_planInput, CarePlanVersionUncheckedUpdateWithoutCare_planInput>
+  }
+
+  export type CarePlanVersionUpdateManyWithWhereWithoutCare_planInput = {
+    where: CarePlanVersionScalarWhereInput
+    data: XOR<CarePlanVersionUpdateManyMutationInput, CarePlanVersionUncheckedUpdateManyWithoutCare_planInput>
+  }
+
+  export type CarePlanVersionScalarWhereInput = {
+    AND?: CarePlanVersionScalarWhereInput | CarePlanVersionScalarWhereInput[]
+    OR?: CarePlanVersionScalarWhereInput[]
+    NOT?: CarePlanVersionScalarWhereInput | CarePlanVersionScalarWhereInput[]
+    id?: StringFilter<"CarePlanVersion"> | string
+    care_plan_id?: StringFilter<"CarePlanVersion"> | string
+    version_number?: IntFilter<"CarePlanVersion"> | number
+    status?: EnumCarePlanStatusFilter<"CarePlanVersion"> | $Enums.CarePlanStatus
+    review_due_at?: DateTimeNullableFilter<"CarePlanVersion"> | Date | string | null
+    effective_from?: DateTimeNullableFilter<"CarePlanVersion"> | Date | string | null
+    authored_by?: StringFilter<"CarePlanVersion"> | string
+    approved_by?: StringNullableFilter<"CarePlanVersion"> | string | null
+    approved_at?: DateTimeNullableFilter<"CarePlanVersion"> | Date | string | null
+    content?: JsonFilter<"CarePlanVersion">
+    created_at?: DateTimeFilter<"CarePlanVersion"> | Date | string
+    updated_at?: DateTimeFilter<"CarePlanVersion"> | Date | string
+    deleted_at?: DateTimeNullableFilter<"CarePlanVersion"> | Date | string | null
+  }
+
+  export type CarePlanCreateWithoutVersionsInput = {
+    id?: string
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    client: ClientCreateNestedOneWithoutCare_planInput
+    active_version?: CarePlanVersionCreateNestedOneWithoutActive_forInput
+    draft_version?: CarePlanVersionCreateNestedOneWithoutDraft_forInput
+  }
+
+  export type CarePlanUncheckedCreateWithoutVersionsInput = {
+    id?: string
+    client_id: string
+    active_version_id?: string | null
+    draft_version_id?: string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+  }
+
+  export type CarePlanCreateOrConnectWithoutVersionsInput = {
+    where: CarePlanWhereUniqueInput
+    create: XOR<CarePlanCreateWithoutVersionsInput, CarePlanUncheckedCreateWithoutVersionsInput>
+  }
+
+  export type CarePlanCreateWithoutActive_versionInput = {
+    id?: string
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    client: ClientCreateNestedOneWithoutCare_planInput
+    draft_version?: CarePlanVersionCreateNestedOneWithoutDraft_forInput
+    versions?: CarePlanVersionCreateNestedManyWithoutCare_planInput
+  }
+
+  export type CarePlanUncheckedCreateWithoutActive_versionInput = {
+    id?: string
+    client_id: string
+    draft_version_id?: string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    versions?: CarePlanVersionUncheckedCreateNestedManyWithoutCare_planInput
+  }
+
+  export type CarePlanCreateOrConnectWithoutActive_versionInput = {
+    where: CarePlanWhereUniqueInput
+    create: XOR<CarePlanCreateWithoutActive_versionInput, CarePlanUncheckedCreateWithoutActive_versionInput>
+  }
+
+  export type CarePlanCreateWithoutDraft_versionInput = {
+    id?: string
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    client: ClientCreateNestedOneWithoutCare_planInput
+    active_version?: CarePlanVersionCreateNestedOneWithoutActive_forInput
+    versions?: CarePlanVersionCreateNestedManyWithoutCare_planInput
+  }
+
+  export type CarePlanUncheckedCreateWithoutDraft_versionInput = {
+    id?: string
+    client_id: string
+    active_version_id?: string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+    versions?: CarePlanVersionUncheckedCreateNestedManyWithoutCare_planInput
+  }
+
+  export type CarePlanCreateOrConnectWithoutDraft_versionInput = {
+    where: CarePlanWhereUniqueInput
+    create: XOR<CarePlanCreateWithoutDraft_versionInput, CarePlanUncheckedCreateWithoutDraft_versionInput>
+  }
+
+  export type CarePlanUpsertWithoutVersionsInput = {
+    update: XOR<CarePlanUpdateWithoutVersionsInput, CarePlanUncheckedUpdateWithoutVersionsInput>
+    create: XOR<CarePlanCreateWithoutVersionsInput, CarePlanUncheckedCreateWithoutVersionsInput>
+    where?: CarePlanWhereInput
+  }
+
+  export type CarePlanUpdateToOneWithWhereWithoutVersionsInput = {
+    where?: CarePlanWhereInput
+    data: XOR<CarePlanUpdateWithoutVersionsInput, CarePlanUncheckedUpdateWithoutVersionsInput>
+  }
+
+  export type CarePlanUpdateWithoutVersionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    client?: ClientUpdateOneRequiredWithoutCare_planNestedInput
+    active_version?: CarePlanVersionUpdateOneWithoutActive_forNestedInput
+    draft_version?: CarePlanVersionUpdateOneWithoutDraft_forNestedInput
+  }
+
+  export type CarePlanUncheckedUpdateWithoutVersionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    client_id?: StringFieldUpdateOperationsInput | string
+    active_version_id?: NullableStringFieldUpdateOperationsInput | string | null
+    draft_version_id?: NullableStringFieldUpdateOperationsInput | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type CarePlanUpsertWithoutActive_versionInput = {
+    update: XOR<CarePlanUpdateWithoutActive_versionInput, CarePlanUncheckedUpdateWithoutActive_versionInput>
+    create: XOR<CarePlanCreateWithoutActive_versionInput, CarePlanUncheckedCreateWithoutActive_versionInput>
+    where?: CarePlanWhereInput
+  }
+
+  export type CarePlanUpdateToOneWithWhereWithoutActive_versionInput = {
+    where?: CarePlanWhereInput
+    data: XOR<CarePlanUpdateWithoutActive_versionInput, CarePlanUncheckedUpdateWithoutActive_versionInput>
+  }
+
+  export type CarePlanUpdateWithoutActive_versionInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    client?: ClientUpdateOneRequiredWithoutCare_planNestedInput
+    draft_version?: CarePlanVersionUpdateOneWithoutDraft_forNestedInput
+    versions?: CarePlanVersionUpdateManyWithoutCare_planNestedInput
+  }
+
+  export type CarePlanUncheckedUpdateWithoutActive_versionInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    client_id?: StringFieldUpdateOperationsInput | string
+    draft_version_id?: NullableStringFieldUpdateOperationsInput | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    versions?: CarePlanVersionUncheckedUpdateManyWithoutCare_planNestedInput
+  }
+
+  export type CarePlanUpsertWithoutDraft_versionInput = {
+    update: XOR<CarePlanUpdateWithoutDraft_versionInput, CarePlanUncheckedUpdateWithoutDraft_versionInput>
+    create: XOR<CarePlanCreateWithoutDraft_versionInput, CarePlanUncheckedCreateWithoutDraft_versionInput>
+    where?: CarePlanWhereInput
+  }
+
+  export type CarePlanUpdateToOneWithWhereWithoutDraft_versionInput = {
+    where?: CarePlanWhereInput
+    data: XOR<CarePlanUpdateWithoutDraft_versionInput, CarePlanUncheckedUpdateWithoutDraft_versionInput>
+  }
+
+  export type CarePlanUpdateWithoutDraft_versionInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    client?: ClientUpdateOneRequiredWithoutCare_planNestedInput
+    active_version?: CarePlanVersionUpdateOneWithoutActive_forNestedInput
+    versions?: CarePlanVersionUpdateManyWithoutCare_planNestedInput
+  }
+
+  export type CarePlanUncheckedUpdateWithoutDraft_versionInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    client_id?: StringFieldUpdateOperationsInput | string
+    active_version_id?: NullableStringFieldUpdateOperationsInput | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    versions?: CarePlanVersionUncheckedUpdateManyWithoutCare_planNestedInput
+  }
+
   export type CarerCreateWithoutVisitsInput = {
     id?: string
     first_name: string
@@ -22863,15 +26788,25 @@ export namespace Prisma {
   export type ClientCreateWithoutVisitsInput = {
     id?: string
     full_name: string
+    preferred_name?: string | null
+    pronouns?: string | null
     address_line1: string
     address_line2?: string | null
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    preferred_language?: string | null
+    communication_needs?: string | null
+    accessibility_adjustments?: string | null
+    representative_name?: string | null
+    representative_relationship?: string | null
+    representative_phone?: string | null
+    representative_email?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
     prescriptions?: PrescriptionCreateNestedManyWithoutClientInput
+    care_plan?: CarePlanCreateNestedOneWithoutClientInput
     organization?: OrganizationCreateNestedOneWithoutClientsInput
     health_summaries?: HealthSummaryCreateNestedManyWithoutClientInput
   }
@@ -22879,16 +26814,26 @@ export namespace Prisma {
   export type ClientUncheckedCreateWithoutVisitsInput = {
     id?: string
     full_name: string
+    preferred_name?: string | null
+    pronouns?: string | null
     address_line1: string
     address_line2?: string | null
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    preferred_language?: string | null
+    communication_needs?: string | null
+    accessibility_adjustments?: string | null
+    representative_name?: string | null
+    representative_relationship?: string | null
+    representative_phone?: string | null
+    representative_email?: string | null
     organization_id?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
     prescriptions?: PrescriptionUncheckedCreateNestedManyWithoutClientInput
+    care_plan?: CarePlanUncheckedCreateNestedOneWithoutClientInput
     health_summaries?: HealthSummaryUncheckedCreateNestedManyWithoutClientInput
   }
 
@@ -23052,15 +26997,25 @@ export namespace Prisma {
   export type ClientUpdateWithoutVisitsInput = {
     id?: StringFieldUpdateOperationsInput | string
     full_name?: StringFieldUpdateOperationsInput | string
+    preferred_name?: NullableStringFieldUpdateOperationsInput | string | null
+    pronouns?: NullableStringFieldUpdateOperationsInput | string | null
     address_line1?: StringFieldUpdateOperationsInput | string
     address_line2?: NullableStringFieldUpdateOperationsInput | string | null
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    preferred_language?: NullableStringFieldUpdateOperationsInput | string | null
+    communication_needs?: NullableStringFieldUpdateOperationsInput | string | null
+    accessibility_adjustments?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_name?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_relationship?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_phone?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_email?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     prescriptions?: PrescriptionUpdateManyWithoutClientNestedInput
+    care_plan?: CarePlanUpdateOneWithoutClientNestedInput
     organization?: OrganizationUpdateOneWithoutClientsNestedInput
     health_summaries?: HealthSummaryUpdateManyWithoutClientNestedInput
   }
@@ -23068,16 +27023,26 @@ export namespace Prisma {
   export type ClientUncheckedUpdateWithoutVisitsInput = {
     id?: StringFieldUpdateOperationsInput | string
     full_name?: StringFieldUpdateOperationsInput | string
+    preferred_name?: NullableStringFieldUpdateOperationsInput | string | null
+    pronouns?: NullableStringFieldUpdateOperationsInput | string | null
     address_line1?: StringFieldUpdateOperationsInput | string
     address_line2?: NullableStringFieldUpdateOperationsInput | string | null
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    preferred_language?: NullableStringFieldUpdateOperationsInput | string | null
+    communication_needs?: NullableStringFieldUpdateOperationsInput | string | null
+    accessibility_adjustments?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_name?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_relationship?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_phone?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_email?: NullableStringFieldUpdateOperationsInput | string | null
     organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     prescriptions?: PrescriptionUncheckedUpdateManyWithoutClientNestedInput
+    care_plan?: CarePlanUncheckedUpdateOneWithoutClientNestedInput
     health_summaries?: HealthSummaryUncheckedUpdateManyWithoutClientNestedInput
   }
 
@@ -23323,15 +27288,25 @@ export namespace Prisma {
   export type ClientCreateWithoutPrescriptionsInput = {
     id?: string
     full_name: string
+    preferred_name?: string | null
+    pronouns?: string | null
     address_line1: string
     address_line2?: string | null
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    preferred_language?: string | null
+    communication_needs?: string | null
+    accessibility_adjustments?: string | null
+    representative_name?: string | null
+    representative_relationship?: string | null
+    representative_phone?: string | null
+    representative_email?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
     visits?: VisitCreateNestedManyWithoutClientInput
+    care_plan?: CarePlanCreateNestedOneWithoutClientInput
     organization?: OrganizationCreateNestedOneWithoutClientsInput
     health_summaries?: HealthSummaryCreateNestedManyWithoutClientInput
   }
@@ -23339,16 +27314,26 @@ export namespace Prisma {
   export type ClientUncheckedCreateWithoutPrescriptionsInput = {
     id?: string
     full_name: string
+    preferred_name?: string | null
+    pronouns?: string | null
     address_line1: string
     address_line2?: string | null
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    preferred_language?: string | null
+    communication_needs?: string | null
+    accessibility_adjustments?: string | null
+    representative_name?: string | null
+    representative_relationship?: string | null
+    representative_phone?: string | null
+    representative_email?: string | null
     organization_id?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
     visits?: VisitUncheckedCreateNestedManyWithoutClientInput
+    care_plan?: CarePlanUncheckedCreateNestedOneWithoutClientInput
     health_summaries?: HealthSummaryUncheckedCreateNestedManyWithoutClientInput
   }
 
@@ -23468,15 +27453,25 @@ export namespace Prisma {
   export type ClientUpdateWithoutPrescriptionsInput = {
     id?: StringFieldUpdateOperationsInput | string
     full_name?: StringFieldUpdateOperationsInput | string
+    preferred_name?: NullableStringFieldUpdateOperationsInput | string | null
+    pronouns?: NullableStringFieldUpdateOperationsInput | string | null
     address_line1?: StringFieldUpdateOperationsInput | string
     address_line2?: NullableStringFieldUpdateOperationsInput | string | null
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    preferred_language?: NullableStringFieldUpdateOperationsInput | string | null
+    communication_needs?: NullableStringFieldUpdateOperationsInput | string | null
+    accessibility_adjustments?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_name?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_relationship?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_phone?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_email?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     visits?: VisitUpdateManyWithoutClientNestedInput
+    care_plan?: CarePlanUpdateOneWithoutClientNestedInput
     organization?: OrganizationUpdateOneWithoutClientsNestedInput
     health_summaries?: HealthSummaryUpdateManyWithoutClientNestedInput
   }
@@ -23484,16 +27479,26 @@ export namespace Prisma {
   export type ClientUncheckedUpdateWithoutPrescriptionsInput = {
     id?: StringFieldUpdateOperationsInput | string
     full_name?: StringFieldUpdateOperationsInput | string
+    preferred_name?: NullableStringFieldUpdateOperationsInput | string | null
+    pronouns?: NullableStringFieldUpdateOperationsInput | string | null
     address_line1?: StringFieldUpdateOperationsInput | string
     address_line2?: NullableStringFieldUpdateOperationsInput | string | null
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    preferred_language?: NullableStringFieldUpdateOperationsInput | string | null
+    communication_needs?: NullableStringFieldUpdateOperationsInput | string | null
+    accessibility_adjustments?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_name?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_relationship?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_phone?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_email?: NullableStringFieldUpdateOperationsInput | string | null
     organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     visits?: VisitUncheckedUpdateManyWithoutClientNestedInput
+    care_plan?: CarePlanUncheckedUpdateOneWithoutClientNestedInput
     health_summaries?: HealthSummaryUncheckedUpdateManyWithoutClientNestedInput
   }
 
@@ -23953,32 +27958,52 @@ export namespace Prisma {
   export type ClientCreateWithoutOrganizationInput = {
     id?: string
     full_name: string
+    preferred_name?: string | null
+    pronouns?: string | null
     address_line1: string
     address_line2?: string | null
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    preferred_language?: string | null
+    communication_needs?: string | null
+    accessibility_adjustments?: string | null
+    representative_name?: string | null
+    representative_relationship?: string | null
+    representative_phone?: string | null
+    representative_email?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
     visits?: VisitCreateNestedManyWithoutClientInput
     prescriptions?: PrescriptionCreateNestedManyWithoutClientInput
+    care_plan?: CarePlanCreateNestedOneWithoutClientInput
     health_summaries?: HealthSummaryCreateNestedManyWithoutClientInput
   }
 
   export type ClientUncheckedCreateWithoutOrganizationInput = {
     id?: string
     full_name: string
+    preferred_name?: string | null
+    pronouns?: string | null
     address_line1: string
     address_line2?: string | null
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    preferred_language?: string | null
+    communication_needs?: string | null
+    accessibility_adjustments?: string | null
+    representative_name?: string | null
+    representative_relationship?: string | null
+    representative_phone?: string | null
+    representative_email?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
     visits?: VisitUncheckedCreateNestedManyWithoutClientInput
     prescriptions?: PrescriptionUncheckedCreateNestedManyWithoutClientInput
+    care_plan?: CarePlanUncheckedCreateNestedOneWithoutClientInput
     health_summaries?: HealthSummaryUncheckedCreateNestedManyWithoutClientInput
   }
 
@@ -24014,11 +28039,20 @@ export namespace Prisma {
     NOT?: ClientScalarWhereInput | ClientScalarWhereInput[]
     id?: StringFilter<"Client"> | string
     full_name?: StringFilter<"Client"> | string
+    preferred_name?: StringNullableFilter<"Client"> | string | null
+    pronouns?: StringNullableFilter<"Client"> | string | null
     address_line1?: StringFilter<"Client"> | string
     address_line2?: StringNullableFilter<"Client"> | string | null
     city?: StringFilter<"Client"> | string
     postcode?: StringFilter<"Client"> | string
     date_of_birth?: DateTimeNullableFilter<"Client"> | Date | string | null
+    preferred_language?: StringNullableFilter<"Client"> | string | null
+    communication_needs?: StringNullableFilter<"Client"> | string | null
+    accessibility_adjustments?: StringNullableFilter<"Client"> | string | null
+    representative_name?: StringNullableFilter<"Client"> | string | null
+    representative_relationship?: StringNullableFilter<"Client"> | string | null
+    representative_phone?: StringNullableFilter<"Client"> | string | null
+    representative_email?: StringNullableFilter<"Client"> | string | null
     organization_id?: StringNullableFilter<"Client"> | string | null
     created_at?: DateTimeFilter<"Client"> | Date | string
     updated_at?: DateTimeFilter<"Client"> | Date | string
@@ -24112,33 +28146,53 @@ export namespace Prisma {
   export type ClientCreateWithoutHealth_summariesInput = {
     id?: string
     full_name: string
+    preferred_name?: string | null
+    pronouns?: string | null
     address_line1: string
     address_line2?: string | null
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    preferred_language?: string | null
+    communication_needs?: string | null
+    accessibility_adjustments?: string | null
+    representative_name?: string | null
+    representative_relationship?: string | null
+    representative_phone?: string | null
+    representative_email?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
     visits?: VisitCreateNestedManyWithoutClientInput
     prescriptions?: PrescriptionCreateNestedManyWithoutClientInput
+    care_plan?: CarePlanCreateNestedOneWithoutClientInput
     organization?: OrganizationCreateNestedOneWithoutClientsInput
   }
 
   export type ClientUncheckedCreateWithoutHealth_summariesInput = {
     id?: string
     full_name: string
+    preferred_name?: string | null
+    pronouns?: string | null
     address_line1: string
     address_line2?: string | null
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    preferred_language?: string | null
+    communication_needs?: string | null
+    accessibility_adjustments?: string | null
+    representative_name?: string | null
+    representative_relationship?: string | null
+    representative_phone?: string | null
+    representative_email?: string | null
     organization_id?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
     visits?: VisitUncheckedCreateNestedManyWithoutClientInput
     prescriptions?: PrescriptionUncheckedCreateNestedManyWithoutClientInput
+    care_plan?: CarePlanUncheckedCreateNestedOneWithoutClientInput
   }
 
   export type ClientCreateOrConnectWithoutHealth_summariesInput = {
@@ -24193,33 +28247,53 @@ export namespace Prisma {
   export type ClientUpdateWithoutHealth_summariesInput = {
     id?: StringFieldUpdateOperationsInput | string
     full_name?: StringFieldUpdateOperationsInput | string
+    preferred_name?: NullableStringFieldUpdateOperationsInput | string | null
+    pronouns?: NullableStringFieldUpdateOperationsInput | string | null
     address_line1?: StringFieldUpdateOperationsInput | string
     address_line2?: NullableStringFieldUpdateOperationsInput | string | null
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    preferred_language?: NullableStringFieldUpdateOperationsInput | string | null
+    communication_needs?: NullableStringFieldUpdateOperationsInput | string | null
+    accessibility_adjustments?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_name?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_relationship?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_phone?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_email?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     visits?: VisitUpdateManyWithoutClientNestedInput
     prescriptions?: PrescriptionUpdateManyWithoutClientNestedInput
+    care_plan?: CarePlanUpdateOneWithoutClientNestedInput
     organization?: OrganizationUpdateOneWithoutClientsNestedInput
   }
 
   export type ClientUncheckedUpdateWithoutHealth_summariesInput = {
     id?: StringFieldUpdateOperationsInput | string
     full_name?: StringFieldUpdateOperationsInput | string
+    preferred_name?: NullableStringFieldUpdateOperationsInput | string | null
+    pronouns?: NullableStringFieldUpdateOperationsInput | string | null
     address_line1?: StringFieldUpdateOperationsInput | string
     address_line2?: NullableStringFieldUpdateOperationsInput | string | null
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    preferred_language?: NullableStringFieldUpdateOperationsInput | string | null
+    communication_needs?: NullableStringFieldUpdateOperationsInput | string | null
+    accessibility_adjustments?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_name?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_relationship?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_phone?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_email?: NullableStringFieldUpdateOperationsInput | string | null
     organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     visits?: VisitUncheckedUpdateManyWithoutClientNestedInput
     prescriptions?: PrescriptionUncheckedUpdateManyWithoutClientNestedInput
+    care_plan?: CarePlanUncheckedUpdateOneWithoutClientNestedInput
   }
 
   export type CarerUpsertWithoutApproved_summariesInput = {
@@ -24577,6 +28651,70 @@ export namespace Prisma {
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type CarePlanVersionCreateManyCare_planInput = {
+    id?: string
+    version_number: number
+    status?: $Enums.CarePlanStatus
+    review_due_at?: Date | string | null
+    effective_from?: Date | string | null
+    authored_by: string
+    approved_by?: string | null
+    approved_at?: Date | string | null
+    content: JsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+    deleted_at?: Date | string | null
+  }
+
+  export type CarePlanVersionUpdateWithoutCare_planInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    version_number?: IntFieldUpdateOperationsInput | number
+    status?: EnumCarePlanStatusFieldUpdateOperationsInput | $Enums.CarePlanStatus
+    review_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    effective_from?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    authored_by?: StringFieldUpdateOperationsInput | string
+    approved_by?: NullableStringFieldUpdateOperationsInput | string | null
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    content?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    active_for?: CarePlanUpdateOneWithoutActive_versionNestedInput
+    draft_for?: CarePlanUpdateOneWithoutDraft_versionNestedInput
+  }
+
+  export type CarePlanVersionUncheckedUpdateWithoutCare_planInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    version_number?: IntFieldUpdateOperationsInput | number
+    status?: EnumCarePlanStatusFieldUpdateOperationsInput | $Enums.CarePlanStatus
+    review_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    effective_from?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    authored_by?: StringFieldUpdateOperationsInput | string
+    approved_by?: NullableStringFieldUpdateOperationsInput | string | null
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    content?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    active_for?: CarePlanUncheckedUpdateOneWithoutActive_versionNestedInput
+    draft_for?: CarePlanUncheckedUpdateOneWithoutDraft_versionNestedInput
+  }
+
+  export type CarePlanVersionUncheckedUpdateManyWithoutCare_planInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    version_number?: IntFieldUpdateOperationsInput | number
+    status?: EnumCarePlanStatusFieldUpdateOperationsInput | $Enums.CarePlanStatus
+    review_due_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    effective_from?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    authored_by?: StringFieldUpdateOperationsInput | string
+    approved_by?: NullableStringFieldUpdateOperationsInput | string | null
+    approved_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    content?: JsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
   export type VisitTaskCreateManyVisitInput = {
     id?: string
     task_name: string
@@ -24924,11 +29062,20 @@ export namespace Prisma {
   export type ClientCreateManyOrganizationInput = {
     id?: string
     full_name: string
+    preferred_name?: string | null
+    pronouns?: string | null
     address_line1: string
     address_line2?: string | null
     city: string
     postcode: string
     date_of_birth?: Date | string | null
+    preferred_language?: string | null
+    communication_needs?: string | null
+    accessibility_adjustments?: string | null
+    representative_name?: string | null
+    representative_relationship?: string | null
+    representative_phone?: string | null
+    representative_email?: string | null
     created_at?: Date | string
     updated_at?: Date | string
     deleted_at?: Date | string | null
@@ -24937,43 +29084,72 @@ export namespace Prisma {
   export type ClientUpdateWithoutOrganizationInput = {
     id?: StringFieldUpdateOperationsInput | string
     full_name?: StringFieldUpdateOperationsInput | string
+    preferred_name?: NullableStringFieldUpdateOperationsInput | string | null
+    pronouns?: NullableStringFieldUpdateOperationsInput | string | null
     address_line1?: StringFieldUpdateOperationsInput | string
     address_line2?: NullableStringFieldUpdateOperationsInput | string | null
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    preferred_language?: NullableStringFieldUpdateOperationsInput | string | null
+    communication_needs?: NullableStringFieldUpdateOperationsInput | string | null
+    accessibility_adjustments?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_name?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_relationship?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_phone?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_email?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     visits?: VisitUpdateManyWithoutClientNestedInput
     prescriptions?: PrescriptionUpdateManyWithoutClientNestedInput
+    care_plan?: CarePlanUpdateOneWithoutClientNestedInput
     health_summaries?: HealthSummaryUpdateManyWithoutClientNestedInput
   }
 
   export type ClientUncheckedUpdateWithoutOrganizationInput = {
     id?: StringFieldUpdateOperationsInput | string
     full_name?: StringFieldUpdateOperationsInput | string
+    preferred_name?: NullableStringFieldUpdateOperationsInput | string | null
+    pronouns?: NullableStringFieldUpdateOperationsInput | string | null
     address_line1?: StringFieldUpdateOperationsInput | string
     address_line2?: NullableStringFieldUpdateOperationsInput | string | null
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    preferred_language?: NullableStringFieldUpdateOperationsInput | string | null
+    communication_needs?: NullableStringFieldUpdateOperationsInput | string | null
+    accessibility_adjustments?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_name?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_relationship?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_phone?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_email?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     visits?: VisitUncheckedUpdateManyWithoutClientNestedInput
     prescriptions?: PrescriptionUncheckedUpdateManyWithoutClientNestedInput
+    care_plan?: CarePlanUncheckedUpdateOneWithoutClientNestedInput
     health_summaries?: HealthSummaryUncheckedUpdateManyWithoutClientNestedInput
   }
 
   export type ClientUncheckedUpdateManyWithoutOrganizationInput = {
     id?: StringFieldUpdateOperationsInput | string
     full_name?: StringFieldUpdateOperationsInput | string
+    preferred_name?: NullableStringFieldUpdateOperationsInput | string | null
+    pronouns?: NullableStringFieldUpdateOperationsInput | string | null
     address_line1?: StringFieldUpdateOperationsInput | string
     address_line2?: NullableStringFieldUpdateOperationsInput | string | null
     city?: StringFieldUpdateOperationsInput | string
     postcode?: StringFieldUpdateOperationsInput | string
     date_of_birth?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    preferred_language?: NullableStringFieldUpdateOperationsInput | string | null
+    communication_needs?: NullableStringFieldUpdateOperationsInput | string | null
+    accessibility_adjustments?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_name?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_relationship?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_phone?: NullableStringFieldUpdateOperationsInput | string | null
+    representative_email?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     deleted_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -24992,6 +29168,10 @@ export namespace Prisma {
      * @deprecated Use ClientCountOutputTypeDefaultArgs instead
      */
     export type ClientCountOutputTypeArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = ClientCountOutputTypeDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use CarePlanCountOutputTypeDefaultArgs instead
+     */
+    export type CarePlanCountOutputTypeArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = CarePlanCountOutputTypeDefaultArgs<ExtArgs>
     /**
      * @deprecated Use VisitCountOutputTypeDefaultArgs instead
      */
@@ -25020,6 +29200,14 @@ export namespace Prisma {
      * @deprecated Use ClientDefaultArgs instead
      */
     export type ClientArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = ClientDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use CarePlanDefaultArgs instead
+     */
+    export type CarePlanArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = CarePlanDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use CarePlanVersionDefaultArgs instead
+     */
+    export type CarePlanVersionArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = CarePlanVersionDefaultArgs<ExtArgs>
     /**
      * @deprecated Use VisitDefaultArgs instead
      */

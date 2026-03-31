@@ -1,13 +1,24 @@
-import { InputType, Field } from '@nestjs/graphql';
-import { IsString, IsNotEmpty, IsOptional, MaxLength, IsBoolean, Equals, IsDateString, IsEmail } from 'class-validator';
+import { Field, ID, InputType } from '@nestjs/graphql';
+import {
+  IsDateString,
+  IsEmail,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 
 @InputType()
-export class CreateClientInput {
-  @Field()
+export class UpdateClientInput {
+  @Field(() => ID)
+  @IsUUID()
+  id!: string;
+
+  @Field(() => String, { nullable: true })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(200)
-  fullName!: string;
+  fullName?: string;
 
   @Field(() => String, { nullable: true })
   @IsOptional()
@@ -21,11 +32,11 @@ export class CreateClientInput {
   @MaxLength(50)
   pronouns?: string;
 
-  @Field()
+  @Field(() => String, { nullable: true })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(200)
-  addressLine1!: string;
+  addressLine1?: string;
 
   @Field(() => String, { nullable: true })
   @IsOptional()
@@ -33,17 +44,17 @@ export class CreateClientInput {
   @MaxLength(200)
   addressLine2?: string;
 
-  @Field()
+  @Field(() => String, { nullable: true })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(100)
-  city!: string;
+  city?: string;
 
-  @Field()
+  @Field(() => String, { nullable: true })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(20)
-  postcode!: string;
+  postcode?: string;
 
   @Field(() => String, { nullable: true })
   @IsOptional()
@@ -91,15 +102,4 @@ export class CreateClientInput {
   @IsEmail()
   @MaxLength(200)
   representativeEmail?: string;
-
-  @Field()
-  @IsBoolean()
-  @Equals(true)
-  privacyNoticeAcknowledged!: boolean;
-
-  @Field(() => String, { nullable: true })
-  @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  privacyNoticeVersion?: string;
 }
