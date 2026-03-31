@@ -33,12 +33,12 @@ As of the latest verified pass:
 
 - API
   - service: `oasis-care-staging-api`
-  - task definition: `oasis-care-staging-api:70`
-  - digest: `sha256:18abb02daa9e7adf1404cedd0b51535be57d83e42351dec808d627889fac5409`
+  - task definition: `oasis-care-staging-api:71`
+  - digest: `sha256:253db579189715f4a113688dab4e67ff39b9496c0601bb86ae50684295c443a5`
 - Web
   - service: `oasis-care-staging-web`
-  - task definition: `oasis-care-staging-web:84`
-  - digest: `sha256:c5c09caca624a5f7eabc7cfba5a10d62d7805121d910c524dda65c471fce1475`
+  - task definition: `oasis-care-staging-web:86`
+  - digest: `sha256:ab365d56c9d320447f379f53d056ded7d47fb3a8940d34307ebc0d8beec72467`
 
 ## What Actually Works For Web Deploys
 
@@ -52,27 +52,33 @@ If you build plain local Docker images on Apple silicon without setting the plat
 
 - `CannotPullContainerError: image Manifest does not contain descriptor matching platform 'linux/amd64'`
 
-### Normal Docker push caveat on this machine
+### Buildx push caveat on this machine
 
-The plain `docker push` path can hang during the final registry commit on this machine even when most layers have already uploaded.
+The flaky path on this machine is `docker buildx build --push`, not a plain `docker push` of an already-built local image.
 
 What that means in practice:
-- sometimes the tag is already in ECR even though the client never returns
-- sometimes the tag is not committed yet and the client is genuinely stuck
+- the amd64 image can finish building locally
+- `buildx --push` can still go dark after the export/push phase
+- the tag may never appear in ECR even though the local build succeeded
 
-So after any plain `docker push`, always verify ECR directly instead of trusting the local client.
+What did work cleanly in the latest pass:
+- build the `linux/amd64` image locally
+- push that local image with plain `docker push`
+- verify the tag in ECR
 
 ### Fastest safe web publish path from this machine
 
-1. Build the web image for `linux/amd64`.
-2. Export it as OCI layout.
-3. Publish that OCI layout to ECR with `oras cp`.
+1. Build the web image for `linux/amd64` and load it locally.
+2. Push the local image tag with plain `docker push`.
+3. Confirm the tag exists in ECR.
 4. Register a new ECS task definition from the last healthy web revision.
 5. Update the ECS service and wait for stability.
 
+Use the OCI `oras cp` path only as a fallback if a plain `docker push` really fails.
+
 ## Commands That Were Actually Used
 
-### 1. Build a web image as OCI layout for ECS
+### 1. Build a web image locally for ECS
 
 ```bash
 cd /private/tmp/oasis-codex-impl-review
@@ -80,19 +86,19 @@ cd /private/tmp/oasis-codex-impl-review
 docker buildx build \
   --platform linux/amd64 \
   --provenance=false \
-  --output type=oci,dest=/tmp/oasis-web-<tag>.tar,name=oasis-web:<tag> \
+  --load \
+  -t 721689331449.dkr.ecr.eu-west-2.amazonaws.com/oasis-web:<tag> \
   -f apps/web/Dockerfile .
 ```
 
 Example tag used successfully:
 
-- `sha-7e26b39-amd64`
+- `sha-6e29852`
 
-### 2. Publish the OCI image to ECR
+### 2. Push the local image to ECR
 
 ```bash
-oras cp \
-  --from-oci-layout /tmp/oasis-web-<tag>.tar:<tag> \
+docker push \
   721689331449.dkr.ecr.eu-west-2.amazonaws.com/oasis-web:<tag>
 ```
 
@@ -116,7 +122,7 @@ Example used:
 ```bash
 aws ecs describe-task-definition \
   --region eu-west-2 \
-  --task-definition oasis-care-staging-web:82 \
+  --task-definition oasis-care-staging-web:85 \
   --query 'taskDefinition' \
   --output json > /tmp/oasis-web-base.json
 
@@ -202,15 +208,16 @@ Fix:
 ### 2. Plain Docker push hangs on final commit
 
 Symptom:
-- most or all layers upload
-- `docker push` never returns
+- `docker buildx build --push` never finishes publishing
+- the local build succeeds but the tag does not appear in ECR
 
 Meaning:
-- this machine’s direct Docker client path to ECR is unreliable for the final registry commit
+- the broken path is the local `buildx --push` registry export on this machine
 
 Fix:
-- verify whether the tag actually landed in ECR
-- if not, export OCI layout and publish with `oras cp`
+- build with `--load`
+- push the local image with plain `docker push`
+- verify the tag exists in ECR before rolling ECS
 
 ### 3. Fresh web task shows empty data surfaces even though shell loads
 
