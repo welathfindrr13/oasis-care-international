@@ -1,41 +1,49 @@
-import { Controller, Post, Get, Body, Param, HttpCode, HttpStatus, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+  SetMetadata,
+  StreamableFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import type { Response } from 'express';
+import { RolesGuard } from '@oasis/auth';
+import { AuditLogInterceptor } from '../common/interceptors/audit-log.interceptor';
 import { ConsentService, GrantConsentInput } from './services/consent.service';
 import { SarService } from './services/sar.service';
 import { ErasureService } from './services/erasure.service';
+import { ConsentRequestDto } from './dto/consent-request.dto';
+import { SarRequestDto } from './dto/sar-request.dto';
+import { ErasureRequestDto } from './dto/erasure-request.dto';
+import { GdprListQueryDto } from './dto/gdpr-list-query.dto';
+import { RetentionService } from './services/retention.service';
+import { ComplianceService } from './services/compliance.service';
 
-interface ConsentRequestDto {
-  userId: string;
-  consentType: string;
-  purpose: string;
-  legalBasis: string;
-  granted: boolean;
-  metadata?: Record<string, any>;
-}
-
-interface SarRequestDto {
-  userId: string;
-  requestType: string;
-  email?: string;
-}
-
-interface ErasureRequestDto {
-  userId: string;
-  requestType: string;
-  reason?: string;
-}
+const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
+  SetMetadata('roles', roles);
 
 @Controller('gdpr')
+@UseInterceptors(AuditLogInterceptor)
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('admin', 'office')
 export class GdprController {
   constructor(
     private readonly consentService: ConsentService,
     private readonly sarService: SarService,
     private readonly erasureService: ErasureService,
+    private readonly retentionService: RetentionService,
+    private readonly complianceService: ComplianceService,
   ) {}
 
-  /**
-   * Grant or withdraw consent
-   * POST /gdpr/consent
-   */
   @Post('consent')
   @HttpCode(HttpStatus.ACCEPTED)
   async grantOrWithdrawConsent(@Body() request: ConsentRequestDto) {
@@ -71,10 +79,6 @@ export class GdprController {
     }
   }
 
-  /**
-   * Get consent status for a user
-   * GET /gdpr/consent/:userId
-   */
   @Get('consent/:userId')
   async getConsentStatus(@Param('userId') userId: string) {
     const status = await this.consentService.getConsentStatus(userId);
@@ -84,10 +88,6 @@ export class GdprController {
     };
   }
 
-  /**
-   * Get consent history for a user
-   * GET /gdpr/consent/:userId/history
-   */
   @Get('consent/:userId/history')
   async getConsentHistory(@Param('userId') userId: string) {
     const history = await this.consentService.getConsentHistory(userId);
@@ -97,10 +97,6 @@ export class GdprController {
     };
   }
 
-  /**
-   * Check if user has specific consent
-   * GET /gdpr/consent/:userId/check?type=marketing
-   */
   @Get('consent/:userId/check')
   async checkConsent(
     @Param('userId') userId: string,
@@ -114,17 +110,22 @@ export class GdprController {
     };
   }
 
-  /**
-   * Request Subject Access Report
-   * POST /gdpr/sar
-   */
+  @Get('sar')
+  async listSubjectAccessRequests(@Query() query: GdprListQueryDto) {
+    return {
+      requests: await this.sarService.listSubjectAccessRequests(query.limit),
+    };
+  }
+
   @Post('sar')
   @HttpCode(HttpStatus.ACCEPTED) 
-  async requestSubjectAccessReport(@Body() request: SarRequestDto) {
+  async requestSubjectAccessReport(@Body() request: SarRequestDto, @Req() req: any) {
+    const requestedBy = req.user?.sub ?? req.user?.id ?? 'unknown';
     const result = await this.sarService.enqueueSubjectAccessRequest(
       request.userId,
       request.requestType,
       request.email,
+      requestedBy,
     );
     
     return {
@@ -135,17 +136,44 @@ export class GdprController {
     };
   }
 
-  /**
-   * Request Data Erasure
-   * POST /gdpr/erasure
-   */
+  @Get('sar/:requestId')
+  async getSubjectAccessReportStatus(@Param('requestId') requestId: string) {
+    return this.sarService.getSarStatus(requestId);
+  }
+
+  @Post('sar/:requestId/process')
+  async processSubjectAccessReport(@Param('requestId') requestId: string) {
+    return this.sarService.processSubjectAccessRequest(requestId);
+  }
+
+  @Get('sar/:requestId/download')
+  async downloadSubjectAccessReport(
+    @Param('requestId') requestId: string,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<StreamableFile> {
+    const artifact = await this.sarService.downloadSubjectAccessReport(requestId);
+    response.setHeader('Content-Type', artifact.contentType);
+    response.setHeader('Content-Disposition', `attachment; filename="${artifact.fileName}"`);
+
+    return artifact.file;
+  }
+
+  @Get('erasure')
+  async listErasureRequests(@Query() query: GdprListQueryDto) {
+    return {
+      requests: await this.erasureService.listErasureRequests(query.limit),
+    };
+  }
+
   @Post('erasure')
   @HttpCode(HttpStatus.ACCEPTED)
-  async requestDataErasure(@Body() request: ErasureRequestDto) {
+  async requestDataErasure(@Body() request: ErasureRequestDto, @Req() req: any) {
+    const requestedBy = req.user?.sub ?? req.user?.id ?? 'unknown';
     const result = await this.erasureService.enqueueDataErasure(
       request.userId,
       request.requestType,
       request.reason,
+      requestedBy,
     );
     
     return {
@@ -154,5 +182,39 @@ export class GdprController {
       status: 'accepted',
       estimatedCompletion: '30 days',
     };
+  }
+
+  @Get('erasure/:requestId')
+  async getErasureStatus(@Param('requestId') requestId: string) {
+    return this.erasureService.getErasureStatus(requestId);
+  }
+
+  @Post('erasure/:requestId/process')
+  async processErasureRequest(@Param('requestId') requestId: string) {
+    return this.erasureService.processDataErasure(requestId);
+  }
+
+  @Post('erasure/:requestId/cancel')
+  async cancelErasureRequest(@Param('requestId') requestId: string) {
+    return this.erasureService.cancelErasureRequest(requestId);
+  }
+
+  @Get('audit-logs')
+  async getAuditLogs(@Query() query: GdprListQueryDto) {
+    return {
+      logs: await this.complianceService.listAuditLogs(query.limit),
+    };
+  }
+
+  @Get('retention-policies')
+  async getRetentionPolicies() {
+    return {
+      policies: await this.retentionService.listPolicies(),
+    };
+  }
+
+  @Post('retention-policies/enforce')
+  async enforceRetentionPolicies() {
+    return this.retentionService.enforcePolicies();
   }
 }

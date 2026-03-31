@@ -48,6 +48,8 @@ describe('ClientResolver', () => {
       addressLine2: 'Flat 2B',
       city: 'London',
       postcode: 'SW1A 1AA',
+      privacyNoticeAcknowledged: true,
+      privacyNoticeVersion: 'pilot-v1',
     };
     const ctx = {
       req: {

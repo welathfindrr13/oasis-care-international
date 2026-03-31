@@ -1,4 +1,4 @@
-import { Injectable, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, HttpStatus, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@oasis/db';
 import { ClientRepository } from './client.repository';
 import { ClientDTO, ClientPaginatedResponse } from './dto/client.dto';
@@ -61,6 +61,10 @@ export class ClientService {
   async createClient(input: CreateClientInput, userId?: string): Promise<ClientDTO> {
     this.logger.log(`Creating client: [NAME REDACTED]`); // GDPR: Don't log PII
 
+    if (!input.privacyNoticeAcknowledged) {
+      throw new BadRequestException('A privacy notice acknowledgement is required to create a client.');
+    }
+
     const client = await this.clientRepository.create({
       full_name: input.fullName,
       address_line1: input.addressLine1,
@@ -71,6 +75,26 @@ export class ClientService {
 
     // GDPR: Audit log the client creation with PII masked
     try {
+      const privacyNoticeVersion = input.privacyNoticeVersion?.trim() || 'pilot-v1';
+
+      await this.prisma.auditLog.create({
+        data: {
+          user_id: userId || 'system',
+          action: 'ACKNOWLEDGE_CLIENT_DATA_PROCESSING',
+          resource_type: 'client_intake',
+          resource_id: client.id,
+          old_values: {},
+          new_values: {
+            clientId: client.id,
+            lawfulBasis: 'health_or_social_care_delivery',
+            privacyNoticeAcknowledged: true,
+            privacyNoticeVersion,
+            acknowledgementSource: 'client_create_form',
+          },
+          timestamp: new Date(),
+        },
+      });
+
       await this.prisma.auditLog.create({
         data: {
           user_id: userId || 'system',
@@ -83,6 +107,8 @@ export class ClientService {
             fullName: '[REDACTED]',
             city: client.city,
             postcode: '[REDACTED]',
+            lawfulBasis: 'health_or_social_care_delivery',
+            privacyNoticeVersion,
           },
           timestamp: new Date(),
         },

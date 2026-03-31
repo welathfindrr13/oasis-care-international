@@ -1,8 +1,9 @@
 import { Metadata } from 'next';
+import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { Header } from '../../components/oasis/Header';
 import { authOptions } from '../../lib/auth/auth-options';
-import { normalizeAppRoles } from '../../lib/auth/roles';
+import { hasRole, normalizeAppRoles } from '../../lib/auth/roles';
 
 export const metadata: Metadata = {
   title: 'Settings - Oasis Care',
@@ -25,6 +26,7 @@ export default async function SettingsPage() {
   const userEmail = session?.user?.email || 'No email available';
   const primaryRole = roles[0] ? formatRole(roles[0]) : 'No role assigned';
   const accessTokenAvailable = typeof (session as any)?.accessToken === 'string';
+  const isAdmin = hasRole(roles, 'admin');
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -88,6 +90,38 @@ export default async function SettingsPage() {
             </div>
           </section>
         </div>
+
+        <section className="mt-6 bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+          <h2 className="font-heading text-xl font-semibold text-slate-900 mb-5">Privacy and compliance</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Link href="/privacy" className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Privacy notice
+            </Link>
+            <Link href="/data-processing" className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Data processing summary
+            </Link>
+            <Link href="/security" className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Security summary
+            </Link>
+            <Link href="/subprocessors" className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Subprocessors
+            </Link>
+          </div>
+          {isAdmin && (
+            <div className="mt-4 rounded-xl bg-blue-50 border border-blue-200 p-4">
+              <p className="text-sm font-medium text-blue-900">Admin compliance console</p>
+              <p className="mt-1 text-sm text-blue-800">
+                Review subject access, erasure, retention enforcement, and audit evidence from one route.
+              </p>
+              <Link
+                href="/admin/compliance"
+                className="inline-flex mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                Open compliance console
+              </Link>
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );

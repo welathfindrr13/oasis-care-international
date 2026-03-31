@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
@@ -100,14 +101,25 @@ function LoginContent() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                 </svg>
-                <span className="text-xs">GDPR Compliant</span>
+                <span className="text-xs">Privacy controls documented</span>
               </div>
             </div>
           </div>
 
           {/* Footer */}
           <p className="mt-8 text-center text-xs text-slate-400">
-            By signing in, you agree to our Terms of Service and Privacy Policy
+            By signing in, you acknowledge the{' '}
+            <Link href="/privacy" className="underline underline-offset-2 hover:text-slate-500">
+              privacy notice
+            </Link>
+            ,{' '}
+            <Link href="/security" className="underline underline-offset-2 hover:text-slate-500">
+              security summary
+            </Link>
+            , and{' '}
+            <Link href="/subprocessors" className="underline underline-offset-2 hover:text-slate-500">
+              subprocessor list
+            </Link>
           </p>
         </div>
       </div>

@@ -33,7 +33,7 @@ export default function NewClientPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [gdprConsent, setGdprConsent] = useState(false);
+  const [privacyNoticeAcknowledged, setPrivacyNoticeAcknowledged] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     fullName: '',
     addressLine1: '',
@@ -67,8 +67,8 @@ export default function NewClientPage() {
       return;
     }
 
-    if (!gdprConsent) {
-      setError('You must acknowledge the data processing notice to continue.');
+    if (!privacyNoticeAcknowledged) {
+      setError('You must confirm the privacy notice and lawful basis acknowledgement to continue.');
       return;
     }
 
@@ -83,6 +83,8 @@ export default function NewClientPage() {
           addressLine2: trimmedData.addressLine2 || null,
           city: trimmedData.city,
           postcode: trimmedData.postcode,
+          privacyNoticeAcknowledged: true,
+          privacyNoticeVersion: 'pilot-v1',
         },
       });
 
@@ -93,7 +95,7 @@ export default function NewClientPage() {
         city: '',
         postcode: '',
       });
-      setGdprConsent(false);
+      setPrivacyNoticeAcknowledged(false);
       router.push('/clients');
       router.refresh();
     } catch (err: any) {
@@ -110,7 +112,7 @@ export default function NewClientPage() {
       formData.city.trim() &&
       formData.postcode.trim()
     ) &&
-    gdprConsent &&
+    privacyNoticeAcknowledged &&
     !isSubmitting;
 
   return (
@@ -238,7 +240,7 @@ export default function NewClientPage() {
                 </div>
               </div>
 
-              {/* GDPR Notice */}
+              {/* Privacy Notice */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 mt-0.5">
@@ -248,24 +250,35 @@ export default function NewClientPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-sm font-semibold text-blue-800 mb-1">
-                      Data Protection Notice (GDPR)
+                      Privacy notice and lawful basis check
                     </h3>
                     <p className="text-sm text-blue-700 mb-3">
-                      The personal information you provide will be processed for the purpose of providing 
-                      domiciliary care services. This data will be stored securely and only accessed by 
-                      authorised care staff. Under UK GDPR, clients have the right to access, rectify, 
-                      or request deletion of their personal data.
+                      Client records in Oasis are created for care delivery and operational oversight. Before
+                      creating a record, confirm that the privacy notice has been provided, or that your
+                      organisation has arranged for it to be provided under the relevant lawful basis for care.
+                    </p>
+                    <p className="text-xs text-blue-700 mb-3">
+                      Read the{' '}
+                      <Link href="/privacy" className="font-medium underline underline-offset-2">
+                        privacy notice
+                      </Link>{' '}
+                      and{' '}
+                      <Link href="/data-processing" className="font-medium underline underline-offset-2">
+                        data processing summary
+                      </Link>
+                      .
                     </p>
                     <label className="flex items-start gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={gdprConsent}
-                        onChange={(e) => setGdprConsent(e.target.checked)}
+                        checked={privacyNoticeAcknowledged}
+                        onChange={(e) => setPrivacyNoticeAcknowledged(e.target.checked)}
                         className="mt-1 h-4 w-4 text-teal-600 border-slate-300 rounded focus:ring-teal-500"
                       />
                       <span className="text-sm text-blue-800">
-                        I confirm that the client has been informed about how their data will be processed 
-                        and that I have legal basis to register their information for care services.
+                        I confirm that the privacy information has been provided, or arranged to be provided,
+                        and that I am creating this record under the organisation&apos;s lawful basis for care
+                        delivery.
                       </span>
                     </label>
                   </div>
