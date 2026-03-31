@@ -82,6 +82,23 @@ function ShortcutLink({
   )
 }
 
+function LaunchpadLink({
+  href,
+  label,
+}: {
+  href: string
+  label: string
+}) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700"
+    >
+      {label}
+    </Link>
+  )
+}
+
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
   const stats = await getTodayStats()
@@ -154,7 +171,7 @@ export default async function DashboardPage() {
                   <ShortcutLink
                     href="/clients"
                     title="Review clients"
-                    description="Open client records, care logs, summaries, and prescriptions."
+                    description="Open client records, prescriptions, and visit history without leaving the operational flow."
                   />
                   <ShortcutLink
                     href="/admin/carers"
@@ -177,7 +194,7 @@ export default async function DashboardPage() {
                   <ShortcutLink
                     href="/emar"
                     title="Review medication"
-                    description="See scheduled medication and update administration outcomes."
+                    description="See medication due today and record administration outcomes from the working queue."
                   />
                   <ShortcutLink
                     href="/activity"
@@ -196,16 +213,32 @@ export default async function DashboardPage() {
 
           <Card className="rounded-2xl border-slate-100">
             <CardHeader>
-              <h2 className="font-heading text-xl font-semibold text-slate-900">What this dashboard shows</h2>
+              <h2 className="font-heading text-xl font-semibold text-slate-900">Start here today</h2>
             </CardHeader>
             <CardContent className="mb-0 space-y-4 text-sm text-slate-600">
               <p>
-                These cards show real visit totals for today. They are no longer padded with placeholder client,
-                staffing, alert, or activity numbers.
+                {isAdmin
+                  ? "Use this page as the launchpad for today's care day: move into visits, review client records, check medication execution, and open the pilot proof story when you need the big picture."
+                  : 'Use this page to move quickly into the routes that matter today: your visit queue, medication work, and the totals that explain what is still outstanding.'}
               </p>
+              <div className="flex flex-wrap gap-2">
+                {isAdmin ? (
+                  <>
+                    <LaunchpadLink href="/visits" label="Open today's visit queue" />
+                    <LaunchpadLink href="/emar" label="Open eMAR" />
+                    <LaunchpadLink href="/admin/pilot" label="Open pilot story" />
+                  </>
+                ) : (
+                  <>
+                    <LaunchpadLink href="/visits" label="Open your queue" />
+                    <LaunchpadLink href="/emar" label="Record medication outcomes" />
+                    <LaunchpadLink href="/activity" label="Check today's totals" />
+                  </>
+                )}
+              </div>
               <p>
-                For operational detail, use visits, eMAR, and the activity screen directly. A richer live event feed
-                is not wired into the dashboard yet, so Oasis stays explicit about that instead of inventing one.
+                The numbers above are the live visit totals for today. Use the linked routes for the real work rather
+                than treating this page like a detailed operations board.
               </p>
               {!isAdmin && !isCarer && (
                 <p className="rounded-xl bg-amber-50 p-3 text-amber-900">

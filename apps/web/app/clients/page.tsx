@@ -14,7 +14,7 @@ import {
 
 export const metadata: Metadata = {
   title: 'Clients - Oasis Care',
-  description: 'Manage and view client information',
+  description: 'Open live client records and move into prescriptions and visit workflows',
 }
 
 export const dynamic = 'force-dynamic'
@@ -74,7 +74,7 @@ function EmptyState() {
         No clients found
       </h3>
       <p className="text-text-secondary mb-4">
-        No live client records are available in this environment yet.
+        No live client records match the current search.
       </p>
     </div>
   )
@@ -93,7 +93,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
             Clients
           </h1>
           <p className="text-slate-500 mt-1">
-            View live client records and jump into prescriptions and visit workflows
+            Open live client records and move into prescriptions, care history, and scheduling.
           </p>
         </div>
 
@@ -102,10 +102,10 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-text-primary font-heading">
-                  Client Directory
+                  Operational client directory
                 </h2>
                 <p className="text-sm text-text-secondary">
-                  {hasClients ? `${clients.length} of ${total} clients` : 'No clients found'}
+                  {hasClients ? `${clients.length} live records shown from ${total}` : 'No clients found'}
                 </p>
               </div>
               <form method="get" action="/clients">
@@ -156,9 +156,6 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
                             <div className="font-medium text-text-primary">
                               {client.fullName}
                             </div>
-                            <div className="text-sm text-text-secondary">
-                              ID: {client.id.slice(0, 8)}...
-                            </div>
                           </div>
                         </td>
                         <td className="py-3 px-4">
@@ -170,14 +167,11 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
-                            <Link href={`/clients/${client.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-                              View
+                            <Link href={`/clients/${client.id}`} className={buttonVariants({ variant: 'primary', size: 'sm' })}>
+                              Open record
                             </Link>
-                            <Link href={`/clients/${client.id}/prescriptions`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                            <Link href={`/clients/${client.id}/prescriptions`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
                               Prescriptions
-                            </Link>
-                            <Link href={`/visits?clientId=${client.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-                              Queue
                             </Link>
                             <Link href={`/visits/new?clientId=${client.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
                               Schedule

@@ -134,6 +134,12 @@ export function Header({
                   </Link>
                   {isAdmin && (
                     <>
+                      <Link href="/admin/pilot" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.79 2-4 2s-4-.895-4-2 1.79-2 4-2 4 .895 4 2zm12-2c0 1.105-1.79 2-4 2s-4-.895-4-2 1.79-2 4-2 4 .895 4 2z" />
+                        </svg>
+                        Pilot Story
+                      </Link>
                       <Link href="/admin/compliance" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.012-2.33a2.25 2.25 0 00-1.62-1.617l-5.07-1.449a2.25 2.25 0 00-1.234 0l-5.07 1.45A2.25 2.25 0 005.4 7.67V12c0 5.082 2.91 8.59 6.6 9.856 3.69-1.267 6.6-4.775 6.6-9.856V7.67z" />

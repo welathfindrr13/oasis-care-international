@@ -27,6 +27,18 @@ export default async function SettingsPage() {
   const primaryRole = roles[0] ? formatRole(roles[0]) : 'No role assigned';
   const accessTokenAvailable = typeof (session as any)?.accessToken === 'string';
   const isAdmin = hasRole(roles, 'admin');
+  const nextLinks = isAdmin
+    ? [
+        { href: '/visits', label: 'Open care queue' },
+        { href: '/clients', label: 'Review clients' },
+        { href: '/admin/medications', label: 'Medication library' },
+        { href: '/admin/pilot', label: 'Pilot story' },
+      ]
+    : [
+        { href: '/visits', label: 'Open visits' },
+        { href: '/emar', label: 'Open eMAR' },
+        { href: '/activity', label: "Today's totals" },
+      ];
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -41,7 +53,7 @@ export default async function SettingsPage() {
 
         <div className="grid gap-6 lg:grid-cols-[1.4fr,1fr]">
           <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-            <h2 className="font-heading text-xl font-semibold text-slate-900 mb-5">Account</h2>
+            <h2 className="font-heading text-xl font-semibold text-slate-900 mb-5">Signed-in account</h2>
             <dl className="grid gap-4 sm:grid-cols-2">
               <div>
                 <dt className="text-sm font-medium text-slate-500">Name</dt>
@@ -65,7 +77,7 @@ export default async function SettingsPage() {
           </section>
 
           <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-            <h2 className="font-heading text-xl font-semibold text-slate-900 mb-5">Session</h2>
+            <h2 className="font-heading text-xl font-semibold text-slate-900 mb-5">Access state</h2>
             <div className="space-y-4">
               <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
                 <p className="text-sm font-medium text-slate-700">Authenticated session</p>
@@ -92,7 +104,25 @@ export default async function SettingsPage() {
         </div>
 
         <section className="mt-6 bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="font-heading text-xl font-semibold text-slate-900 mb-5">Privacy and compliance</h2>
+          <h2 className="font-heading text-xl font-semibold text-slate-900 mb-5">Where to work next</h2>
+          <p className="mb-5 text-sm text-slate-500">
+            Use these routes when you need to pick work back up quickly from this account.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {nextLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-6 bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+          <h2 className="font-heading text-xl font-semibold text-slate-900 mb-5">Policy and compliance references</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Link href="/privacy" className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
               Privacy notice
@@ -109,16 +139,24 @@ export default async function SettingsPage() {
           </div>
           {isAdmin && (
             <div className="mt-4 rounded-xl bg-blue-50 border border-blue-200 p-4">
-              <p className="text-sm font-medium text-blue-900">Admin compliance console</p>
+              <p className="text-sm font-medium text-blue-900">Pilot admin compliance console</p>
               <p className="mt-1 text-sm text-blue-800">
-                Review subject access, erasure, retention enforcement, and audit evidence from one route.
+                Review subject access, erasure handling, retention enforcement, and audit evidence from one admin route.
               </p>
-              <Link
-                href="/admin/compliance"
-                className="inline-flex mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-              >
-                Open compliance console
-              </Link>
+              <div className="mt-3 flex flex-wrap gap-3">
+                <Link
+                  href="/admin/compliance"
+                  className="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                >
+                  Open compliance console
+                </Link>
+                <Link
+                  href="/admin/pilot"
+                  className="inline-flex rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white"
+                >
+                  Open pilot story
+                </Link>
+              </div>
             </div>
           )}
         </section>

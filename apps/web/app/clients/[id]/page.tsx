@@ -102,9 +102,18 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
 
   const visits = await getClientVisits(client.id);
   const prescriptions = await getClientPrescriptions(client.id);
-  const nextVisit = visits
-    .filter((visit) => new Date(visit.scheduledStart).getTime() >= Date.now())
-    .sort((left, right) => new Date(left.scheduledStart).getTime() - new Date(right.scheduledStart).getTime())[0];
+  const now = Date.now();
+  const upcomingVisits = [...visits]
+    .filter((visit) => new Date(visit.scheduledStart).getTime() >= now)
+    .sort((left, right) => new Date(left.scheduledStart).getTime() - new Date(right.scheduledStart).getTime());
+  const recentCareActivity = [...visits]
+    .filter((visit) => new Date(visit.scheduledStart).getTime() < now)
+    .sort((left, right) => new Date(right.scheduledStart).getTime() - new Date(left.scheduledStart).getTime())
+    .slice(0, 3);
+  const nextVisit = upcomingVisits[0];
+  const clientAddress = [client.addressLine1, client.addressLine2, `${client.city}, ${client.postcode}`]
+    .filter(Boolean)
+    .join(', ');
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -127,17 +136,39 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
             <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">
               {client.fullName}
             </h1>
-            <p className="text-slate-500 mt-1">Client ID: {client.id}</p>
+            <p className="text-slate-500 mt-1">{clientAddress}</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Next scheduled visit</p>
+                <p className="mt-2 text-sm font-medium text-slate-900">
+                  {nextVisit ? formatDateTime(nextVisit.scheduledStart) : 'None scheduled'}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Active prescriptions</p>
+                <p className="mt-2 text-sm font-medium text-slate-900">
+                  {prescriptions.length} {prescriptions.length === 1 ? 'active prescription' : 'active prescriptions'}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Recent care activity</p>
+                <p className="mt-2 text-sm font-medium text-slate-900">
+                  {recentCareActivity.length
+                    ? `${recentCareActivity.length} recent visit${recentCareActivity.length === 1 ? '' : 's'} loaded`
+                    : 'No past visits loaded'}
+                </p>
+              </div>
+            </div>
           </div>
           <div className="flex items-center gap-3">
-            <Link href={`/clients/${client.id}/prescriptions`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              Manage Prescriptions
-            </Link>
-            <Link href={`/visits?clientId=${client.id}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              Open Visits Queue
-            </Link>
             <Link href={`/visits/new?clientId=${client.id}`} className={buttonVariants({ variant: 'primary', size: 'sm' })}>
               Schedule Visit
+            </Link>
+            <Link href={`/visits?clientId=${client.id}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              Client Queue
+            </Link>
+            <Link href={`/clients/${client.id}/prescriptions`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+              Open Prescriptions
             </Link>
           </div>
         </div>
@@ -146,7 +177,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
-                <h2 className="text-lg font-semibold text-slate-900">Client Overview</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Client details</h2>
               </CardHeader>
               <CardContent>
                 <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -176,11 +207,11 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900">Active Prescriptions</h2>
                     <p className="text-sm text-slate-500">
-                      {prescriptions.length ? `${prescriptions.length} active prescriptions loaded` : 'No active prescriptions recorded yet'}
+                      {prescriptions.length ? `${prescriptions.length} active prescriptions recorded` : 'No active prescriptions recorded yet'}
                     </p>
                   </div>
                   <Link href={`/clients/${client.id}/prescriptions`} className="text-sm text-teal-600 hover:text-teal-700">
-                    Manage →
+                    Open prescriptions →
                   </Link>
                 </div>
               </CardHeader>
@@ -218,9 +249,9 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
               <CardHeader>
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Recent Visits</h2>
+                    <h2 className="text-lg font-semibold text-slate-900">Visit snapshot</h2>
                     <p className="text-sm text-slate-500">
-                      {visits.length ? `${visits.length} recent visits loaded` : 'No visits loaded for this client yet'}
+                      {visits.length ? `${visits.length} visits loaded for this client` : 'No visits loaded for this client yet'}
                     </p>
                   </div>
                   <Link href={`/visits?clientId=${client.id}`} className="text-sm text-teal-600 hover:text-teal-700">
@@ -230,29 +261,64 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
               </CardHeader>
               <CardContent>
                 {visits.length ? (
-                  <div className="divide-y divide-slate-100">
-                    {visits.map((visit) => (
-                      <div key={visit.id} className="py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">
-                            {formatDateTime(visit.scheduledStart)}
-                          </p>
-                          <p className="text-sm text-slate-500">
-                            {visit.actualStart
-                              ? `Actual: ${formatDateTime(visit.actualStart)}${visit.actualEnd ? ` - ${formatTime(visit.actualEnd)}` : ''}`
-                              : 'Not started yet'}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClasses(visit.status)}`}>
-                            {formatVisitStatus(visit.status)}
-                          </span>
-                          <Link href={`/visits/${visit.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-                            View details
-                          </Link>
-                        </div>
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Upcoming visits</h3>
+                      <div className="mt-3 divide-y divide-slate-100">
+                        {upcomingVisits.length ? upcomingVisits.slice(0, 3).map((visit) => (
+                          <div key={visit.id} className="py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-slate-900">
+                                {formatDateTime(visit.scheduledStart)}
+                              </p>
+                              <p className="text-sm text-slate-500">
+                                Scheduled to finish at {formatTime(visit.scheduledEnd)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClasses(visit.status)}`}>
+                                {formatVisitStatus(visit.status)}
+                              </span>
+                              <Link href={`/visits/${visit.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                                Open visit
+                              </Link>
+                            </div>
+                          </div>
+                        )) : (
+                          <p className="py-4 text-sm text-slate-500">No future visits are currently scheduled.</p>
+                        )}
                       </div>
-                    ))}
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Recent care activity</h3>
+                      <div className="mt-3 divide-y divide-slate-100">
+                        {recentCareActivity.length ? recentCareActivity.map((visit) => (
+                          <div key={visit.id} className="py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-slate-900">
+                                {formatDateTime(visit.scheduledStart)}
+                              </p>
+                              <p className="text-sm text-slate-500">
+                                {visit.actualStart
+                                  ? `Actual: ${formatDateTime(visit.actualStart)}${visit.actualEnd ? ` - ${formatTime(visit.actualEnd)}` : ''}`
+                                  : 'No actual timing was recorded on this visit'}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClasses(visit.status)}`}>
+                                {formatVisitStatus(visit.status)}
+                              </span>
+                              <Link href={`/visits/${visit.id}`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                                Open visit
+                              </Link>
+                            </div>
+                          </div>
+                        )) : (
+                          <p className="py-4 text-sm text-slate-500">No past visit activity is loaded for this client yet.</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <p className="text-slate-500">No visits are available for this client yet.</p>
@@ -264,7 +330,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <h2 className="text-lg font-semibold text-slate-900">Next Visit</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Next care checkpoint</h2>
               </CardHeader>
               <CardContent>
                 {nextVisit ? (
@@ -292,31 +358,19 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
                     href={`/clients/${client.id}/prescriptions`}
                     className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"
                   >
-                    💊 Manage Prescriptions
-                  </Link>
-                  <Link
-                    href="/admin/medications"
-                    className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                  >
-                    🧪 Medication Library
-                  </Link>
-                  <Link
-                    href="/emar"
-                    className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                  >
-                    💊 Open eMAR
+                    Open prescriptions
                   </Link>
                   <Link
                     href={`/visits?clientId=${client.id}`}
                     className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"
                   >
-                    📋 Open Visits Queue
+                    Open client queue
                   </Link>
                   <Link
                     href={`/visits/new?clientId=${client.id}`}
                     className="block w-full rounded-xl bg-teal-50 px-4 py-3 text-left font-medium text-teal-700 transition-colors hover:bg-teal-100"
                   >
-                    📅 Schedule Visit
+                    Schedule visit
                   </Link>
                 </div>
               </CardContent>
