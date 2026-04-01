@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card';
 import { Button, buttonVariants } from '../../../components/ui/Button';
+import { formatMaskedActorLabel, type ComplianceSubjectContext } from '../../../lib/compliance';
 
 type SarRequest = {
   requestId: string;
@@ -52,6 +53,7 @@ type Props = {
   erasureRequests: ErasureRequest[];
   auditLogs: AuditLog[];
   retentionPolicies: RetentionPolicy[];
+  selectedSubject?: ComplianceSubjectContext | null;
 };
 
 function formatStamp(value?: string | null) {
@@ -68,14 +70,20 @@ export function ComplianceConsole({
   erasureRequests,
   auditLogs,
   retentionPolicies,
+  selectedSubject,
 }: Props) {
   const router = useRouter();
-  const [sarUserId, setSarUserId] = useState('');
+  const [sarUserId, setSarUserId] = useState(selectedSubject?.id ?? '');
   const [sarEmail, setSarEmail] = useState('');
-  const [erasureUserId, setErasureUserId] = useState('');
+  const [erasureUserId, setErasureUserId] = useState(selectedSubject?.id ?? '');
   const [erasureReason, setErasureReason] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setSarUserId(selectedSubject?.id ?? '');
+    setErasureUserId(selectedSubject?.id ?? '');
+  }, [selectedSubject?.id]);
 
   const outstandingCounts = useMemo(
     () => ({
@@ -100,6 +108,26 @@ export function ComplianceConsole({
 
   return (
     <div className="grid gap-6">
+      {selectedSubject && (
+        <Card>
+          <CardHeader>
+            <h2 className="font-heading text-lg font-semibold text-slate-900">Selected subject context</h2>
+            <p className="text-sm text-slate-500">
+              Use this context to queue rights handling without re-entering the client UUID.
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-slate-900">{selectedSubject.name || 'Linked subject'}</p>
+              <p className="mt-1 break-all text-sm text-slate-600">{selectedSubject.id}</p>
+            </div>
+            <Link href={`/clients/${selectedSubject.id}`} className={buttonVariants({ variant: 'outline' })}>
+              Open client record
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4 xl:grid-cols-4">
         <Card>
           <CardHeader>
@@ -401,7 +429,7 @@ export function ComplianceConsole({
                   <p className="mt-1 text-xs text-slate-500">
                     {log.resourceType}{log.resourceId ? ` · ${log.resourceId}` : ''} · {formatStamp(log.timestamp)}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">Actor: {log.userId || 'unknown'}</p>
+                  <p className="mt-1 text-xs text-slate-500">Actor: {formatMaskedActorLabel(log.userId)}</p>
                 </div>
               )) : (
                 <p className="text-sm text-slate-500">No audit logs are available yet.</p>

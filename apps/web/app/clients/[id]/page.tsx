@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
 import { buttonVariants } from '../../../components/ui/Button'
 import { requireAdminSession } from '../../../lib/auth/require-admin'
 import { formatCarePlanDate, getCarePlanHighlights } from '../../../lib/care-plan'
+import { getClientProfileCompleteness } from '../../../lib/client-profile'
 import { query } from '../../../lib/graphql/client'
 import {
   CLIENT_CARE_PLAN_QUERY,
@@ -130,13 +131,22 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
     .filter((visit) => new Date(visit.scheduledStart).getTime() < now)
     .sort((left, right) => new Date(right.scheduledStart).getTime() - new Date(left.scheduledStart).getTime())
     .slice(0, 3);
+  const completedVisits = [...visits]
+    .filter((visit) => visit.status === 'COMPLETED' || Boolean(visit.actualEnd))
+    .sort(
+      (left, right) =>
+        new Date(right.actualEnd || right.scheduledStart).getTime() - new Date(left.actualEnd || left.scheduledStart).getTime()
+    );
+  const lastCompletedVisit = completedVisits[0];
   const nextVisit = upcomingVisits[0];
   const activeCarePlan = carePlan?.activeVersion ?? null;
   const draftCarePlan = carePlan?.draftVersion ?? null;
   const carePlanHighlights = getCarePlanHighlights(activeCarePlan);
+  const profileCompleteness = getClientProfileCompleteness(client)
   const clientAddress = [client.addressLine1, client.addressLine2, `${client.city}, ${client.postcode}`]
     .filter(Boolean)
     .join(', ');
+  const complianceHref = `/admin/compliance?subjectId=${encodeURIComponent(client.id)}&subjectName=${encodeURIComponent(client.fullName)}`
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -177,11 +187,11 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
                 </p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Recent care activity</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Last completed visit</p>
                 <p className="mt-2 text-sm font-medium text-slate-900">
-                  {recentCareActivity.length
-                    ? `${recentCareActivity.length} recent visit${recentCareActivity.length === 1 ? '' : 's'} loaded`
-                    : 'No past visits loaded'}
+                  {lastCompletedVisit
+                    ? formatDateTime(lastCompletedVisit.actualEnd || lastCompletedVisit.scheduledEnd)
+                    : 'No completed visits yet'}
                 </p>
               </div>
             </div>
@@ -280,6 +290,51 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
                     <dd className="text-slate-900">{client.representativeEmail || 'Not recorded'}</dd>
                   </div>
                 </dl>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Profile completeness</h2>
+                    <p className="text-sm text-slate-500">
+                      Keep the operational profile complete before staff rely on care-plan and visit guidance.
+                    </p>
+                  </div>
+                  <Link href={`/clients/${client.id}/edit`} className="text-sm text-teal-600 hover:text-teal-700">
+                    Update profile →
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {profileCompleteness.isComplete ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                    <p className="text-sm font-semibold text-emerald-900">Operational profile looks complete.</p>
+                    <p className="mt-2 text-sm text-emerald-800">
+                      Preferred name, communication, accessibility, and representative details are all visible to staff.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                      <p className="text-sm font-semibold text-amber-900">
+                        {profileCompleteness.missingCount} of {profileCompleteness.totalCount} operational profile areas still need attention.
+                      </p>
+                      <p className="mt-2 text-sm text-amber-800">
+                        Fill these before relying on the record as the single source of truth for care planning and visit delivery.
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      {profileCompleteness.missingItems.map((item) => (
+                        <div key={item.key} className="rounded-xl border border-slate-200 p-4">
+                          <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                          <p className="mt-2 text-sm text-slate-600">{item.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -545,6 +600,12 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
                     className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"
                   >
                     Open client queue
+                  </Link>
+                  <Link
+                    href={complianceHref}
+                    className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                  >
+                    Open compliance context
                   </Link>
                   <Link
                     href={`/visits/new?clientId=${client.id}`}

@@ -141,7 +141,7 @@ export default async function SettingsPage() {
             <div className="mt-4 rounded-xl bg-blue-50 border border-blue-200 p-4">
               <p className="text-sm font-medium text-blue-900">Pilot admin compliance console</p>
               <p className="mt-1 text-sm text-blue-800">
-                Review subject access, erasure handling, retention enforcement, and audit evidence from one admin route.
+                Review subject access, erasure handling, retention evidence, and masked audit history from one admin route.
               </p>
               <div className="mt-3 flex flex-wrap gap-3">
                 <Link

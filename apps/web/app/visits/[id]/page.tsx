@@ -18,6 +18,7 @@ import {
 } from '../../../lib/graphql/queries'
 import { formatDateTime } from '../../../lib/time'
 import { getVisitReviewSummary } from '../queue-state'
+import { buildVisitTimelineGroups } from '../timeline'
 import { VisitCareLogPanel } from './VisitCareLogPanel'
 import { VisitCareGuidancePanel } from './VisitCareGuidancePanel'
 import { VisitMedicationPanel } from './VisitMedicationPanel'
@@ -66,111 +67,6 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function toTimestamp(value?: string | null) {
-  return value ? new Date(value).getTime() : null
-}
-
-function summariseNote(note?: string | null) {
-  const cleaned = note?.trim()
-  if (!cleaned) {
-    return null
-  }
-
-  if (cleaned.length <= 120) {
-    return cleaned
-  }
-
-  return `${cleaned.slice(0, 117)}...`
-}
-
-function deriveTimeline(visit: Awaited<ReturnType<typeof getVisit>>, medications: MedicationAdministration[]) {
-  if (!visit) {
-    return []
-  }
-
-  const events = [
-    {
-      id: `${visit.id}-scheduled`,
-      at: visit.scheduledStart,
-      title: 'Visit scheduled',
-      detail: `Scheduled to start at ${formatDateTime(visit.scheduledStart)}`,
-    },
-    ...(visit.actualStart
-      ? [
-          {
-            id: `${visit.id}-actual-start`,
-            at: visit.actualStart,
-            title: 'Visit started',
-            detail: `Carer started the visit at ${formatDateTime(visit.actualStart)}`,
-          },
-        ]
-      : []),
-    ...(visit.actualEnd
-      ? [
-          {
-            id: `${visit.id}-actual-end`,
-            at: visit.actualEnd,
-            title: 'Visit completed',
-            detail: `Visit finished at ${formatDateTime(visit.actualEnd)}`,
-          },
-        ]
-      : []),
-    ...(visit.notes?.trim()
-      ? [
-          {
-            id: `${visit.id}-notes`,
-            at: visit.updatedAt,
-            title: 'Care log updated',
-            detail: 'Visit notes were last updated on this record.',
-          },
-        ]
-      : []),
-    ...visit.tasks.flatMap((task) => {
-      const items = []
-      const taskNote = summariseNote(task.notes)
-      const updatedAt = toTimestamp(task.updatedAt)
-      const completedAt = toTimestamp(task.completedAt)
-
-      if (task.completedAt) {
-        items.push({
-          id: `${task.id}-completed`,
-          at: task.completedAt,
-          title: `Task completed: ${task.taskName}`,
-          detail: taskNote || 'Task marked as completed.',
-        })
-      }
-
-      if (taskNote && updatedAt && updatedAt !== completedAt) {
-        items.push({
-          id: `${task.id}-notes`,
-          at: task.updatedAt,
-          title: `Task notes updated: ${task.taskName}`,
-          detail: taskNote,
-        })
-      }
-
-      return items
-    }),
-    ...medications.map((administration) => ({
-      id: administration.id,
-      at: administration.administeredTime || administration.scheduledTime,
-      title:
-        administration.status === 'ADMINISTERED'
-          ? `Medication administered: ${administration.prescription?.medication?.name || 'Medication'}`
-          : `Medication ${administration.status.toLowerCase()}: ${administration.prescription?.medication?.name || 'Medication'}`,
-      detail:
-        administration.notes?.trim() ||
-        administration.instructionSnapshot ||
-        administration.prescription?.specialInstructions ||
-        administration.prescription?.medication?.instructions ||
-        'No extra medication notes recorded.',
-    })),
-  ]
-
-  return events
-    .sort((left, right) => new Date(left.at).getTime() - new Date(right.at).getTime())
-}
-
 export default async function VisitDetailPage({ params }: VisitDetailPageProps) {
   const session = await getServerSession(authOptions)
   const visit = await getVisit(params.id)
@@ -180,7 +76,7 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
   }
 
   const medications = await getMedicationContext(visit.id)
-  const timeline = deriveTimeline(visit, medications)
+  const timeline = buildVisitTimelineGroups(visit, medications)
   const reviewSummary = getVisitReviewSummary(visit, new Date())
 
   const isAdmin = hasRole((session as any)?.roles, 'admin')
@@ -205,7 +101,7 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
               {visit.client?.fullName ?? 'Visit'}
             </h1>
             <p className="mt-1 text-slate-500">
-              Scheduled for {formatDateTime(visit.scheduledStart)}
+              Planned window, recorded care delivery, and active guidance in one place for this visit.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -225,8 +121,8 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
             <CardHeader>
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-semibold text-text-primary font-heading">Visit timeline</h2>
-                  <p className="text-sm text-text-secondary">Scheduled and actual timings for this visit</p>
+                  <h2 className="text-xl font-semibold text-text-primary font-heading">Planned and recorded timing</h2>
+                  <p className="text-sm text-text-secondary">What was planned for the visit and what timing evidence was actually recorded.</p>
                 </div>
                 <StatusChip status={visit.status.toLowerCase() as 'scheduled' | 'in_progress' | 'completed' | 'cancelled'} />
               </div>
@@ -294,7 +190,7 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
               <CardHeader>
                 <h2 className="text-lg font-semibold text-text-primary font-heading">Care guidance</h2>
                 <p className="text-sm text-text-secondary">
-                  Read-only excerpts from the client&apos;s active care plan.
+                  Read-only guidance that governed the care delivery for this visit.
                 </p>
               </CardHeader>
               <CardContent>
@@ -339,24 +235,49 @@ export default async function VisitDetailPage({ params }: VisitDetailPageProps) 
             <CardHeader>
               <h2 className="text-lg font-semibold text-text-primary font-heading">Care timeline</h2>
               <p className="text-sm text-text-secondary">
-                A derived history from visit timings, task updates, and medication records.
+                Planned activity is shown first, followed by the recorded care activity for this visit.
               </p>
             </CardHeader>
             <CardContent>
-              {timeline.length > 0 ? (
-                <ol className="space-y-4">
-                  {timeline.map((event) => (
-                    <li key={event.id} className="rounded-2xl border border-base-gray-200 bg-white p-4 shadow-sm">
-                      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="font-medium text-text-primary">{event.title}</p>
-                        <time className="text-sm text-text-secondary" dateTime={event.at}>
-                          {formatDateTime(event.at)}
-                        </time>
-                      </div>
-                      <p className="mt-2 text-sm text-text-secondary">{event.detail}</p>
-                    </li>
-                  ))}
-                </ol>
+              {timeline.planned.length > 0 || timeline.recorded.length > 0 ? (
+                <div className="space-y-6">
+                  {timeline.planned.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Planned care day</h3>
+                      <ol className="mt-3 space-y-4">
+                        {timeline.planned.map((event) => (
+                          <li key={event.id} className="rounded-2xl border border-base-gray-200 bg-white p-4 shadow-sm">
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                              <p className="font-medium text-text-primary">{event.title}</p>
+                              <time className="text-sm text-text-secondary" dateTime={event.at}>
+                                {formatDateTime(event.at)}
+                              </time>
+                            </div>
+                            <p className="mt-2 text-sm text-text-secondary">{event.detail}</p>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                  {timeline.recorded.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Recorded activity</h3>
+                      <ol className="mt-3 space-y-4">
+                        {timeline.recorded.map((event) => (
+                          <li key={event.id} className="rounded-2xl border border-base-gray-200 bg-white p-4 shadow-sm">
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                              <p className="font-medium text-text-primary">{event.title}</p>
+                              <time className="text-sm text-text-secondary" dateTime={event.at}>
+                                {formatDateTime(event.at)}
+                              </time>
+                            </div>
+                            <p className="mt-2 text-sm text-text-secondary">{event.detail}</p>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-text-secondary">
                   No derived care timeline events are available for this visit yet.

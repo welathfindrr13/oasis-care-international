@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { Header } from '../../../components/oasis/Header';
 import { requireAdminSession } from '../../../lib/auth/require-admin';
+import { getComplianceSubjectContext } from '../../../lib/compliance';
 import { getSiteBaseUrl } from '../../../lib/url';
 import { ComplianceConsole } from './ComplianceConsole';
 
@@ -34,8 +35,16 @@ async function getComplianceDashboard(): Promise<ComplianceDashboardResponse> {
   return response.json();
 }
 
-export default async function AdminCompliancePage() {
+export default async function AdminCompliancePage({
+  searchParams,
+}: {
+  searchParams?: {
+    subjectId?: string;
+    subjectName?: string;
+  };
+}) {
   const dashboard = await getComplianceDashboard();
+  const selectedSubject = getComplianceSubjectContext(searchParams);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -53,6 +62,7 @@ export default async function AdminCompliancePage() {
           erasureRequests={dashboard.erasureRequests}
           auditLogs={dashboard.auditLogs}
           retentionPolicies={dashboard.retentionPolicies}
+          selectedSubject={selectedSubject}
         />
       </main>
     </div>

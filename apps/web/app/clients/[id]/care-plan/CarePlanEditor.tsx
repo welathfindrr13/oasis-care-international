@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, buttonVariants } from '../../../../components/ui/Button';
 import { Card, CardContent, CardHeader } from '../../../../components/ui/Card';
@@ -66,13 +66,35 @@ interface CarePlanEditorProps {
   auditHistory: CarePlanAuditEntry[];
 }
 
+const CARE_PLAN_SECTION_INDEX = [
+  { id: 'review-dates', title: 'Review dates' },
+  { id: 'overview', title: 'Overview' },
+  { id: 'goals-and-outcomes', title: 'Goals and outcomes' },
+  { id: 'daily-routine', title: 'Daily routine' },
+  { id: 'personal-care-and-mobility', title: 'Personal care and mobility' },
+  { id: 'nutrition-hydration-medication', title: 'Nutrition, hydration, and medication support' },
+  { id: 'communication-and-accessibility', title: 'Communication and accessibility' },
+  { id: 'risks-and-escalation', title: 'Risks and escalation' },
+  { id: 'representatives-and-involvement', title: 'Representatives and involvement' },
+]
+
 function cloneEmptyContent(): CarePlanContent {
   return JSON.parse(JSON.stringify(EMPTY_CARE_PLAN_CONTENT)) as CarePlanContent;
 }
 
-function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+function Section({
+  id,
+  title,
+  description,
+  children,
+}: {
+  id: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
   return (
-    <Card>
+    <Card id={id}>
       <CardHeader>
         <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
         <p className="text-sm text-slate-500">{description}</p>
@@ -105,19 +127,54 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
   const [isPublishing, setIsPublishing] = useState(false);
   const [isDiscarding, setIsDiscarding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const sourceVersion = useMemo(
     () => carePlan?.draftVersion ?? carePlan?.activeVersion ?? null,
     [carePlan]
   );
 
+  const hasDraft = Boolean(carePlan?.draftVersion);
+  const activeVersion = carePlan?.activeVersion ?? null;
+  const highlights = useMemo(() => getCarePlanHighlights(activeVersion), [activeVersion]);
+  const sourceSnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        reviewDueAt: toDateInputValue(sourceVersion?.reviewDueAt),
+        effectiveFrom: toDateInputValue(sourceVersion?.effectiveFrom),
+        content: sourceVersion?.content ?? cloneEmptyContent(),
+      }),
+    [sourceVersion]
+  );
   const [reviewDueAt, setReviewDueAt] = useState(toDateInputValue(sourceVersion?.reviewDueAt));
   const [effectiveFrom, setEffectiveFrom] = useState(toDateInputValue(sourceVersion?.effectiveFrom));
   const [content, setContent] = useState<CarePlanContent>(sourceVersion?.content ?? cloneEmptyContent());
 
-  const hasDraft = Boolean(carePlan?.draftVersion);
-  const activeVersion = carePlan?.activeVersion ?? null;
-  const highlights = useMemo(() => getCarePlanHighlights(activeVersion), [activeVersion]);
+  useEffect(() => {
+    const nextReviewDueAt = toDateInputValue(sourceVersion?.reviewDueAt)
+    const nextEffectiveFrom = toDateInputValue(sourceVersion?.effectiveFrom)
+    setReviewDueAt(nextReviewDueAt)
+    setEffectiveFrom(nextEffectiveFrom)
+    setContent(sourceVersion?.content ?? cloneEmptyContent())
+  }, [sourceSnapshot, sourceVersion])
+
+  const currentSnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        reviewDueAt,
+        effectiveFrom,
+        content,
+      }),
+    [content, effectiveFrom, reviewDueAt]
+  )
+  const hasUnsavedChanges = currentSnapshot !== sourceSnapshot
+  const orderedAuditHistory = useMemo(
+    () =>
+      [...auditHistory].sort(
+        (left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime()
+      ),
+    [auditHistory]
+  )
 
   function setSection<K extends keyof CarePlanContent>(section: K, value: CarePlanContent[K]) {
     setContent((current) => ({
@@ -134,6 +191,7 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
     event.preventDefault();
     setIsSaving(true);
     setError(null);
+    setFeedback(null);
 
     try {
       await clientQuery(SAVE_CARE_PLAN_DRAFT_MUTATION, {
@@ -145,6 +203,7 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
         },
       });
 
+      setFeedback(hasDraft ? 'Draft changes saved.' : 'Draft created and ready for review.');
       router.refresh();
     } catch (submitError: any) {
       setError(submitError.message || 'Unable to save the draft care plan right now.');
@@ -160,9 +219,11 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
 
     setIsPublishing(true);
     setError(null);
+    setFeedback(null);
 
     try {
       await clientQuery(PUBLISH_CARE_PLAN_DRAFT_MUTATION, { carePlanId: carePlan.id });
+      setFeedback('Care plan published. The active visit guidance now reflects this version.');
       router.refresh();
     } catch (submitError: any) {
       setError(submitError.message || 'Unable to publish the draft care plan right now.');
@@ -178,9 +239,11 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
 
     setIsDiscarding(true);
     setError(null);
+    setFeedback(null);
 
     try {
       await clientQuery(DISCARD_CARE_PLAN_DRAFT_MUTATION, { carePlanId: carePlan.id });
+      setFeedback('Draft discarded. The published guidance remains unchanged.');
       router.refresh();
     } catch (submitError: any) {
       setError(submitError.message || 'Unable to discard the open draft right now.');
@@ -247,6 +310,46 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
             </p>
           </div>
         </CardContent>
+        <CardContent className="pt-0">
+          <div className={`rounded-xl border px-4 py-3 text-sm ${
+            hasUnsavedChanges
+              ? 'border-amber-200 bg-amber-50 text-amber-900'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-900'
+          }`}>
+            <p className="font-medium">
+              {hasUnsavedChanges
+                ? 'Draft changes on this screen have not been saved yet.'
+                : hasDraft
+                  ? 'Draft on screen is up to date.'
+                  : 'No draft changes are waiting to be saved.'}
+            </p>
+            <p className="mt-1">
+              {hasUnsavedChanges
+                ? 'Save the draft before publishing or leaving the page so coordinators are reviewing the latest care guidance.'
+                : 'Published care guidance remains unchanged until a saved draft is explicitly published.'}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <h2 className="text-lg font-semibold text-slate-900">Section index</h2>
+          <p className="text-sm text-slate-500">
+            Jump straight to the guidance area you need to review or edit.
+          </p>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {CARE_PLAN_SECTION_INDEX.map((section) => (
+            <a
+              key={section.id}
+              href={`#${section.id}`}
+              className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700"
+            >
+              {section.title}
+            </a>
+          ))}
+        </CardContent>
       </Card>
 
       {activeVersion && (
@@ -274,8 +377,14 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
         </div>
       )}
 
+      {feedback && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-sm text-emerald-800">{feedback}</p>
+        </div>
+      )}
+
       <form id="care-plan-form" onSubmit={handleSaveDraft} className="space-y-6">
-        <Section title="Review dates" description="Drafts need both an effective date and a review date before they can be published.">
+        <Section id="review-dates" title="Review dates" description="Drafts need both an effective date and a review date before they can be published.">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Review due date">
               <input type="date" value={reviewDueAt} onChange={(event) => setReviewDueAt(event.target.value)} className={inputClassName()} />
@@ -286,7 +395,7 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
           </div>
         </Section>
 
-        <Section title="Overview" description="Summarise the client, their strengths, and what good support looks like day to day.">
+        <Section id="overview" title="Overview" description="Summarise the client, their strengths, and what good support looks like day to day.">
           <Field label="Care overview">
             <textarea
               value={content.overview.summary}
@@ -312,7 +421,7 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
           </div>
         </Section>
 
-        <Section title="Goals and outcomes" description="Keep the goals practical enough for carers and coordinators to act on.">
+        <Section id="goals-and-outcomes" title="Goals and outcomes" description="Keep the goals practical enough for carers and coordinators to act on.">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Goals (one per line)">
               <textarea
@@ -336,7 +445,7 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
           </div>
         </Section>
 
-        <Section title="Daily routine" description="Describe the expected support across the London care day.">
+        <Section id="daily-routine" title="Daily routine" description="Describe the expected support across the London care day.">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Morning">
               <textarea value={content.dailyRoutines.morning} onChange={(event) => setSection('dailyRoutines', { ...content.dailyRoutines, morning: event.target.value })} className={textareaClassName()} />
@@ -353,7 +462,7 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
           </div>
         </Section>
 
-        <Section title="Personal care and mobility" description="Record hands-on support guidance without turning this into a full clinical assessment tool.">
+        <Section id="personal-care-and-mobility" title="Personal care and mobility" description="Record hands-on support guidance without turning this into a full clinical assessment tool.">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Bathing">
               <textarea value={content.personalCareSupport.bathing} onChange={(event) => setSection('personalCareSupport', { ...content.personalCareSupport, bathing: event.target.value })} className={textareaClassName()} />
@@ -383,7 +492,7 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
           </div>
         </Section>
 
-        <Section title="Nutrition, hydration, and medication support" description="Keep nutrition and medication guidance operational so carers know what level of support is expected.">
+        <Section id="nutrition-hydration-medication" title="Nutrition, hydration, and medication support" description="Keep nutrition and medication guidance operational so carers know what level of support is expected.">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Nutrition summary">
               <textarea value={content.nutritionAndHydration.nutritionSummary} onChange={(event) => setSection('nutritionAndHydration', { ...content.nutritionAndHydration, nutritionSummary: event.target.value })} className={textareaClassName()} />
@@ -410,7 +519,7 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
           </div>
         </Section>
 
-        <Section title="Communication and accessibility" description="Keep communication approach and reasonable adjustments visible to carers before they enter the home.">
+        <Section id="communication-and-accessibility" title="Communication and accessibility" description="Keep communication approach and reasonable adjustments visible to carers before they enter the home.">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Communication approach">
               <textarea value={content.communicationAndAccessibility.communicationApproach} onChange={(event) => setSection('communicationAndAccessibility', { ...content.communicationAndAccessibility, communicationApproach: event.target.value })} className={textareaClassName()} />
@@ -432,7 +541,7 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
           </div>
         </Section>
 
-        <Section title="Risks and escalation" description="Capture the red flags carers should actively watch for and what to do next.">
+        <Section id="risks-and-escalation" title="Risks and escalation" description="Capture the red flags carers should actively watch for and what to do next.">
           <div className="space-y-4">
             {content.risksAndRedFlags.items.length === 0 && (
               <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
@@ -503,7 +612,7 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
           </div>
         </Section>
 
-        <Section title="Representatives and involvement" description="Capture who should be kept informed and how they are involved in ongoing care.">
+        <Section id="representatives-and-involvement" title="Representatives and involvement" description="Capture who should be kept informed and how they are involved in ongoing care.">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Representative and family involvement">
               <textarea value={content.representativesAndInvolvement.summary} onChange={(event) => setSection('representativesAndInvolvement', { ...content.representativesAndInvolvement, summary: event.target.value })} className={textareaClassName()} />
@@ -561,9 +670,9 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
           </p>
         </CardHeader>
         <CardContent>
-          {auditHistory.length > 0 ? (
+          {orderedAuditHistory.length > 0 ? (
             <div className="space-y-3">
-              {auditHistory.map((entry) => (
+              {orderedAuditHistory.map((entry) => (
                 <div key={entry.id} className="rounded-xl border border-slate-200 p-4">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -571,9 +680,9 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
                         {formatCarePlanAuditAction(entry.action)}
                         {entry.versionNumber ? ` · Version ${entry.versionNumber}` : ''}
                       </p>
-                      <p className="text-sm text-slate-500">{formatCarePlanChangedSections(entry.changedSections)}</p>
+                      <p className="text-sm text-slate-500">Changed: {formatCarePlanChangedSections(entry.changedSections)}</p>
                     </div>
-                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       {formatDateTime(entry.timestamp)}
                     </p>
                   </div>

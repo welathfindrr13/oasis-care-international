@@ -63,6 +63,26 @@ interface FormState {
   representativeEmail: string;
 }
 
+function FormSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+      <div>
+        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+        <p className="mt-1 text-sm text-slate-600">{description}</p>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">{children}</div>
+    </section>
+  );
+}
+
 function toDateInputValue(value?: string) {
   if (!value) {
     return '';
@@ -194,7 +214,10 @@ export default function ClientForm({ mode, client }: ClientFormProps) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2">
+          <FormSection
+            title="Identity"
+            description="Keep the long-lived client identity and location details current before visits or care-plan updates."
+          >
             <div className="md:col-span-2">
               <label htmlFor="fullName" className="mb-2 block text-sm font-medium text-slate-700">
                 Full name <span className="text-red-500">*</span>
@@ -299,7 +322,12 @@ export default function ClientForm({ mode, client }: ClientFormProps) {
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
             </div>
+          </FormSection>
 
+          <FormSection
+            title="Communication and accessibility"
+            description="These details feed care guidance and visit execution, so keep them concrete enough for carers to act on."
+          >
             <div>
               <label htmlFor="preferredLanguage" className="mb-2 block text-sm font-medium text-slate-700">
                 Preferred language
@@ -342,7 +370,12 @@ export default function ClientForm({ mode, client }: ClientFormProps) {
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
             </div>
+          </FormSection>
 
+          <FormSection
+            title="Representative details"
+            description="Record who should be kept informed and how staff can reliably contact them when care guidance or escalation changes."
+          >
             <div>
               <label htmlFor="representativeName" className="mb-2 block text-sm font-medium text-slate-700">
                 Representative name
@@ -395,7 +428,7 @@ export default function ClientForm({ mode, client }: ClientFormProps) {
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
             </div>
-          </div>
+          </FormSection>
 
           {mode === 'create' && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">

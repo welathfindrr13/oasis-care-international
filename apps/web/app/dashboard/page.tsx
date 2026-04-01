@@ -118,7 +118,7 @@ export default async function DashboardPage() {
               Welcome back, {greetingName}
             </h1>
             <p className="mt-1 text-slate-500">
-              {formatDate(new Date())} • real visit counts for today&apos;s operational workload
+              {formatDate(new Date())} • live visit totals and the quickest route into today&apos;s care day
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -236,10 +236,7 @@ export default async function DashboardPage() {
                   </>
                 )}
               </div>
-              <p>
-                The numbers above are the live visit totals for today. Use the linked routes for the real work rather
-                than treating this page like a detailed operations board.
-              </p>
+              <p>The cards above are today&apos;s live visit totals. Use the routes here to step straight into the working screens.</p>
               {!isAdmin && !isCarer && (
                 <p className="rounded-xl bg-amber-50 p-3 text-amber-900">
                   This dashboard is primarily built for admin and carer workflows.

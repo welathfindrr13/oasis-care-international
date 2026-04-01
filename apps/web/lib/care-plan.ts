@@ -1,4 +1,4 @@
-import type { CarePlanContent, CarePlanVersion } from './graphql/queries';
+import type { CarePlanContent, CarePlanRiskAndRedFlagItem, CarePlanVersion } from './graphql/queries';
 import { formatDate, formatDateInputValueInLondon } from './time';
 
 const CARE_PLAN_SECTION_LABELS: Record<string, string> = {
@@ -147,12 +147,16 @@ export function getCarePlanHighlights(version?: CarePlanVersion | null) {
       body: content.communicationAndAccessibility.communicationApproach,
     },
     {
+      label: 'Risk and escalation',
+      body: content.risksAndRedFlags.items[0] ? formatRiskAndRedFlagSummary(content.risksAndRedFlags.items[0]) : '',
+    },
+    {
       label: 'Escalation',
       body: content.contingencyAndEscalation.summary || content.medicationSupport.refusalEscalation,
     },
   ];
 
-  return highlights.filter((item) => item.body).slice(0, 4);
+  return highlights.filter((item) => item.body).slice(0, 5);
 }
 
 export function formatCarePlanAuditAction(action: string) {
@@ -184,6 +188,20 @@ export function formatCarePlanChangedSections(changedSections?: string[] | null)
   }
 
   return labels.join(', ');
+}
+
+export function formatRiskAndRedFlagLines(item: CarePlanRiskAndRedFlagItem) {
+  const lines = [`Risk: ${item.title}`, `Guidance: ${item.guidance}`]
+
+  if (item.escalationTrigger?.trim()) {
+    lines.push(`Escalate when: ${item.escalationTrigger}`)
+  }
+
+  return lines
+}
+
+export function formatRiskAndRedFlagSummary(item: CarePlanRiskAndRedFlagItem) {
+  return formatRiskAndRedFlagLines(item).join(' ')
 }
 
 export function getCareGuidanceSections(version?: CarePlanVersion | null) {
@@ -230,11 +248,7 @@ export function getCareGuidanceSections(version?: CarePlanVersion | null) {
     {
       title: 'Risks and red flags',
       body: '',
-      bullets: content.risksAndRedFlags.items.map((item) =>
-        item.escalationTrigger
-          ? `${item.title}: ${item.guidance} Escalate when ${item.escalationTrigger}.`
-          : `${item.title}: ${item.guidance}`
-      ),
+      bullets: content.risksAndRedFlags.items.flatMap((item) => formatRiskAndRedFlagLines(item)),
     },
     {
       title: 'Contingency and escalation',

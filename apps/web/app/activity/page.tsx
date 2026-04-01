@@ -93,11 +93,18 @@ export default function ActivityPage() {
         </div>
 
         <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
-          <h2 className="font-heading text-lg font-semibold text-slate-900">What&apos;s on this page</h2>
+          <h2 className="font-heading text-lg font-semibold text-slate-900">Next actions</h2>
           <p className="mt-2 text-sm text-slate-600">
-            This is a live totals page that refreshes every 30 seconds. Detailed event-by-event activity is still
-            handled through visits, eMAR, and the compliance audit view.
+            These totals refresh every 30 seconds. Move into visits or eMAR when you need the underlying operational detail.
           </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link href="/visits" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              Open visits
+            </Link>
+            <Link href="/emar" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+              Open eMAR
+            </Link>
+          </div>
         </div>
       </main>
     </div>

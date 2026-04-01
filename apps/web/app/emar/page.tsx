@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { Header } from '../../components/oasis/Header';
 import { buttonVariants } from '../../components/ui/Button';
 import { hasRole } from '../../lib/auth/roles';
+import { describeEmarRowPosture } from '../../lib/emar';
 import { clientQuery } from '../../lib/graphql/client-side';
 import { formatDateInputValueInLondon, formatDateTime } from '../../lib/time';
 import { RECORD_ADMINISTRATION_MUTATION, type RecordAdministrationMutationResponse } from '../../lib/graphql/queries';
@@ -272,7 +273,7 @@ export default function EmarPage() {
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">Electronic Medication Administration Record (eMAR)</h1>
-          <p className="text-slate-500 mt-1">Track and manage medication administration</p>
+          <p className="text-slate-500 mt-1">Work through today&apos;s scheduled medication outcomes and review linked visit context.</p>
         </div>
         <div className="mb-6">
           <div className="flex items-center space-x-4">
@@ -370,6 +371,9 @@ export default function EmarPage() {
                           Visit
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Queue posture
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Notes
                         </th>
                         {canActAsCarer && (
@@ -380,101 +384,114 @@ export default function EmarPage() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {clientMeds.map((med) => (
-                        <tr key={med.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {formatTime(med.scheduledTime)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{med.prescription.medication.name}</div>
-                            {(med.instructionSnapshot || med.prescription.specialInstructions) && (
-                              <div className="text-xs text-gray-500 mt-1">
-                                {med.instructionSnapshot || med.prescription.specialInstructions}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {med.prescription.medication.dosage} {med.prescription.medication.unit}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(med.status)}`}>
-                              {med.status.toLowerCase()}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {med.administeredTime ? formatTime(med.administeredTime) : '-'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {med.visit ? (
-                              <div>
-                                <div>{formatTime(med.visit.scheduledStart)} - {formatTime(med.visit.scheduledEnd)}</div>
-                              </div>
-                            ) : (
-                              'No visit'
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-900">
-                            {canActAsCarer && med.status === 'SCHEDULED' && med.visit ? (
-                              <div className="space-y-2">
-                                <textarea
-                                  value={noteDrafts[med.id] ?? ''}
-                                  onChange={(event) =>
-                                    setNoteDrafts((current) => ({
-                                      ...current,
-                                      [med.id]: event.target.value,
-                                    }))
-                                  }
-                                  rows={3}
-                                  className="w-full min-w-[220px] rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
-                                  placeholder="Capture medication-specific detail."
-                                />
-                              </div>
-                            ) : med.notes ? (
-                              <div className="max-w-xs truncate" title={med.notes}>
-                                {med.notes}
-                              </div>
-                            ) : (
-                              '-'
-                            )}
-                          </td>
-                          {canActAsCarer && (
-                            <td className="px-6 py-4 text-sm text-gray-900">
-                              {med.status === 'SCHEDULED' && med.visit ? (
-                                <div className="flex min-w-[180px] flex-col items-start gap-2">
-                                  <button
-                                    type="button"
-                                    className={buttonVariants({ variant: 'primary', size: 'sm' })}
-                                    onClick={() => updateAdministration(med, 'ADMINISTERED')}
-                                    disabled={isSaving && activeMedicationId === med.id}
-                                  >
-                                    {isSaving && activeMedicationId === med.id ? 'Saving…' : 'Mark administered'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                                    onClick={() => updateAdministration(med, 'MISSED')}
-                                    disabled={isSaving && activeMedicationId === med.id}
-                                  >
-                                    Mark missed
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-                                    onClick={() => updateAdministration(med, 'REFUSED')}
-                                    disabled={isSaving && activeMedicationId === med.id}
-                                  >
-                                    Mark refused
-                                  </button>
+                      {clientMeds.map((med) => {
+                        const posture = describeEmarRowPosture({
+                          status: med.status,
+                          visit: med.visit ?? null,
+                        });
+
+                        return (
+                          <tr key={med.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {formatTime(med.scheduledTime)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">{med.prescription.medication.name}</div>
+                              {(med.instructionSnapshot || med.prescription.specialInstructions) && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {med.instructionSnapshot || med.prescription.specialInstructions}
                                 </div>
-                              ) : (
-                                <span className="text-xs text-slate-500">
-                                  {med.visit ? 'Outcome recorded' : 'No linked visit'}
-                                </span>
                               )}
                             </td>
-                          )}
-                        </tr>
-                      ))}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {med.prescription.medication.dosage} {med.prescription.medication.unit}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(med.status)}`}>
+                                {med.status.toLowerCase()}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {med.administeredTime ? formatTime(med.administeredTime) : '-'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {med.visit ? (
+                                <div>
+                                  <div>{formatTime(med.visit.scheduledStart)} - {formatTime(med.visit.scheduledEnd)}</div>
+                                </div>
+                              ) : (
+                                'No linked visit'
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              <div className="min-w-[220px]">
+                                <div className="font-medium text-slate-900">{posture.label}</div>
+                                <div className="mt-1 text-xs text-slate-500">{posture.description}</div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              {canActAsCarer && med.status === 'SCHEDULED' && med.visit ? (
+                                <div className="space-y-2">
+                                  <textarea
+                                    value={noteDrafts[med.id] ?? ''}
+                                    onChange={(event) =>
+                                      setNoteDrafts((current) => ({
+                                        ...current,
+                                        [med.id]: event.target.value,
+                                      }))
+                                    }
+                                    rows={3}
+                                    className="w-full min-w-[220px] rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+                                    placeholder="Capture medication-specific detail."
+                                  />
+                                </div>
+                              ) : med.notes ? (
+                                <div className="max-w-xs truncate" title={med.notes}>
+                                  {med.notes}
+                                </div>
+                              ) : (
+                                '-'
+                              )}
+                            </td>
+                            {canActAsCarer && (
+                              <td className="px-6 py-4 text-sm text-gray-900">
+                                {med.status === 'SCHEDULED' && med.visit ? (
+                                  <div className="flex min-w-[180px] flex-col items-start gap-2">
+                                    <button
+                                      type="button"
+                                      className={buttonVariants({ variant: 'primary', size: 'sm' })}
+                                      onClick={() => updateAdministration(med, 'ADMINISTERED')}
+                                      disabled={isSaving && activeMedicationId === med.id}
+                                    >
+                                      {isSaving && activeMedicationId === med.id ? 'Saving…' : 'Mark administered'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                                      onClick={() => updateAdministration(med, 'MISSED')}
+                                      disabled={isSaving && activeMedicationId === med.id}
+                                    >
+                                      Mark missed
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                                      onClick={() => updateAdministration(med, 'REFUSED')}
+                                      disabled={isSaving && activeMedicationId === med.id}
+                                    >
+                                      Mark refused
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-slate-500">
+                                    {posture.label}
+                                  </span>
+                                )}
+                              </td>
+                            )}
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>

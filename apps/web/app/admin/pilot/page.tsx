@@ -86,6 +86,30 @@ export default async function AdminPilotPage() {
           </p>
         </div>
 
+        <div className="mb-6 rounded-2xl border border-teal-200 bg-teal-50 p-5">
+          <h2 className="font-heading text-lg font-semibold text-teal-950">Recommended demo path</h2>
+          <p className="mt-2 text-sm text-teal-900">
+            Walk buyers through the live spine in this order so the product story stays grounded in one coherent care-delivery flow.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link href="/clients/34bd571f-22cd-4bcc-a296-f576ba3dbbc3" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              1. Client record
+            </Link>
+            <Link href="/clients/34bd571f-22cd-4bcc-a296-f576ba3dbbc3/care-plan" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              2. Care plan
+            </Link>
+            <Link href="/visits/501a4c46-9e48-4841-be43-c3fd72afb071" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              3. Visit
+            </Link>
+            <Link href="/emar" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              4. eMAR
+            </Link>
+            <Link href="/admin/compliance" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              5. Compliance
+            </Link>
+          </div>
+        </div>
+
         <div className="grid gap-6 lg:grid-cols-2">
           {pillars.map((pillar) => (
             <Card key={pillar.title} className="rounded-2xl border-slate-100">
