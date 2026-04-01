@@ -145,21 +145,21 @@ export class ClientService {
 
     const updateData: Record<string, unknown> = {};
 
-    if (input.fullName !== undefined) updateData.full_name = input.fullName.trim();
-    if (input.preferredName !== undefined) updateData.preferred_name = input.preferredName.trim() || null;
-    if (input.pronouns !== undefined) updateData.pronouns = input.pronouns.trim() || null;
-    if (input.addressLine1 !== undefined) updateData.address_line1 = input.addressLine1.trim();
-    if (input.addressLine2 !== undefined) updateData.address_line2 = input.addressLine2.trim() || null;
-    if (input.city !== undefined) updateData.city = input.city.trim();
-    if (input.postcode !== undefined) updateData.postcode = input.postcode.trim().toUpperCase();
+    if (typeof input.fullName === 'string') updateData.full_name = input.fullName.trim();
+    if (input.preferredName !== undefined) updateData.preferred_name = this.normalizeOptionalText(input.preferredName);
+    if (input.pronouns !== undefined) updateData.pronouns = this.normalizeOptionalText(input.pronouns);
+    if (typeof input.addressLine1 === 'string') updateData.address_line1 = input.addressLine1.trim();
+    if (input.addressLine2 !== undefined) updateData.address_line2 = this.normalizeOptionalText(input.addressLine2);
+    if (typeof input.city === 'string') updateData.city = input.city.trim();
+    if (typeof input.postcode === 'string') updateData.postcode = input.postcode.trim().toUpperCase();
     if (input.dateOfBirth !== undefined) updateData.date_of_birth = input.dateOfBirth ? new Date(input.dateOfBirth) : null;
-    if (input.preferredLanguage !== undefined) updateData.preferred_language = input.preferredLanguage.trim() || null;
-    if (input.communicationNeeds !== undefined) updateData.communication_needs = input.communicationNeeds.trim() || null;
-    if (input.accessibilityAdjustments !== undefined) updateData.accessibility_adjustments = input.accessibilityAdjustments.trim() || null;
-    if (input.representativeName !== undefined) updateData.representative_name = input.representativeName.trim() || null;
-    if (input.representativeRelationship !== undefined) updateData.representative_relationship = input.representativeRelationship.trim() || null;
-    if (input.representativePhone !== undefined) updateData.representative_phone = input.representativePhone.trim() || null;
-    if (input.representativeEmail !== undefined) updateData.representative_email = input.representativeEmail.trim() || null;
+    if (input.preferredLanguage !== undefined) updateData.preferred_language = this.normalizeOptionalText(input.preferredLanguage);
+    if (input.communicationNeeds !== undefined) updateData.communication_needs = this.normalizeOptionalText(input.communicationNeeds);
+    if (input.accessibilityAdjustments !== undefined) updateData.accessibility_adjustments = this.normalizeOptionalText(input.accessibilityAdjustments);
+    if (input.representativeName !== undefined) updateData.representative_name = this.normalizeOptionalText(input.representativeName);
+    if (input.representativeRelationship !== undefined) updateData.representative_relationship = this.normalizeOptionalText(input.representativeRelationship);
+    if (input.representativePhone !== undefined) updateData.representative_phone = this.normalizeOptionalText(input.representativePhone);
+    if (input.representativeEmail !== undefined) updateData.representative_email = this.normalizeOptionalText(input.representativeEmail);
 
     const updatedClient = await this.clientRepository.update(input.id, updateData);
 
@@ -215,5 +215,9 @@ export class ClientService {
       representativePhone: client.representative_phone,
       representativeEmail: client.representative_email,
     };
+  }
+
+  private normalizeOptionalText(value?: string | null): string | null {
+    return value?.trim() || null;
   }
 }

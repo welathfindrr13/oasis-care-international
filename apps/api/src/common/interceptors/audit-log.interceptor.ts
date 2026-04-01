@@ -25,6 +25,8 @@ interface AuditLogEntry {
   userAgent?: string;
 }
 
+const MAX_AUDIT_ACTION_LENGTH = 50;
+
 @Injectable()
 export class AuditLogInterceptor implements NestInterceptor {
   constructor(
@@ -110,7 +112,7 @@ export class AuditLogInterceptor implements NestInterceptor {
       await this.prisma.auditLog.create({
         data: {
           user_id: entry.userId,
-          action: entry.action,
+          action: this.normalizeAuditAction(entry.action),
           resource_type: entry.resourceType,
           resource_id: entry.resourceId,
           old_values: entry.oldValues || {},
@@ -123,6 +125,15 @@ export class AuditLogInterceptor implements NestInterceptor {
     } catch (error) {
       console.error('Failed to write audit log:', error);
     }
+  }
+
+  private normalizeAuditAction(action: string): string {
+    const singleLineAction = action.replace(/\s+/g, ' ').trim();
+    if (singleLineAction.length <= MAX_AUDIT_ACTION_LENGTH) {
+      return singleLineAction;
+    }
+
+    return `${singleLineAction.slice(0, MAX_AUDIT_ACTION_LENGTH - 3)}...`;
   }
 
   private extractResourceType(url: string): string {
