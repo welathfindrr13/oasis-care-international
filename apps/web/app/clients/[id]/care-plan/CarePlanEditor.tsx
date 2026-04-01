@@ -7,6 +7,7 @@ import { Button, buttonVariants } from '../../../../components/ui/Button';
 import { Card, CardContent, CardHeader } from '../../../../components/ui/Card';
 import { clientQuery } from '../../../../lib/graphql/client-side';
 import {
+  type CarePlanAuditEntry,
   type CarePlan,
   type CarePlanContent,
   type CarePlanRiskAndRedFlagItem,
@@ -15,11 +16,15 @@ import {
 } from '../../../../lib/graphql/queries';
 import {
   EMPTY_CARE_PLAN_CONTENT,
+  formatCarePlanAuditAction,
+  formatCarePlanChangedSections,
   formatCarePlanDate,
+  getCarePlanHighlights,
   listToMultiline,
   multilineToList,
   toDateInputValue,
 } from '../../../../lib/care-plan';
+import { formatDateTime } from '../../../../lib/time';
 
 const SAVE_CARE_PLAN_DRAFT_MUTATION = `
   mutation SaveCarePlanDraft($input: SaveCarePlanDraftInput!) {
@@ -58,6 +63,7 @@ interface CarePlanEditorProps {
   client: Client;
   carePlan: CarePlan | null;
   history: CarePlanVersion[];
+  auditHistory: CarePlanAuditEntry[];
 }
 
 function cloneEmptyContent(): CarePlanContent {
@@ -93,7 +99,7 @@ function textareaClassName() {
   return `${inputClassName()} min-h-[96px]`;
 }
 
-export default function CarePlanEditor({ client, carePlan, history }: CarePlanEditorProps) {
+export default function CarePlanEditor({ client, carePlan, history, auditHistory }: CarePlanEditorProps) {
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -111,6 +117,7 @@ export default function CarePlanEditor({ client, carePlan, history }: CarePlanEd
 
   const hasDraft = Boolean(carePlan?.draftVersion);
   const activeVersion = carePlan?.activeVersion ?? null;
+  const highlights = useMemo(() => getCarePlanHighlights(activeVersion), [activeVersion]);
 
   function setSection<K extends keyof CarePlanContent>(section: K, value: CarePlanContent[K]) {
     setContent((current) => ({
@@ -190,7 +197,7 @@ export default function CarePlanEditor({ client, carePlan, history }: CarePlanEd
             <div>
               <h2 className="text-xl font-semibold text-slate-900">Care plan status</h2>
               <p className="text-sm text-slate-500">
-                Published guidance stays immutable. Draft changes remain separate until staff publish them.
+                Published guidance stays immutable. Draft work stays separate until staff approve and publish the next version.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -216,7 +223,9 @@ export default function CarePlanEditor({ client, carePlan, history }: CarePlanEd
               {activeVersion ? `Version ${activeVersion.versionNumber}` : 'None published'}
             </p>
             <p className="mt-1 text-sm text-slate-500">
-              {activeVersion?.approvedAt ? `Approved ${formatCarePlanDate(activeVersion.approvedAt)}` : 'Publish the first care plan when the draft is ready.'}
+              {activeVersion?.approvedAt
+                ? `Approved ${formatCarePlanDate(activeVersion.approvedAt)} and ready for visit guidance.`
+                : 'Publish the first care plan when the draft is ready.'}
             </p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -226,8 +235,8 @@ export default function CarePlanEditor({ client, carePlan, history }: CarePlanEd
             </p>
             <p className="mt-1 text-sm text-slate-500">
               {carePlan?.draftVersion
-                ? 'Save draft changes freely until you are ready to publish.'
-                : 'Saving here will create or reopen the next draft version.'}
+                ? 'Draft edits stay internal until you publish the next approved version.'
+                : 'Saving here will create the next draft without touching the active plan.'}
             </p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -239,6 +248,25 @@ export default function CarePlanEditor({ client, carePlan, history }: CarePlanEd
           </div>
         </CardContent>
       </Card>
+
+      {activeVersion && (
+        <Card>
+          <CardHeader>
+            <h2 className="text-lg font-semibold text-slate-900">Current care guidance at a glance</h2>
+            <p className="text-sm text-slate-500">
+              These are the guidance themes carers will see in the visit workspace from the active version.
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            {highlights.map((highlight) => (
+              <div key={highlight.label} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{highlight.label}</p>
+                <p className="mt-2 text-sm text-slate-700">{highlight.body}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4">
@@ -493,9 +521,9 @@ export default function CarePlanEditor({ client, carePlan, history }: CarePlanEd
 
       <Card>
         <CardHeader>
-          <h2 className="text-lg font-semibold text-slate-900">Published history</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Version history</h2>
           <p className="text-sm text-slate-500">
-            Published versions stay immutable so carers can trust the guidance they used at the time.
+            Published versions stay immutable so coordinators can review exactly which guidance was active at the time of care.
           </p>
         </CardHeader>
         <CardContent>
@@ -513,7 +541,7 @@ export default function CarePlanEditor({ client, carePlan, history }: CarePlanEd
                       </p>
                     </div>
                     <p className="text-xs uppercase tracking-wide text-slate-500">
-                      {version.approvedAt ? `Approved ${formatCarePlanDate(version.approvedAt)}` : 'Draft history only'}
+                      {version.approvedAt ? `Approved ${formatCarePlanDate(version.approvedAt)}` : 'Awaiting approval'}
                     </p>
                   </div>
                 </div>
@@ -521,6 +549,39 @@ export default function CarePlanEditor({ client, carePlan, history }: CarePlanEd
             </div>
           ) : (
             <p className="text-sm text-slate-500">No published care-plan history exists for this client yet.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <h2 className="text-lg font-semibold text-slate-900">Audit trail</h2>
+          <p className="text-sm text-slate-500">
+            Direct staff actions on this care plan so reviewers can see when drafts were created, updated, published, or discarded.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {auditHistory.length > 0 ? (
+            <div className="space-y-3">
+              {auditHistory.map((entry) => (
+                <div key={entry.id} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {formatCarePlanAuditAction(entry.action)}
+                        {entry.versionNumber ? ` · Version ${entry.versionNumber}` : ''}
+                      </p>
+                      <p className="text-sm text-slate-500">{formatCarePlanChangedSections(entry.changedSections)}</p>
+                    </div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                      {formatDateTime(entry.timestamp)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">No care-plan audit events have been recorded for this client yet.</p>
           )}
         </CardContent>
       </Card>

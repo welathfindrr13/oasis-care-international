@@ -5,7 +5,7 @@ import { Header } from '../../../components/oasis/Header'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
 import { buttonVariants } from '../../../components/ui/Button'
 import { requireAdminSession } from '../../../lib/auth/require-admin'
-import { formatCarePlanDate, getCarePlanSummary } from '../../../lib/care-plan'
+import { formatCarePlanDate, getCarePlanHighlights } from '../../../lib/care-plan'
 import { query } from '../../../lib/graphql/client'
 import {
   CLIENT_CARE_PLAN_QUERY,
@@ -133,7 +133,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
   const nextVisit = upcomingVisits[0];
   const activeCarePlan = carePlan?.activeVersion ?? null;
   const draftCarePlan = carePlan?.draftVersion ?? null;
-  const carePlanSummary = getCarePlanSummary(activeCarePlan);
+  const carePlanHighlights = getCarePlanHighlights(activeCarePlan);
   const clientAddress = [client.addressLine1, client.addressLine2, `${client.city}, ${client.postcode}`]
     .filter(Boolean)
     .join(', ');
@@ -315,16 +315,28 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
                       </div>
                     </div>
                     <div className="space-y-3">
-                      {carePlanSummary.map((line) => (
-                        <p key={line} className="rounded-xl border border-slate-200 p-4 text-sm text-slate-700">
-                          {line}
-                        </p>
-                      ))}
-                      {draftCarePlan && (
-                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                          Draft version {draftCarePlan.versionNumber} is open and can be updated before it replaces the active plan.
+                      {carePlanHighlights.length > 0 ? (
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {carePlanHighlights.map((item) => (
+                            <div key={item.label} className="rounded-xl border border-slate-200 p-4">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p>
+                              <p className="mt-2 text-sm text-slate-700">{item.body}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-slate-200 p-4 text-sm text-slate-700">
+                          Active version {activeCarePlan.versionNumber} is published, but no guidance highlights are filled in yet.
                         </div>
                       )}
+                      {draftCarePlan && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                          Draft version {draftCarePlan.versionNumber} is open. Staff can keep editing it without changing the live visit guidance until it is published.
+                        </div>
+                      )}
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                        Open the care-plan record to review full section content, version history, and the staff audit trail for draft saves and publication.
+                      </div>
                     </div>
                   </div>
                 ) : (

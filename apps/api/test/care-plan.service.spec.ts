@@ -23,6 +23,7 @@ describe('CarePlanService', () => {
   const mockPrisma = {
     auditLog: {
       create: jest.fn(),
+      findMany: jest.fn(),
     },
   };
 
@@ -281,5 +282,46 @@ describe('CarePlanService', () => {
     ).rejects.toMatchObject({
       response: { code: 'FORBIDDEN_ADMIN_ONLY' },
     });
+  });
+
+  it('lists recent care-plan audit history for admin review', async () => {
+    mockRepository.findByClientId.mockResolvedValue(makeCarePlan({ id: 'care-plan-123' }));
+    mockPrisma.auditLog.findMany.mockResolvedValue([
+      {
+        id: 'audit-1',
+        action: 'PUBLISH_CARE_PLAN_DRAFT',
+        user_id: 'admin-123',
+        resource_id: 'care-plan-123',
+        resource_type: 'care_plan',
+        new_values: {
+          versionNumber: 2,
+          changedSections: ['overview', 'mobilityAndTransfers'],
+          status: 'ACTIVE',
+        },
+        timestamp: new Date('2026-04-01T10:00:00.000Z'),
+      },
+    ]);
+
+    const result = await service.getClientCarePlanAuditHistory('client-123', 'admin');
+
+    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
+      where: {
+        resource_type: 'care_plan',
+        resource_id: 'care-plan-123',
+      },
+      orderBy: { timestamp: 'desc' },
+      take: 20,
+    });
+    expect(result).toEqual([
+      {
+        id: 'audit-1',
+        action: 'PUBLISH_CARE_PLAN_DRAFT',
+        userId: 'admin-123',
+        versionNumber: 2,
+        status: 'ACTIVE',
+        changedSections: ['overview', 'mobilityAndTransfers'],
+        timestamp: new Date('2026-04-01T10:00:00.000Z'),
+      },
+    ]);
   });
 });

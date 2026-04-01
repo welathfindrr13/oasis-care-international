@@ -5,7 +5,7 @@ import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
 import { CarePlanRepository } from './care-plan.repository';
 import { SaveCarePlanDraftInput } from './dto/save-care-plan-draft.input';
-import { CarePlanContentDTO, CarePlanDTO, CarePlanVersionDTO } from './dto/care-plan.dto';
+import { CarePlanAuditEntryDTO, CarePlanContentDTO, CarePlanDTO, CarePlanVersionDTO } from './dto/care-plan.dto';
 
 type CarePlanRiskItem = {
   title: string;
@@ -88,6 +88,39 @@ export class CarePlanService {
     this.assertAdmin(userRole);
     const history = await this.carePlanRepository.findPublishedHistoryByClientId(clientId);
     return history.map((version) => this.mapVersionToDTO(version));
+  }
+
+  async getClientCarePlanAuditHistory(clientId: string, userRole: string): Promise<CarePlanAuditEntryDTO[]> {
+    this.assertAdmin(userRole);
+
+    const carePlan = await this.carePlanRepository.findByClientId(clientId);
+    if (!carePlan) {
+      return [];
+    }
+
+    const auditLogs = await this.prisma.auditLog.findMany({
+      where: {
+        resource_type: 'care_plan',
+        resource_id: carePlan.id,
+      },
+      orderBy: { timestamp: 'desc' },
+      take: 20,
+    });
+
+    return auditLogs.map((log) => {
+      const details = (log.new_values as Record<string, unknown> | null) ?? {};
+      return {
+        id: log.id,
+        action: log.action,
+        userId: log.user_id ?? 'unknown',
+        versionNumber: typeof details.versionNumber === 'number' ? details.versionNumber : null,
+        status: typeof details.status === 'string' ? details.status : null,
+        changedSections: Array.isArray(details.changedSections)
+          ? details.changedSections.filter((value): value is string => typeof value === 'string')
+          : [],
+        timestamp: log.timestamp,
+      };
+    });
   }
 
   async getActiveVersionForClient(clientId: string): Promise<CarePlanVersionDTO | null> {

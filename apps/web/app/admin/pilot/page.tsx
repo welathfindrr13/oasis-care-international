@@ -12,12 +12,30 @@ export const metadata: Metadata = {
 
 const pillars = [
   {
+    title: 'Client record',
+    summary:
+      'Each client record now acts as the operational source of truth: profile, representative details, active prescriptions, visit snapshot, and the current care-plan status all sit together.',
+    links: [
+      { href: '/clients', label: 'Open client directory' },
+      { href: '/clients/34bd571f-22cd-4bcc-a296-f576ba3dbbc3', label: 'Open live client record' },
+    ],
+  },
+  {
+    title: 'Care plans',
+    summary:
+      'Staff can draft, publish, supersede, and review immutable care-plan versions. Carers read the active guidance inside the visit workspace, while coordinators can inspect version history and the care-plan audit trail.',
+    links: [
+      { href: '/clients/34bd571f-22cd-4bcc-a296-f576ba3dbbc3/care-plan', label: 'Open live care-plan record' },
+      { href: '/clients/34bd571f-22cd-4bcc-a296-f576ba3dbbc3', label: 'Open client care-plan summary' },
+    ],
+  },
+  {
     title: 'Visits',
     summary:
-      'The daily visit queue is the operating spine: coordinators can triage the day, carers can move from queue into the visit workspace, and review-needed visits can be reconciled without inventing evidence.',
+      'The daily visit queue is the operating spine: coordinators can triage, reschedule, reassign, cancel, and reconcile while carers move from queue into the visit workspace without losing context.',
     links: [
       { href: '/visits', label: 'Open visit queue' },
-      { href: '/visits?status=IN_PROGRESS', label: 'Open in-progress visits' },
+      { href: '/visits/501a4c46-9e48-4841-be43-c3fd72afb071', label: 'Open live visit record' },
     ],
   },
   {
@@ -30,28 +48,11 @@ const pillars = [
     ],
   },
   {
-    title: 'Coordinator control',
-    summary:
-      'Coordinators can schedule, reschedule, reassign, cancel, and reconcile visits without widening the product into a separate planning system.',
-    links: [
-      { href: '/visits/new', label: 'Schedule a visit' },
-      { href: '/visits', label: 'Review coordinator queue' },
-    ],
-  },
-  {
     title: 'Compliance console',
     summary:
-      'The pilot includes an admin-only compliance route for subject access, retention-aware erasure, retention enforcement, and masked audit review. It is intentionally operational rather than enterprise-heavy.',
+      'The pilot includes an admin-only compliance route for subject access, retention-aware erasure, retention enforcement, masked audit review, and in-app legal references. It is intentionally operational rather than enterprise-heavy.',
     links: [
       { href: '/admin/compliance', label: 'Open compliance console' },
-      { href: '/settings', label: 'Open admin settings' },
-    ],
-  },
-  {
-    title: 'Legal and privacy posture',
-    summary:
-      'Privacy, data-processing, security, and subprocessor references are available in-app so operators and buyers can see the pilot posture without relying on implied claims.',
-    links: [
       { href: '/privacy', label: 'Privacy notice' },
       { href: '/data-processing', label: 'Data processing summary' },
       { href: '/security', label: 'Security summary' },
@@ -79,9 +80,9 @@ export default async function AdminPilotPage() {
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="font-heading text-lg font-semibold text-slate-900">Pilot framing</h2>
           <p className="mt-2 text-sm text-slate-600">
-            Oasis is strongest today as an operational domiciliary-care tool: run the visit queue, execute medication
-            work, keep coordinator corrections inside the visit model, and back the pilot with a real privacy and
-            compliance posture.
+            Oasis is strongest today when read as one connected flow: keep the client record current, publish the care
+            plan, carry that guidance into the visit, execute medication safely, and back the pilot with a real privacy
+            and compliance posture.
           </p>
         </div>
 
@@ -112,9 +113,9 @@ export default async function AdminPilotPage() {
         <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
           <h2 className="font-heading text-lg font-semibold text-amber-950">Intentionally out of scope for this freeze</h2>
           <p className="mt-2 text-sm text-amber-900">
-            This pilot does not claim a rostering engine, billing, care-plan authoring, a rich activity feed, or a
-            full enterprise compliance platform. The release is being frozen around the routes above because those are
-            the flows already proven in staging.
+            This pilot does not claim a rostering engine, billing, incidents and complaints tooling, a rich activity
+            feed, or a full enterprise compliance platform. The release is being frozen around the routes above because
+            those are the flows already proven in staging.
           </p>
         </div>
       </main>

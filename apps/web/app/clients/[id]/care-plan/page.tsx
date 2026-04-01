@@ -5,9 +5,11 @@ import { Header } from '../../../../components/oasis/Header';
 import { requireAdminSession } from '../../../../lib/auth/require-admin';
 import { query } from '../../../../lib/graphql/client';
 import {
+  CLIENT_CARE_PLAN_AUDIT_HISTORY_QUERY,
   CLIENT_CARE_PLAN_HISTORY_QUERY,
   CLIENT_CARE_PLAN_QUERY,
   CLIENT_QUERY,
+  type ClientCarePlanAuditHistoryQueryResponse,
   type ClientCarePlanHistoryQueryResponse,
   type ClientCarePlanQueryResponse,
   type ClientQueryResponse,
@@ -57,6 +59,16 @@ async function getCarePlanHistory(clientId: string) {
   }
 }
 
+async function getCarePlanAuditHistory(clientId: string) {
+  try {
+    const response = await query<ClientCarePlanAuditHistoryQueryResponse>(CLIENT_CARE_PLAN_AUDIT_HISTORY_QUERY, { clientId });
+    return response.clientCarePlanAuditHistory;
+  } catch (error) {
+    console.error('Failed to fetch care-plan audit history:', error);
+    return [];
+  }
+}
+
 export default async function ClientCarePlanPage({ params }: ClientCarePlanPageProps) {
   await requireAdminSession();
 
@@ -66,9 +78,10 @@ export default async function ClientCarePlanPage({ params }: ClientCarePlanPageP
     notFound();
   }
 
-  const [carePlan, history] = await Promise.all([
+  const [carePlan, history, auditHistory] = await Promise.all([
     getCarePlan(client.id),
     getCarePlanHistory(client.id),
+    getCarePlanAuditHistory(client.id),
   ]);
 
   return (
@@ -97,11 +110,11 @@ export default async function ClientCarePlanPage({ params }: ClientCarePlanPageP
             {client.preferredName || client.fullName} Care Plan
           </h1>
           <p className="mt-1 text-slate-500">
-            Maintain structured guidance that carers can read directly inside the visit workspace.
+            Maintain the staff-owned care record that carers read directly inside the visit workspace.
           </p>
         </div>
 
-        <CarePlanEditor client={client} carePlan={carePlan} history={history} />
+        <CarePlanEditor client={client} carePlan={carePlan} history={history} auditHistory={auditHistory} />
       </main>
     </div>
   );

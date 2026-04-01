@@ -1,6 +1,20 @@
 import type { CarePlanContent, CarePlanVersion } from './graphql/queries';
 import { formatDate, formatDateInputValueInLondon } from './time';
 
+const CARE_PLAN_SECTION_LABELS: Record<string, string> = {
+  overview: 'Overview',
+  goalsAndOutcomes: 'Goals and outcomes',
+  dailyRoutines: 'Daily routine',
+  personalCareSupport: 'Personal care',
+  mobilityAndTransfers: 'Mobility and transfers',
+  nutritionAndHydration: 'Nutrition and hydration',
+  medicationSupport: 'Medication support',
+  communicationAndAccessibility: 'Communication and accessibility',
+  risksAndRedFlags: 'Risks and red flags',
+  contingencyAndEscalation: 'Contingency and escalation',
+  representativesAndInvolvement: 'Representatives and involvement',
+};
+
 export const EMPTY_CARE_PLAN_CONTENT: CarePlanContent = {
   overview: {
     summary: '',
@@ -111,6 +125,65 @@ export function getCarePlanSummary(version?: CarePlanVersion | null) {
   }
 
   return summary.slice(0, 3);
+}
+
+export function getCarePlanHighlights(version?: CarePlanVersion | null) {
+  if (!version) {
+    return [];
+  }
+
+  const content = version.content;
+  const highlights = [
+    {
+      label: 'Day-to-day guidance',
+      body: content.dailyRoutines.morning || content.overview.summary,
+    },
+    {
+      label: 'Mobility and transfers',
+      body: content.mobilityAndTransfers.transferGuidance || content.mobilityAndTransfers.mobilitySummary,
+    },
+    {
+      label: 'Communication approach',
+      body: content.communicationAndAccessibility.communicationApproach,
+    },
+    {
+      label: 'Escalation',
+      body: content.contingencyAndEscalation.summary || content.medicationSupport.refusalEscalation,
+    },
+  ];
+
+  return highlights.filter((item) => item.body).slice(0, 4);
+}
+
+export function formatCarePlanAuditAction(action: string) {
+  switch (action) {
+    case 'CREATE_CARE_PLAN_DRAFT':
+      return 'Draft created';
+    case 'UPDATE_CARE_PLAN_DRAFT':
+      return 'Draft updated';
+    case 'PUBLISH_CARE_PLAN_DRAFT':
+      return 'Draft published';
+    case 'DISCARD_CARE_PLAN_DRAFT':
+      return 'Draft discarded';
+    default:
+      return action
+        .toLowerCase()
+        .split('_')
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+  }
+}
+
+export function formatCarePlanChangedSections(changedSections?: string[] | null) {
+  const labels = (changedSections ?? [])
+    .map((section) => CARE_PLAN_SECTION_LABELS[section] ?? section)
+    .filter(Boolean);
+
+  if (!labels.length) {
+    return 'No section-level summary recorded';
+  }
+
+  return labels.join(', ');
 }
 
 export function getCareGuidanceSections(version?: CarePlanVersion | null) {

@@ -1,4 +1,4 @@
-import { Field, ID, ObjectType, registerEnumType } from '@nestjs/graphql';
+import { Field, ID, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
 import { CarePlanStatus } from '@oasis/db';
 
 registerEnumType(CarePlanStatus, {
@@ -244,4 +244,28 @@ export class CarePlanDTO {
 
   @Field(() => Date)
   updatedAt!: Date;
+}
+
+@ObjectType()
+export class CarePlanAuditEntryDTO {
+  @Field(() => ID)
+  id!: string;
+
+  @Field()
+  action!: string;
+
+  @Field()
+  userId!: string;
+
+  @Field(() => Int, { nullable: true })
+  versionNumber?: number | null;
+
+  @Field(() => String, { nullable: true })
+  status?: string | null;
+
+  @Field(() => [String])
+  changedSections!: string[];
+
+  @Field(() => Date)
+  timestamp!: Date;
 }

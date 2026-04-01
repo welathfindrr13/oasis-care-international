@@ -4,25 +4,33 @@ This document packages the final pilot around the routes and workflows that are 
 
 ## Core Product Story
 
-Oasis is strongest today as an operational domiciliary-care product built around five proof points:
+Oasis is strongest today as an operational domiciliary-care product built around five connected proof points:
 
-1. **Visits**
+1. **Client record**
+   - Operational profile, representative details, prescriptions, and visit snapshot on one record
+   - Care-plan status is visible before staff move into daily delivery
+2. **Care plans**
+   - Staff-owned draft -> publish flow with immutable published versions
+   - Active guidance is visible on the client record and inside visit detail
+   - Version history and direct care-plan audit trail are reviewable in-product
+3. **Visits**
    - Daily queue with explicit queue states
-   - Visit workspace for timing, tasks, notes, and medication context
+   - Visit workspace for timing, tasks, notes, medication context, and care guidance
+   - Coordinators can schedule, reschedule, reassign, cancel, and reconcile without a separate planning system
    - Review-needed reconciliation without inventing evidence
-2. **eMAR**
+4. **eMAR**
    - Date-scoped medication queue
    - Administered, missed, and refused recording
    - Visit-linked medication context remains visible
-3. **Coordinator control**
-   - Schedule, reschedule, reassign, cancel, and reconcile within the existing visit model
-4. **Compliance console**
+5. **Compliance console**
    - Admin-only subject access, erasure handling, retention enforcement, and masked audit review
-5. **Legal and privacy posture**
    - In-app privacy notice, data-processing summary, security summary, and subprocessor list
 
 ## Proof Routes
 
+- `/clients`
+- `/clients/[id]`
+- `/clients/[id]/care-plan`
 - `/visits`
 - `/visits/[id]`
 - `/visits/[id]/edit`
@@ -40,6 +48,7 @@ Oasis is strongest today as an operational domiciliary-care product built around
 The final freeze should re-prove these flows in staging:
 
 - Admin queue triage and visit creation
+- Client profile updates and care-plan draft/publish/history
 - Carer queue to visit workspace to completion
 - Task completion and care-note persistence
 - Medication outcomes from visit detail and `/emar`
@@ -52,7 +61,7 @@ The final freeze should re-prove these flows in staging:
 
 - No rostering or planning engine
 - No billing or invoicing
-- No care-plan authoring
+- No incidents, complaints, or safeguarding workflow
 - No rich event-feed style activity board
 - No enterprise-scale compliance platform beyond the pilot console
 

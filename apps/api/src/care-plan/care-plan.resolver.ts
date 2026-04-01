@@ -1,7 +1,7 @@
 import { Args, ID, Mutation, Query, Resolver, Context } from '@nestjs/graphql';
 import { SetMetadata, UseGuards } from '@nestjs/common';
 import { RolesGuard } from '@oasis/auth';
-import { CarePlanDTO, CarePlanVersionDTO } from './dto/care-plan.dto';
+import { CarePlanAuditEntryDTO, CarePlanDTO, CarePlanVersionDTO } from './dto/care-plan.dto';
 import { SaveCarePlanDraftInput } from './dto/save-care-plan-draft.input';
 import { CarePlanService } from './care-plan.service';
 
@@ -41,6 +41,16 @@ export class CarePlanResolver {
   ): Promise<CarePlanVersionDTO[]> {
     const { userRole } = this.getActor(ctx);
     return this.carePlanService.getClientCarePlanHistory(clientId, userRole);
+  }
+
+  @Query(() => [CarePlanAuditEntryDTO])
+  @Roles('admin')
+  async clientCarePlanAuditHistory(
+    @Args('clientId', { type: () => ID }) clientId: string,
+    @Context() ctx: any,
+  ): Promise<CarePlanAuditEntryDTO[]> {
+    const { userRole } = this.getActor(ctx);
+    return this.carePlanService.getClientCarePlanAuditHistory(clientId, userRole);
   }
 
   @Mutation(() => CarePlanVersionDTO)

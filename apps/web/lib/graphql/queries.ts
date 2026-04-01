@@ -153,6 +153,16 @@ export interface CarePlan {
   updatedAt: string;
 }
 
+export interface CarePlanAuditEntry {
+  id: string;
+  action: string;
+  userId: string;
+  versionNumber?: number;
+  status?: string;
+  changedSections: string[];
+  timestamp: string;
+}
+
 export interface VisitTask {
   id: string;
   taskName: string;
@@ -514,6 +524,10 @@ export interface ClientCarePlanHistoryQueryResponse {
   clientCarePlanHistory: CarePlanVersion[];
 }
 
+export interface ClientCarePlanAuditHistoryQueryResponse {
+  clientCarePlanAuditHistory: CarePlanAuditEntry[];
+}
+
 export const CLIENT_QUERY = `
   query Client($id: String!) {
     client(id: $id) {
@@ -725,6 +739,20 @@ export const CLIENT_CARE_PLAN_HISTORY_QUERY = `
       approvedAt
       createdAt
       updatedAt
+    }
+  }
+`;
+
+export const CLIENT_CARE_PLAN_AUDIT_HISTORY_QUERY = `
+  query ClientCarePlanAuditHistory($clientId: ID!) {
+    clientCarePlanAuditHistory(clientId: $clientId) {
+      id
+      action
+      userId
+      versionNumber
+      status
+      changedSections
+      timestamp
     }
   }
 `;
