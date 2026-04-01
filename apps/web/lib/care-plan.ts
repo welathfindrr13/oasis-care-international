@@ -127,13 +127,19 @@ export function getCarePlanSummary(version?: CarePlanVersion | null) {
   return summary.slice(0, 3);
 }
 
+export interface CarePlanHighlight {
+  label: string
+  body?: string
+  bullets?: string[]
+}
+
 export function getCarePlanHighlights(version?: CarePlanVersion | null) {
   if (!version) {
     return [];
   }
 
   const content = version.content;
-  const highlights = [
+  const highlights: CarePlanHighlight[] = [
     {
       label: 'Day-to-day guidance',
       body: content.dailyRoutines.morning || content.overview.summary,
@@ -148,7 +154,7 @@ export function getCarePlanHighlights(version?: CarePlanVersion | null) {
     },
     {
       label: 'Risk and escalation',
-      body: content.risksAndRedFlags.items[0] ? formatRiskAndRedFlagSummary(content.risksAndRedFlags.items[0]) : '',
+      bullets: content.risksAndRedFlags.items[0] ? formatRiskAndRedFlagLines(content.risksAndRedFlags.items[0]) : [],
     },
     {
       label: 'Escalation',
@@ -156,7 +162,7 @@ export function getCarePlanHighlights(version?: CarePlanVersion | null) {
     },
   ];
 
-  return highlights.filter((item) => item.body).slice(0, 5);
+  return highlights.filter((item) => item.body || item.bullets?.length).slice(0, 5);
 }
 
 export function formatCarePlanAuditAction(action: string) {

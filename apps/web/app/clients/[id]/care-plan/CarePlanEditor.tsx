@@ -364,7 +364,16 @@ export default function CarePlanEditor({ client, carePlan, history, auditHistory
             {highlights.map((highlight) => (
               <div key={highlight.label} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{highlight.label}</p>
-                <p className="mt-2 text-sm text-slate-700">{highlight.body}</p>
+                {highlight.body ? (
+                  <p className="mt-2 text-sm text-slate-700">{highlight.body}</p>
+                ) : null}
+                {highlight.bullets?.length ? (
+                  <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                    {highlight.bullets.map((bullet) => (
+                      <li key={bullet}>{bullet}</li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
             ))}
           </CardContent>

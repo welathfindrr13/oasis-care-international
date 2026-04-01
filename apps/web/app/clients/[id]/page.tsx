@@ -375,7 +375,16 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
                           {carePlanHighlights.map((item) => (
                             <div key={item.label} className="rounded-xl border border-slate-200 p-4">
                               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p>
-                              <p className="mt-2 text-sm text-slate-700">{item.body}</p>
+                              {item.body ? (
+                                <p className="mt-2 text-sm text-slate-700">{item.body}</p>
+                              ) : null}
+                              {item.bullets?.length ? (
+                                <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                                  {item.bullets.map((bullet) => (
+                                    <li key={bullet}>{bullet}</li>
+                                  ))}
+                                </ul>
+                              ) : null}
                             </div>
                           ))}
                         </div>
