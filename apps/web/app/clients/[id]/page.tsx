@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
 import { buttonVariants } from '../../../components/ui/Button'
 import { requireAdminSession } from '../../../lib/auth/require-admin'
 import { formatCarePlanDate, getCarePlanHighlights } from '../../../lib/care-plan'
-import { getClientProfileCompleteness } from '../../../lib/client-profile'
+import { formatDateOnlyForDisplay, getClientProfileCompleteness } from '../../../lib/client-profile'
 import { query } from '../../../lib/graphql/client'
 import {
   CLIENT_CARE_PLAN_QUERY,
@@ -55,7 +55,7 @@ async function getClientVisits(clientId: string): Promise<Visit[]> {
   try {
     const response = await query<VisitsQueryResponse>(VISITS_QUERY, {
       clientId,
-      take: 5,
+      take: 10,
       skip: 0,
     });
 
@@ -63,6 +63,22 @@ async function getClientVisits(clientId: string): Promise<Visit[]> {
   } catch (error) {
     console.error('Failed to fetch client visits:', error);
     return [];
+  }
+}
+
+async function getLastCompletedVisit(clientId: string): Promise<Visit | null> {
+  try {
+    const response = await query<VisitsQueryResponse>(VISITS_QUERY, {
+      clientId,
+      status: 'COMPLETED',
+      take: 1,
+      skip: 0,
+    })
+
+    return response.visits.items[0] ?? null
+  } catch (error) {
+    console.error('Failed to fetch last completed visit:', error)
+    return null
   }
 }
 
@@ -118,10 +134,11 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
     notFound();
   }
 
-  const [visits, prescriptions, carePlan] = await Promise.all([
+  const [visits, prescriptions, carePlan, lastCompletedVisit] = await Promise.all([
     getClientVisits(client.id),
     getClientPrescriptions(client.id),
     getClientCarePlan(client.id),
+    getLastCompletedVisit(client.id),
   ]);
   const now = Date.now();
   const upcomingVisits = [...visits]
@@ -131,13 +148,6 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
     .filter((visit) => new Date(visit.scheduledStart).getTime() < now)
     .sort((left, right) => new Date(right.scheduledStart).getTime() - new Date(left.scheduledStart).getTime())
     .slice(0, 3);
-  const completedVisits = [...visits]
-    .filter((visit) => visit.status === 'COMPLETED' || Boolean(visit.actualEnd))
-    .sort(
-      (left, right) =>
-        new Date(right.actualEnd || right.scheduledStart).getTime() - new Date(left.actualEnd || left.scheduledStart).getTime()
-    );
-  const lastCompletedVisit = completedVisits[0];
   const nextVisit = upcomingVisits[0];
   const activeCarePlan = carePlan?.activeVersion ?? null;
   const draftCarePlan = carePlan?.draftVersion ?? null;
@@ -146,7 +156,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
   const clientAddress = [client.addressLine1, client.addressLine2, `${client.city}, ${client.postcode}`]
     .filter(Boolean)
     .join(', ');
-  const complianceHref = `/admin/compliance?subjectId=${encodeURIComponent(client.id)}&subjectName=${encodeURIComponent(client.fullName)}`
+  const complianceHref = `/admin/compliance?subjectId=${encodeURIComponent(client.id)}&subjectName=${encodeURIComponent(client.fullName)}&subjectType=client`
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -247,11 +257,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
                   </div>
                   <div>
                     <dt className="text-sm text-slate-500">Date of birth</dt>
-                    <dd className="text-slate-900">
-                      {client.dateOfBirth
-                        ? formatDateTime(client.dateOfBirth, { year: 'numeric', month: 'short', day: 'numeric' })
-                        : 'Not recorded'}
-                    </dd>
+                    <dd className="text-slate-900">{formatDateOnlyForDisplay(client.dateOfBirth)}</dd>
                   </div>
                   <div>
                     <dt className="text-sm text-slate-500">Preferred language</dt>

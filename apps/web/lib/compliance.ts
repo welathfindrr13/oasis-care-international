@@ -1,14 +1,19 @@
 export interface ComplianceSubjectContext {
   id: string
   name?: string
+  type?: 'client' | 'carer'
 }
 
 export function getComplianceSubjectContext(searchParams?: {
   subjectId?: string
   subjectName?: string
+  subjectType?: string
 }) {
   const id = searchParams?.subjectId?.trim()
   const name = searchParams?.subjectName?.trim()
+  const type = searchParams?.subjectType === 'client' || searchParams?.subjectType === 'carer'
+    ? searchParams.subjectType
+    : undefined
 
   if (!id) {
     return null
@@ -17,6 +22,7 @@ export function getComplianceSubjectContext(searchParams?: {
   return {
     id,
     name: name || undefined,
+    type,
   } satisfies ComplianceSubjectContext
 }
 

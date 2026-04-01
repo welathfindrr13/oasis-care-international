@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { Client } from '../graphql/queries'
-import { getClientProfileCompleteness } from '../client-profile'
+import { formatDateOnlyForDisplay, getClientProfileCompleteness, toDateInputValue } from '../client-profile'
 
 function buildClient(overrides: Partial<Client> = {}): Client {
   return {
@@ -47,4 +47,13 @@ test('marks the client profile complete when operational details are filled', ()
 
   assert.equal(completeness.isComplete, true)
   assert.equal(completeness.missingItems.length, 0)
+})
+
+test('keeps date-only profile fields stable when converting them for form input', () => {
+  assert.equal(toDateInputValue('1948-05-14T00:00:00.000Z'), '1948-05-14')
+  assert.equal(toDateInputValue('1948-05-14'), '1948-05-14')
+})
+
+test('formats date of birth without leaking a time-of-day into the client record', () => {
+  assert.equal(formatDateOnlyForDisplay('1948-05-14T00:00:00.000Z'), '14 May 1948')
 })

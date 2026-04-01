@@ -71,3 +71,43 @@ export function getClientProfileCompleteness(client: Client) {
     isComplete: missingItems.length === 0,
   }
 }
+
+function formatUtcDateParts(date: Date) {
+  const year = date.getUTCFullYear()
+  const month = `${date.getUTCMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getUTCDate()}`.padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+export function toDateInputValue(value?: string | null) {
+  if (!value) {
+    return ''
+  }
+
+  const dateOnlyMatch = value.match(/^\d{4}-\d{2}-\d{2}/)
+  if (dateOnlyMatch) {
+    return dateOnlyMatch[0]
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return formatUtcDateParts(date)
+}
+
+export function formatDateOnlyForDisplay(value?: string | null) {
+  const dateOnly = toDateInputValue(value)
+  if (!dateOnly) {
+    return 'Not recorded'
+  }
+
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${dateOnly}T00:00:00.000Z`))
+}

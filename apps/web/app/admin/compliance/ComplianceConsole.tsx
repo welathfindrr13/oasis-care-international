@@ -113,17 +113,28 @@ export function ComplianceConsole({
           <CardHeader>
             <h2 className="font-heading text-lg font-semibold text-slate-900">Selected subject context</h2>
             <p className="text-sm text-slate-500">
-              Use this context to queue rights handling without re-entering the client UUID.
+              Use this context to queue rights handling without re-entering the subject UUID.
             </p>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-sm font-semibold text-slate-900">{selectedSubject.name || 'Linked subject'}</p>
               <p className="mt-1 break-all text-sm text-slate-600">{selectedSubject.id}</p>
+              {selectedSubject.type && (
+                <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                  {selectedSubject.type}
+                </p>
+              )}
             </div>
-            <Link href={`/clients/${selectedSubject.id}`} className={buttonVariants({ variant: 'outline' })}>
-              Open client record
-            </Link>
+            {selectedSubject.type === 'client' ? (
+              <Link href={`/clients/${selectedSubject.id}`} className={buttonVariants({ variant: 'outline' })}>
+                Open client record
+              </Link>
+            ) : (
+              <div className="text-sm text-slate-500">
+                Open the matching subject record from the directory before taking action.
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

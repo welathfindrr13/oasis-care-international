@@ -41,6 +41,7 @@ export default async function AdminCompliancePage({
   searchParams?: {
     subjectId?: string;
     subjectName?: string;
+    subjectType?: string;
   };
 }) {
   const dashboard = await getComplianceDashboard();

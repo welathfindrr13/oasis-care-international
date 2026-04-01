@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button, buttonVariants } from '../../components/ui/Button';
+import { toDateInputValue } from '../../lib/client-profile';
 import { clientQuery } from '../../lib/graphql/client-side';
 import type { Client } from '../../lib/graphql/queries';
 
@@ -81,19 +82,6 @@ function FormSection({
       <div className="grid gap-4 md:grid-cols-2">{children}</div>
     </section>
   );
-}
-
-function toDateInputValue(value?: string) {
-  if (!value) {
-    return '';
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-
-  return date.toISOString().slice(0, 10);
 }
 
 export default function ClientForm({ mode, client }: ClientFormProps) {

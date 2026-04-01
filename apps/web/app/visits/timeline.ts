@@ -30,8 +30,10 @@ function summariseNote(note?: string | null) {
   return `${cleaned.slice(0, 117)}...`
 }
 
+const RECORDED_MEDICATION_STATUSES = new Set(['ADMINISTERED', 'MISSED', 'REFUSED'])
+
 export function buildVisitTimelineGroups(
-  visit: Pick<Visit, 'id' | 'scheduledStart' | 'actualStart' | 'actualEnd' | 'updatedAt' | 'notes'> & {
+  visit: Pick<Visit, 'id' | 'scheduledStart' | 'actualStart' | 'actualEnd'> & {
     tasks: Visit['tasks']
   },
   medications: MedicationAdministration[]
@@ -78,16 +80,6 @@ export function buildVisitTimelineGroups(
           },
         ]
       : []),
-    ...(visit.notes?.trim()
-      ? [
-          {
-            id: `${visit.id}-notes`,
-            at: visit.updatedAt,
-            title: 'Care log updated',
-            detail: 'Visit notes were last updated on this record.',
-          },
-        ]
-      : []),
     ...visit.tasks.flatMap((task) => {
       const items: VisitTimelineEvent[] = []
       const taskNote = summariseNote(task.notes)
@@ -115,7 +107,7 @@ export function buildVisitTimelineGroups(
       return items
     }),
     ...medications
-      .filter((administration) => administration.status !== 'SCHEDULED')
+      .filter((administration) => RECORDED_MEDICATION_STATUSES.has(administration.status))
       .map((administration) => ({
         id: administration.id,
         at: administration.administeredTime || administration.scheduledTime,

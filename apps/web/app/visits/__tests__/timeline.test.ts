@@ -62,3 +62,24 @@ test('places scheduled medications in the planned group and recorded outcomes in
   assert.ok(groups.planned.some((event) => event.title.includes('Medication scheduled')))
   assert.ok(groups.recorded.some((event) => event.title.includes('Medication administered')))
 })
+
+test('keeps cancelled medication out of recorded activity because it is not delivered care evidence', () => {
+  const medications: MedicationAdministration[] = [
+    {
+      id: 'med-cancelled',
+      prescriptionId: 'rx-3',
+      scheduledTime: '2026-04-01T09:30:00.000Z',
+      status: 'CANCELLED',
+      createdAt: '2026-04-01T08:00:00.000Z',
+      updatedAt: '2026-04-01T09:00:00.000Z',
+      prescription: {
+        id: 'rx-3',
+        medication: { id: 'm-3', name: 'Held dose', dosage: '1', unit: 'tablet' },
+      },
+    },
+  ]
+
+  const groups = buildVisitTimelineGroups(buildVisit(), medications)
+
+  assert.equal(groups.recorded.some((event) => event.title.includes('Held dose')), false)
+})
