@@ -28,8 +28,8 @@ export default function ApprovalControls({
   const [feedbackText, setFeedbackText] = useState('');
   const [selectedAction, setSelectedAction] = useState<'approved' | 'rejected' | null>(null);
 
-  // Only show controls to managers and admins
-  if (userRole !== 'manager' && userRole !== 'admin') {
+  // Only show controls to admins in the current release flow.
+  if (userRole !== 'admin') {
     return null;
   }
 
@@ -121,7 +121,7 @@ export default function ApprovalControls({
         </div>
 
         <p className="text-sm text-gray-700 mb-4">
-          This health summary requires manager approval before it can be shared with the care team.
+          This health summary requires admin approval before it can be treated as staff-reviewed context.
         </p>
 
         <div className="flex gap-3">

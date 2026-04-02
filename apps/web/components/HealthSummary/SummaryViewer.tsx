@@ -12,9 +12,9 @@ interface HealthSummary {
   generatedAt: string;
   generatedBy: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  approvedBy?: string;
-  approvedAt?: string;
-  feedback?: string;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  feedback?: string | null;
   expiresAt: string;
   client?: {
     id: string;
@@ -22,13 +22,13 @@ interface HealthSummary {
     addressLine1: string;
     city: string;
     postcode: string;
-  };
+  } | null;
   approver?: {
     id: string;
     firstName: string;
     lastName: string;
     email: string;
-  };
+  } | null;
 }
 
 interface SummaryViewerProps {

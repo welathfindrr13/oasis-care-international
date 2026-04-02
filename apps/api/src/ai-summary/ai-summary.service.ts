@@ -8,6 +8,7 @@ import { HealthSummary, MedicationAuditAction } from '@oasis/db';
 import { ClsService } from 'nestjs-cls';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import { EmbeddingBatchService } from './embeddings/embedding.batch';
 
 @Injectable()
 export class AiSummaryService {
@@ -16,6 +17,7 @@ export class AiSummaryService {
   constructor(
     private readonly aiSummaryRepository: AiSummaryRepository,
     private readonly medicationRepository: MedicationRepository,
+    private readonly embeddingBatchService: EmbeddingBatchService,
     private readonly cls: ClsService,
   ) {}
 
@@ -26,6 +28,14 @@ export class AiSummaryService {
   ): Promise<HealthSummary> {
     const requestId = this.cls.get('requestId');
     this.logger.log(`Generating AI summary for client ${data.clientId}`, { requestId });
+
+    if (process.env.AI_SUMMARY_ENABLED_ENV !== 'true') {
+      throw new BaseHttpException(
+        ErrorCode.FEATURE_NOT_ENABLED,
+        'AI summary generation is currently disabled in this environment',
+        HttpStatus.FORBIDDEN
+      );
+    }
 
     // Check if AI summary is enabled for this client's organization
     const aiEnabled = await this.aiSummaryRepository.checkOrganizationAIEnabled(data.clientId);
@@ -52,16 +62,48 @@ export class AiSummaryService {
       return existingSummary;
     }
 
-    // Generate mock AI summary (in production, this would call the AI service)
-    const mockSummary = this.generateMockSummary();
-    const mockRiskLevels = this.generateMockRiskLevels();
+    const periodStart = new Date(data.periodStart);
+    const periodEnd = new Date(data.periodEnd);
+
+    if (Number.isNaN(periodStart.getTime()) || Number.isNaN(periodEnd.getTime()) || periodStart >= periodEnd) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Summary period must include a valid start date before the end date',
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    let summaryPayload: {
+      summaryJson: any;
+      riskLevels: any;
+      careLogCount: number;
+    };
+
+    try {
+      summaryPayload = await this.embeddingBatchService.generateSummaryPayload(
+        data.clientId,
+        periodStart,
+        periodEnd
+      );
+    } catch (error: any) {
+      const message = error instanceof Error ? error.message : 'Unable to generate AI summary right now';
+      const statusCode = /No care activity/i.test(message)
+        ? HttpStatus.UNPROCESSABLE_ENTITY
+        : HttpStatus.BAD_GATEWAY;
+
+      throw new BaseHttpException(
+        statusCode === HttpStatus.UNPROCESSABLE_ENTITY ? ErrorCode.VALIDATION_FAILED : ErrorCode.INTERNAL_ERROR,
+        message,
+        statusCode
+      );
+    }
 
     const summary = await this.aiSummaryRepository.create({
       client: { connect: { id: data.clientId } },
-      period_start: new Date(data.periodStart),
-      period_end: new Date(data.periodEnd),
-      summary_json: mockSummary,
-      risk_levels: mockRiskLevels,
+      period_start: periodStart,
+      period_end: periodEnd,
+      summary_json: summaryPayload.summaryJson,
+      risk_levels: summaryPayload.riskLevels,
       generated_at: new Date(),
       generated_by: 'ai',
       expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
@@ -70,14 +112,15 @@ export class AiSummaryService {
     // Audit: Log AI summary generation
     await this.medicationRepository.createMedicationAudit({
       action: MedicationAuditAction.AI_SUMMARY_GENERATED,
-      actorId: 'system',
-      actorRole: 'ai',
+      actorId: userId,
+      actorRole: userRole,
       changes: {
         summaryId: summary.id,
         clientId: data.clientId,
         periodStart: data.periodStart,
         periodEnd: data.periodEnd,
-        riskLevels: mockRiskLevels,
+        riskLevels: summaryPayload.riskLevels,
+        careLogCount: summaryPayload.careLogCount,
       },
     });
 
@@ -93,11 +136,11 @@ export class AiSummaryService {
   ): Promise<{ items: HealthSummary[]; total: number }> {
     const requestId = this.cls.get('requestId');
     
-    // Only managers and admins can view pending summaries
-    if (userRole !== 'admin' && userRole !== 'manager') {
+    // Only admins can review pending summaries in the current UI.
+    if (userRole !== 'admin') {
       throw new BaseHttpException(
         ErrorCode.FORBIDDEN_ROLE_REQUIRED,
-        'Only managers and admins can view pending summaries',
+        'Only admins can view pending summaries',
         HttpStatus.FORBIDDEN
       );
     }
@@ -192,11 +235,11 @@ export class AiSummaryService {
   ): Promise<HealthSummary> {
     const requestId = this.cls.get('requestId');
     
-    // Only managers and admins can approve summaries
-    if (userRole !== 'admin' && userRole !== 'manager') {
+    // Only admins can approve summaries in the current UI.
+    if (userRole !== 'admin') {
       throw new BaseHttpException(
         ErrorCode.FORBIDDEN_ROLE_REQUIRED,
-        'Only managers and admins can approve summaries',
+        'Only admins can approve summaries',
         HttpStatus.FORBIDDEN
       );
     }
@@ -291,38 +334,5 @@ export class AiSummaryService {
 
   private isSummaryExpired(summary: HealthSummary): boolean {
     return new Date() > summary.expires_at;
-  }
-
-  private generateMockSummary(): any {
-    return {
-      overall_health: "Stable with minor concerns",
-      key_observations: [
-        "Client showed good mobility during morning visits",
-        "Medication compliance improved this week",
-        "Some signs of fatigue in the afternoons"
-      ],
-      recommendations: [
-        "Continue current medication schedule",
-        "Monitor energy levels during afternoon visits",
-        "Consider light exercise routine"
-      ],
-      visit_summary: {
-        total_visits: 14,
-        completed_visits: 13,
-        missed_visits: 1,
-        average_visit_duration: "45 minutes"
-      }
-    };
-  }
-
-  private generateMockRiskLevels(): any {
-    return {
-      overall: "amber",
-      mobility: "green",
-      medication: "green",
-      mental_health: "amber",
-      nutrition: "green",
-      safety: "green"
-    };
   }
 }

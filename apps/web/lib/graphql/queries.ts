@@ -163,6 +163,28 @@ export interface CarePlanAuditEntry {
   timestamp: string;
 }
 
+export type HealthSummaryStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface HealthSummary {
+  id: string;
+  clientId: string;
+  periodStart: string;
+  periodEnd: string;
+  summaryJson: any;
+  riskLevels: any;
+  generatedAt: string;
+  generatedBy: string;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  feedback?: string | null;
+  expiresAt: string;
+  status: HealthSummaryStatus;
+  client?: Pick<Client, 'id' | 'fullName' | 'addressLine1' | 'addressLine2' | 'city' | 'postcode'> | null;
+  approver?: Pick<Carer, 'id' | 'firstName' | 'lastName' | 'email' | 'phone'> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface VisitTask {
   id: string;
   taskName: string;
@@ -528,6 +550,13 @@ export interface ClientCarePlanAuditHistoryQueryResponse {
   clientCarePlanAuditHistory: CarePlanAuditEntry[];
 }
 
+export interface ClientSummaryHistoryQueryResponse {
+  listHistory: {
+    items: HealthSummary[];
+    total: number;
+  };
+}
+
 export const CLIENT_QUERY = `
   query Client($id: String!) {
     client(id: $id) {
@@ -753,6 +782,46 @@ export const CLIENT_CARE_PLAN_AUDIT_HISTORY_QUERY = `
       status
       changedSections
       timestamp
+    }
+  }
+`;
+
+export const CLIENT_SUMMARY_HISTORY_QUERY = `
+  query ClientSummaryHistory($clientId: ID!, $take: Int) {
+    listHistory(clientId: $clientId, take: $take) {
+      items {
+        id
+        clientId
+        periodStart
+        periodEnd
+        summaryJson
+        riskLevels
+        generatedAt
+        generatedBy
+        approvedBy
+        approvedAt
+        feedback
+        expiresAt
+        status
+        client {
+          id
+          fullName
+          addressLine1
+          addressLine2
+          city
+          postcode
+        }
+        approver {
+          id
+          firstName
+          lastName
+          email
+          phone
+        }
+        createdAt
+        updatedAt
+      }
+      total
     }
   }
 `;

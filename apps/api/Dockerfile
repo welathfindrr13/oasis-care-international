@@ -70,6 +70,7 @@ RUN mkdir -p node_modules/@oasis && \
 
 # Copy built application from build stage
 COPY --from=build /app/apps/api/dist ./apps/api/dist
+COPY --from=build /app/apps/api/prompts ./apps/api/prompts
 
 # Copy compiled libs
 COPY --from=build /app/libs/auth/dist ./libs/auth/dist

@@ -222,6 +222,9 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
             <Link href={`/clients/${client.id}/prescriptions`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
               Open Prescriptions
             </Link>
+            <Link href={`/clients/${client.id}/summary`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+              AI Summary
+            </Link>
           </div>
         </div>
 
@@ -609,6 +612,12 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
                     className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"
                   >
                     Open prescriptions
+                  </Link>
+                  <Link
+                    href={`/clients/${client.id}/summary`}
+                    className="block w-full rounded-xl px-4 py-3 text-left font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                  >
+                    Open AI summary
                   </Link>
                   <Link
                     href={`/visits?clientId=${client.id}`}

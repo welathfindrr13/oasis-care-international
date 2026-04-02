@@ -8,7 +8,7 @@ import {
 import { GenerateSummaryInput } from './dto/generate-summary.input';
 import { ApproveSummaryInput } from './dto/approve-summary.input';
 import { HealthSummaryFilterArgs } from './dto/health-summary-filter.args';
-import { RolesGuard } from '@oasis/auth';
+import { RolesGuard, primaryRole } from '@oasis/auth';
 
 export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => 
   SetMetadata('roles', roles);
@@ -19,14 +19,14 @@ export class AiSummaryResolver {
   constructor(private readonly aiSummaryService: AiSummaryService) {}
 
   @Query(() => HealthSummaryPaginatedResponse)
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async listPendingSummaries(
     @Args('skip', { type: () => Int, nullable: true }) skip: number = 0,
     @Args('take', { type: () => Int, nullable: true }) take: number = 20,
     @Context() ctx: any
   ): Promise<HealthSummaryPaginatedResponse> {
-    const { sub: userId, realm_access } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'manager';
+    const { sub: userId } = ctx.req.user;
+    const userRole = primaryRole(ctx.req.user) || 'carer';
 
     const result = await this.aiSummaryService.listPendingSummaries(
       skip, 
@@ -47,8 +47,8 @@ export class AiSummaryResolver {
     @Args() filter: HealthSummaryFilterArgs,
     @Context() ctx: any
   ): Promise<HealthSummaryPaginatedResponse> {
-    const { sub: userId, realm_access } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'client';
+    const { sub: userId } = ctx.req.user;
+    const userRole = primaryRole(ctx.req.user) || 'client';
 
     const result = await this.aiSummaryService.listHistory(filter, userId, userRole);
     
@@ -64,8 +64,8 @@ export class AiSummaryResolver {
     @Args('clientId', { type: () => ID }) clientId: string,
     @Context() ctx: any
   ): Promise<HealthSummaryDTO | null> {
-    const { sub: userId, realm_access } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'client';
+    const { sub: userId } = ctx.req.user;
+    const userRole = primaryRole(ctx.req.user) || 'client';
 
     const summary = await this.aiSummaryService.getCurrentWeekSummary(
       clientId, 
@@ -82,8 +82,8 @@ export class AiSummaryResolver {
     @Args('input') input: GenerateSummaryInput,
     @Context() ctx: any
   ): Promise<HealthSummaryDTO> {
-    const { sub: userId, realm_access } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'carer';
+    const { sub: userId } = ctx.req.user;
+    const userRole = primaryRole(ctx.req.user) || 'carer';
 
     const summary = await this.aiSummaryService.generateSummary(
       input, 
@@ -95,13 +95,13 @@ export class AiSummaryResolver {
   }
 
   @Mutation(() => HealthSummaryDTO)
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async approveSummary(
     @Args('input') input: ApproveSummaryInput,
     @Context() ctx: any
   ): Promise<HealthSummaryDTO> {
-    const { sub: userId, realm_access } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'manager';
+    const { sub: userId } = ctx.req.user;
+    const userRole = primaryRole(ctx.req.user) || 'carer';
 
     const summary = await this.aiSummaryService.approveSummary(
       input, 

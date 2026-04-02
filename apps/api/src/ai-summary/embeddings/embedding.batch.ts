@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@oasis/db';
 import { DateTime } from 'luxon';
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import * as fs from 'fs/promises';
+import * as fs from 'fs';
 import * as path from 'path';
 
 const DEFAULT_BEDROCK_SUMMARY_MODEL = 'eu.anthropic.claude-haiku-4-5-20251001-v1:0';
@@ -27,17 +27,57 @@ export class EmbeddingBatchService {
     this.bedrock = new BedrockRuntimeClient({
       region: process.env.AWS_REGION || 'eu-west-2',
     });
-    this.loadPromptTemplate();
+    this.healthSummaryPrompt = this.loadPromptTemplate();
   }
 
-  private async loadPromptTemplate(): Promise<void> {
-    try {
-      const promptPath = path.join(process.cwd(), 'prompts', 'health-summary.md');
-      this.healthSummaryPrompt = await fs.readFile(promptPath, 'utf-8');
-    } catch (error) {
-      this.logger.error('Failed to load health summary prompt template', error);
-      throw new Error('Health summary prompt template not found');
+  private loadPromptTemplate(): string {
+    const candidatePaths = [
+      path.resolve(__dirname, '../../../prompts/health-summary.md'),
+      path.resolve(__dirname, '../../../../../../prompts/health-summary.md'),
+      path.resolve(process.cwd(), 'apps/api/prompts/health-summary.md'),
+      path.resolve(process.cwd(), 'prompts/health-summary.md'),
+    ];
+
+    for (const promptPath of candidatePaths) {
+      if (fs.existsSync(promptPath)) {
+        return fs.readFileSync(promptPath, 'utf-8');
+      }
     }
+
+    const message = `Health summary prompt template not found in any expected location: ${candidatePaths.join(', ')}`;
+    this.logger.error(message);
+    throw new Error(message);
+  }
+
+  async generateSummaryPayload(
+    clientId: string,
+    periodStartDate: Date,
+    periodEndDate: Date,
+  ): Promise<{
+    summaryJson: any;
+    riskLevels: any;
+    careLogCount: number;
+  }> {
+    const periodStart = DateTime.fromJSDate(periodStartDate);
+    const periodEnd = DateTime.fromJSDate(periodEndDate);
+    const careLogs = await this.collectCareLogs(clientId, periodStart, periodEnd);
+
+    if (careLogs.length === 0) {
+      throw new Error('No care activity was found for the requested summary period.');
+    }
+
+    const { summaryJson, riskLevels } = await this.buildSummaryFromLogs(
+      clientId,
+      careLogs,
+      periodStart,
+      periodEnd,
+    );
+
+    return {
+      summaryJson,
+      riskLevels,
+      careLogCount: careLogs.length,
+    };
   }
 
   /**
@@ -147,10 +187,15 @@ export class EmbeddingBatchService {
     await this.generateLogEmbeddings(careLogs, clientId);
 
     // 3. Create AI health summary using Bedrock
-    const healthSummary = await this.createHealthSummary(clientId, careLogs, periodStart, periodEnd);
+    const { summaryJson, riskLevels } = await this.buildSummaryFromLogs(
+      clientId,
+      careLogs,
+      periodStart,
+      periodEnd,
+    );
 
     // 4. Store summary in database with expiration
-    await this.storeSummary(clientId, healthSummary, periodStart, periodEnd);
+    await this.storeSummary(clientId, summaryJson, riskLevels, periodStart, periodEnd);
 
     this.logger.log(`Successfully generated summary for client ${clientId}`);
   }
@@ -275,6 +320,18 @@ export class EmbeddingBatchService {
     return responseBody.embedding;
   }
 
+  private async buildSummaryFromLogs(
+    clientId: string,
+    logs: any[],
+    periodStart: DateTime,
+    periodEnd: DateTime,
+  ): Promise<{ summaryJson: any; riskLevels: any }> {
+    const summaryJson = await this.createHealthSummary(clientId, logs, periodStart, periodEnd);
+    const riskLevels = this.calculateOverallRisk(summaryJson);
+
+    return { summaryJson, riskLevels };
+  }
+
   private async createHealthSummary(
     clientId: string,
     logs: any[],
@@ -333,12 +390,10 @@ Please analyze this week's care logs and generate the health summary in the spec
   private async storeSummary(
     clientId: string,
     summaryData: any,
+    riskLevels: any,
     periodStart: DateTime,
     periodEnd: DateTime,
   ): Promise<void> {
-    // Calculate risk levels from summary data
-    const riskLevels = this.calculateOverallRisk(summaryData);
-    
     // Store in database with 24-hour expiration
     await this.prisma.healthSummary.create({
       data: {
