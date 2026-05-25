@@ -6,7 +6,11 @@ import { Masker } from '../utils/masker';
 
 @Catch(BaseHttpException)
 export class GraphqlExceptionFilter implements GqlExceptionFilter {
-  catch(exception: BaseHttpException, _host: ArgumentsHost) {
+  catch(exception: BaseHttpException, host: ArgumentsHost) {
+    if ((host.getType() as string) !== 'graphql') {
+      throw exception;
+    }
+
     const { code, message } = exception.getResponse() as any;
 
     return new GraphQLError(Masker.mask(message), {

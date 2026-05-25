@@ -1,7 +1,34 @@
-import { Controller, Post, Get, Body, Param, HttpCode, HttpStatus, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Req,
+  SetMetadata,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
 import { ConsentService, GrantConsentInput } from './services/consent.service';
 import { SarService } from './services/sar.service';
 import { ErasureService } from './services/erasure.service';
+import { ApiRolesGuard } from '../auth/api-roles.guard';
+
+export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
+  SetMetadata('roles', roles);
+
+type GdprActor = {
+  id?: string | null;
+  sub?: string | null;
+  role?: string | null;
+  realm_access?: {
+    roles?: unknown;
+  } | null;
+};
 
 interface ConsentRequestDto {
   userId: string;
@@ -25,6 +52,8 @@ interface ErasureRequestDto {
 }
 
 @Controller('gdpr')
+@UseGuards(ApiRolesGuard)
+@Roles('admin', 'manager')
 export class GdprController {
   constructor(
     private readonly consentService: ConsentService,
@@ -38,7 +67,12 @@ export class GdprController {
    */
   @Post('consent')
   @HttpCode(HttpStatus.ACCEPTED)
-  async grantOrWithdrawConsent(@Body() request: ConsentRequestDto) {
+  async grantOrWithdrawConsent(
+    @Req() req: { user?: GdprActor },
+    @Body() request: ConsentRequestDto,
+  ) {
+    this.assertGdprStaffAccess(req.user);
+
     if (request.granted) {
       const input: GrantConsentInput = {
         userId: request.userId,
@@ -76,7 +110,12 @@ export class GdprController {
    * GET /gdpr/consent/:userId
    */
   @Get('consent/:userId')
-  async getConsentStatus(@Param('userId') userId: string) {
+  async getConsentStatus(
+    @Req() req: { user?: GdprActor },
+    @Param('userId') userId: string,
+  ) {
+    this.assertGdprStaffAccess(req.user);
+
     const status = await this.consentService.getConsentStatus(userId);
     return {
       userId,
@@ -89,7 +128,12 @@ export class GdprController {
    * GET /gdpr/consent/:userId/history
    */
   @Get('consent/:userId/history')
-  async getConsentHistory(@Param('userId') userId: string) {
+  async getConsentHistory(
+    @Req() req: { user?: GdprActor },
+    @Param('userId') userId: string,
+  ) {
+    this.assertGdprStaffAccess(req.user);
+
     const history = await this.consentService.getConsentHistory(userId);
     return {
       userId,
@@ -103,9 +147,12 @@ export class GdprController {
    */
   @Get('consent/:userId/check')
   async checkConsent(
+    @Req() req: { user?: GdprActor },
     @Param('userId') userId: string,
     @Query('type') consentType: string,
   ) {
+    this.assertGdprStaffAccess(req.user);
+
     const hasConsent = await this.consentService.hasConsent(userId, consentType);
     return {
       userId,
@@ -120,7 +167,12 @@ export class GdprController {
    */
   @Post('sar')
   @HttpCode(HttpStatus.ACCEPTED) 
-  async requestSubjectAccessReport(@Body() request: SarRequestDto) {
+  async requestSubjectAccessReport(
+    @Req() req: { user?: GdprActor },
+    @Body() request: SarRequestDto,
+  ) {
+    this.assertGdprStaffAccess(req.user);
+
     const result = await this.sarService.enqueueSubjectAccessRequest(
       request.userId,
       request.requestType,
@@ -141,7 +193,12 @@ export class GdprController {
    */
   @Post('erasure')
   @HttpCode(HttpStatus.ACCEPTED)
-  async requestDataErasure(@Body() request: ErasureRequestDto) {
+  async requestDataErasure(
+    @Req() req: { user?: GdprActor },
+    @Body() request: ErasureRequestDto,
+  ) {
+    this.assertGdprStaffAccess(req.user);
+
     const result = await this.erasureService.enqueueDataErasure(
       request.userId,
       request.requestType,
@@ -154,5 +211,35 @@ export class GdprController {
       status: 'accepted',
       estimatedCompletion: '30 days',
     };
+  }
+
+  private assertGdprStaffAccess(actor?: GdprActor): void {
+    if (!actor) {
+      throw new UnauthorizedException('GDPR requests require authentication');
+    }
+
+    const roles = new Set<string>();
+    if (typeof actor.role === 'string' && actor.role.trim().length > 0) {
+      roles.add(actor.role.toLowerCase().trim());
+    }
+
+    if (Array.isArray(actor.realm_access?.roles)) {
+      for (const role of actor.realm_access.roles) {
+        const normalized = String(role || '')
+          .toLowerCase()
+          .trim();
+        if (normalized) {
+          roles.add(normalized);
+        }
+      }
+    }
+
+    if (roles.has('admin') || roles.has('manager')) {
+      return;
+    }
+
+    throw new ForbiddenException(
+      'GDPR endpoints are restricted to authorised managers and administrators until subject/representative access is implemented.',
+    );
   }
 }

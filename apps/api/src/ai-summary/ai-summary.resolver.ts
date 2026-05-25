@@ -8,14 +8,15 @@ import {
 import { GenerateSummaryInput } from './dto/generate-summary.input';
 import { ApproveSummaryInput } from './dto/approve-summary.input';
 import { HealthSummaryFilterArgs } from './dto/health-summary-filter.args';
-import { AuthGuard } from '@nestjs/passport';
-import { RolesGuard } from '@oasis/auth';
+import { GqlRolesGuard } from '../auth/gql-roles.guard';
+import { LegacyOperationalSurface } from '../auth/legacy-operational-access';
 
 export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => 
   SetMetadata('roles', roles);
 
 @Resolver(() => HealthSummaryDTO)
-@UseGuards(AuthGuard('jwt'), RolesGuard)
+@UseGuards(GqlRolesGuard)
+@LegacyOperationalSurface()
 export class AiSummaryResolver {
   constructor(private readonly aiSummaryService: AiSummaryService) {}
 
@@ -26,14 +27,15 @@ export class AiSummaryResolver {
     @Args('take', { type: () => Int, nullable: true }) take: number = 20,
     @Context() ctx: any
   ): Promise<HealthSummaryPaginatedResponse> {
-    const { sub: userId, realm_access } = ctx.req.user;
+    const { sub: userId, realm_access, organizationId } = ctx.req.user;
     const userRole = realm_access?.roles?.[0] || 'manager';
 
     const result = await this.aiSummaryService.listPendingSummaries(
       skip, 
       take, 
       userId, 
-      userRole
+      userRole,
+      organizationId,
     );
     
     return {
@@ -43,15 +45,15 @@ export class AiSummaryResolver {
   }
 
   @Query(() => HealthSummaryPaginatedResponse)
-  @Roles('admin', 'manager', 'carer', 'client')
+  @Roles('admin', 'manager', 'carer')
   async listHistory(
     @Args() filter: HealthSummaryFilterArgs,
     @Context() ctx: any
   ): Promise<HealthSummaryPaginatedResponse> {
-    const { sub: userId, realm_access } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'client';
+    const { sub: userId, realm_access, organizationId } = ctx.req.user;
+    const userRole = realm_access?.roles?.[0] || 'user';
 
-    const result = await this.aiSummaryService.listHistory(filter, userId, userRole);
+    const result = await this.aiSummaryService.listHistory(filter, userId, userRole, organizationId);
     
     return {
       items: result.items.map(s => this.mapHealthSummaryToDTO(s)),
@@ -60,18 +62,19 @@ export class AiSummaryResolver {
   }
 
   @Query(() => HealthSummaryDTO, { nullable: true })
-  @Roles('admin', 'manager', 'carer', 'client')
+  @Roles('admin', 'manager', 'carer')
   async currentWeekSummary(
     @Args('clientId', { type: () => ID }) clientId: string,
     @Context() ctx: any
   ): Promise<HealthSummaryDTO | null> {
-    const { sub: userId, realm_access } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'client';
+    const { sub: userId, realm_access, organizationId } = ctx.req.user;
+    const userRole = realm_access?.roles?.[0] || 'user';
 
     const summary = await this.aiSummaryService.getCurrentWeekSummary(
       clientId, 
       userId, 
-      userRole
+      userRole,
+      organizationId,
     );
 
     return summary ? this.mapHealthSummaryToDTO(summary) : null;
@@ -83,13 +86,14 @@ export class AiSummaryResolver {
     @Args('input') input: GenerateSummaryInput,
     @Context() ctx: any
   ): Promise<HealthSummaryDTO> {
-    const { sub: userId, realm_access } = ctx.req.user;
+    const { sub: userId, realm_access, organizationId } = ctx.req.user;
     const userRole = realm_access?.roles?.[0] || 'carer';
 
     const summary = await this.aiSummaryService.generateSummary(
       input, 
       userId, 
-      userRole
+      userRole,
+      organizationId,
     );
     
     return this.mapHealthSummaryToDTO(summary);
@@ -101,20 +105,50 @@ export class AiSummaryResolver {
     @Args('input') input: ApproveSummaryInput,
     @Context() ctx: any
   ): Promise<HealthSummaryDTO> {
-    const { sub: userId, realm_access } = ctx.req.user;
+    const { sub: userId, realm_access, email, organizationId } = ctx.req.user;
     const userRole = realm_access?.roles?.[0] || 'manager';
 
     const summary = await this.aiSummaryService.approveSummary(
       input, 
       userId, 
-      userRole
+      userRole,
+      email,
+      organizationId,
     );
     
     return this.mapHealthSummaryToDTO(summary);
   }
 
+  @Mutation(() => Boolean)
+  @Roles('admin', 'manager')
+  async setAiSummaryEnabledForClientOrganization(
+    @Args('clientId', { type: () => ID }) clientId: string,
+    @Args('enabled', { type: () => Boolean, nullable: true, defaultValue: true }) enabled: boolean,
+    @Context() ctx: any,
+  ): Promise<boolean> {
+    const { realm_access, organizationId } = ctx.req.user;
+    const userRole = realm_access?.roles?.[0] || 'manager';
+
+    return this.aiSummaryService.setOrganizationAIEnabledForClient(
+      clientId,
+      enabled,
+      userRole,
+      organizationId,
+    );
+  }
+
+  @Query(() => Boolean)
+  @Roles('admin', 'manager')
+  async isAiSummaryEnabledForClientOrganization(
+    @Args('clientId', { type: () => ID }) clientId: string,
+    @Context() ctx: any,
+  ): Promise<boolean> {
+    const { organizationId } = ctx.req.user;
+    return this.aiSummaryService.isOrganizationAIEnabledForClient(clientId, organizationId);
+  }
+
   private mapHealthSummaryToDTO(summary: any): HealthSummaryDTO {
-    const dto = {
+    const dto = Object.assign(new HealthSummaryDTO(), {
       id: summary.id,
       clientId: summary.client_id,
       periodStart: summary.period_start,
@@ -144,7 +178,7 @@ export class AiSummaryResolver {
       } : null,
       createdAt: summary.created_at,
       updatedAt: summary.updated_at,
-    } as HealthSummaryDTO;
+    });
 
     return dto;
   }

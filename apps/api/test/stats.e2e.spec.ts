@@ -90,6 +90,7 @@ describe('Stats E2E Tests', () => {
       data: {
         carer_id: fixtures.carers.carer.id,
         client_id: fixtures.clients.client.id,
+        organization_id: fixtures.organization.id,
         scheduled_start: yesterday,
         scheduled_end: yesterday,
         created_at: yesterday,
@@ -103,6 +104,7 @@ describe('Stats E2E Tests', () => {
       data: {
         carer_id: fixtures.carers.carer.id,
         client_id: fixtures.clients.client.id,
+        organization_id: fixtures.organization.id,
         scheduled_start: now,
         scheduled_end: new Date(now.getTime() + 60 * 60 * 1000),
         created_at: now,
@@ -116,6 +118,7 @@ describe('Stats E2E Tests', () => {
       data: {
         carer_id: fixtures.carers.carer.id,
         client_id: fixtures.clients.client.id,
+        organization_id: fixtures.organization.id,
         scheduled_start: now,
         scheduled_end: new Date(now.getTime() + 60 * 60 * 1000),
         created_at: now,
@@ -129,6 +132,7 @@ describe('Stats E2E Tests', () => {
       data: {
         carer_id: fixtures.carers.carer.id,
         client_id: fixtures.clients.client.id,
+        organization_id: fixtures.organization.id,
         scheduled_start: yesterday,
         scheduled_end: yesterday,
         created_at: yesterday,
@@ -158,8 +162,8 @@ describe('Stats E2E Tests', () => {
         .expect(200)
         .expect((res) => {
           expect(res.body).toEqual({
-            booked: 4,    // Two from fixtures + two created in beforeAll
-            finished: 2,  // Two visits finished today (one created today, one created yesterday)
+            booked: 2,    // Two visits scheduled today in beforeAll
+            finished: 1,  // One scheduled-today visit is completed
           });
         });
     });
@@ -168,7 +172,7 @@ describe('Stats E2E Tests', () => {
       return request(app.getHttpServer())
         .get('/stats/today')
         // No Authorization header = unauthenticated
-        .expect(403); // MockAuthGuard returns 403 when no auth header
+        .expect(401);
     });
   });
 });

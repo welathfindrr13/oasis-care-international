@@ -14,14 +14,39 @@ export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
 
   catch(exception: unknown, host: ArgumentsHost) {
-    // Skip if this isn't an HTTP request (e.g. GraphQL, WebSocket)
-    if (host.getType() !== 'http') {
-      return exception; // hand off to the next filter (GQL)
+    const contextType =
+      typeof host?.getType === 'function' ? (host.getType() as string) : 'http';
+
+    if (contextType !== 'http') {
+      return exception;
     }
 
-    const ctx = host.switchToHttp();
+    const ctx = typeof host?.switchToHttp === 'function' ? host.switchToHttp() : null;
+    if (
+      !ctx ||
+      typeof ctx.getRequest !== 'function' ||
+      typeof ctx.getResponse !== 'function'
+    ) {
+      throw exception;
+    }
+
     const req = ctx.getRequest();
     const res = ctx.getResponse();
+    const requestPath = String(req?.url ?? '');
+
+    // GraphQL operations should be handled by GraphQL filters/formatters.
+    if (requestPath.startsWith('/graphql')) {
+      throw exception;
+    }
+
+    if (
+      !res ||
+      typeof res.status !== 'function' ||
+      typeof res.json !== 'function' ||
+      res.headersSent
+    ) {
+      throw exception;
+    }
 
     const status =
       exception instanceof HttpException

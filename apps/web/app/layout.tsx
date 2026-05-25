@@ -1,29 +1,21 @@
-import type { Metadata } from 'next'
-import { Inter, Work_Sans, Source_Sans_3 } from 'next/font/google'
+import type { Metadata, Viewport } from 'next'
 import { SessionProvider } from '../components/providers/SessionProvider'
+import { ServiceWorkerRegistration } from '../components/pwa/ServiceWorkerRegistration'
 import './globals.css'
-
-const inter = Inter({ 
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-})
-
-const workSans = Work_Sans({ 
-  subsets: ['latin'],
-  variable: '--font-work-sans',
-  display: 'swap',
-})
-
-const sourceSans = Source_Sans_3({ 
-  subsets: ['latin'],
-  variable: '--font-source-sans',
-  display: 'swap',
-})
 
 export const metadata: Metadata = {
   title: 'Oasis Care',
   description: 'Domiciliary care management platform',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Oasis Care',
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#0f766e',
 }
 
 export default function RootLayout({
@@ -32,9 +24,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${workSans.variable} ${sourceSans.variable}`}>
-      <body className={inter.className}>
+    <html lang="en">
+      <body>
         <SessionProvider>
+          <ServiceWorkerRegistration />
           {children}
         </SessionProvider>
       </body>

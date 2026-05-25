@@ -15,10 +15,18 @@ import { VisitModule } from './visit/visit.module';
 import { StatsModule } from './stats/stats.module';
 import { MedicationModule } from './medication/medication.module';
 import { ClientModule } from './client/client.module';
+import { CarerModule } from './carer/carer.module';
+import { ShiftModule } from './shift/shift.module';
+import { CareLogModule } from './care-log/care-log.module';
+import { CarePlanningModule } from './care-planning/care-planning.module';
 import { formatGraphQLError } from './common/filters/graphql-error.filter';
 import { GdprModule } from './gdpr/gdpr.module';
 import { DemoModule } from './demo/demo.module';
+import { AiSummaryModule } from './ai-summary/ai-summary.module';
+import { CarebridgeModule } from './carebridge/carebridge.module';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
+import { ApiRolesGuard } from './auth/api-roles.guard';
+import { GqlRolesGuard } from './auth/gql-roles.guard';
 
 // FIX: ClsModule must come before LoggerModule (RequestIdMiddleware depends on ClsService)
 @Module({
@@ -55,6 +63,12 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
     StatsModule,
     MedicationModule,
     ClientModule,
+    CarerModule,
+    ShiftModule,
+    CareLogModule,
+    CarePlanningModule,
+    AiSummaryModule,
+    CarebridgeModule,
     DemoModule,
     // GDPR module (feature-flagged)
     ...(process.env.GDPR_ENABLED === 'true' ? [GdprModule] : []),
@@ -63,6 +77,8 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
     JwtStrategy,
     PrismaService,
     AuditLogInterceptor,
+    ApiRolesGuard,
+    GqlRolesGuard,
   ],
 })
 export class AppModule {}

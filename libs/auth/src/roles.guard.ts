@@ -1,4 +1,11 @@
-import { Injectable, CanActivate, ExecutionContext, Type } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  Type,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 
@@ -11,25 +18,43 @@ export class RolesGuard extends JwtAuthGuard implements CanActivate {
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // First check JWT authentication
-    const isAuthenticated = await super.canActivate(context);
-    if (!isAuthenticated) {
-      return false;
+    await super.canActivate(context);
+    return true;
+  }
+
+  handleRequest(err: unknown, user: any, _info: unknown, context: ExecutionContext): any {
+    if (err || !user) {
+      throw (err as Error) || new UnauthorizedException('Unauthorized');
     }
 
-    // Then check roles
     const requiredRoles = this.reflector.get<string[]>('roles', context.getHandler());
     if (!requiredRoles || requiredRoles.length === 0) {
-      return true;
+      return user;
     }
 
-    const request = context.switchToHttp().getRequest();
-    const user = request.user;
-    
-    if (!user || !user.realm_access?.roles) {
-      return false;
+    const normalizedUserRoles = new Set<string>();
+    if (typeof user.role === 'string' && user.role.trim().length > 0) {
+      normalizedUserRoles.add(user.role.toLowerCase().trim());
+    }
+    if (Array.isArray(user.realm_access?.roles)) {
+      for (const role of user.realm_access.roles) {
+        const normalized = String(role).toLowerCase().trim();
+        if (normalized) normalizedUserRoles.add(normalized);
+      }
     }
 
-    return requiredRoles.some((role) => user.realm_access.roles.includes(role));
+    const hasRole = requiredRoles.some((role) =>
+      normalizedUserRoles.has(String(role).toLowerCase().trim())
+    );
+
+    if (!hasRole) {
+      throw new ForbiddenException('Forbidden resource');
+    }
+
+    return user;
+  }
+
+  getRequest(context: ExecutionContext) {
+    return context.switchToHttp().getRequest();
   }
 }

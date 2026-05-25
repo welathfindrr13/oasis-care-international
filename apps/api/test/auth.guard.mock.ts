@@ -32,6 +32,7 @@ export class MockAuthGuard implements CanActivate {
         id: payload_data.sub,  // Map sub to id for resolver compatibility
         sub: payload_data.sub,
         username: payload_data.preferred_username,
+        organizationId: payload_data.organization_id || payload_data.organizationId || null,
         role: payload_data.realm_access?.roles?.[0] || 'user',  // Extract role for resolver compatibility
         realm_access: payload_data.realm_access,
         resource_access: payload_data.resource_access,

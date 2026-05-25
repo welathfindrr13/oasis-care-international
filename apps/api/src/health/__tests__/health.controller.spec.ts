@@ -18,6 +18,10 @@ describe('HealthController', () => {
 
   it('should return health status', () => {
     const result = controller.health();
-    expect(result).toEqual({ status: 'ok' });
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'ok',
+      }),
+    );
   });
 });

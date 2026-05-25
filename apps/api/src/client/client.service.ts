@@ -3,6 +3,7 @@ import { PrismaService } from '@oasis/db';
 import { ClientRepository } from './client.repository';
 import { ClientDTO, ClientPaginatedResponse } from './dto/client.dto';
 import { CreateClientInput } from './dto/create-client.input';
+import { UpdateClientInput } from './dto/update-client.input';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
 
@@ -15,13 +16,18 @@ export class ClientService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async findClients(filter: { skip?: number; take?: number; search?: string }): Promise<ClientPaginatedResponse> {
+  async findClients(
+    filter: { skip?: number; take?: number; search?: string },
+    userId: string,
+    userRole: string,
+    organizationId?: string,
+  ): Promise<ClientPaginatedResponse> {
+    const orgId = await this.requireOrganizationId(organizationId);
     this.logger.log(`Finding clients with filter`, { filter });
 
     // Build where clause with optional search
-    // Note: Single-tenant for now; add organization_id filter when multi-tenant
     const where: any = {};
-    
+
     if (filter.search) {
       where.OR = [
         { full_name: { contains: filter.search, mode: 'insensitive' } },
@@ -30,11 +36,22 @@ export class ClientService {
       ];
     }
 
+    // Carers should only see clients they have at least one assigned visit for.
+    if (this.normalizeRole(userRole) === 'carer') {
+      where.visits = {
+        some: {
+          organization_id: orgId,
+          carer_id: userId,
+          deleted_at: null,
+        },
+      };
+    }
+
     const result = await this.clientRepository.findMany({
       where,
       skip: filter.skip,
       take: filter.take || 20,
-    });
+    }, orgId);
 
     return {
       items: result.items.map(client => this.mapClientToDTO(client)),
@@ -42,10 +59,31 @@ export class ClientService {
     };
   }
 
-  async findClientById(id: string): Promise<ClientDTO> {
+  async findClientById(
+    id: string,
+    userId: string,
+    userRole: string,
+    organizationId?: string,
+  ): Promise<ClientDTO> {
+    const orgId = await this.requireOrganizationId(organizationId);
     this.logger.log(`Finding client by ID: ${id}`);
 
-    const client = await this.clientRepository.findById(id);
+    const normalizedRole = this.normalizeRole(userRole);
+    const client = normalizedRole === 'carer'
+      ? await this.prisma.client.findFirst({
+        where: this.prisma.whereNotDeleted({
+          id,
+          organization_id: orgId,
+          visits: {
+            some: {
+              organization_id: orgId,
+              carer_id: userId,
+              deleted_at: null,
+            },
+          },
+        }),
+      })
+      : await this.clientRepository.findById(id, orgId);
 
     if (!client) {
       throw new BaseHttpException(
@@ -58,10 +96,12 @@ export class ClientService {
     return this.mapClientToDTO(client);
   }
 
-  async createClient(input: CreateClientInput, userId?: string): Promise<ClientDTO> {
+  async createClient(input: CreateClientInput, userId?: string, organizationId?: string): Promise<ClientDTO> {
+    const orgId = await this.requireOrganizationId(organizationId);
     this.logger.log(`Creating client: [NAME REDACTED]`); // GDPR: Don't log PII
 
     const client = await this.clientRepository.create({
+      organization_id: orgId,
       full_name: input.fullName,
       address_line1: input.addressLine1,
       address_line2: input.addressLine2,
@@ -95,6 +135,121 @@ export class ClientService {
     return this.mapClientToDTO(client);
   }
 
+  async updateClient(id: string, input: UpdateClientInput, userId?: string, organizationId?: string): Promise<ClientDTO> {
+    const orgId = await this.requireOrganizationId(organizationId);
+    this.logger.log(`Updating client: ${id}`);
+
+    const existingClient = await this.clientRepository.findById(id, orgId);
+    if (!existingClient) {
+      throw new BaseHttpException(
+        ErrorCode.CLIENT_NOT_FOUND,
+        'Client not found',
+        HttpStatus.NOT_FOUND
+      );
+    }
+
+    const client = await this.clientRepository.update(id, orgId, {
+      full_name: input.fullName,
+      address_line1: input.addressLine1,
+      address_line2: input.addressLine2 ?? null,
+      city: input.city,
+      postcode: input.postcode,
+    });
+
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          user_id: userId || 'system',
+          action: 'UPDATE_CLIENT',
+          resource_type: 'client',
+          resource_id: client.id,
+          old_values: {
+            id: existingClient.id,
+            fullName: '[REDACTED]',
+            city: existingClient.city,
+            postcode: '[REDACTED]',
+          },
+          new_values: {
+            id: client.id,
+            fullName: '[REDACTED]',
+            city: client.city,
+            postcode: '[REDACTED]',
+          },
+          timestamp: new Date(),
+        },
+      });
+    } catch (auditError) {
+      this.logger.warn('Failed to write audit log for client update', auditError);
+    }
+
+    return this.mapClientToDTO(client);
+  }
+
+  async deleteClient(id: string, userId?: string, organizationId?: string): Promise<ClientDTO> {
+    const orgId = await this.requireOrganizationId(organizationId);
+    this.logger.log(`Soft deleting client: ${id}`);
+
+    const existingClient = await this.clientRepository.findById(id, orgId);
+    if (!existingClient) {
+      throw new BaseHttpException(
+        ErrorCode.CLIENT_NOT_FOUND,
+        'Client not found',
+        HttpStatus.NOT_FOUND
+      );
+    }
+
+    // Soft-delete related visits as well, so scheduled visits don't linger after cleanup.
+    const deletedClient = await this.prisma.$transaction(async (tx) => {
+      await tx.visit.updateMany({
+        where: { client_id: id, organization_id: orgId, deleted_at: null },
+        data: { deleted_at: new Date() },
+      });
+
+      await tx.client.updateMany({
+        where: { id, organization_id: orgId, deleted_at: null },
+        data: { deleted_at: new Date() },
+      });
+
+      return tx.client.findFirst({
+        where: { id, organization_id: orgId },
+      });
+    });
+    if (!deletedClient) {
+      throw new BaseHttpException(
+        ErrorCode.CLIENT_NOT_FOUND,
+        'Client not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // GDPR: Audit log the deletion with PII masked
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          user_id: userId || 'system',
+          action: 'DELETE_CLIENT',
+          resource_type: 'client',
+          resource_id: id,
+          old_values: {
+            id,
+            fullName: '[REDACTED]',
+            city: existingClient.city,
+            postcode: '[REDACTED]',
+          },
+          new_values: {
+            id,
+            deletedAt: new Date().toISOString(),
+          },
+          timestamp: new Date(),
+        },
+      });
+    } catch (auditError) {
+      this.logger.warn('Failed to write audit log for client deletion', auditError);
+    }
+
+    return this.mapClientToDTO(deletedClient);
+  }
+
   private mapClientToDTO(client: any): ClientDTO {
     return {
       id: client.id,
@@ -104,5 +259,22 @@ export class ClientService {
       city: client.city,
       postcode: client.postcode,
     };
+  }
+
+  private normalizeRole(userRole: string): string {
+    return (userRole || '').toLowerCase().trim();
+  }
+
+  private async requireOrganizationId(organizationId?: string): Promise<string> {
+    const orgId = (organizationId || '').trim();
+    if (orgId) {
+      return orgId;
+    }
+
+    throw new BaseHttpException(
+      ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
+      'Organization context is required for this request',
+      HttpStatus.FORBIDDEN,
+    );
   }
 }

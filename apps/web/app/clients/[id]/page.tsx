@@ -1,107 +1,139 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
+import { getServerSession } from 'next-auth'
 import { Header } from '../../../components/oasis/Header'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
 import { Button } from '../../../components/ui/Button'
+import { DeleteClientButton } from '../../../components/oasis/DeleteClientButton'
+import { authOptions } from '../../api/auth/[...nextauth]/authOptions'
+import { query } from '../../../lib/graphql/client'
+import {
+  CARE_PLANNING_QUERY,
+  CLIENT_QUERY,
+  VISITS_QUERY,
+  type CarePlanningQueryResponse,
+  type ClientQueryResponse,
+  type VisitsQueryResponse,
+} from '../../../lib/graphql/queries'
 
-// Mock client data - same as clients list, would come from API
-const mockClients: Record<string, {
-  id: string
-  name: string
-  email: string
-  phone: string
-  address: string
-  dateOfBirth: string
-  lastVisit: string
-  nextVisit: string
-  status: string
-  emergencyContact: { name: string; phone: string; relationship: string }
-  notes: string
-}> = {
-  'demo-client-1': {
-    id: 'demo-client-1',
-    name: 'Margaret Thompson',
-    email: 'margaret.thompson@example.com',
-    phone: '+44 20 7946 0958',
-    address: '15 Oak Street, London SW1A 1AA',
-    dateOfBirth: '1945-03-15',
-    lastVisit: '2025-08-19T14:30:00Z',
-    nextVisit: '2025-08-21T10:00:00Z',
-    status: 'active',
-    emergencyContact: { name: 'James Thompson', phone: '+44 20 7946 1234', relationship: 'Son' },
-    notes: 'Requires assistance with mobility. Prefers morning visits.'
-  },
-  'demo-client-2': {
-    id: 'demo-client-2',
-    name: 'Robert Smith',
-    email: 'robert.smith@example.com',
-    phone: '+44 20 7946 0959',
-    address: '42 High Road, London W1K 2HL',
-    dateOfBirth: '1938-07-22',
-    lastVisit: '2025-08-19T16:00:00Z',
-    nextVisit: '2025-08-20T15:30:00Z',
-    status: 'active',
-    emergencyContact: { name: 'Sarah Smith', phone: '+44 20 7946 5678', relationship: 'Daughter' },
-    notes: 'Diabetic - requires medication management.'
-  },
-  'demo-client-3': {
-    id: 'demo-client-3',
-    name: 'Emily Davis',
-    email: 'emily.davis@example.com',
-    phone: '+44 20 7946 0960',
-    address: '28 Church Lane, London EC1A 4JU',
-    dateOfBirth: '1950-11-08',
-    lastVisit: '2025-08-18T11:00:00Z',
-    nextVisit: '2025-08-20T14:00:00Z',
-    status: 'active',
-    emergencyContact: { name: 'Michael Davis', phone: '+44 20 7946 9012', relationship: 'Husband' },
-    notes: 'Light housekeeping assistance needed.'
-  },
-  'demo-client-4': {
-    id: 'demo-client-4',
-    name: 'John Williams',
-    email: 'john.williams@example.com',
-    phone: '+44 20 7946 0961',
-    address: '7 Victoria Park, London E9 7BT',
-    dateOfBirth: '1942-02-28',
-    lastVisit: '2025-08-17T13:30:00Z',
-    nextVisit: '2025-08-22T09:00:00Z',
-    status: 'active',
-    emergencyContact: { name: 'Anne Williams', phone: '+44 20 7946 3456', relationship: 'Wife' },
-    notes: 'Enjoys conversation. Has hearing aid - speak clearly.'
-  },
-  'demo-client-5': {
-    id: 'demo-client-5',
-    name: 'Mary Brown',
-    email: 'mary.brown@example.com',
-    phone: '+44 20 7946 0962',
-    address: '33 Green Street, London W1K 7PS',
-    dateOfBirth: '1948-09-03',
-    lastVisit: '2025-08-19T12:00:00Z',
-    nextVisit: '2025-08-21T11:30:00Z',
-    status: 'active',
-    emergencyContact: { name: 'Peter Brown', phone: '+44 20 7946 7890', relationship: 'Son' },
-    notes: 'Vegetarian diet. Enjoys gardening discussions.'
+export const dynamic = 'force-dynamic'
+
+async function getClient(id: string) {
+  try {
+    const data = await query<ClientQueryResponse>(CLIENT_QUERY, { id })
+    return data.client
+  } catch (error: any) {
+    const message = String(error?.message || '')
+    if (message.toLowerCase().includes('not found')) {
+      return null
+    }
+    throw error
   }
 }
 
-// Mock recent visits
-const mockRecentVisits = [
-  { id: 'v1', date: '2025-08-19T14:30:00Z', carer: 'Sarah Johnson', status: 'completed', duration: '45 min' },
-  { id: 'v2', date: '2025-08-17T10:00:00Z', carer: 'Mike Thompson', status: 'completed', duration: '60 min' },
-  { id: 'v3', date: '2025-08-15T14:00:00Z', carer: 'Sarah Johnson', status: 'completed', duration: '45 min' },
-]
+async function getClientSafe(id: string) {
+  try {
+    return { client: await getClient(id), error: null as string | null }
+  } catch (error: any) {
+    return {
+      client: null,
+      error: error?.message || 'Failed to load client details',
+    }
+  }
+}
+
+async function getRecentVisits(clientId: string) {
+  const data = await query<VisitsQueryResponse>(VISITS_QUERY, {
+    clientId,
+    take: 5,
+    skip: 0,
+  })
+  return data.visits.items
+}
+
+async function getRecentVisitsSafe(clientId: string) {
+  try {
+    return { visits: await getRecentVisits(clientId), error: null as string | null }
+  } catch (error: any) {
+    return {
+      visits: [] as VisitsQueryResponse['visits']['items'],
+      error: error?.message || 'Failed to load recent visits',
+    }
+  }
+}
+
+async function getCarePlanningSafe(clientId: string) {
+  try {
+    return await query<CarePlanningQueryResponse>(CARE_PLANNING_QUERY, { clientId, take: 20 })
+  } catch {
+    return null
+  }
+}
+
+function formatAddress(client: {
+  addressLine1: string
+  addressLine2?: string | null
+  city: string
+  postcode: string
+}) {
+  return [client.addressLine1, client.addressLine2, `${client.city}, ${client.postcode}`]
+    .filter(Boolean)
+    .join(', ')
+}
+
+function formatShortDateTime(value?: string | null): string {
+  if (!value) return 'Not set'
+
+  return new Intl.DateTimeFormat('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
+function formatShortDate(value?: string | null): string {
+  if (!value) return 'Not set'
+
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value))
+}
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const client = mockClients[params.id]
+  const { client } = await getClientSafe(params.id)
   return {
-    title: client ? `${client.name} - Oasis Care` : 'Client Not Found - Oasis Care',
-    description: client ? `Client profile for ${client.name}` : 'Client not found',
+    title: client ? `${client.fullName} - Oasis Care` : 'Person Not Found - Oasis Care',
+    description: client ? `Person profile for ${client.fullName}` : 'Person not found',
   }
 }
 
-export default function ClientDetailPage({ params }: { params: { id: string } }) {
-  const client = mockClients[params.id]
+export default async function ClientDetailPage({ params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions)
+  const roles = Array.isArray((session as any)?.roles) ? (session as any).roles : []
+  const isAdmin = roles.some((role: unknown) => String(role).toLowerCase() === 'admin')
+
+  const { client, error: clientError } = await getClientSafe(params.id)
+
+  if (clientError) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <Header />
+        <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">Unable to Load Person</h1>
+            <p className="text-slate-600 mb-4">{clientError}</p>
+            <Button asChild variant="primary">
+              <Link href="/people">Back to People</Link>
+            </Button>
+          </div>
+        </main>
+      </div>
+    )
+  }
 
   if (!client) {
     return (
@@ -109,216 +141,286 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
         <Header />
         <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">Client Not Found</h1>
-            <p className="text-slate-600 mb-4">The client you&apos;re looking for doesn&apos;t exist.</p>
-            <Link href="/clients">
-              <Button variant="primary">Back to Clients</Button>
-            </Link>
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">Person Not Found</h1>
+            <p className="text-slate-600 mb-4">The person you&apos;re looking for doesn&apos;t exist.</p>
+            <Button asChild variant="primary">
+              <Link href="/people">Back to People</Link>
+            </Button>
           </div>
         </main>
       </div>
     )
   }
 
+  const { visits: recentVisits } = await getRecentVisitsSafe(client.id)
+  const carePlanning = await getCarePlanningSafe(client.id)
+  const nextVisit = recentVisits.find((visit) => new Date(visit.scheduledStart) > new Date())
+  const assessments = carePlanning?.assessments ?? []
+  const carePlans = carePlanning?.carePlans ?? []
+  const evidencePacks = carePlanning?.evidencePacks ?? []
+  const completedAssessments = assessments.filter((assessment) => assessment.status === 'COMPLETED')
+  const inProgressAssessments = assessments.length - completedAssessments.length
+  const activeCarePlan = carePlans.find((plan) => plan.status === 'ACTIVE')
+  const draftCarePlans = carePlans.filter((plan) => plan.status === 'DRAFT')
+  const reviewDueDate = activeCarePlan?.reviewDueAt ?? assessments.find((assessment) => assessment.reviewDueAt)?.reviewDueAt ?? null
+  const latestEvidencePack = evidencePacks[0]
+  const latestPackSourceTypes = new Set((latestEvidencePack?.items ?? []).map((item) => item.sourceType))
+  const hasAssessmentEvidence = latestPackSourceTypes.has('ASSESSMENT')
+  const hasCarePlanEvidence = latestPackSourceTypes.has('CARE_PLAN')
+  const scheduleVisitHref = `/visits/new?${new URLSearchParams({ clientId: client.id }).toString()}`
+  const profileTabs = [
+    { label: 'Overview', href: `/people/${client.id}` },
+    { label: 'Care Plan', href: '/care-planning' },
+    { label: 'Assessments', href: '/care-planning' },
+    { label: 'Visits', href: `/schedule?clientId=${client.id}` },
+    { label: 'Care Notes', href: `/clients/${client.id}/care-logs` },
+    { label: 'Medication', href: `/medication?clientId=${client.id}` },
+    { label: 'Risks', href: '/care-planning' },
+    { label: 'Family Updates', href: `/clients/${client.id}/carebridge` },
+    { label: 'Documents', href: '/evidence' },
+    { label: 'Audit', href: '/activity' },
+  ]
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Header />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        {/* Breadcrumb */}
         <nav className="mb-6">
           <ol className="flex items-center gap-2 text-sm">
             <li>
-              <Link href="/clients" className="text-slate-500 hover:text-slate-700">
-                Clients
+              <Link href="/people" className="text-slate-500 hover:text-slate-700">
+                People
               </Link>
             </li>
             <li className="text-slate-400">/</li>
-            <li className="text-slate-900 font-medium">{client.name}</li>
+            <li className="text-slate-900 font-medium">{client.fullName}</li>
           </ol>
         </nav>
 
-        {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>
             <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">
-              {client.name}
+              {client.fullName}
             </h1>
-            <p className="text-slate-500 mt-1">Client ID: {client.id}</p>
+            <p className="text-slate-500 mt-1">Person profile · source record {client.id}</p>
           </div>
           <div className="flex items-center gap-3">
-            <Link href={`/clients/${client.id}/summary`}>
-              <Button variant="outline" size="sm">
-                🤖 AI Health Summary
-              </Button>
-            </Link>
-            <Link href={`/clients/${client.id}/edit`}>
-              <Button variant="secondary" size="sm">
-                Edit
-              </Button>
-            </Link>
-            <Link href={`/visits/new?clientId=${client.id}`}>
-              <Button variant="primary" size="sm">
-                Schedule Visit
-              </Button>
-            </Link>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/clients/${client.id}/carebridge`}>Family Updates</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/clients/${client.id}/summary`}>AI Health Summary</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/clients/${client.id}/care-logs`}>Care Notes</Link>
+            </Button>
+            {isAdmin && (
+              <>
+                <Button asChild variant="secondary" size="sm">
+                  <Link href={`/clients/${client.id}/edit`}>Edit</Link>
+                </Button>
+                <Button asChild variant="primary" size="sm">
+                  <a href={scheduleVisitHref}>
+                    Schedule care visit
+                  </a>
+                </Button>
+              </>
+            )}
+            <DeleteClientButton clientId={client.id} clientName={client.fullName} />
           </div>
         </div>
 
+        <section className="mb-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="rounded-2xl bg-teal-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">Next visit</p>
+              <p className="mt-2 text-sm font-semibold text-teal-950">
+                {nextVisit
+                  ? formatShortDateTime(nextVisit.scheduledStart)
+                  : 'No upcoming visit'}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-sky-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Assessments</p>
+              <p className="mt-2 text-sm font-semibold text-sky-950">
+                {assessments.length > 0
+                  ? `${completedAssessments.length} completed · ${inProgressAssessments} in progress`
+                  : 'No assessments recorded'}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-amber-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Active care plan</p>
+              <p className="mt-2 text-sm font-semibold text-amber-950">
+                {activeCarePlan
+                  ? `${activeCarePlan.title} · v${activeCarePlan.version}`
+                  : draftCarePlans.length > 0
+                    ? `${draftCarePlans.length} draft ${draftCarePlans.length === 1 ? 'plan' : 'plans'}`
+                    : 'No active or draft plan'}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-slate-100 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Review due</p>
+              <p className="mt-2 text-sm font-semibold text-slate-950">{formatShortDate(reviewDueDate)}</p>
+            </div>
+          </div>
+
+          <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
+            {profileTabs.map((tab) => (
+              <Link
+                key={tab.label}
+                href={tab.href}
+                className="shrink-0 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:text-teal-800"
+              >
+                {tab.label}
+              </Link>
+            ))}
+          </div>
+        </section>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Info */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Contact Information */}
             <Card>
               <CardHeader>
-                <h2 className="text-lg font-semibold text-slate-900">Contact Information</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Person summary</h2>
               </CardHeader>
               <CardContent>
                 <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <dt className="text-sm text-slate-500">Email</dt>
-                    <dd className="text-slate-900">{client.email}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-slate-500">Phone</dt>
-                    <dd className="text-slate-900">{client.phone}</dd>
-                  </div>
                   <div className="sm:col-span-2">
                     <dt className="text-sm text-slate-500">Address</dt>
-                    <dd className="text-slate-900">{client.address}</dd>
+                    <dd className="text-slate-900">{formatAddress(client)}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm text-slate-500">Date of Birth</dt>
-                    <dd className="text-slate-900">
-                      {new Date(client.dateOfBirth).toLocaleDateString('en-GB', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric'
-                      })}
-                    </dd>
+                    <dt className="text-sm text-slate-500">City</dt>
+                    <dd className="text-slate-900">{client.city}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm text-slate-500">Status</dt>
-                    <dd>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-                        {client.status}
-                      </span>
-                    </dd>
+                    <dt className="text-sm text-slate-500">Postcode</dt>
+                    <dd className="text-slate-900">{client.postcode}</dd>
                   </div>
                 </dl>
               </CardContent>
             </Card>
 
-            {/* Recent Visits */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-slate-900">Recent Visits</h2>
                   <Link href={`/visits?clientId=${client.id}`} className="text-sm text-teal-600 hover:text-teal-700">
-                    View All →
+                    View all →
                   </Link>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="divide-y divide-slate-100">
-                  {mockRecentVisits.map((visit) => (
-                    <div key={visit.id} className="py-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">
-                          {new Date(visit.date).toLocaleDateString('en-GB', {
-                            weekday: 'short',
-                            day: 'numeric',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </p>
-                        <p className="text-sm text-slate-500">Carer: {visit.carer}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-slate-500">{visit.duration}</span>
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
-                          {visit.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                {recentVisits.length === 0 ? (
+                  <p className="text-slate-500">No visits found for this client yet.</p>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {recentVisits.map((visit) => {
+                      const durationMin = Math.round(
+                        (new Date(visit.scheduledEnd).getTime() - new Date(visit.scheduledStart).getTime()) / 60000
+                      )
+                      const carerName = visit.carer
+                        ? `${visit.carer.firstName} ${visit.carer.lastName}`
+                        : 'Unassigned'
 
-            {/* Care Notes */}
-            <Card>
-              <CardHeader>
-                <h2 className="text-lg font-semibold text-slate-900">Care Notes</h2>
-              </CardHeader>
-              <CardContent>
-                <p className="text-slate-600">{client.notes}</p>
+                      return (
+                        <div key={visit.id} className="py-3 flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-slate-900">
+                              {new Date(visit.scheduledStart).toLocaleString('en-GB', {
+                                weekday: 'short',
+                                day: 'numeric',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </p>
+                            <p className="text-sm text-slate-500">Carer: {carerName}</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-slate-500">{durationMin} min</span>
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                              {visit.status.toLowerCase()}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Emergency Contact */}
-            <Card>
-              <CardHeader>
-                <h2 className="text-lg font-semibold text-slate-900">Emergency Contact</h2>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <p className="font-medium text-slate-900">{client.emergencyContact.name}</p>
-                  <p className="text-sm text-slate-500">{client.emergencyContact.relationship}</p>
-                  <p className="text-sm text-slate-600">{client.emergencyContact.phone}</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Upcoming Visits */}
             <Card>
               <CardHeader>
                 <h2 className="text-lg font-semibold text-slate-900">Next Visit</h2>
               </CardHeader>
               <CardContent>
-                <div className="bg-teal-50 rounded-xl p-4">
-                  <p className="text-lg font-semibold text-teal-900">
-                    {new Date(client.nextVisit).toLocaleDateString('en-GB', {
-                      weekday: 'long',
-                      day: 'numeric',
-                      month: 'long'
-                    })}
-                  </p>
-                  <p className="text-teal-700">
-                    {new Date(client.nextVisit).toLocaleTimeString('en-GB', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
-                </div>
+                {nextVisit ? (
+                  <div className="bg-teal-50 rounded-xl p-4">
+                    <p className="text-lg font-semibold text-teal-900">
+                      {new Date(nextVisit.scheduledStart).toLocaleDateString('en-GB', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                      })}
+                    </p>
+                    <p className="text-teal-700">
+                      {new Date(nextVisit.scheduledStart).toLocaleTimeString('en-GB', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-slate-500">No upcoming visit scheduled.</p>
+                )}
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
             <Card>
               <CardHeader>
-                <h2 className="text-lg font-semibold text-slate-900">Quick Actions</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Evidence packs</h2>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <Link href={`/emar?clientId=${client.id}`} className="block">
-                    <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 rounded-xl text-slate-700 font-medium transition-colors text-left">
-                      💊 View Medications
-                    </button>
-                  </Link>
-                  <Link href={`/clients/${client.id}/summary`} className="block">
-                    <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 rounded-xl text-slate-700 font-medium transition-colors text-left">
-                      🤖 AI Health Summary
-                    </button>
-                  </Link>
-                  <Link href={`/visits/new?clientId=${client.id}`} className="block">
-                    <button className="w-full flex items-center gap-3 px-4 py-3 bg-teal-50 hover:bg-teal-100 rounded-xl text-teal-700 font-medium transition-colors text-left">
-                      📅 Schedule Visit
-                    </button>
-                  </Link>
+                <div className="space-y-3">
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Coverage</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-900">
+                      {evidencePacks.length > 0
+                        ? `${evidencePacks.length} packs · latest includes ${latestEvidencePack?.items.length ?? 0} items`
+                        : 'No evidence packs created'}
+                    </p>
+                    {latestEvidencePack && (
+                      <p className="mt-2 text-xs text-slate-600">
+                        Assessment evidence: {hasAssessmentEvidence ? 'Included' : 'Not included'} · Care plan evidence:{' '}
+                        {hasCarePlanEvidence ? 'Included' : 'Not included'}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
+                      <Link href={`/clients/${client.id}/carebridge`}>Family Updates room</Link>
+                    </Button>
+                    <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
+                      <Link href={`/medication?clientId=${client.id}`}>View Medication Round</Link>
+                    </Button>
+                    <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
+                      <Link href={`/clients/${client.id}/summary`}>AI Health Summary</Link>
+                    </Button>
+                    <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
+                      <Link href={`/clients/${client.id}/care-logs`}>Care Notes</Link>
+                    </Button>
+                    {isAdmin && (
+                      <Button asChild variant="primary" className="w-full justify-start rounded-xl px-4 py-3 text-left">
+                        <a href={scheduleVisitHref}>
+                          Schedule care visit
+                        </a>
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -328,4 +430,3 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     </div>
   )
 }
-

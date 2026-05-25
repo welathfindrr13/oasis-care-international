@@ -5,6 +5,14 @@
 /* Import design tokens from Figma */
 @import '../styles/tokens.css';
 
+/* Avoid build-time network fetches from `next/font/google` by providing
+   fallback font variables used by Tailwind config. */
+:root {
+  --font-inter: Inter, system-ui, sans-serif;
+  --font-work-sans: "Work Sans", system-ui, sans-serif;
+  --font-source-sans: "Source Sans 3", system-ui, sans-serif;
+}
+
 /* Global styles using design tokens */
 body {
   font-family: var(--font-family-body);

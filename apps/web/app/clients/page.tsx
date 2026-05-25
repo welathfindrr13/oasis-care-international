@@ -1,8 +1,10 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
+import { getServerSession } from 'next-auth'
 import { Header } from '../../components/oasis/Header'
 import { Card, CardContent, CardHeader } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
+import { authOptions } from '../api/auth/[...nextauth]/authOptions'
 import { query } from '../../lib/graphql/client'
 import {
   CLIENTS_QUERY,
@@ -13,9 +15,11 @@ import {
 } from '../../lib/graphql/queries'
 
 export const metadata: Metadata = {
-  title: 'Clients - Oasis Care',
-  description: 'Manage and view client information',
+  title: 'People - Oasis Care',
+  description: 'Manage people supported and their care context',
 }
+
+export const dynamic = 'force-dynamic'
 
 interface ClientsPageProps {
   searchParams: {
@@ -42,12 +46,20 @@ async function getClients(searchParams: ClientsPageProps['searchParams']): Promi
       total: response.clients.total,
     };
   } catch (error) {
+    // Important: don't mask auth failures as "empty data" or it looks like the system lost records.
     console.error('Failed to fetch clients:', error);
-    return { clients: [], total: 0 };
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('401') || message.toLowerCase().includes('unauthorized')) {
+      throw new Error('Unauthorized');
+    }
+    if (message.includes('403') || message.toLowerCase().includes('forbidden')) {
+      throw new Error('Forbidden');
+    }
+    throw new Error('Failed to load clients');
   }
 }
 
-function EmptyState() {
+function EmptyState({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="text-center py-12">
       <div className="mb-4">
@@ -69,16 +81,20 @@ function EmptyState() {
         </div>
       </div>
       <h3 className="text-lg font-medium text-text-primary mb-2">
-        No clients found
+        No people found
       </h3>
       <p className="text-text-secondary mb-4">
-        Get started by adding your first client.
+        {isAdmin
+          ? 'Get started by adding the first person supported.'
+          : 'No people are available right now.'}
       </p>
-      <Link href="/clients/new">
-        <Button variant="primary">
-          Add Client
+      {isAdmin && (
+        <Button asChild variant="primary">
+          <Link href="/people/new">
+            Add person
+          </Link>
         </Button>
-      </Link>
+      )}
     </div>
   )
 }
@@ -94,7 +110,22 @@ function formatVisitDate(dateString: string | undefined | null): string {
 }
 
 export default async function ClientsPage({ searchParams }: ClientsPageProps) {
-  const { clients, total } = await getClients(searchParams);
+  const session = await getServerSession(authOptions)
+  const roles = Array.isArray((session as any)?.roles) ? (session as any).roles : []
+  const isAdmin = roles.some((role: unknown) => String(role).toLowerCase() === 'admin')
+
+  let clients: ClientListItem[] = [];
+  let total = 0;
+  let loadError: string | null = null;
+
+  try {
+    const result = await getClients(searchParams);
+    clients = result.clients;
+    total = result.total;
+  } catch (e) {
+    loadError = e instanceof Error ? e.message : 'Failed to load clients';
+  }
+
   const hasClients = clients.length > 0;
 
   return (
@@ -103,10 +134,10 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="mb-8">
           <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">
-            Clients
+            People
           </h1>
           <p className="text-slate-500 mt-1">
-            View and manage your care clients
+            View each person&apos;s care status, visits, Care Notes, medication support, and family access.
           </p>
         </div>
 
@@ -115,37 +146,63 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-text-primary font-heading">
-                  Client Directory
+                  People supported
                 </h2>
                 <p className="text-sm text-text-secondary">
-                  {hasClients ? `${clients.length} of ${total} clients` : 'No clients found'}
+                  {loadError
+                    ? 'Unable to load people'
+                    : hasClients
+                    ? `${clients.length} of ${total} people`
+                    : 'No people found'}
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <form method="get" action="/clients">
+                {!isAdmin && (
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href="/shift">My Shift</Link>
+                  </Button>
+                )}
+                <form method="get" action="/people" className="flex items-center gap-2">
                   <input
                     type="search"
                     name="search"
                     defaultValue={searchParams.search || ''}
-                    placeholder="Search clients..."
+                    placeholder="Search people..."
                     className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 w-64"
                   />
-                </form>
-                <Link href="/clients/new">
-                  <Button variant="primary" size="sm">
-                    Add Client
+                  <Button type="submit" variant="ghost" size="sm">
+                    Search
                   </Button>
-                </Link>
+                </form>
+                {isAdmin && (
+                  <Button asChild variant="primary" size="sm">
+                    <Link href="/people/new">
+                      Add person
+                    </Link>
+                  </Button>
+                )}
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            {hasClients ? (
+            {loadError ? (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+                <div className="font-medium text-red-800 mb-1">Error</div>
+                <div className="text-sm text-red-700">
+                  {loadError === 'Unauthorized' ? 'You are signed out. Please sign in again.' : loadError}
+                </div>
+                <div className="mt-4">
+                  <Button asChild variant="primary" size="sm">
+                    <Link href="/login">Sign in</Link>
+                  </Button>
+                </div>
+              </div>
+            ) : hasClients ? (
               <div className="overflow-x-auto">
                 <table
                   className="w-full"
                   role="table"
-                  aria-label="Clients directory"
+                    aria-label="People supported directory"
                 >
                   <thead>
                     <tr className="border-b border-base-gray-200">
@@ -207,21 +264,25 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
-                            <Link href={`/clients/${client.id}`}>
-                              <Button variant="ghost" size="sm">
+                            <Button asChild variant="ghost" size="sm">
+                              <Link href={`/people/${client.id}`}>
                                 View
-                              </Button>
-                            </Link>
-                            <Link href={`/clients/${client.id}/edit`}>
-                              <Button variant="ghost" size="sm">
-                                Edit
-                              </Button>
-                            </Link>
-                            <Link href={`/visits/new?clientId=${client.id}`}>
-                              <Button variant="ghost" size="sm">
-                                Schedule
-                              </Button>
-                            </Link>
+                              </Link>
+                            </Button>
+                            {isAdmin && (
+                              <>
+                                <Button asChild variant="ghost" size="sm">
+                                  <Link href={`/clients/${client.id}/edit`}>
+                                    Edit
+                                  </Link>
+                                </Button>
+                                <Button asChild variant="ghost" size="sm">
+                                  <a href={`/visits/new?clientId=${client.id}`}>
+                                    Schedule
+                                  </a>
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -230,7 +291,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
                 </table>
               </div>
             ) : (
-              <EmptyState />
+              <EmptyState isAdmin={isAdmin} />
             )}
           </CardContent>
         </Card>

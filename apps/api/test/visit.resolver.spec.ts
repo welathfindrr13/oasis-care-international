@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Reflector } from '@nestjs/core';
 import { VisitResolver } from '../src/visit/visit.resolver';
 import { VisitService } from '../src/visit/visit.service';
-import { VisitStatus } from '@oasis/db';
-import { ForbiddenException } from '@nestjs/common';
+import { CareLogCategory, PrismaService, VisitStatus } from '@oasis/db';
+import { VisitTaskOutcome } from '../src/visit/dto/visit.dto';
 
 describe('VisitResolver', () => {
   let resolver: VisitResolver;
@@ -15,6 +16,10 @@ describe('VisitResolver', () => {
     findVisits: jest.fn(),
     deleteVisit: jest.fn(),
     completeTask: jest.fn(),
+    startVisit: jest.fn(),
+    recordVisitTaskOutcome: jest.fn(),
+    submitVisitCareNote: jest.fn(),
+    completeVisit: jest.fn(),
   };
 
   const mockContext = {
@@ -51,6 +56,52 @@ describe('VisitResolver', () => {
         preferred_username: 'john.smith',
       },
     },
+  };
+
+  const mockTask = {
+    id: 'task-1',
+    visit_id: 'visit-123',
+    task_name: 'Medication',
+    description: 'Give medication',
+    is_completed: true,
+    completed_at: new Date(),
+    notes: 'VISIT_TASK_OUTCOME::{"outcome":"DONE"}',
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+
+  const mockCareLog = {
+    id: 'care-log-1',
+    client_id: 'client-123',
+    carer_id: 'carer-123',
+    visit_id: 'visit-123',
+    medication_administration_id: null,
+    occurred_at: new Date('2024-01-01T09:30:00Z'),
+    category: CareLogCategory.OTHER,
+    notes: 'Visit progressing well',
+    urine_passed: null,
+    bowel_movement: null,
+    stool_type: null,
+    continence_status: null,
+    assistance_level: null,
+    meal_type: null,
+    intake_amount: null,
+    fluid_ml: null,
+    appetite: null,
+    slept: null,
+    sleep_start: null,
+    sleep_end: null,
+    sleep_quality: null,
+    mood_level: null,
+    agitation: null,
+    confusion: null,
+    pain_score: null,
+    escalated: false,
+    escalated_to: null,
+    escalated_at: null,
+    source: 'visit_workflow',
+    created_at: new Date(),
+    updated_at: new Date(),
   };
 
   const mockVisit = {
@@ -99,6 +150,16 @@ describe('VisitResolver', () => {
       providers: [
         VisitResolver,
         {
+          provide: Reflector,
+          useValue: {
+            get: jest.fn(),
+          },
+        },
+        {
+          provide: PrismaService,
+          useValue: {},
+        },
+        {
           provide: VisitService,
           useValue: mockVisitService,
         },
@@ -120,7 +181,8 @@ describe('VisitResolver', () => {
       expect(service.findVisitById).toHaveBeenCalledWith(
         'visit-123',
         'user-123',
-        'admin'
+        'admin',
+        undefined,
       );
       expect(result.id).toBe('visit-123');
       expect(result.carer).toBeDefined();
@@ -148,7 +210,8 @@ describe('VisitResolver', () => {
       expect(service.findVisits).toHaveBeenCalledWith(
         filter,
         'user-123',
-        'admin'
+        'admin',
+        undefined,
       );
       expect(result.items).toHaveLength(1);
       expect(result.total).toBe(1);
@@ -167,7 +230,8 @@ describe('VisitResolver', () => {
       expect(service.findVisits).toHaveBeenCalledWith(
         filter,
         'carer-123',
-        'carer'
+        'carer',
+        undefined,
       );
     });
   });
@@ -192,7 +256,8 @@ describe('VisitResolver', () => {
       expect(service.createVisit).toHaveBeenCalledWith(
         createInput,
         'user-123',
-        'admin'
+        'admin',
+        undefined,
       );
       expect(result.id).toBe('visit-123');
     });
@@ -205,7 +270,8 @@ describe('VisitResolver', () => {
       expect(service.createVisit).toHaveBeenCalledWith(
         createInput,
         'carer-123',
-        'carer'
+        'carer',
+        undefined,
       );
     });
   });
@@ -230,7 +296,8 @@ describe('VisitResolver', () => {
         'visit-123',
         updateInput,
         'user-123',
-        'admin'
+        'admin',
+        undefined,
       );
       expect(result.status).toBe(VisitStatus.IN_PROGRESS);
     });
@@ -248,7 +315,8 @@ describe('VisitResolver', () => {
       expect(service.deleteVisit).toHaveBeenCalledWith(
         'visit-123',
         'user-123',
-        'admin'
+        'admin',
+        undefined,
       );
       expect(result.id).toBe('visit-123');
     });
@@ -280,7 +348,8 @@ describe('VisitResolver', () => {
         'task-1',
         'Completed successfully',
         'user-123',
-        'admin'
+        'admin',
+        undefined,
       );
       expect(result.isCompleted).toBe(true);
       expect(result.completedAt).toBeDefined();
@@ -299,8 +368,102 @@ describe('VisitResolver', () => {
         'task-1',
         undefined,
         'carer-123',
-        'carer'
+        'carer',
+        undefined,
       );
+    });
+  });
+
+  describe('startVisit', () => {
+    it('should forward visitId and auth context to service', async () => {
+      mockVisitService.startVisit.mockResolvedValue({
+        ...mockVisit,
+        status: VisitStatus.IN_PROGRESS,
+        actual_start: new Date('2024-01-01T09:01:00Z'),
+      });
+
+      const result = await resolver.startVisit('visit-123', mockCarerContext);
+
+      expect(service.startVisit).toHaveBeenCalledWith(
+        'visit-123',
+        'carer-123',
+        'carer',
+        undefined,
+      );
+      expect(result.status).toBe(VisitStatus.IN_PROGRESS);
+    });
+  });
+
+  describe('recordVisitTaskOutcome', () => {
+    it('should call service with input and return mapped VisitTaskDTO', async () => {
+      const input = {
+        taskId: 'task-1',
+        outcome: VisitTaskOutcome.DONE,
+        notes: 'Taken with breakfast',
+      };
+      mockVisitService.recordVisitTaskOutcome.mockResolvedValue(mockTask);
+
+      const result = await resolver.recordVisitTaskOutcome(input, mockCarerContext);
+
+      expect(service.recordVisitTaskOutcome).toHaveBeenCalledWith(
+        input,
+        'carer-123',
+        'carer',
+        undefined,
+      );
+      expect(result.id).toBe('task-1');
+      expect(result.isCompleted).toBe(true);
+      expect(result.notes).toContain('VISIT_TASK_OUTCOME::');
+    });
+  });
+
+  describe('submitVisitCareNote', () => {
+    it('should call service and map care log response', async () => {
+      const input = {
+        visitId: 'visit-123',
+        category: CareLogCategory.OTHER,
+        notes: 'Client comfortable and hydrated',
+      };
+      mockVisitService.submitVisitCareNote.mockResolvedValue(mockCareLog);
+
+      const result = await resolver.submitVisitCareNote(input, mockCarerContext);
+
+      expect(service.submitVisitCareNote).toHaveBeenCalledWith(
+        input,
+        'carer-123',
+        'carer',
+        undefined,
+      );
+      expect(result.id).toBe('care-log-1');
+      expect(result.clientId).toBe('client-123');
+      expect(result.carerId).toBe('carer-123');
+      expect(result.visitId).toBe('visit-123');
+    });
+  });
+
+  describe('completeVisit', () => {
+    it('should call service and return mapped visit dto', async () => {
+      const input = {
+        visitId: 'visit-123',
+        notes: 'Visit complete and client settled',
+      };
+      mockVisitService.completeVisit.mockResolvedValue({
+        ...mockVisit,
+        status: VisitStatus.COMPLETED,
+        actual_end: new Date('2024-01-01T10:00:00Z'),
+        notes: 'Visit complete and client settled',
+      });
+
+      const result = await resolver.completeVisit(input, mockCarerContext);
+
+      expect(service.completeVisit).toHaveBeenCalledWith(
+        input,
+        'carer-123',
+        'carer',
+        undefined,
+      );
+      expect(result.status).toBe(VisitStatus.COMPLETED);
+      expect(result.actualEnd).toBeDefined();
     });
   });
 

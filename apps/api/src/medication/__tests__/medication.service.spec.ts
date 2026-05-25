@@ -24,6 +24,7 @@ describe('MedicationService', () => {
     id: 'admin-123',
     role: 'admin',
   };
+  const organizationId = 'org-123';
 
   const mockMedicationAdministration = {
     id: 'med-admin-123',
@@ -81,6 +82,8 @@ describe('MedicationService', () => {
       findTodaysMedicationsByClient: jest.fn(),
       createMedication: jest.fn(),
       findMedicationById: jest.fn(),
+      findClientInOrganization: jest.fn(),
+      findOrganizationsForContext: jest.fn(),
     };
 
     const mockClsService = {
@@ -147,7 +150,8 @@ describe('MedicationService', () => {
       const result = await service.recordAdministration(
         input,
         mockUser.id,
-        mockUser.role
+        mockUser.role,
+        organizationId,
       );
 
       expect(result.status).toBe(MedicationStatus.ADMINISTERED);
@@ -172,7 +176,7 @@ describe('MedicationService', () => {
       repository.findMedicationAdministrationById.mockResolvedValue(null);
 
       await expect(
-        service.recordAdministration(input, mockUser.id, mockUser.role)
+        service.recordAdministration(input, mockUser.id, mockUser.role, organizationId)
       ).rejects.toThrow(
         new BaseHttpException(
           ErrorCode.MEDICATION_ADMINISTRATION_NOT_FOUND,
@@ -199,7 +203,7 @@ describe('MedicationService', () => {
       repository.findMedicationAdministrationById.mockResolvedValue(differentCarerAdmin as any);
 
       await expect(
-        service.recordAdministration(input, mockUser.id, mockUser.role)
+        service.recordAdministration(input, mockUser.id, mockUser.role, organizationId)
       ).rejects.toThrow(
         new BaseHttpException(
           ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
@@ -226,7 +230,7 @@ describe('MedicationService', () => {
       repository.findOverlappingMedicationTimes.mockResolvedValue([overlappingMedication] as any);
 
       await expect(
-        service.recordAdministration(input, mockUser.id, mockUser.role)
+        service.recordAdministration(input, mockUser.id, mockUser.role, organizationId)
       ).rejects.toThrow(
         new BaseHttpException(
           ErrorCode.MEDICATION_OVERLAP,
@@ -263,7 +267,8 @@ describe('MedicationService', () => {
       const result = await service.recordAdministration(
         input,
         mockUser.id,
-        mockUser.role
+        mockUser.role,
+        organizationId,
       );
 
       expect(result.status).toBe(MedicationStatus.ADMINISTERED);
@@ -287,7 +292,8 @@ describe('MedicationService', () => {
       const result = await service.recordAdministration(
         input,
         mockUser.id,
-        mockUser.role
+        mockUser.role,
+        organizationId,
       );
 
       expect(result.status).toBe(MedicationStatus.MISSED);
@@ -305,11 +311,12 @@ describe('MedicationService', () => {
       const result = await service.listDueMeds(
         'visit-123',
         mockUser.id,
-        mockUser.role
+        mockUser.role,
+        organizationId,
       );
 
       expect(result).toEqual(dueMeds);
-      expect(repository.findDueMedicationsForVisit).toHaveBeenCalledWith('visit-123');
+      expect(repository.findDueMedicationsForVisit).toHaveBeenCalledWith('visit-123', organizationId);
     });
 
     it('should filter out medications for other carers', async () => {
@@ -330,7 +337,8 @@ describe('MedicationService', () => {
       const result = await service.listDueMeds(
         'visit-123',
         mockUser.id,
-        mockUser.role
+        mockUser.role,
+        organizationId,
       );
 
       expect(result).toHaveLength(1);
@@ -355,7 +363,8 @@ describe('MedicationService', () => {
       const result = await service.listDueMeds(
         'visit-123',
         mockAdminUser.id,
-        mockAdminUser.role
+        mockAdminUser.role,
+        organizationId,
       );
 
       expect(result).toHaveLength(2);
@@ -363,19 +372,58 @@ describe('MedicationService', () => {
   });
 
   describe('getTodaysMedicationsByClient', () => {
-    it('should throw error for non-office users', async () => {
+    it('should reject invalid dates before querying the repository', async () => {
       await expect(
-        service.getTodaysMedicationsByClient(
-          new Date(),
-          mockUser.id,
-          mockUser.role
-        )
+        service.getTodaysMedicationsByClient(new Date('invalid'), mockUser.id, mockUser.role, organizationId)
       ).rejects.toThrow(
         new BaseHttpException(
-          ErrorCode.FORBIDDEN_OFFICE_ACCESS,
-          'Office or admin access required',
-          HttpStatus.FORBIDDEN
+          ErrorCode.VALIDATION_FAILED,
+          'A valid medication date is required',
+          HttpStatus.BAD_REQUEST
         )
+      );
+
+      expect(repository.findTodaysMedicationsByClient).not.toHaveBeenCalled();
+    });
+
+    it('should skip incomplete medication rows instead of surfacing an internal error', async () => {
+      repository.findTodaysMedicationsByClient.mockResolvedValue([
+        mockMedicationAdministration,
+        {
+          ...mockMedicationAdministration,
+          id: 'med-admin-incomplete',
+          prescription: null,
+        },
+      ] as any);
+
+      const result = await service.getTodaysMedicationsByClient(
+        new Date('2025-01-08T00:00:00Z'),
+        mockUser.id,
+        mockUser.role,
+        organizationId,
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(mockMedicationAdministration.id);
+    });
+
+    it('should return medications for carers', async () => {
+      const todaysMeds = [mockMedicationAdministration];
+
+      repository.findTodaysMedicationsByClient.mockResolvedValue(todaysMeds as any);
+
+      const result = await service.getTodaysMedicationsByClient(
+        new Date(),
+        mockUser.id,
+        mockUser.role,
+        organizationId,
+      );
+
+      expect(result).toEqual(todaysMeds);
+      expect(repository.findTodaysMedicationsByClient).toHaveBeenCalledWith(
+        expect.any(Date),
+        organizationId,
+        mockUser.id,
       );
     });
 
@@ -387,10 +435,16 @@ describe('MedicationService', () => {
       const result = await service.getTodaysMedicationsByClient(
         new Date(),
         'office-user-123',
-        'office'
+        'office',
+        organizationId,
       );
 
       expect(result).toEqual(todaysMeds);
+      expect(repository.findTodaysMedicationsByClient).toHaveBeenCalledWith(
+        expect.any(Date),
+        organizationId,
+        undefined,
+      );
     });
 
     it('should return medications for admin users', async () => {
@@ -401,10 +455,16 @@ describe('MedicationService', () => {
       const result = await service.getTodaysMedicationsByClient(
         new Date(),
         mockAdminUser.id,
-        mockAdminUser.role
+        mockAdminUser.role,
+        organizationId,
       );
 
       expect(result).toEqual(todaysMeds);
+      expect(repository.findTodaysMedicationsByClient).toHaveBeenCalledWith(
+        expect.any(Date),
+        organizationId,
+        undefined,
+      );
     });
   });
 
@@ -431,7 +491,8 @@ describe('MedicationService', () => {
       const result = await service.createMedication(
         medicationData,
         mockAdminUser.id,
-        mockAdminUser.role
+        mockAdminUser.role,
+        organizationId,
       );
 
       expect(result).toEqual(mockMedication);
@@ -449,7 +510,8 @@ describe('MedicationService', () => {
         service.createMedication(
           medicationData,
           mockUser.id,
-          mockUser.role
+          mockUser.role,
+          organizationId,
         )
       ).rejects.toThrow(
         new BaseHttpException(

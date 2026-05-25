@@ -1,9 +1,12 @@
-import { cookies } from 'next/headers'
-import { getSiteBaseUrl } from '../url'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '../../app/api/auth/[...nextauth]/authOptions'
 
 /**
- * Simple GraphQL client for server components
- * Uses Next.js API route proxy to handle authentication
+ * Simple GraphQL client for server components.
+ *
+ * Server components should call the API directly instead of routing through the
+ * app's own /api/graphql handler. In local Next dev, that self-proxy can block
+ * server-rendered pages while the backend itself is healthy.
  */
 
 export interface GraphQLResponse<T = any> {
@@ -21,8 +24,7 @@ export interface GraphQLRequest {
 }
 
 /**
- * Execute GraphQL query via Next.js API proxy
- * This ensures cookies are properly forwarded for authentication
+ * Execute a GraphQL query directly against the API from server components.
  */
 export async function executeGraphQLQuery<T = any>(
   query: string,
@@ -34,13 +36,19 @@ export async function executeGraphQLQuery<T = any>(
   };
 
   try {
-    const baseUrl = getSiteBaseUrl();
-    const cookie = cookies().toString();
-    const response = await fetch(`${baseUrl}/api/graphql`, {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql';
+    const session = await getServerSession(authOptions);
+    const accessToken = (session as any)?.accessToken || (session as any)?.idToken;
+
+    if (!accessToken) {
+      throw new Error('Unauthorized');
+    }
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        cookie
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify(request),
       cache: 'no-store', // Always fetch fresh data

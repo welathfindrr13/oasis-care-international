@@ -1,0 +1,380 @@
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { BaseHttpException } from '../common/errors/base-http.exception';
+import { ErrorCode } from '../common/errors/error-codes';
+import { CarePlanningRepository } from './care-planning.repository';
+import {
+  AssessmentDTO,
+  AssessmentSourceGQL,
+  AssessmentStatusGQL,
+  CarePlanDTO,
+  CarePlanStatusGQL,
+  EvidenceItemDTO,
+  EvidencePackDTO,
+  EvidencePackStatusGQL,
+  EvidenceSourceTypeGQL,
+} from './dto/care-planning.dto';
+import { CreateAssessmentInput } from './dto/create-assessment.input';
+import { CreateCarePlanInput } from './dto/create-care-plan.input';
+import { CreateEvidencePackInput } from './dto/create-evidence-pack.input';
+import { CompleteAssessmentInput } from './dto/complete-assessment.input';
+import { ApproveCarePlanInput } from './dto/approve-care-plan.input';
+import { ArchiveCarePlanInput } from './dto/archive-care-plan.input';
+
+interface CarePlanningViewer {
+  role: string;
+  organizationId?: string | null;
+  userId?: string | null;
+}
+
+@Injectable()
+export class CarePlanningService {
+  constructor(private readonly repository: CarePlanningRepository) {}
+
+  async listAssessments(clientId: string, take: number, viewer: CarePlanningViewer): Promise<AssessmentDTO[]> {
+    const organizationId = this.requireOrganizationId(viewer.organizationId);
+    this.assertReadAccess(viewer.role);
+
+    const records = await this.withSchemaGuard(() =>
+      this.repository.listAssessments(organizationId, clientId, take),
+    );
+    return records.map((record) => this.mapAssessment(record));
+  }
+
+  async createAssessment(input: CreateAssessmentInput, viewer: CarePlanningViewer): Promise<AssessmentDTO> {
+    const organizationId = this.requireOrganizationId(viewer.organizationId);
+    this.assertWriteAccess(viewer.role);
+
+    const record = await this.withSchemaGuard(() =>
+      this.repository.createAssessment(organizationId, input),
+    );
+    return this.mapAssessment(record);
+  }
+
+  async getAssessment(id: string, viewer: CarePlanningViewer): Promise<AssessmentDTO> {
+    const organizationId = this.requireOrganizationId(viewer.organizationId);
+    this.assertReadAccess(viewer.role);
+
+    const record = await this.withSchemaGuard(() =>
+      this.repository.getAssessment(organizationId, id),
+    );
+    if (!record) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Assessment not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return this.mapAssessment(record);
+  }
+
+  async completeAssessment(input: CompleteAssessmentInput, viewer: CarePlanningViewer): Promise<AssessmentDTO> {
+    const organizationId = this.requireOrganizationId(viewer.organizationId);
+    this.assertWriteAccess(viewer.role);
+
+    const record = await this.withSchemaGuard(() =>
+      this.repository.completeAssessment(organizationId, {
+        ...input,
+        assessorId: input.assessorId ?? viewer.userId ?? undefined,
+      }),
+    );
+    if (!record) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Assessment not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return this.mapAssessment(record);
+  }
+
+  async listCarePlans(clientId: string, take: number, viewer: CarePlanningViewer): Promise<CarePlanDTO[]> {
+    const organizationId = this.requireOrganizationId(viewer.organizationId);
+    this.assertReadAccess(viewer.role);
+
+    const records = await this.withSchemaGuard(() =>
+      this.repository.listCarePlans(organizationId, clientId, take),
+    );
+    return records.map((record) => this.mapCarePlan(record));
+  }
+
+  async createCarePlan(input: CreateCarePlanInput, viewer: CarePlanningViewer): Promise<CarePlanDTO> {
+    const organizationId = this.requireOrganizationId(viewer.organizationId);
+    this.assertWriteAccess(viewer.role);
+
+    const record = await this.withSchemaGuard(() =>
+      this.repository.createCarePlan(organizationId, input),
+    );
+    return this.mapCarePlan(record);
+  }
+
+  async getCarePlan(id: string, viewer: CarePlanningViewer): Promise<CarePlanDTO> {
+    const organizationId = this.requireOrganizationId(viewer.organizationId);
+    this.assertReadAccess(viewer.role);
+
+    const record = await this.withSchemaGuard(() =>
+      this.repository.getCarePlan(organizationId, id),
+    );
+    if (!record) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Care plan not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return this.mapCarePlan(record);
+  }
+
+  async approveCarePlan(input: ApproveCarePlanInput, viewer: CarePlanningViewer): Promise<CarePlanDTO> {
+    const organizationId = this.requireOrganizationId(viewer.organizationId);
+    this.assertWriteAccess(viewer.role);
+
+    const record = await this.withSchemaGuard(() =>
+      this.repository.approveCarePlan(organizationId, {
+        ...input,
+        approvedById: input.approvedById ?? viewer.userId ?? undefined,
+      }),
+    );
+    if (!record) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Care plan not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return this.mapCarePlan(record);
+  }
+
+  async archiveCarePlan(input: ArchiveCarePlanInput, viewer: CarePlanningViewer): Promise<CarePlanDTO> {
+    const organizationId = this.requireOrganizationId(viewer.organizationId);
+    this.assertWriteAccess(viewer.role);
+
+    const record = await this.withSchemaGuard(() =>
+      this.repository.archiveCarePlan(organizationId, input),
+    );
+    if (!record) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Care plan not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return this.mapCarePlan(record);
+  }
+
+  async listEvidencePacks(clientId: string, take: number, viewer: CarePlanningViewer): Promise<EvidencePackDTO[]> {
+    const organizationId = this.requireOrganizationId(viewer.organizationId);
+    this.assertReadAccess(viewer.role);
+
+    const records = await this.withSchemaGuard(() =>
+      this.repository.listEvidencePacks(organizationId, clientId, take),
+    );
+    return records.map((record) => this.mapEvidencePack(record));
+  }
+
+  async createEvidencePack(input: CreateEvidencePackInput, viewer: CarePlanningViewer): Promise<EvidencePackDTO> {
+    const organizationId = this.requireOrganizationId(viewer.organizationId);
+    this.assertWriteAccess(viewer.role);
+
+    const record = await this.withSchemaGuard(() =>
+      this.repository.createEvidencePack(organizationId, input),
+    );
+    return this.mapEvidencePack(record);
+  }
+
+  async getEvidencePack(id: string, viewer: CarePlanningViewer): Promise<EvidencePackDTO> {
+    const organizationId = this.requireOrganizationId(viewer.organizationId);
+    this.assertReadAccess(viewer.role);
+
+    const record = await this.withSchemaGuard(() =>
+      this.repository.getEvidencePack(organizationId, id),
+    );
+    if (!record) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Evidence pack not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return this.mapEvidencePack(record);
+  }
+
+  async recordEvidencePackExport(id: string, viewer: CarePlanningViewer): Promise<EvidencePackDTO> {
+    const organizationId = this.requireOrganizationId(viewer.organizationId);
+    this.assertWriteAccess(viewer.role);
+
+    const record = await this.withSchemaGuard(() =>
+      this.repository.recordEvidencePackExport(organizationId, id, viewer.userId ?? undefined),
+    );
+    if (!record) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Evidence pack not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return this.mapEvidencePack(record);
+  }
+
+  private mapAssessment(record: any): AssessmentDTO {
+    return {
+      id: record.id,
+      organizationId: record.organization_id,
+      clientId: record.client_id,
+      visitId: record.visit_id,
+      status: record.status as AssessmentStatusGQL,
+      source: record.source as AssessmentSourceGQL,
+      title: record.title,
+      summary: record.summary,
+      findings: (record.findings || {}) as Record<string, unknown>,
+      riskFlags: (record.risk_flags || null) as Record<string, unknown> | null,
+      recommendedActions: (record.recommended_actions || null) as Record<string, unknown> | null,
+      assessorId: record.assessor_id,
+      completedAt: record.completed_at,
+      reviewDueAt: record.review_due_at,
+      createdAt: record.created_at,
+      updatedAt: record.updated_at,
+    };
+  }
+
+  private mapCarePlan(record: any): CarePlanDTO {
+    return {
+      id: record.id,
+      organizationId: record.organization_id,
+      clientId: record.client_id,
+      assessmentId: record.assessment_id,
+      status: record.status as CarePlanStatusGQL,
+      version: record.version,
+      title: record.title,
+      goals: (record.goals || {}) as Record<string, unknown>,
+      interventions: (record.interventions || {}) as Record<string, unknown>,
+      safetyNotes: record.safety_notes,
+      effectiveFrom: record.effective_from,
+      effectiveTo: record.effective_to,
+      reviewDueAt: record.review_due_at,
+      authoredById: record.authored_by_id,
+      approvedById: record.approved_by_id,
+      approvedAt: record.approved_at,
+      createdAt: record.created_at,
+      updatedAt: record.updated_at,
+    };
+  }
+
+  private mapEvidencePack(record: any): EvidencePackDTO {
+    const items = Array.isArray(record.items)
+      ? record.items.map((item: any) => this.mapEvidenceItem(item))
+      : [];
+
+    return {
+      id: record.id,
+      organizationId: record.organization_id,
+      clientId: record.client_id,
+      carePlanId: record.care_plan_id,
+      status: record.status as EvidencePackStatusGQL,
+      kind: record.kind,
+      periodStart: record.period_start,
+      periodEnd: record.period_end,
+      summary: (record.summary || null) as Record<string, unknown> | null,
+      sourceRefs: (record.source_refs || {}) as Record<string, unknown>,
+      generatedBy: record.generated_by,
+      generatedAt: record.generated_at,
+      publishedAt: record.published_at,
+      items,
+      createdAt: record.created_at,
+      updatedAt: record.updated_at,
+    };
+  }
+
+  private mapEvidenceItem(record: any): EvidenceItemDTO {
+    return {
+      id: record.id,
+      evidencePackId: record.evidence_pack_id,
+      sourceType: record.source_type as EvidenceSourceTypeGQL,
+      sourceId: record.source_id,
+      occurredAt: record.occurred_at,
+      headline: record.headline,
+      detail: record.detail,
+      metadata: (record.metadata || null) as Record<string, unknown> | null,
+      createdAt: record.created_at,
+      updatedAt: record.updated_at,
+    };
+  }
+
+  private assertReadAccess(role: string): void {
+    const normalizedRole = this.normalizeRole(role);
+    if (!['admin', 'carer'].includes(normalizedRole)) {
+      throw new BaseHttpException(
+        ErrorCode.FORBIDDEN_ROLE_REQUIRED,
+        'Clinical staff access required',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+  }
+
+  private assertWriteAccess(role: string): void {
+    const normalizedRole = this.normalizeRole(role);
+    if (!['admin', 'carer'].includes(normalizedRole)) {
+      throw new BaseHttpException(
+        ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
+        'Only clinical staff can update assessment-led care planning records',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+  }
+
+  private normalizeRole(role: string): string {
+    return (role || '').toLowerCase().trim();
+  }
+
+  private requireOrganizationId(organizationId?: string | null): string {
+    const orgId = (organizationId || '').trim();
+    if (orgId) {
+      return orgId;
+    }
+    throw new BaseHttpException(
+      ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
+      'Organization context is required for care-planning operations',
+      HttpStatus.FORBIDDEN,
+    );
+  }
+
+  private async withSchemaGuard<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error: unknown) {
+      if (error instanceof BaseHttpException) {
+        throw error;
+      }
+
+      if (this.isMissingSchemaError(error)) {
+        throw new BaseHttpException(
+          ErrorCode.FEATURE_NOT_ENABLED,
+          'Care-planning persistence tables are not available in this environment yet. Apply the Prisma migration first.',
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  private isMissingSchemaError(error: unknown): boolean {
+    const code = (error as { code?: string })?.code;
+    if (code === 'P2021' || code === 'P2022') {
+      return true;
+    }
+
+    const message = (error as { message?: string })?.message;
+    if (!message) {
+      return false;
+    }
+
+    return message.includes('does not exist') || message.includes('Unknown arg');
+  }
+}

@@ -6,11 +6,11 @@ import { usePathname } from 'next/navigation'
 import { cn } from '../../lib/utils'
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/visits', label: 'Visits' },
-  { href: '/activity', label: 'Activity' },
-  { href: '/emar', label: 'EMAR' },
-  { href: '/clients', label: 'Clients' },
+  { href: '/today', label: 'Today' },
+  { href: '/schedule', label: 'Schedule' },
+  { href: '/people', label: 'People' },
+  { href: '/medication', label: 'Medication Round' },
+  { href: '/family-updates', label: 'Family Updates' },
 ] as const
 
 export interface NavProps {
@@ -28,8 +28,7 @@ export function Nav({ className }: NavProps) {
     >
       <div className="flex items-center gap-1 p-2 bg-background-secondary rounded-sm border border-base-gray-300">
         {navItems.map((item) => {
-          const isActive = pathname === item.href || 
-                          (item.href === '/clients' && pathname.startsWith('/clients'))
+          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
           
           return (
             <Link

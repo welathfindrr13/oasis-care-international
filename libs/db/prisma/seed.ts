@@ -6,6 +6,10 @@ async function main() {
   console.log('🌱 Seeding demo database...');
 
   // Clear existing data
+  await prisma.evidenceItem.deleteMany();
+  await prisma.evidencePack.deleteMany();
+  await prisma.carePlan.deleteMany();
+  await prisma.assessment.deleteMany();
   await prisma.visitTask.deleteMany();
   await prisma.medicationAdministration.deleteMany();
   await prisma.visit.deleteMany();
@@ -332,6 +336,118 @@ async function main() {
     }),
   ]);
 
+  await prisma.carer.updateMany({ data: { organization_id: org.id } });
+  await prisma.visit.updateMany({ data: { organization_id: org.id } });
+
+  const assessment = await prisma.assessment.create({
+    data: {
+      organization_id: org.id,
+      client_id: clients[0].id,
+      visit_id: visits[0].id,
+      status: 'COMPLETED',
+      source: 'MANUAL',
+      title: 'Initial home-care assessment',
+      summary:
+        'Margaret needs morning medication prompting, light mobility support, hydration encouragement, and family reassurance after completed visits.',
+      findings: {
+        communication: 'Prefers clear step-by-step explanations and time to respond.',
+        mobility: 'Uses a walking frame indoors; requires standby support on stairs.',
+        medicationSupport: 'Prompting and observation required during morning and evening calls.',
+        nutritionHydration: 'Benefits from visible drink prompts and light meal preparation.',
+      },
+      risk_flags: {
+        falls: 'Medium',
+        medication: 'Medium',
+        hydration: 'Watch',
+      },
+      recommended_actions: {
+        visitActions: ['Medication prompt', 'Hydration check', 'Mobility reassurance'],
+        familyAssurance: 'Publish approved visit updates after morning calls.',
+      },
+      assessor_id: carers[0].id,
+      completed_at: getTodayTime(10, 30),
+      review_due_at: getTomorrowTime(9, 0),
+    },
+  });
+
+  const carePlan = await prisma.carePlan.create({
+    data: {
+      organization_id: org.id,
+      client_id: clients[0].id,
+      assessment_id: assessment.id,
+      status: 'ACTIVE',
+      version: 1,
+      title: 'Morning and evening reassurance plan',
+      goals: {
+        independence: 'Maintain safe routines at home with minimal disruption.',
+        medicationSupport: 'Medication support is recorded on each scheduled occasion.',
+        familyConfidence: 'Family receives approved proof-of-care updates for completed visits.',
+      },
+      interventions: {
+        morningVisit: ['Medication prompt', 'Breakfast and hydration check', 'Mobility support'],
+        eveningVisit: ['Medication prompt', 'Environment safety check', 'Family-safe update draft'],
+      },
+      safety_notes:
+        'Escalate immediately if medication support is refused, mobility changes, or hydration intake is notably reduced.',
+      effective_from: getTodayTime(10, 45),
+      review_due_at: getTomorrowTime(17, 0),
+      authored_by_id: carers[0].id,
+      approved_by_id: carers[0].id,
+      approved_at: getTodayTime(11, 0),
+    },
+  });
+
+  await prisma.evidencePack.create({
+    data: {
+      organization_id: org.id,
+      client_id: clients[0].id,
+      care_plan_id: carePlan.id,
+      status: 'COMPILED',
+      kind: 'INSPECTION_READY_REVIEW',
+      period_start: getTodayTime(0, 0),
+      period_end: getTomorrowTime(23, 59),
+      summary: {
+        purpose: 'Demo pack showing assessment-led planning, visit evidence, medication support, and family assurance readiness.',
+        caveat: 'Inspection-ready evidence does not guarantee compliance outcomes.',
+      },
+      source_refs: {
+        assessmentId: assessment.id,
+        carePlanId: carePlan.id,
+        visitIds: [visits[0].id],
+      },
+      generated_by: 'demo-seed',
+      generated_at: getTodayTime(11, 15),
+      items: {
+        create: [
+          {
+            source_type: 'ASSESSMENT',
+            source_id: assessment.id,
+            occurred_at: assessment.completed_at,
+            headline: 'Initial assessment completed',
+            detail: 'Needs, risks, and recommended actions were recorded before care-plan approval.',
+            metadata: { cqcTag: 'EFFECTIVE' },
+          },
+          {
+            source_type: 'CARE_PLAN',
+            source_id: carePlan.id,
+            occurred_at: carePlan.approved_at,
+            headline: 'Care plan approved',
+            detail: 'Active plan version created with medication, mobility, hydration, and family assurance goals.',
+            metadata: { cqcTag: 'RESPONSIVE' },
+          },
+          {
+            source_type: 'VISIT',
+            source_id: visits[0].id,
+            occurred_at: visits[0].actual_end,
+            headline: 'Morning visit completed',
+            detail: 'Completed visit evidence is available for internal review and family-safe projection.',
+            metadata: { cqcTag: 'SAFE' },
+          },
+        ],
+      },
+    },
+  });
+
   // Count final data
   const counts = {
     organizations: await prisma.organization.count(),
@@ -341,12 +457,16 @@ async function main() {
     prescriptions: await prisma.prescription.count(),
     visits: await prisma.visit.count(),
     visitTasks: await prisma.visitTask.count(),
+    assessments: await prisma.assessment.count(),
+    carePlans: await prisma.carePlan.count(),
+    evidencePacks: await prisma.evidencePack.count(),
   };
 
   console.log('✅ Seed completed:', counts);
   
   // Save summary
   const fs = await import('fs');
+  fs.mkdirSync('./demo/output', { recursive: true });
   fs.writeFileSync('./demo/output/seed-summary.json', JSON.stringify(counts, null, 2));
   
   return counts;
@@ -354,8 +474,10 @@ async function main() {
 
 main()
   .then((counts) => {
-    console.log('✅ Demo database seeded successfully');
-    console.log(`📊 ${counts.visits} visits, ${counts.clients} clients, ${counts.carers} carers`);
+  console.log('✅ Demo database seeded successfully');
+    console.log(
+      `📊 ${counts.visits} visits, ${counts.clients} clients, ${counts.carers} carers, ${counts.carePlans} care plans`,
+    );
   })
   .catch((e) => {
     console.error('❌ Seed failed:', e);

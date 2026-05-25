@@ -1,11 +1,26 @@
 import { Controller, Get } from '@nestjs/common';
 
+function healthPayload() {
+  const environment =
+    process.env.APP_ENVIRONMENT ||
+    process.env.ENVIRONMENT ||
+    process.env.STAGE ||
+    process.env.NODE_ENV ||
+    'development';
+
+  return {
+    status: 'ok',
+    version: process.env.APP_VERSION || process.env.VERSION || 'unknown',
+    commitSha: process.env.APP_COMMIT_SHA || process.env.COMMIT_SHA || 'unknown',
+    environment,
+  };
+}
+
 @Controller('healthz')
 export class HealthController {
   @Get()
   health() {
-    console.log('>>> /healthz called at', new Date().toISOString());
-    return { status: 'ok' };
+    return healthPayload();
   }
 }
 
@@ -13,8 +28,7 @@ export class HealthController {
 export class StandardHealthController {
   @Get('health')
   standardHealth() {
-    console.log('>>> /health called at', new Date().toISOString());
-    return { status: 'ok' };
+    return healthPayload();
   }
 }
 

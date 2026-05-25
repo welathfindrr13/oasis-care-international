@@ -28,6 +28,10 @@ export class DemoSeedController {
   async seedDemo(
     @Headers('x-seed-key') seedKey: string,
   ): Promise<DemoSeedResponse> {
+    if (process.env.DEMO_MODE !== 'true') {
+      throw new HttpException('Not Found', HttpStatus.NOT_FOUND);
+    }
+
     // Validate seed key
     const expectedKey = process.env.DEMO_SEED_TOKEN;
     if (!expectedKey || seedKey !== expectedKey) {
