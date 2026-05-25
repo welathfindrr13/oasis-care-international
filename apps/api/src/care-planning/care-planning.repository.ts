@@ -10,6 +10,32 @@ import { ApproveCarePlanInput } from './dto/approve-care-plan.input';
 import { ArchiveCarePlanInput } from './dto/archive-care-plan.input';
 import { EvidenceSourceTypeGQL } from './dto/care-planning.dto';
 
+interface EvidenceSourceCandidateQuery {
+  clientId: string;
+  periodStart: Date;
+  periodEnd: Date;
+  sourceTypes?: EvidenceSourceTypeGQL[];
+  take?: number;
+}
+
+interface EvidenceSourceCandidateRecord {
+  id: string;
+  sourceType: EvidenceSourceTypeGQL;
+  title: string;
+  subtitle?: string | null;
+  occurredAt: Date;
+  createdBy?: string | null;
+  status?: string | null;
+  previewText?: string | null;
+}
+
+const EVIDENCE_SOURCE_CANDIDATE_TYPES = new Set<EvidenceSourceTypeGQL>([
+  EvidenceSourceTypeGQL.VISIT,
+  EvidenceSourceTypeGQL.CARE_LOG,
+  EvidenceSourceTypeGQL.MEDICATION_ADMINISTRATION,
+  EvidenceSourceTypeGQL.CONCERN,
+]);
+
 @Injectable()
 export class CarePlanningRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -228,6 +254,128 @@ export class CarePlanningRepository {
     });
   }
 
+  async listEvidenceSourceCandidates(
+    organizationId: string,
+    input: EvidenceSourceCandidateQuery,
+  ): Promise<EvidenceSourceCandidateRecord[]> {
+    await this.assertClientInOrganization(organizationId, input.clientId);
+
+    const sourceTypes = input.sourceTypes?.length
+      ? Array.from(new Set(input.sourceTypes))
+      : Array.from(EVIDENCE_SOURCE_CANDIDATE_TYPES);
+    const unsupported = sourceTypes.filter((sourceType) => !EVIDENCE_SOURCE_CANDIDATE_TYPES.has(sourceType));
+    if (unsupported.length) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        `Unsupported evidence source candidate type: ${unsupported.join(', ')}`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const take = Math.min(Math.max(Math.trunc(input.take ?? 100), 1), 100);
+    const candidates: EvidenceSourceCandidateRecord[] = [];
+
+    if (sourceTypes.includes(EvidenceSourceTypeGQL.VISIT)) {
+      const visits = await (this.prisma as any).visit.findMany({
+        where: {
+          organization_id: organizationId,
+          client_id: input.clientId,
+          deleted_at: null,
+          scheduled_start: { gte: input.periodStart, lte: input.periodEnd },
+        },
+        include: {
+          carer: {
+            select: { first_name: true, last_name: true },
+          },
+        },
+        orderBy: { scheduled_start: 'desc' },
+        take,
+      });
+      candidates.push(...visits.map((visit: any) => this.mapVisitCandidate(visit)));
+    }
+
+    if (sourceTypes.includes(EvidenceSourceTypeGQL.CARE_LOG)) {
+      const careLogs = await (this.prisma as any).careLog.findMany({
+        where: {
+          organization_id: organizationId,
+          client_id: input.clientId,
+          deleted_at: null,
+          occurred_at: { gte: input.periodStart, lte: input.periodEnd },
+        },
+        include: {
+          carer: {
+            select: { first_name: true, last_name: true },
+          },
+        },
+        orderBy: { occurred_at: 'desc' },
+        take,
+      });
+      candidates.push(...careLogs.map((careLog: any) => this.mapCareLogCandidate(careLog)));
+    }
+
+    if (sourceTypes.includes(EvidenceSourceTypeGQL.MEDICATION_ADMINISTRATION)) {
+      const medicationAdministrations = await (this.prisma as any).medicationAdministration.findMany({
+        where: {
+          deleted_at: null,
+          scheduled_time: { gte: input.periodStart, lte: input.periodEnd },
+          OR: [
+            {
+              visit: {
+                is: {
+                  organization_id: organizationId,
+                  client_id: input.clientId,
+                  deleted_at: null,
+                },
+              },
+            },
+            {
+              prescription: {
+                client: {
+                  id: input.clientId,
+                  organization_id: organizationId,
+                  deleted_at: null,
+                },
+              },
+            },
+          ],
+        },
+        include: {
+          visit: {
+            include: {
+              carer: {
+                select: { first_name: true, last_name: true },
+              },
+            },
+          },
+        },
+        orderBy: { scheduled_time: 'desc' },
+        take,
+      });
+      candidates.push(
+        ...medicationAdministrations.map((administration: any) =>
+          this.mapMedicationAdministrationCandidate(administration),
+        ),
+      );
+    }
+
+    if (sourceTypes.includes(EvidenceSourceTypeGQL.CONCERN)) {
+      const concerns = await (this.prisma as any).concern.findMany({
+        where: {
+          organization_id: organizationId,
+          client_id: input.clientId,
+          created_at: { gte: input.periodStart, lte: input.periodEnd },
+        },
+        orderBy: { created_at: 'desc' },
+        take,
+      });
+      candidates.push(...concerns.map((concern: any) => this.mapConcernCandidate(concern)));
+    }
+
+    return candidates
+      .sort((left, right) => right.occurredAt.getTime() - left.occurredAt.getTime())
+      .slice(0, take);
+  }
+
   async createEvidencePack(organizationId: string, input: CreateEvidencePackInput): Promise<any> {
     await this.assertClientInOrganization(organizationId, input.clientId);
     if (input.carePlanId) {
@@ -326,6 +474,88 @@ export class CarePlanningRepository {
     if (!client) {
       this.throwScopedRecordNotFound('Person not found');
     }
+  }
+
+  private mapVisitCandidate(visit: any): EvidenceSourceCandidateRecord {
+    return {
+      id: visit.id,
+      sourceType: EvidenceSourceTypeGQL.VISIT,
+      title: `Care visit: ${this.formatStatus(visit.status)}`,
+      subtitle: `Scheduled ${this.formatDateTime(visit.scheduled_start)} to ${this.formatDateTime(visit.scheduled_end)}`,
+      occurredAt: visit.actual_end ?? visit.actual_start ?? visit.scheduled_start,
+      createdBy: this.formatName(visit.carer),
+      status: visit.status,
+      previewText: this.truncateText(visit.notes) ?? 'Visit record selected as inspection-ready evidence.',
+    };
+  }
+
+  private mapCareLogCandidate(careLog: any): EvidenceSourceCandidateRecord {
+    return {
+      id: careLog.id,
+      sourceType: EvidenceSourceTypeGQL.CARE_LOG,
+      title: `Care note: ${this.formatStatus(careLog.category)}`,
+      subtitle: careLog.escalated
+        ? `Escalated to ${careLog.escalated_to ?? 'care team'}`
+        : `Recorded ${this.formatDateTime(careLog.occurred_at)}`,
+      occurredAt: careLog.occurred_at,
+      createdBy: this.formatName(careLog.carer),
+      status: careLog.escalated ? 'ESCALATED' : careLog.category,
+      previewText: this.truncateText(careLog.notes) ?? 'Care note selected as inspection-ready evidence.',
+    };
+  }
+
+  private mapMedicationAdministrationCandidate(administration: any): EvidenceSourceCandidateRecord {
+    return {
+      id: administration.id,
+      sourceType: EvidenceSourceTypeGQL.MEDICATION_ADMINISTRATION,
+      title: `Medication support: ${this.formatStatus(administration.status)}`,
+      subtitle: `Medication support status ${administration.status}`,
+      occurredAt: administration.administered_time ?? administration.scheduled_time,
+      createdBy: this.formatName(administration.visit?.carer) ?? administration.administered_by ?? null,
+      status: administration.status,
+      previewText:
+        this.truncateText(administration.notes) ??
+        'Medication support outcome selected as inspection-ready evidence.',
+    };
+  }
+
+  private mapConcernCandidate(concern: any): EvidenceSourceCandidateRecord {
+    return {
+      id: concern.id,
+      sourceType: EvidenceSourceTypeGQL.CONCERN,
+      title: `Concern case: ${concern.title}`,
+      subtitle: `${this.formatStatus(concern.category)} · ${this.formatStatus(concern.severity)}`,
+      occurredAt: concern.resolved_at ?? concern.created_at,
+      createdBy: concern.assigned_to_user_id ?? null,
+      status: concern.status,
+      previewText: this.truncateText(concern.description) ?? 'Concern case selected as inspection-ready evidence.',
+    };
+  }
+
+  private formatName(person?: { first_name?: string | null; last_name?: string | null } | null): string | null {
+    const name = [person?.first_name, person?.last_name].filter(Boolean).join(' ').trim();
+    return name || null;
+  }
+
+  private formatStatus(value?: string | null): string {
+    return (value || 'recorded').replace(/_/g, ' ').toLowerCase();
+  }
+
+  private formatDateTime(value?: Date | string | null): string {
+    if (!value) {
+      return 'not recorded';
+    }
+
+    return new Date(value).toISOString();
+  }
+
+  private truncateText(value?: string | null): string | null {
+    const text = (value || '').trim();
+    if (!text) {
+      return null;
+    }
+
+    return text.length > 220 ? `${text.slice(0, 217)}...` : text;
   }
 
   private async assertVisitInOrganization(

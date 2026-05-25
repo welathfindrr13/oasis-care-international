@@ -1,4 +1,5 @@
 import { BaseHttpException } from '../../common/errors/base-http.exception';
+import { EvidenceSourceTypeGQL } from '../dto/care-planning.dto';
 import { CarePlanningRepository } from '../care-planning.repository';
 import { CarePlanningService } from '../care-planning.service';
 
@@ -19,6 +20,7 @@ describe('CarePlanningService', () => {
       archiveCarePlan: jest.fn(),
       listEvidencePacks: jest.fn(),
       createEvidencePack: jest.fn(),
+      listEvidenceSourceCandidates: jest.fn(),
       getEvidencePack: jest.fn(),
       recordEvidencePackExport: jest.fn(),
     } as unknown as jest.Mocked<CarePlanningRepository>;
@@ -132,5 +134,97 @@ describe('CarePlanningService', () => {
     );
 
     expect(repository.recordEvidencePackExport).toHaveBeenCalledWith('org-1', 'pack-1', 'admin-1');
+  });
+
+  it('lists evidence source candidates for clinical staff', async () => {
+    repository.listEvidenceSourceCandidates.mockResolvedValue([
+      {
+        id: 'visit-1',
+        sourceType: EvidenceSourceTypeGQL.VISIT,
+        title: 'Visit completed',
+        subtitle: 'Scheduled 09:00 to 10:00',
+        occurredAt: new Date('2026-05-07T09:00:00.000Z'),
+        createdBy: 'Asha Patel',
+        status: 'COMPLETED',
+        previewText: 'Morning personal care visit',
+      },
+    ]);
+
+    const result = await service.evidenceSourceCandidates(
+      {
+        clientId: 'client-1',
+        periodStart: new Date('2026-05-01T00:00:00.000Z'),
+        periodEnd: new Date('2026-05-07T23:59:59.000Z'),
+        sourceTypes: [EvidenceSourceTypeGQL.VISIT],
+        take: 25,
+      },
+      { role: 'carer', organizationId: 'org-1', userId: 'carer-1' },
+    );
+
+    expect(result).toHaveLength(1);
+    expect(repository.listEvidenceSourceCandidates).toHaveBeenCalledWith('org-1', {
+      clientId: 'client-1',
+      periodStart: new Date('2026-05-01T00:00:00.000Z'),
+      periodEnd: new Date('2026-05-07T23:59:59.000Z'),
+      sourceTypes: [EvidenceSourceTypeGQL.VISIT],
+      take: 25,
+    });
+  });
+
+  it('denies evidence source candidates for family and user roles', async () => {
+    await expect(
+      service.evidenceSourceCandidates(
+        {
+          clientId: 'client-1',
+          periodStart: new Date('2026-05-01T00:00:00.000Z'),
+          periodEnd: new Date('2026-05-07T23:59:59.000Z'),
+        },
+        { role: 'family', organizationId: 'org-1' },
+      ),
+    ).rejects.toBeInstanceOf(BaseHttpException);
+
+    await expect(
+      service.evidenceSourceCandidates(
+        {
+          clientId: 'client-1',
+          periodStart: new Date('2026-05-01T00:00:00.000Z'),
+          periodEnd: new Date('2026-05-07T23:59:59.000Z'),
+        },
+        { role: 'user', organizationId: 'org-1' },
+      ),
+    ).rejects.toBeInstanceOf(BaseHttpException);
+
+    expect(repository.listEvidenceSourceCandidates).not.toHaveBeenCalled();
+  });
+
+  it('requires organization context for evidence source candidates', async () => {
+    await expect(
+      service.evidenceSourceCandidates(
+        {
+          clientId: 'client-1',
+          periodStart: new Date('2026-05-01T00:00:00.000Z'),
+          periodEnd: new Date('2026-05-07T23:59:59.000Z'),
+        },
+        { role: 'admin' },
+      ),
+    ).rejects.toBeInstanceOf(BaseHttpException);
+
+    expect(repository.listEvidenceSourceCandidates).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsupported evidence source candidate types before querying', async () => {
+    await expect(
+      service.evidenceSourceCandidates(
+        {
+          clientId: 'client-1',
+          periodStart: new Date('2026-05-01T00:00:00.000Z'),
+          periodEnd: new Date('2026-05-07T23:59:59.000Z'),
+          sourceTypes: [EvidenceSourceTypeGQL.CARE_PLAN],
+        },
+        { role: 'admin', organizationId: 'org-1' },
+      ),
+    ).rejects.toBeInstanceOf(BaseHttpException);
+
+    expect(repository.listEvidenceSourceCandidates).not.toHaveBeenCalled();
   });
 });

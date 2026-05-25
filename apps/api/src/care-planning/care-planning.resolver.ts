@@ -3,13 +3,14 @@ import { SetMetadata, UseGuards } from '@nestjs/common';
 import { GqlRolesGuard } from '../auth/gql-roles.guard';
 import { LegacyOperationalSurface } from '../auth/legacy-operational-access';
 import { CarePlanningService } from './care-planning.service';
-import { AssessmentDTO, CarePlanDTO, EvidencePackDTO } from './dto/care-planning.dto';
+import { AssessmentDTO, CarePlanDTO, EvidencePackDTO, EvidenceSourceCandidateDTO } from './dto/care-planning.dto';
 import { CreateAssessmentInput } from './dto/create-assessment.input';
 import { CreateCarePlanInput } from './dto/create-care-plan.input';
 import { CreateEvidencePackInput } from './dto/create-evidence-pack.input';
 import { CompleteAssessmentInput } from './dto/complete-assessment.input';
 import { ApproveCarePlanInput } from './dto/approve-care-plan.input';
 import { ArchiveCarePlanInput } from './dto/archive-care-plan.input';
+import { EvidenceSourceCandidatesInput } from './dto/evidence-source-candidates.input';
 
 const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
   SetMetadata('roles', roles);
@@ -111,6 +112,15 @@ export class CarePlanningResolver {
     @Context() ctx: any,
   ): Promise<EvidencePackDTO[]> {
     return this.carePlanningService.listEvidencePacks(clientId, take, this.viewerFromContext(ctx));
+  }
+
+  @Query(() => [EvidenceSourceCandidateDTO])
+  @Roles('admin', 'carer')
+  async evidenceSourceCandidates(
+    @Args('input') input: EvidenceSourceCandidatesInput,
+    @Context() ctx: any,
+  ): Promise<EvidenceSourceCandidateDTO[]> {
+    return this.carePlanningService.evidenceSourceCandidates(input, this.viewerFromContext(ctx));
   }
 
   @Mutation(() => EvidencePackDTO)

@@ -186,6 +186,33 @@ export class EvidenceItemDTO {
 }
 
 @ObjectType()
+export class EvidenceSourceCandidateDTO {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => EvidenceSourceTypeGQL)
+  sourceType!: EvidenceSourceTypeGQL;
+
+  @Field(() => String)
+  title!: string;
+
+  @Field(() => String, { nullable: true })
+  subtitle?: string | null;
+
+  @Field(() => Date)
+  occurredAt!: Date;
+
+  @Field(() => String, { nullable: true })
+  createdBy?: string | null;
+
+  @Field(() => String, { nullable: true })
+  status?: string | null;
+
+  @Field(() => String, { nullable: true })
+  previewText?: string | null;
+}
+
+@ObjectType()
 export class EvidencePackDTO {
   @Field(() => ID)
   id!: string;

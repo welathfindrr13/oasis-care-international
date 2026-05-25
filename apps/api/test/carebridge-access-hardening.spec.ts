@@ -49,6 +49,7 @@ describe('CareBridge access hardening metadata', () => {
     expect(getRoles(CarePlanningResolver.prototype, 'assessments')).toEqual(['admin', 'carer']);
     expect(getRoles(CarePlanningResolver.prototype, 'carePlans')).toEqual(['admin', 'carer']);
     expect(getRoles(CarePlanningResolver.prototype, 'evidencePacks')).toEqual(['admin', 'carer']);
+    expect(getRoles(CarePlanningResolver.prototype, 'evidenceSourceCandidates')).toEqual(['admin', 'carer']);
     expect(getRoles(CarePlanningResolver.prototype, 'createAssessment')).toEqual(['admin', 'carer']);
     expect(getRoles(CarePlanningResolver.prototype, 'createCarePlan')).toEqual(['admin', 'carer']);
     expect(getRoles(CarePlanningResolver.prototype, 'createEvidencePack')).toEqual(['admin', 'carer']);

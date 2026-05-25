@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { EvidenceSourcePicker } from './EvidenceSourcePicker'
 import { clientQuery } from '../../lib/graphql/client-side'
 import {
   APPROVE_CARE_PLAN_MUTATION,
@@ -17,6 +18,7 @@ import {
   type CreateAssessmentInput,
   type CreateCarePlanInput,
   type CreateEvidencePackInput,
+  type EvidenceSourceCandidateRecord,
 } from '../../lib/graphql/queries'
 
 interface CarePlanningActionsProps {
@@ -44,6 +46,7 @@ export function CarePlanningActions({ clientId, assessments, carePlans, onComple
   const [evidencePlanId, setEvidencePlanId] = useState('')
   const [selectedEvidenceAssessmentIds, setSelectedEvidenceAssessmentIds] = useState<string[]>([])
   const [selectedEvidenceCarePlanIds, setSelectedEvidenceCarePlanIds] = useState<string[]>([])
+  const [selectedOperationalEvidenceSources, setSelectedOperationalEvidenceSources] = useState<EvidenceSourceCandidateRecord[]>([])
   const [assessmentToComplete, setAssessmentToComplete] = useState('')
   const [planToApprove, setPlanToApprove] = useState('')
   const [planToArchive, setPlanToArchive] = useState('')
@@ -96,18 +99,40 @@ export function CarePlanningActions({ clientId, assessments, carePlans, onComple
         })
       })
 
+    selectedOperationalEvidenceSources.forEach((source) => {
+      items.push({
+        sourceType: source.sourceType,
+        sourceId: source.id,
+        occurredAt: source.occurredAt,
+        headline: source.title,
+        detail: [source.subtitle, source.previewText].filter(Boolean).join(' · ') || undefined,
+        metadata: {
+          source: 'evidence-source-picker',
+          status: source.status,
+          createdBy: source.createdBy,
+          sourceType: source.sourceType,
+        },
+      })
+    })
+
     items.push({
       sourceType: 'MANUAL_NOTE',
       headline: selectedPlans.length
         ? 'Evidence pack created with selected care-planning sources'
         : 'Evidence pack created from care planning dashboard',
       detail:
-        'Visits, care notes, medication exceptions, and concerns will be added in the source picker once those list queries are wired.',
+        selectedOperationalEvidenceSources.length > 0
+          ? 'Evidence pack includes selected operational sources from the staff-only evidence source picker.'
+          : 'Evidence pack created from care planning dashboard. Add operational sources when recorded evidence is available.',
       metadata: {
         source: 'care-planning-ui',
         selectedCarePlanId: evidencePlanId || null,
         selectedCarePlanIds: planIds,
         selectedAssessmentIds: Array.from(selectedAssessmentIds),
+        selectedOperationalSources: selectedOperationalEvidenceSources.map((source) => ({
+          id: source.id,
+          sourceType: source.sourceType,
+        })),
       },
     })
 
@@ -424,6 +449,16 @@ export function CarePlanningActions({ clientId, assessments, carePlans, onComple
           <input type="date" value={evidencePeriodStart} onChange={(e) => setEvidencePeriodStart(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
           <label className="mt-3 block text-sm font-medium text-slate-700">Period end</label>
           <input type="date" value={evidencePeriodEnd} onChange={(e) => setEvidencePeriodEnd(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+          {evidencePeriodStart && evidencePeriodEnd && (
+            <EvidenceSourcePicker
+              clientId={clientId}
+              periodStart={evidencePeriodStart}
+              periodEnd={evidencePeriodEnd}
+              selectedSources={selectedOperationalEvidenceSources}
+              onSelectedSourcesChange={setSelectedOperationalEvidenceSources}
+              disabled={busyAction !== null}
+            />
+          )}
           <button disabled={busyAction !== null || !evidencePeriodStart || !evidencePeriodEnd} onClick={submitEvidencePack} className="mt-4 w-full rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
             {busyAction === 'evidencePack' ? 'Creating...' : 'Create evidence pack'}
           </button>

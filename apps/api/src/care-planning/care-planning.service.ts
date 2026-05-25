@@ -11,6 +11,7 @@ import {
   EvidenceItemDTO,
   EvidencePackDTO,
   EvidencePackStatusGQL,
+  EvidenceSourceCandidateDTO,
   EvidenceSourceTypeGQL,
 } from './dto/care-planning.dto';
 import { CreateAssessmentInput } from './dto/create-assessment.input';
@@ -19,12 +20,20 @@ import { CreateEvidencePackInput } from './dto/create-evidence-pack.input';
 import { CompleteAssessmentInput } from './dto/complete-assessment.input';
 import { ApproveCarePlanInput } from './dto/approve-care-plan.input';
 import { ArchiveCarePlanInput } from './dto/archive-care-plan.input';
+import { EvidenceSourceCandidatesInput } from './dto/evidence-source-candidates.input';
 
 interface CarePlanningViewer {
   role: string;
   organizationId?: string | null;
   userId?: string | null;
 }
+
+const SUPPORTED_EVIDENCE_CANDIDATE_SOURCE_TYPES = new Set<EvidenceSourceTypeGQL>([
+  EvidenceSourceTypeGQL.VISIT,
+  EvidenceSourceTypeGQL.CARE_LOG,
+  EvidenceSourceTypeGQL.MEDICATION_ADMINISTRATION,
+  EvidenceSourceTypeGQL.CONCERN,
+]);
 
 @Injectable()
 export class CarePlanningService {
@@ -176,6 +185,35 @@ export class CarePlanningService {
     return records.map((record) => this.mapEvidencePack(record));
   }
 
+  async evidenceSourceCandidates(
+    input: EvidenceSourceCandidatesInput,
+    viewer: CarePlanningViewer,
+  ): Promise<EvidenceSourceCandidateDTO[]> {
+    const organizationId = this.requireOrganizationId(viewer.organizationId);
+    this.assertReadAccess(viewer.role);
+
+    const sourceTypes = this.normalizeCandidateSourceTypes(input.sourceTypes);
+    const periodStart = new Date(input.periodStart);
+    const periodEnd = new Date(input.periodEnd);
+    if (Number.isNaN(periodStart.getTime()) || Number.isNaN(periodEnd.getTime()) || periodStart > periodEnd) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'A valid evidence source period is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    return this.withSchemaGuard(() =>
+      this.repository.listEvidenceSourceCandidates(organizationId, {
+        clientId: input.clientId,
+        periodStart,
+        periodEnd,
+        sourceTypes,
+        take: this.normalizeTake(input.take),
+      }),
+    );
+  }
+
   async createEvidencePack(input: CreateEvidencePackInput, viewer: CarePlanningViewer): Promise<EvidencePackDTO> {
     const organizationId = this.requireOrganizationId(viewer.organizationId);
     this.assertWriteAccess(viewer.role);
@@ -304,6 +342,31 @@ export class CarePlanningService {
       createdAt: record.created_at,
       updatedAt: record.updated_at,
     };
+  }
+
+  private normalizeCandidateSourceTypes(sourceTypes?: EvidenceSourceTypeGQL[] | null): EvidenceSourceTypeGQL[] {
+    const requested = sourceTypes?.length
+      ? Array.from(new Set(sourceTypes))
+      : Array.from(SUPPORTED_EVIDENCE_CANDIDATE_SOURCE_TYPES);
+
+    const unsupported = requested.filter((sourceType) => !SUPPORTED_EVIDENCE_CANDIDATE_SOURCE_TYPES.has(sourceType));
+    if (unsupported.length) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        `Unsupported evidence source candidate type: ${unsupported.join(', ')}`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    return requested;
+  }
+
+  private normalizeTake(take?: number | null): number {
+    if (!Number.isFinite(take ?? NaN)) {
+      return 100;
+    }
+
+    return Math.min(Math.max(Math.trunc(take as number), 1), 100);
   }
 
   private assertReadAccess(role: string): void {

@@ -280,6 +280,23 @@ export interface EvidencePackRecord {
   updatedAt: string;
 }
 
+export type OperationalEvidenceSourceType = 'VISIT' | 'CARE_LOG' | 'MEDICATION_ADMINISTRATION' | 'CONCERN';
+
+export interface EvidenceSourceCandidateRecord {
+  id: string;
+  sourceType: OperationalEvidenceSourceType;
+  title: string;
+  subtitle?: string | null;
+  occurredAt: string;
+  createdBy?: string | null;
+  status?: string | null;
+  previewText?: string | null;
+}
+
+export interface EvidenceSourceCandidatesQueryResponse {
+  evidenceSourceCandidates: EvidenceSourceCandidateRecord[];
+}
+
 export interface CarePlanningQueryResponse {
   assessments: AssessmentRecord[];
   carePlans: CarePlanRecord[];
@@ -413,6 +430,21 @@ export const CARE_PLANNING_QUERY = `
       }
       createdAt
       updatedAt
+    }
+  }
+`;
+
+export const EVIDENCE_SOURCE_CANDIDATES_QUERY = `
+  query EvidenceSourceCandidates($input: EvidenceSourceCandidatesInput!) {
+    evidenceSourceCandidates(input: $input) {
+      id
+      sourceType
+      title
+      subtitle
+      occurredAt
+      createdBy
+      status
+      previewText
     }
   }
 `;
