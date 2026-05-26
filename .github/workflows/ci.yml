@@ -73,9 +73,21 @@ jobs:
         
     - name: Web Lint and Build
       run: pnpm --filter @oasis/web lint && pnpm --filter @oasis/web build
+      env:
+        COGNITO_ISSUER: https://cognito-idp.eu-west-2.amazonaws.com/ci-placeholder
+        COGNITO_CLIENT_ID: ci-client-id
+        COGNITO_CLIENT_SECRET: ci-client-secret
+        NEXTAUTH_SECRET: ci-nextauth-secret
+        NEXTAUTH_URL: http://localhost:3002
         
     - name: Build
       run: pnpm turbo run build
+      env:
+        COGNITO_ISSUER: https://cognito-idp.eu-west-2.amazonaws.com/ci-placeholder
+        COGNITO_CLIENT_ID: ci-client-id
+        COGNITO_CLIENT_SECRET: ci-client-secret
+        NEXTAUTH_SECRET: ci-nextauth-secret
+        NEXTAUTH_URL: http://localhost:3002
       
     - name: Lint
       run: pnpm turbo run lint
