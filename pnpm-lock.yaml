@@ -272,9 +272,6 @@ importers:
       '@nestjs/passport':
         specifier: 10.0.3
         version: 10.0.3(@nestjs/common@10.3.0(class-transformer@0.5.1)(class-validator@0.14.0)(reflect-metadata@0.2.1)(rxjs@7.8.1))(passport@0.7.0)
-      '@oasis/db':
-        specifier: workspace:*
-        version: link:../db
       jwks-rsa:
         specifier: ^3.1.0
         version: 3.2.1
