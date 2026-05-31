@@ -20,7 +20,8 @@
 		reverse_proxy api:4000
 	}
 
-	handle /api/* {
+	handle /api/graphql {
+		uri strip_prefix /api
 		reverse_proxy api:4000
 	}
 

@@ -59,7 +59,7 @@ Required areas:
 - public domain and ACME email;
 - Postgres database/user/password;
 - `JWT_SECRET` and `NEXTAUTH_SECRET`;
-- public app/API URLs;
+- public app/API URLs, with GraphQL routed at `/graphql`;
 - production auth provider values.
 
 Known blocker: production auth provider selection is still unresolved if Oasis moves away from AWS Cognito. Do not use real client data until this is decided and tested.

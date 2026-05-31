@@ -2,7 +2,7 @@
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost}"
-API_URL="${API_URL:-${BASE_URL%/}/api/graphql}"
+API_URL="${API_URL:-${BASE_URL%/}/graphql}"
 TIMEOUT_SECONDS="${SMOKE_TIMEOUT_SECONDS:-15}"
 
 # Optional future authenticated checks. Do not print these values.
