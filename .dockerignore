@@ -12,6 +12,9 @@ yarn-error.log*
 **/out
 
 # Development files
+**/.env
+**/.env.*
+!**/.env.example
 **/.env.local
 **/.env.development.local
 **/.env.test.local
@@ -45,8 +48,18 @@ docs/
 # Temporary files
 *.tmp
 *.temp
+*.log
+*.tgz
+*.zip
 coverage/
 **/.nyc_output
+output/
+test-results/
+_reports/
+artifacts/
+*.png
+!apps/**/public/**/*.png
 
 # Large infrastructure files
 AWSCLIV2.pkg
+infrastructure/

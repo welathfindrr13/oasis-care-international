@@ -1,93 +1,66 @@
-# ---- build stage ----
-FROM node:20-slim AS build
+FROM node:20-alpine AS build
 
-# Install native build dependencies for node-gyp packages
-RUN apt-get update && apt-get install -y python3 make g++ openssl && rm -rf /var/lib/apt/lists/*
-
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN apk add --no-cache python3 make g++ openssl libc6-compat
+RUN corepack enable && corepack prepare pnpm@9.13.1 --activate
 
 WORKDIR /app
 
-# Copy workspace files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY turbo.json ./
-
-# Copy package.json files for all workspaces
 COPY apps/api/package.json ./apps/api/
 COPY libs/auth/package.json ./libs/auth/
 COPY libs/db/package.json ./libs/db/
 
-# Install dependencies for all workspaces
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
-# Copy source code
 COPY . .
 
-# Generate Prisma client
-RUN cd libs/db && npx prisma generate
+RUN rm -f libs/auth/tsconfig.tsbuildinfo libs/db/tsconfig.tsbuildinfo && \
+    rm -rf libs/auth/dist libs/db/dist
 
-# Build libs explicitly (not declared as npm deps, just tsconfig paths)
+RUN cd libs/db && pnpm prisma generate
 RUN cd libs/auth && pnpm build
 RUN cd libs/db && pnpm build
-
-# Build the API
 RUN cd apps/api && pnpm build
 
-# ---- production image ----
-FROM node:20-slim AS production
+FROM node:20-alpine AS production
 
-# Install openssl for Prisma and curl for health checks
-RUN apt-get update && apt-get install -y openssl curl && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache openssl curl libc6-compat
+RUN corepack enable && corepack prepare pnpm@9.13.1 --activate
 
 ENV NODE_ENV=production
+ENV PORT=4000
 WORKDIR /app
 
-# Install pnpm for production
-RUN corepack enable && corepack prepare pnpm@latest --activate
-
-# Copy workspace config
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY turbo.json ./
-
-# Copy package.json files
 COPY apps/api/package.json ./apps/api/
 COPY libs/auth/package.json ./libs/auth/
 COPY libs/db/package.json ./libs/db/
 
-# Patch libs package.json to point to compiled dist instead of src
 RUN sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|g' ./libs/auth/package.json && \
     sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|g' ./libs/db/package.json
 
-# Install production dependencies only
-RUN pnpm install --prod --no-frozen-lockfile
+RUN pnpm install --prod --frozen-lockfile
 
-# Create symlinks for workspace packages (pnpm doesn't do this in prod mode)
 RUN mkdir -p node_modules/@oasis && \
-    ln -sf /app/libs/auth node_modules/@oasis/auth && \
-    ln -sf /app/libs/db node_modules/@oasis/db
+    rm -rf node_modules/@oasis/auth node_modules/@oasis/db && \
+    ln -s /app/libs/auth node_modules/@oasis/auth && \
+    ln -s /app/libs/db node_modules/@oasis/db
 
-# Copy built application from build stage
 COPY --from=build /app/apps/api/dist ./apps/api/dist
-
-# Copy compiled libs
 COPY --from=build /app/libs/auth/dist ./libs/auth/dist
 COPY --from=build /app/libs/db/dist ./libs/db/dist
-
-# Copy Prisma schema and generated client (includes query engine)
 COPY --from=build /app/libs/db/prisma ./libs/db/prisma
 COPY --from=build /app/libs/db/src/generated ./libs/db/src/generated
-# Also copy to dist/ where the compiled code expects it
 COPY --from=build /app/libs/db/src/generated ./libs/db/dist/generated
 
-# Copy entrypoint script
 COPY apps/api/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-# Create non-root user
-RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs nestjs
+RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001 -G nodejs
 USER nestjs
 
-EXPOSE 3000
+EXPOSE 4000
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

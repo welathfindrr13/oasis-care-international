@@ -1,14 +1,15 @@
 #!/bin/sh
+set -eu
 
-echo ">>> Running database migrations..."
-cd /app/libs/db
-if npx prisma migrate deploy; then
+if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
+  echo ">>> Running database migrations..."
+  cd /app/libs/db
+  npx prisma migrate deploy
   echo ">>> Migrations complete."
 else
-  echo ">>> Migration failed, but continuing to start server..."
+  echo ">>> Skipping database migrations. Set RUN_MIGRATIONS=true to run Prisma migrate deploy."
 fi
 
 echo ">>> Starting API server..."
+cd /app
 exec node /app/apps/api/dist/apps/api/src/main.js
-
-
