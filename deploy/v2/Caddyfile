@@ -1,0 +1,32 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	# Health, GraphQL, and API traffic stay internal and route to the API.
+	handle /health {
+		reverse_proxy api:4000
+	}
+
+	handle /graphql {
+		reverse_proxy api:4000
+	}
+
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+
+	# CareBridge access boundaries are validated by deployment smoke tests, not by
+	# Caddy routing. Family-safe projections must stay enforced in app/API auth.
+	handle {
+		reverse_proxy web:3000
+	}
+}
