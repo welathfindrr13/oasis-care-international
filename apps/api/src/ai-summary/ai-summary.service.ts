@@ -23,7 +23,7 @@ type CareLogForModel = {
 @Injectable()
 export class AiSummaryService {
   private readonly logger = new Logger(AiSummaryService.name);
-  private readonly bedrock: BedrockRuntimeClient;
+  private bedrock: BedrockRuntimeClient | null = null;
   private readonly summaryModelId: string;
   private readonly fallbackModelIds: string[];
   private readonly summaryPromptTemplate: string;
@@ -59,7 +59,6 @@ export class AiSummaryService {
   ) {
     this.summaryModelId = process.env.BEDROCK_MODEL || 'anthropic.claude-3-haiku-20240307-v1:0';
     this.fallbackModelIds = this.parseFallbackModelIds();
-    this.bedrock = this.initBedrockClient();
     this.summaryPromptTemplate = this.loadPromptTemplate();
   }
 
@@ -71,8 +70,8 @@ export class AiSummaryService {
   ): Promise<HealthSummary> {
     const orgId = await this.requireOrganizationId(organizationId);
     const requestId = this.cls.get('requestId');
-    this.logger.log(`Generating AI summary for client ${data.clientId}`, { requestId });
     this.validateGenerationPreflight();
+    this.logger.log(`Generating AI summary for client ${data.clientId}`, { requestId });
 
     // Check if AI summary is enabled for this client's organization
     const aiEnabled = await this.aiSummaryRepository.checkOrganizationAIEnabled(data.clientId, orgId);
@@ -594,6 +593,15 @@ Return valid JSON only.`;
   }
 
   private validateGenerationPreflight(): void {
+    const aiSummaryEnabled = String(process.env.AI_SUMMARY_ENABLED || 'false').trim().toLowerCase() === 'true';
+    if (!aiSummaryEnabled) {
+      throw new BaseHttpException(
+        ErrorCode.FEATURE_NOT_ENABLED,
+        'AI summary generation is disabled for this deployment.',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
     const modelId = String(this.summaryModelId || '').trim();
     const region = String(process.env.AWS_REGION || '').trim();
     if (!modelId) {
@@ -635,6 +643,10 @@ Return valid JSON only.`;
   }
 
   private async invokeSummaryModel(modelId: string, prompt: string): Promise<string> {
+    if (!this.bedrock) {
+      this.bedrock = this.initBedrockClient();
+    }
+
     const command = new ConverseCommand({
       modelId,
       messages: [

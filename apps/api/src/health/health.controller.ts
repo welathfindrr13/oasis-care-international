@@ -1,4 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
+import { PrismaService } from '@oasis/db';
 
 function healthPayload() {
   const environment =
@@ -26,9 +27,39 @@ export class HealthController {
 
 @Controller()
 export class StandardHealthController {
+  constructor(private readonly prisma: PrismaService) {}
+
   @Get('health')
   standardHealth() {
     return healthPayload();
+  }
+
+  @Get('ready')
+  async readiness() {
+    const checks = {
+      api: 'ok',
+      database: 'unknown',
+    };
+
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      checks.database = 'ok';
+    } catch {
+      checks.database = 'error';
+    }
+
+    const ready = checks.database === 'ok';
+    const payload = {
+      ...healthPayload(),
+      status: ready ? 'ready' : 'degraded',
+      checks,
+    };
+
+    if (!ready) {
+      throw new ServiceUnavailableException(payload);
+    }
+
+    return payload;
   }
 }
 
