@@ -138,7 +138,8 @@ function validate(values) {
 }
 
 function main() {
-  const envFile = process.argv[2];
+  const args = process.argv.slice(2).filter((arg) => arg !== '--');
+  const envFile = args[0];
   if (!envFile) {
     console.error('Usage: preflight-env.mjs <env-file>');
     process.exit(2);
