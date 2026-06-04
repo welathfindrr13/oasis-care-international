@@ -54,6 +54,14 @@ cp deploy/v2/.env.example deploy/v2/.env
 
 Replace every `<...>` placeholder. Never commit `deploy/v2/.env`.
 
+Run the env preflight before any VPS rehearsal:
+
+```bash
+pnpm deploy:v2:preflight -- deploy/v2/.env
+```
+
+The preflight must pass before any production-like runtime test. It fails on missing critical variables, placeholder values, localhost public URLs, local auth in production, demo mode in production, and obvious weak/default secrets.
+
 Required areas:
 
 - public domain and ACME email;
@@ -61,6 +69,8 @@ Required areas:
 - `JWT_SECRET` and `NEXTAUTH_SECRET`;
 - public app/API URLs, with GraphQL routed at `/graphql`;
 - production auth provider values.
+
+See `docs/deployment-v2/env-matrix.md` for the canonical variable matrix.
 
 Known blocker: production auth provider selection is still unresolved if Oasis moves away from AWS Cognito. Do not use real client data until this is decided and tested.
 
@@ -105,6 +115,15 @@ STAFF_COOKIE='<staff-session-cookie>' \
 deploy/v2/scripts/smoke-test.sh
 ```
 
+Bearer tokens can also be supplied without printing secrets:
+
+```bash
+BASE_URL=https://your-domain.example \
+STAFF_TEST_TOKEN='<staff-access-token>' \
+FAMILY_TEST_TOKEN='<family-access-token>' \
+deploy/v2/scripts/smoke-test.sh
+```
+
 The deployment is not healthy until CareBridge checks prove:
 
 - family users remain in `/family` and family-safe surfaces;
@@ -120,14 +139,19 @@ The deployment is not healthy until CareBridge checks prove:
 Create a timestamped local backup:
 
 ```bash
+POSTGRES_USER=oasis POSTGRES_DB=oasis \
 deploy/v2/scripts/backup-postgres.sh
 ```
 
 Override backup location if needed:
 
 ```bash
-BACKUP_DIR=/var/backups/oasis deploy/v2/scripts/backup-postgres.sh
+POSTGRES_USER=oasis POSTGRES_DB=oasis \
+BACKUP_DIR=/var/backups/oasis \
+deploy/v2/scripts/backup-postgres.sh
 ```
+
+If `deploy/v2/.env` exists, the script loads it automatically. Keep production backups outside the repo working tree.
 
 Next production hardening step: encrypt and copy backups to an offsite UK/EU-compatible provider.
 
@@ -146,6 +170,32 @@ NON_INTERACTIVE=true deploy/v2/scripts/restore-postgres.sh /path/to/backup.dump
 ```
 
 Run a restore rehearsal before real client data.
+
+For non-interactive disposable rehearsals, explicitly confirm a pre-restore backup gate:
+
+```bash
+PRE_RESTORE_BACKUP_CONFIRMED=true \
+NON_INTERACTIVE=true \
+POSTGRES_USER=oasis \
+POSTGRES_DB=oasis \
+deploy/v2/scripts/restore-postgres.sh /path/to/backup.dump
+```
+
+Do not run restore against real client data until this has been rehearsed on disposable infrastructure.
+
+## Observability And Incident Basics
+
+Before launch, operators need:
+
+- external uptime checks for `/login`, `/health`, and `/ready`;
+- container log access for `caddy`, `web`, `api`, and `postgres`;
+- disk-space alerting for the Postgres volume and backup directory;
+- backup job success/failure alerting;
+- API error reporting or log alerting for repeated `5xx` and auth failures;
+- a documented first-response owner and breach escalation path;
+- a pre-migration snapshot gate;
+- rollback steps for application image/tag rollback and database restore;
+- RTO/RPO targets decided by the business before real client data.
 
 ## GDPR And Care-Sector Pre-Live Gates
 

@@ -82,6 +82,21 @@ Deployment V2 is the single-server production foundation. These controls must be
 - [ ] **Incident/breach response**: document first-response owner, notification process, evidence preservation, and escalation path.
 - [ ] **DPIA/security review**: complete DPIA and security checklist before using real client data.
 
+## Real Client Data Blockers
+
+Real client data must not be processed until all blockers below have evidence:
+
+- [ ] Provider DPA completed and stored.
+- [ ] DPIA/security review completed for the selected hosting and auth provider.
+- [ ] Production auth provider selected and tested with staff/admin/family users.
+- [ ] HTTPS, domain, session cookies, and logout behavior verified in browser.
+- [ ] Deployment V2 env preflight passes with real runtime values.
+- [ ] Backup and restore rehearsal completed on disposable infrastructure.
+- [ ] Authenticated CareBridge smoke proves family users cannot access raw visits, care notes, medication rows, care-planning internals, evidence packs, staff/admin/reporting data, or approval queues.
+- [ ] SAR/export/erasure/retention/legal-hold operating model documented.
+- [ ] Audit logs verified in deployed runtime and retention period chosen.
+- [ ] Incident/breach response owner, escalation path, and evidence preservation procedure documented.
+
 ## TODO - Implementation Requirements
 
 ### 1. Consent Management
