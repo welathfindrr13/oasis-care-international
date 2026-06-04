@@ -108,3 +108,62 @@ jobs:
     #   with:
     #     directory: ./apps/api/coverage
     #     fail_ci_if_error: true
+
+  deployment-v2-verification:
+    name: Deployment V2 verification
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 9.13.1
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Deployment V2 static gates
+      shell: bash
+      run: |
+        set -euo pipefail
+        TEMP_ENV="$(mktemp)"
+        cat > "$TEMP_ENV" <<'ENV'
+        NODE_ENV=production
+        APP_DOMAIN=care.example.org
+        ACME_EMAIL=ops@example.org
+        POSTGRES_DB=oasis
+        POSTGRES_USER=oasis
+        POSTGRES_PASSWORD=0123456789abcdef0123456789abcdef
+        DATABASE_URL=postgresql://oasis:0123456789abcdef0123456789abcdef@postgres:5432/oasis
+        JWT_SECRET=0123456789abcdef0123456789abcdef
+        NEXTAUTH_SECRET=0123456789abcdef0123456789abcdefnextauth
+        NEXTAUTH_URL=https://care.example.org
+        NEXT_PUBLIC_API_URL=https://care.example.org/graphql
+        NEXT_PUBLIC_SITE_URL=https://care.example.org
+        ALLOWED_ORIGINS=https://care.example.org
+        AUTH_IDENTITY_PROVIDER=cognito
+        COGNITO_ISSUER=https://auth.provider.org/oauth2/default
+        COGNITO_CLIENT_ID=oasis-production-client
+        COGNITO_CLIENT_SECRET=0123456789abcdef0123456789abcdefcognito
+        LOCAL_AUTH_ENABLED=false
+        NEXT_PUBLIC_LOCAL_AUTH_ENABLED=false
+        DEMO_MODE=false
+        RUN_MIGRATIONS=false
+        GDPR_ENABLED=false
+        METRICS_ENABLED=false
+        AI_SUMMARY_ENABLED=false
+        ENV
+        node --test deploy/v2/scripts/preflight-env.test.mjs
+        node deploy/v2/scripts/preflight-env.mjs "$TEMP_ENV"
+        docker compose -f deploy/v2/docker-compose.yml config
+        docker run --rm -v "$PWD/deploy/v2/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile
+        bash -n deploy/v2/scripts/smoke-test.sh
+        bash -n deploy/v2/scripts/backup-postgres.sh
+        bash -n deploy/v2/scripts/restore-postgres.sh

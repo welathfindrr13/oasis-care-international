@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEPLOY_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${DEPLOY_DIR}/../.." && pwd)"
+TEMP_ENV="$(mktemp)"
+
+cleanup() {
+  rm -f "$TEMP_ENV"
+}
+trap cleanup EXIT
+
+cat > "$TEMP_ENV" <<'ENV'
+NODE_ENV=production
+APP_DOMAIN=care.example.org
+ACME_EMAIL=ops@example.org
+POSTGRES_DB=oasis
+POSTGRES_USER=oasis
+POSTGRES_PASSWORD=0123456789abcdef0123456789abcdef
+DATABASE_URL=postgresql://oasis:0123456789abcdef0123456789abcdef@postgres:5432/oasis
+JWT_SECRET=0123456789abcdef0123456789abcdef
+NEXTAUTH_SECRET=0123456789abcdef0123456789abcdefnextauth
+NEXTAUTH_URL=https://care.example.org
+NEXT_PUBLIC_API_URL=https://care.example.org/graphql
+NEXT_PUBLIC_SITE_URL=https://care.example.org
+ALLOWED_ORIGINS=https://care.example.org
+AUTH_IDENTITY_PROVIDER=cognito
+COGNITO_ISSUER=https://auth.provider.org/oauth2/default
+COGNITO_CLIENT_ID=oasis-production-client
+COGNITO_CLIENT_SECRET=0123456789abcdef0123456789abcdefcognito
+LOCAL_AUTH_ENABLED=false
+NEXT_PUBLIC_LOCAL_AUTH_ENABLED=false
+DEMO_MODE=false
+RUN_MIGRATIONS=false
+GDPR_ENABLED=false
+METRICS_ENABLED=false
+AI_SUMMARY_ENABLED=false
+ENV
+
+cd "$REPO_ROOT"
+
+pnpm --dir libs/db exec prisma validate
+pnpm --filter @oasis/api test
+pnpm --filter @oasis/api build
+pnpm --filter @oasis/web build
+docker build -f apps/api/Dockerfile -t oasis-api:v2 .
+docker build -f apps/web/Dockerfile -t oasis-web:v2 .
+docker compose -f deploy/v2/docker-compose.yml config
+docker run --rm -v "$PWD/deploy/v2/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile
+bash -n deploy/v2/scripts/smoke-test.sh
+bash -n deploy/v2/scripts/backup-postgres.sh
+bash -n deploy/v2/scripts/restore-postgres.sh
+node --test deploy/v2/scripts/preflight-env.test.mjs
+node deploy/v2/scripts/preflight-env.mjs "$TEMP_ENV"
