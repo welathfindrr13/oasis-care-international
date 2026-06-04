@@ -1,14 +1,22 @@
 import { PrismaClient, VisitStatus } from '@oasis/db';
-import { TEST_USERS } from './jwt.mock';
+import { TEST_ORGANIZATION_ID, TEST_USERS } from './jwt.mock';
 
 export async function createTestFixtures(prisma: PrismaClient) {
   // Clean up existing data
   await cleanDatabase(prisma);
 
+  const organization = await prisma.organization.create({
+    data: {
+      id: TEST_ORGANIZATION_ID,
+      name: 'Oasis Test Care',
+    },
+  });
+
   // Create test carer (matches JWT mock user)
   const carer = await prisma.carer.create({
     data: {
       id: TEST_USERS.carer.sub, // 'carer-123'
+      organization_id: organization.id,
       first_name: 'Jane',
       last_name: 'Doe',
       email: 'jane.doe@oasis.uk',
@@ -22,6 +30,7 @@ export async function createTestFixtures(prisma: PrismaClient) {
   const otherCarer = await prisma.carer.create({
     data: {
       id: TEST_USERS.otherCarer.sub, // 'carer-456'
+      organization_id: organization.id,
       first_name: 'John',
       last_name: 'Smith',
       email: 'john.smith@oasis.uk',
@@ -35,6 +44,7 @@ export async function createTestFixtures(prisma: PrismaClient) {
   const client = await prisma.client.create({
     data: {
       id: TEST_USERS.client.sub, // 'client-123'
+      organization_id: organization.id,
       full_name: 'Mary Jones',
       address_line1: '123 Test Street',
       address_line2: 'Apartment 4B',
@@ -48,6 +58,7 @@ export async function createTestFixtures(prisma: PrismaClient) {
   const otherClient = await prisma.client.create({
     data: {
       id: 'client-456',
+      organization_id: organization.id,
       full_name: 'Robert Brown',
       address_line1: '456 Mock Avenue',
       city: 'Manchester',
@@ -61,6 +72,7 @@ export async function createTestFixtures(prisma: PrismaClient) {
     data: {
       carer_id: carer.id,
       client_id: client.id,
+      organization_id: organization.id,
       scheduled_start: new Date('2024-02-01T09:00:00Z'),
       scheduled_end: new Date('2024-02-01T10:00:00Z'),
       status: VisitStatus.SCHEDULED,
@@ -84,6 +96,7 @@ export async function createTestFixtures(prisma: PrismaClient) {
     data: {
       carer_id: carer.id,
       client_id: otherClient.id,
+      organization_id: organization.id,
       scheduled_start: new Date('2024-01-30T14:00:00Z'),
       scheduled_end: new Date('2024-01-30T15:00:00Z'),
       actual_start: new Date('2024-01-30T14:05:00Z'),
@@ -94,6 +107,7 @@ export async function createTestFixtures(prisma: PrismaClient) {
   });
 
   return {
+    organization,
     carers: { carer, otherCarer },
     clients: { client, otherClient },
     visits: { scheduledVisit, completedVisit },
@@ -103,9 +117,12 @@ export async function createTestFixtures(prisma: PrismaClient) {
 export async function cleanDatabase(prisma: PrismaClient) {
   // Delete in correct order to respect foreign key constraints
   await prisma.$transaction([
+    prisma.careLog.deleteMany(),
     prisma.visitTask.deleteMany(),
     prisma.visit.deleteMany(),
     prisma.carer.deleteMany(),
     prisma.client.deleteMany(),
+    prisma.organizationIdentity.deleteMany(),
+    prisma.organization.deleteMany(),
   ]);
 }

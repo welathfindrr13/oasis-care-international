@@ -36,6 +36,6 @@ register.registerMetric(medicationOverlapsTotal);
       useValue: medicationOverlapsTotal,
     },
   ],
-  exports: [MedicationService],
+  exports: [MedicationService, MedicationRepository],
 })
 export class MedicationModule {}

@@ -7,12 +7,14 @@ generator client {
   provider        = "prisma-client-js"
   output          = "../src/generated/client"
   engineType      = "library"
-  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
+  // Cover both the previous musl-based runtime and the current Debian-based image.
+  binaryTargets   = ["native", "linux-musl", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
   previewFeatures = ["postgresqlExtensions"]
 }
 
 model Carer {
   id                 String          @id @default(uuid())
+  organization_id    String?
   first_name         String
   last_name          String
   email              String          @unique
@@ -20,11 +22,15 @@ model Carer {
   hire_date          DateTime        @default(now())
   is_active          Boolean         @default(true)
   visits             Visit[]
+  shifts             CarerShift[]
+  care_logs          CareLog[]
   approved_summaries HealthSummary[]
+  organization       Organization?   @relation(fields: [organization_id], references: [id])
   created_at         DateTime        @default(now())
   updated_at         DateTime        @updatedAt
   deleted_at         DateTime?
 
+  @@index([organization_id])
   @@map("carer")
 }
 
@@ -38,9 +44,18 @@ model Client {
   date_of_birth    DateTime?
   organization_id  String?
   visits           Visit[]
+  care_logs        CareLog[]
   prescriptions    Prescription[]
   organization     Organization?   @relation(fields: [organization_id], references: [id])
   health_summaries HealthSummary[]
+  care_rooms       CareRoom[]
+  verified_visit_stories VerifiedVisitStory[]
+  concerns         Concern[]
+  weekly_care_summaries WeeklyCareSummary[]
+  carebridge_policy CareBridgePolicy[]
+  assessments      Assessment[]
+  care_plans       CarePlan[]
+  evidence_packs   EvidencePack[]
   created_at       DateTime        @default(now())
   updated_at       DateTime        @updatedAt
   deleted_at       DateTime?
@@ -50,6 +65,7 @@ model Client {
 
 model Visit {
   id                       String                     @id @default(uuid())
+  organization_id          String?
   carer_id                 String
   client_id                String
   scheduled_start          DateTime
@@ -60,13 +76,17 @@ model Visit {
   notes                    String?
   carer                    Carer                      @relation(fields: [carer_id], references: [id])
   client                   Client                     @relation(fields: [client_id], references: [id])
+  organization             Organization?              @relation(fields: [organization_id], references: [id])
   tasks                    VisitTask[]
+  care_logs                CareLog[]
   medication_administrations MedicationAdministration[]
   log_embeddings           LogEmbedding[]
+  verified_visit_stories   VerifiedVisitStory[]
   created_at               DateTime                   @default(now())
   updated_at               DateTime                   @updatedAt
   deleted_at               DateTime?
 
+  @@index([organization_id])
   @@index([carer_id])
   @@index([client_id])
   @@index([scheduled_start, scheduled_end])
@@ -93,11 +113,52 @@ model VisitTask {
   @@map("visit_task")
 }
 
+model CarerShift {
+  id                    String                   @id @default(uuid())
+  organization_id       String?
+  carer_id              String
+  clock_in_at           DateTime
+  clock_out_at          DateTime?
+  clock_in_method       ShiftVerificationMethod  @default(GPS)
+  clock_out_method      ShiftVerificationMethod?
+  clock_in_lat          Float?
+  clock_in_lng          Float?
+  clock_in_accuracy_m   Float?
+  clock_out_lat         Float?
+  clock_out_lng         Float?
+  clock_out_accuracy_m  Float?
+  clock_in_source       String?                  @db.VarChar(50)
+  clock_out_source      String?                  @db.VarChar(50)
+  clock_in_reason_code  String?                  @db.VarChar(50)
+  clock_out_reason_code String?                  @db.VarChar(50)
+  location_consent_at   DateTime?
+  notes                 String?
+  carer                 Carer                    @relation(fields: [carer_id], references: [id])
+  organization          Organization?            @relation(fields: [organization_id], references: [id])
+  created_at            DateTime                 @default(now())
+  updated_at            DateTime                 @updatedAt
+  deleted_at            DateTime?
+
+  @@index([organization_id])
+  @@index([carer_id])
+  @@index([clock_in_at])
+  @@index([clock_out_at])
+  @@map("carer_shift")
+}
+
 enum VisitStatus {
   SCHEDULED
   IN_PROGRESS
   COMPLETED
   CANCELLED
+}
+
+enum ShiftVerificationMethod {
+  GPS
+  QR
+  NFC
+  PHONE
+  MANUAL
 }
 
 model Medication {
@@ -150,6 +211,7 @@ model MedicationAdministration {
   notes             String?
   prescription      Prescription        @relation(fields: [prescription_id], references: [id])
   visit             Visit?              @relation(fields: [visit_id], references: [id])
+  care_logs         CareLog[]
   audits            MedicationAudit[]
   created_at        DateTime            @default(now())
   updated_at        DateTime            @updatedAt
@@ -164,6 +226,7 @@ model MedicationAdministration {
 
 model MedicationAudit {
   id                           String                    @id @default(uuid())
+  organization_id              String?
   prescription_id              String?
   medication_administration_id String?
   action                       MedicationAuditAction
@@ -171,9 +234,11 @@ model MedicationAudit {
   actor_role                   String
   changes                      String // JSON object of what changed
   timestamp                    DateTime                  @default(now())
+  organization                 Organization?             @relation(fields: [organization_id], references: [id])
   prescription                 Prescription?             @relation(fields: [prescription_id], references: [id])
   medication_administration    MedicationAdministration? @relation(fields: [medication_administration_id], references: [id])
 
+  @@index([organization_id])
   @@index([prescription_id])
   @@index([medication_administration_id])
   @@index([timestamp])
@@ -202,15 +267,684 @@ enum MedicationAuditAction {
   AI_SUMMARY_REJECTED
 }
 
+enum CareLogCategory {
+  TOILETING
+  NUTRITION
+  HYDRATION
+  SLEEP
+  MOOD
+  MOBILITY
+  MEDICATION
+  SKIN
+  PAIN
+  INCIDENT
+  OTHER
+}
+
+enum IntakeAmount {
+  NONE
+  QUARTER
+  HALF
+  MOST
+  ALL
+}
+
+enum MoodLevel {
+  VERY_LOW
+  LOW
+  NEUTRAL
+  GOOD
+  VERY_GOOD
+}
+
+enum StoolType {
+  TYPE_1
+  TYPE_2
+  TYPE_3
+  TYPE_4
+  TYPE_5
+  TYPE_6
+  TYPE_7
+}
+
 model Organization {
   id                 String   @id @default(uuid())
   name               String
   ai_summary_enabled Boolean  @default(false)
+  identities         OrganizationIdentity[]
+  memberships        OrganizationMembership[]
+  carers             Carer[]
   clients            Client[]
+  visits             Visit[]
+  carer_shifts       CarerShift[]
+  care_logs          CareLog[]
+  family_contacts    FamilyContact[]
+  care_rooms         CareRoom[]
+  carebridge_policies CareBridgePolicy[]
+  verified_visit_stories VerifiedVisitStory[]
+  concerns           Concern[]
+  weekly_care_summaries WeeklyCareSummary[]
+  family_pulses      FamilyPulse[]
+  consent_records    ConsentRecord[]
+  audit_logs         AuditLog[]
+  erasure_queue      ErasureQueue[]
+  medication_audits  MedicationAudit[]
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
 
   @@map("organization")
+}
+
+enum FamilyAccessBasis {
+  CLIENT_CONSENT
+  HEALTH_WELFARE_ATTORNEY
+  EMERGENCY_ACCESS
+  BEST_INTERESTS
+  PROFESSIONAL_VIEWER
+  PROVIDER_AUTHORISED
+}
+
+enum CareRoomStatus {
+  ACTIVE
+  ARCHIVED
+  REVOKED
+}
+
+enum CareRoomMembershipStatus {
+  INVITED
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum CareRoomRole {
+  PRIMARY_CONTACT
+  FAMILY_VIEWER
+  FAMILY_CONTRIBUTOR
+  LEGAL_REPRESENTATIVE
+  EMERGENCY_CONTACT
+  PROFESSIONAL_VIEWER
+}
+
+enum AccessGrantScope {
+  VIEW_UPDATES
+  VIEW_VISIT_TIMES
+  VIEW_TASK_SUMMARY
+  VIEW_MEDICATION_SUPPORT_STATUS
+  VIEW_WEEKLY_SUMMARIES
+  RAISE_CONCERNS
+  REPLY_TO_CONCERNS
+  SUBMIT_PULSE
+}
+
+enum CarebridgeContentStatus {
+  DRAFT
+  APPROVED
+  PUBLISHED
+  REJECTED
+}
+
+enum ConcernSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ConcernPriority {
+  ROUTINE
+  PRIORITY
+  URGENT
+}
+
+enum ConcernStatus {
+  OPEN
+  ACKNOWLEDGED
+  IN_PROGRESS
+  RESOLVED
+  ESCALATED
+  CLOSED
+}
+
+enum ConcernCategory {
+  VISIT_DELIVERY
+  COMMUNICATION
+  MEDICATION_SUPPORT
+  WELLBEING_CHANGE
+  SCHEDULING
+  OTHER
+}
+
+enum ConcernOutcome {
+  RESOLVED
+  NO_ACTION_REQUIRED
+  CARE_PLAN_REVIEW_REQUIRED
+  CALLBACK_COMPLETED
+  ESCALATED_TO_MANAGER
+  ESCALATED_TO_INCIDENT
+  ESCALATED_TO_SAFEGUARDING
+  FAMILY_NOT_SATISFIED
+}
+
+enum ConcernEventType {
+  RAISED
+  ACKNOWLEDGED
+  ASSIGNED
+  RESPONDED
+  RESOLVED
+  REOPENED
+  ESCALATED
+}
+
+enum ConcernActorType {
+  STAFF
+  FAMILY
+  SYSTEM
+}
+
+enum FamilyPulseSentiment {
+  CONFIDENT
+  UNSURE
+  CONCERNED
+  NEED_CALL
+}
+
+enum AssessmentStatus {
+  DRAFT
+  IN_REVIEW
+  COMPLETED
+  ARCHIVED
+}
+
+enum AssessmentSource {
+  MANUAL
+  VISIT_REVIEW
+  HOSPITAL_DISCHARGE
+  REFERRAL_HANDOFF
+}
+
+enum CarePlanStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum EvidencePackStatus {
+  DRAFT
+  COMPILED
+  PUBLISHED
+}
+
+enum EvidenceSourceType {
+  VISIT
+  CARE_LOG
+  MEDICATION_ADMINISTRATION
+  ASSESSMENT
+  CARE_PLAN
+  CONCERN
+  MANUAL_NOTE
+}
+
+model FamilyContact {
+  id               String                 @id @default(uuid())
+  organization_id  String
+  auth_subject     String?                @unique
+  email            String?
+  phone            String?
+  full_name        String
+  relationship     String?                @db.VarChar(100)
+  identity_type    String?                @db.VarChar(50)
+  disabled_at      DateTime?
+  organization     Organization           @relation(fields: [organization_id], references: [id])
+  memberships      CareRoomMembership[]
+  created_at       DateTime               @default(now())
+  updated_at       DateTime               @updatedAt
+
+  @@index([organization_id])
+  @@index([email])
+  @@map("family_contact")
+}
+
+model CareRoom {
+  id               String                 @id @default(uuid())
+  organization_id  String
+  client_id        String
+  status           CareRoomStatus         @default(ACTIVE)
+  organization     Organization           @relation(fields: [organization_id], references: [id])
+  client           Client                 @relation(fields: [client_id], references: [id])
+  memberships      CareRoomMembership[]
+  policies         CareBridgePolicy[]
+  verified_visit_stories VerifiedVisitStory[]
+  concerns         Concern[]
+  weekly_care_summaries WeeklyCareSummary[]
+  family_pulses    FamilyPulse[]
+  created_at       DateTime               @default(now())
+  updated_at       DateTime               @updatedAt
+
+  @@index([organization_id])
+  @@index([client_id])
+  @@map("care_room")
+}
+
+model CareRoomMembership {
+  id                  String                    @id @default(uuid())
+  care_room_id        String
+  family_contact_id   String
+  role                CareRoomRole
+  status              CareRoomMembershipStatus  @default(INVITED)
+  access_basis        FamilyAccessBasis
+  consent_record_id   String?
+  review_due_at       DateTime?
+  invited_by_user_id  String?
+  approved_by_user_id String?
+  revoked_by_user_id  String?
+  invited_at          DateTime                  @default(now())
+  accepted_at         DateTime?
+  revoked_at          DateTime?
+  care_room           CareRoom                  @relation(fields: [care_room_id], references: [id])
+  family_contact      FamilyContact             @relation(fields: [family_contact_id], references: [id])
+  access_grants       AccessGrant[]
+  family_pulses       FamilyPulse[]
+  created_at          DateTime                  @default(now())
+  updated_at          DateTime                  @updatedAt
+
+  @@index([care_room_id])
+  @@index([family_contact_id])
+  @@map("care_room_membership")
+}
+
+model AccessGrant {
+  id                      String             @id @default(uuid())
+  care_room_membership_id String
+  scope                   AccessGrantScope
+  granted_at              DateTime           @default(now())
+  revoked_at              DateTime?
+  care_room_membership    CareRoomMembership @relation(fields: [care_room_membership_id], references: [id])
+  created_at              DateTime           @default(now())
+  updated_at              DateTime           @updatedAt
+
+  @@index([care_room_membership_id])
+  @@index([scope])
+  @@map("access_grant")
+}
+
+model CareBridgePolicy {
+  id                                String    @id @default(uuid())
+  organization_id                   String
+  care_room_id                      String?
+  client_id                         String?
+  show_carer_name_default           Boolean   @default(false)
+  show_visit_times_default          Boolean   @default(true)
+  show_task_summary_default         Boolean   @default(true)
+  show_medication_support_default   Boolean   @default(false)
+  require_approval_for_all_content  Boolean   @default(true)
+  family_can_raise_concerns         Boolean   @default(true)
+  family_can_reply_to_concerns      Boolean   @default(true)
+  family_can_submit_pulse           Boolean   @default(true)
+  digest_enabled                    Boolean   @default(true)
+  ai_drafting_enabled               Boolean   @default(false)
+  organization                      Organization @relation(fields: [organization_id], references: [id])
+  care_room                         CareRoom? @relation(fields: [care_room_id], references: [id])
+  client                            Client?   @relation(fields: [client_id], references: [id])
+  created_at                        DateTime  @default(now())
+  updated_at                        DateTime  @updatedAt
+
+  @@index([organization_id])
+  @@index([care_room_id])
+  @@index([client_id])
+  @@map("carebridge_policy")
+}
+
+model VerifiedVisitStory {
+  id              String                  @id @default(uuid())
+  organization_id String
+  care_room_id    String
+  client_id       String
+  visit_id        String
+  status          CarebridgeContentStatus @default(DRAFT)
+  draft_title     String
+  draft_body      String
+  approved_title  String?
+  approved_body   String?
+  rejection_reason String?
+  source_refs     Json
+  approved_by_id  String?
+  approved_at     DateTime?
+  published_at    DateTime?
+  rejected_at     DateTime?
+  organization    Organization            @relation(fields: [organization_id], references: [id])
+  care_room       CareRoom                @relation(fields: [care_room_id], references: [id])
+  client          Client                  @relation(fields: [client_id], references: [id])
+  visit           Visit                   @relation(fields: [visit_id], references: [id])
+  created_at      DateTime                @default(now())
+  updated_at      DateTime                @updatedAt
+
+  @@index([organization_id])
+  @@index([care_room_id])
+  @@index([client_id])
+  @@index([visit_id])
+  @@index([status])
+  @@map("verified_visit_story")
+}
+
+model Concern {
+  id                     String            @id @default(uuid())
+  organization_id        String
+  care_room_id           String
+  client_id              String
+  title                  String
+  description            String?
+  severity               ConcernSeverity   @default(MEDIUM)
+  priority               ConcernPriority   @default(ROUTINE)
+  category               ConcernCategory
+  status                 ConcernStatus     @default(OPEN)
+  outcome                ConcernOutcome?
+  raised_by_membership_id String?
+  raised_by_user_id      String?
+  assigned_to_user_id    String?
+  acknowledgement_due_at DateTime?
+  acknowledged_at        DateTime?
+  response_due_at        DateTime?
+  resolution_due_at      DateTime?
+  resolved_at            DateTime?
+  escalated_at           DateTime?
+  source_refs            Json?
+  organization           Organization      @relation(fields: [organization_id], references: [id])
+  care_room              CareRoom          @relation(fields: [care_room_id], references: [id])
+  client                 Client            @relation(fields: [client_id], references: [id])
+  messages               ConcernMessage[]
+  events                 ConcernEvent[]
+  created_at             DateTime          @default(now())
+  updated_at             DateTime          @updatedAt
+
+  @@index([organization_id])
+  @@index([care_room_id])
+  @@index([client_id])
+  @@index([status])
+  @@map("concern")
+}
+
+model ConcernMessage {
+  id               String            @id @default(uuid())
+  concern_id       String
+  actor_type       ConcernActorType
+  actor_label      String?
+  actor_id         String?
+  body             String
+  concern          Concern           @relation(fields: [concern_id], references: [id])
+  created_at       DateTime          @default(now())
+  updated_at       DateTime          @updatedAt
+
+  @@index([concern_id])
+  @@map("concern_message")
+}
+
+model ConcernEvent {
+  id               String            @id @default(uuid())
+  concern_id       String
+  event_type       ConcernEventType
+  actor_type       ConcernActorType
+  actor_id         String?
+  metadata         Json?
+  concern          Concern           @relation(fields: [concern_id], references: [id])
+  created_at       DateTime          @default(now())
+
+  @@index([concern_id])
+  @@map("concern_event")
+}
+
+model WeeklyCareSummary {
+  id              String                  @id @default(uuid())
+  organization_id String
+  care_room_id    String
+  client_id       String
+  period_start    DateTime                @db.Date
+  period_end      DateTime                @db.Date
+  status          CarebridgeContentStatus @default(DRAFT)
+  draft_title     String
+  draft_body      String
+  approved_title  String?
+  approved_body   String?
+  rejection_reason String?
+  source_refs     Json
+  approved_by_id  String?
+  approved_at     DateTime?
+  published_at    DateTime?
+  rejected_at     DateTime?
+  organization    Organization            @relation(fields: [organization_id], references: [id])
+  care_room       CareRoom                @relation(fields: [care_room_id], references: [id])
+  client          Client                  @relation(fields: [client_id], references: [id])
+  created_at      DateTime                @default(now())
+  updated_at      DateTime                @updatedAt
+
+  @@index([organization_id])
+  @@index([care_room_id])
+  @@index([client_id])
+  @@map("weekly_care_summary")
+}
+
+model FamilyPulse {
+  id                      String               @id @default(uuid())
+  organization_id         String
+  care_room_id            String
+  care_room_membership_id String
+  sentiment               FamilyPulseSentiment
+  note                    String?
+  organization            Organization         @relation(fields: [organization_id], references: [id])
+  care_room               CareRoom             @relation(fields: [care_room_id], references: [id])
+  care_room_membership    CareRoomMembership   @relation(fields: [care_room_membership_id], references: [id])
+  created_at              DateTime             @default(now())
+  updated_at              DateTime             @updatedAt
+
+  @@index([organization_id])
+  @@index([care_room_id])
+  @@index([care_room_membership_id])
+  @@map("family_pulse")
+}
+
+model Assessment {
+  id                  String           @id @default(uuid())
+  organization_id     String?
+  client_id           String
+  visit_id            String?
+  status              AssessmentStatus @default(DRAFT)
+  source              AssessmentSource @default(MANUAL)
+  title               String
+  summary             String?
+  findings            Json
+  risk_flags          Json?
+  recommended_actions Json?
+  assessor_id         String?
+  completed_at        DateTime?
+  review_due_at       DateTime?
+  client              Client           @relation(fields: [client_id], references: [id])
+  care_plans          CarePlan[]
+  created_at          DateTime         @default(now())
+  updated_at          DateTime         @updatedAt
+  deleted_at          DateTime?
+
+  @@index([organization_id])
+  @@index([client_id])
+  @@index([visit_id])
+  @@index([status])
+  @@index([review_due_at])
+  @@map("assessment")
+}
+
+model CarePlan {
+  id             String         @id @default(uuid())
+  organization_id String?
+  client_id      String
+  assessment_id  String?
+  status         CarePlanStatus @default(DRAFT)
+  version        Int            @default(1)
+  title          String
+  goals          Json
+  interventions  Json
+  safety_notes   String?
+  effective_from DateTime       @default(now())
+  effective_to   DateTime?
+  review_due_at  DateTime?
+  authored_by_id String?
+  approved_by_id String?
+  approved_at    DateTime?
+  client         Client         @relation(fields: [client_id], references: [id])
+  assessment     Assessment?    @relation(fields: [assessment_id], references: [id])
+  evidence_packs EvidencePack[]
+  created_at     DateTime       @default(now())
+  updated_at     DateTime       @updatedAt
+  deleted_at     DateTime?
+
+  @@index([organization_id])
+  @@index([client_id])
+  @@index([assessment_id])
+  @@index([status])
+  @@index([review_due_at])
+  @@map("care_plan")
+}
+
+model EvidencePack {
+  id              String             @id @default(uuid())
+  organization_id String?
+  client_id       String
+  care_plan_id    String?
+  status          EvidencePackStatus @default(DRAFT)
+  kind            String             @default("REGULATORY_REVIEW") @db.VarChar(50)
+  period_start    DateTime           @db.Date
+  period_end      DateTime           @db.Date
+  summary         Json?
+  source_refs     Json
+  generated_by    String             @default("system") @db.VarChar(50)
+  generated_at    DateTime           @default(now())
+  published_at    DateTime?
+  client          Client             @relation(fields: [client_id], references: [id])
+  care_plan       CarePlan?          @relation(fields: [care_plan_id], references: [id])
+  items           EvidenceItem[]
+  created_at      DateTime           @default(now())
+  updated_at      DateTime           @updatedAt
+
+  @@index([organization_id])
+  @@index([client_id])
+  @@index([care_plan_id])
+  @@index([status])
+  @@index([period_start, period_end])
+  @@map("evidence_pack")
+}
+
+model EvidenceItem {
+  id               String             @id @default(uuid())
+  evidence_pack_id String
+  source_type      EvidenceSourceType
+  source_id        String?
+  occurred_at      DateTime?
+  headline         String
+  detail           String?
+  metadata         Json?
+  evidence_pack    EvidencePack       @relation(fields: [evidence_pack_id], references: [id])
+  created_at       DateTime           @default(now())
+  updated_at       DateTime           @updatedAt
+
+  @@index([evidence_pack_id])
+  @@index([source_type])
+  @@index([source_id])
+  @@index([occurred_at])
+  @@map("evidence_item")
+}
+
+model OrganizationIdentity {
+  id                String       @id @default(uuid())
+  organization_id   String
+  identity_provider String       @db.VarChar(50)
+  identity_subject  String?      @db.VarChar(191)
+  normalized_email  String?      @db.VarChar(320)
+  notes             String?
+  organization      Organization @relation(fields: [organization_id], references: [id])
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+
+  @@index([organization_id])
+  @@unique([identity_provider, identity_subject])
+  @@unique([identity_provider, normalized_email])
+  @@map("organization_identity")
+}
+
+enum OrganizationMembershipStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+model OrganizationMembership {
+  id                       String                       @id @default(uuid())
+  organization_id          String
+  identity_provider        String                       @db.VarChar(50)
+  auth_subject             String                       @db.VarChar(191)
+  normalized_email         String?                      @db.VarChar(320)
+  role                     String                       @db.VarChar(50)
+  status                   OrganizationMembershipStatus @default(ACTIVE)
+  external_organization_id String?                      @db.VarChar(191)
+  external_membership_id   String?                      @db.VarChar(191)
+  metadata                 Json?
+  revoked_at               DateTime?
+  organization             Organization                 @relation(fields: [organization_id], references: [id])
+  created_at               DateTime                     @default(now())
+  updated_at               DateTime                     @updatedAt
+
+  @@index([organization_id])
+  @@index([identity_provider, auth_subject])
+  @@index([status])
+  @@unique([identity_provider, auth_subject, organization_id])
+  @@map("organization_membership")
+}
+
+model CareLog {
+  id                             String                    @id @default(uuid())
+  organization_id                String?
+  visit_id                       String?
+  client_id                      String
+  carer_id                       String
+  medication_administration_id   String?
+  occurred_at                    DateTime
+  category                       CareLogCategory
+  notes                          String?
+  urine_passed                   Boolean?
+  bowel_movement                 Boolean?
+  stool_type                     StoolType?
+  continence_status              String?                   @db.VarChar(50)
+  assistance_level               String?                   @db.VarChar(50)
+  meal_type                      String?                   @db.VarChar(50)
+  intake_amount                  IntakeAmount?
+  fluid_ml                       Int?
+  appetite                       String?                   @db.VarChar(50)
+  slept                          Boolean?
+  sleep_start                    DateTime?
+  sleep_end                      DateTime?
+  sleep_quality                  String?                   @db.VarChar(50)
+  mood_level                     MoodLevel?
+  agitation                      Boolean?
+  confusion                      Boolean?
+  pain_score                     Int?
+  escalated                      Boolean                   @default(false)
+  escalated_to                   String?                   @db.VarChar(100)
+  escalated_at                   DateTime?
+  source                         String?                   @db.VarChar(50)
+  created_at                     DateTime                  @default(now())
+  updated_at                     DateTime                  @updatedAt
+  deleted_at                     DateTime?
+  organization                   Organization?             @relation(fields: [organization_id], references: [id])
+  visit                          Visit?                    @relation(fields: [visit_id], references: [id])
+  client                         Client                    @relation(fields: [client_id], references: [id])
+  carer                          Carer                     @relation(fields: [carer_id], references: [id])
+  medication_administration      MedicationAdministration? @relation(fields: [medication_administration_id], references: [id])
+
+  @@index([organization_id])
+  @@index([visit_id])
+  @@index([client_id])
+  @@index([carer_id])
+  @@index([category, occurred_at])
+  @@index([occurred_at])
+  @@map("care_log")
 }
 
 model LogEmbedding {
@@ -254,6 +988,7 @@ model HealthSummary {
 
 model ConsentRecord {
   id               String   @id @default(uuid())
+  organization_id  String?
   user_id          String
   consent_type     String   @db.VarChar(50)
   purpose          String   @db.VarChar(100)
@@ -262,9 +997,11 @@ model ConsentRecord {
   withdrawn_at     DateTime?
   legal_basis      String   @db.VarChar(50)
   metadata         Json?
+  organization     Organization? @relation(fields: [organization_id], references: [id])
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
 
+  @@index([organization_id])
   @@index([user_id])
   @@index([consent_type])
   @@index([granted_at])
@@ -273,6 +1010,7 @@ model ConsentRecord {
 
 model AuditLog {
   id             String   @id @default(uuid())
+  organization_id String?
   user_id        String?
   action         String   @db.VarChar(50)
   resource_type  String   @db.VarChar(50)
@@ -281,8 +1019,10 @@ model AuditLog {
   new_values     Json?
   ip_address     String?  @db.VarChar(45)
   user_agent     String?  @db.VarChar(500)
+  organization   Organization? @relation(fields: [organization_id], references: [id])
   timestamp      DateTime @default(now())
 
+  @@index([organization_id])
   @@index([user_id])
   @@index([action])
   @@index([resource_type, resource_id])
@@ -307,6 +1047,7 @@ model RetentionPolicy {
 
 model ErasureQueue {
   id             String   @id @default(uuid())
+  organization_id String?
   user_id        String
   request_type   String   @db.VarChar(50)
   status         String   @db.VarChar(20) @default("PENDING")
@@ -314,9 +1055,11 @@ model ErasureQueue {
   scheduled_for  DateTime?
   completed_at   DateTime?
   metadata       Json?
+  organization   Organization? @relation(fields: [organization_id], references: [id])
   created_at     DateTime @default(now())
   updated_at     DateTime @updatedAt
 
+  @@index([organization_id])
   @@index([user_id])
   @@index([status])
   @@index([scheduled_for])

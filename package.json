@@ -18,7 +18,9 @@
     "release:check-secrets": "bash scripts/release/check-secrets-parity.sh",
     "release:mobile-smoke": "node scripts/release/mobile-route-smoke.mjs",
     "release:staging:reliability": "node scripts/release/run-staging-reliability-suite.mjs",
-    "release:readiness-report": "node scripts/release/generate-readiness-report.mjs"
+    "release:readiness-report": "node scripts/release/generate-readiness-report.mjs",
+    "deploy:v2:preflight": "node deploy/v2/scripts/preflight-env.mjs",
+    "deploy:v2:verify": "bash deploy/v2/scripts/verify-local.sh"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",

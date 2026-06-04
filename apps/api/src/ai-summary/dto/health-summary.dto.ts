@@ -73,7 +73,7 @@ export class HealthSummaryDTO {
   }
 }
 
-@ObjectType()
+@ObjectType('AiSummaryCarerDTO')
 export class CarerDTO {
   @Field(() => ID)
   id!: string;
@@ -91,7 +91,7 @@ export class CarerDTO {
   phone?: string | null;
 }
 
-@ObjectType()
+@ObjectType('AiSummaryClientDTO')
 export class ClientDTO {
   @Field(() => ID)
   id!: string;

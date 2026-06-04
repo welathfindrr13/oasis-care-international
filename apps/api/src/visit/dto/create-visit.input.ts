@@ -1,5 +1,5 @@
 import { InputType, Field, ID } from '@nestjs/graphql';
-import { IsUUID, IsDateString, IsEnum, IsOptional, IsString, ValidateNested, IsArray } from 'class-validator';
+import { IsUUID, IsDateString, IsEnum, IsOptional, IsString, ValidateNested, IsArray, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
 import { VisitStatus } from '@oasis/db';
 
@@ -18,7 +18,8 @@ export class CreateVisitTaskInput {
 @InputType()
 export class CreateVisitInput {
   @Field(() => ID)
-  @IsUUID()
+  // Cognito `sub` values may use UUID variants that strict UUID validators can reject.
+  @Matches(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
   carerId!: string;
 
   @Field(() => ID)

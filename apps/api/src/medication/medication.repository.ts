@@ -60,9 +60,16 @@ export class MedicationRepository {
     });
   }
 
-  async findPrescriptionById(id: string): Promise<Prescription | null> {
-    return this.prisma.prescription.findUnique({
-      where: { id, deleted_at: null },
+  async findPrescriptionById(id: string, organizationId: string): Promise<Prescription | null> {
+    return this.prisma.prescription.findFirst({
+      where: {
+        id,
+        deleted_at: null,
+        client: {
+          organization_id: organizationId,
+          deleted_at: null,
+        },
+      },
       include: {
         client: true,
         medication: true,
@@ -78,9 +85,17 @@ export class MedicationRepository {
     skip?: number;
     take?: number;
     orderBy?: Prisma.PrescriptionOrderByWithRelationInput;
-  }): Promise<{ items: Prescription[]; total: number }> {
+  }, organizationId: string): Promise<{ items: Prescription[]; total: number }> {
     const { where = {}, skip, take, orderBy } = params;
-    const finalWhere = { ...where, deleted_at: null };
+    const finalWhere = {
+      ...where,
+      deleted_at: null,
+      client: {
+        ...(where as any).client,
+        organization_id: organizationId,
+        deleted_at: null,
+      },
+    };
 
     const [items, total] = await Promise.all([
       this.prisma.prescription.findMany({
@@ -102,10 +117,38 @@ export class MedicationRepository {
     return { items, total };
   }
 
-  async updatePrescription(id: string, data: Prisma.PrescriptionUpdateInput): Promise<Prescription> {
-    return this.prisma.prescription.update({
-      where: { id },
+  async updatePrescription(
+    id: string,
+    organizationId: string,
+    data: Prisma.PrescriptionUpdateInput,
+  ): Promise<Prescription> {
+    const result = await this.prisma.prescription.updateMany({
+      where: {
+        id,
+        deleted_at: null,
+        client: {
+          organization_id: organizationId,
+          deleted_at: null,
+        },
+      },
       data,
+    });
+    if (result.count !== 1) {
+      throw new Prisma.PrismaClientKnownRequestError('Prescription not found in organization', {
+        code: 'P2025',
+        clientVersion: Prisma.prismaVersion.client,
+      });
+    }
+
+    return this.prisma.prescription.findFirstOrThrow({
+      where: {
+        id,
+        deleted_at: null,
+        client: {
+          organization_id: organizationId,
+          deleted_at: null,
+        },
+      },
       include: {
         client: true,
         medication: true,
@@ -130,9 +173,18 @@ export class MedicationRepository {
     });
   }
 
-  async findMedicationAdministrationById(id: string): Promise<MedicationAdministration | null> {
-    return this.prisma.medicationAdministration.findUnique({
-      where: { id, deleted_at: null },
+  async findMedicationAdministrationById(id: string, organizationId: string): Promise<MedicationAdministration | null> {
+    return this.prisma.medicationAdministration.findFirst({
+      where: {
+        id,
+        deleted_at: null,
+        prescription: {
+          client: {
+            organization_id: organizationId,
+            deleted_at: null,
+          },
+        },
+      },
       include: {
         prescription: {
           include: {
@@ -150,9 +202,20 @@ export class MedicationRepository {
     skip?: number;
     take?: number;
     orderBy?: Prisma.MedicationAdministrationOrderByWithRelationInput;
-  }): Promise<{ items: MedicationAdministration[]; total: number }> {
+  }, organizationId: string): Promise<{ items: MedicationAdministration[]; total: number }> {
     const { where = {}, skip, take, orderBy } = params;
-    const finalWhere = { ...where, deleted_at: null };
+    const finalWhere = {
+      ...where,
+      deleted_at: null,
+      prescription: {
+        ...(where as any).prescription,
+        client: {
+          ...((where as any).prescription?.client || {}),
+          organization_id: organizationId,
+          deleted_at: null,
+        },
+      },
+    };
 
     const [items, total] = await Promise.all([
       this.prisma.medicationAdministration.findMany({
@@ -176,10 +239,42 @@ export class MedicationRepository {
     return { items, total };
   }
 
-  async updateMedicationAdministration(id: string, data: Prisma.MedicationAdministrationUpdateInput): Promise<MedicationAdministration> {
-    return this.prisma.medicationAdministration.update({
-      where: { id },
+  async updateMedicationAdministration(
+    id: string,
+    organizationId: string,
+    data: Prisma.MedicationAdministrationUpdateInput,
+  ): Promise<MedicationAdministration> {
+    const result = await this.prisma.medicationAdministration.updateMany({
+      where: {
+        id,
+        deleted_at: null,
+        prescription: {
+          client: {
+            organization_id: organizationId,
+            deleted_at: null,
+          },
+        },
+      },
       data,
+    });
+    if (result.count !== 1) {
+      throw new Prisma.PrismaClientKnownRequestError('Medication administration not found in organization', {
+        code: 'P2025',
+        clientVersion: Prisma.prismaVersion.client,
+      });
+    }
+
+    return this.prisma.medicationAdministration.findFirstOrThrow({
+      where: {
+        id,
+        deleted_at: null,
+        prescription: {
+          client: {
+            organization_id: organizationId,
+            deleted_at: null,
+          },
+        },
+      },
       include: {
         prescription: {
           include: {
@@ -193,12 +288,16 @@ export class MedicationRepository {
   }
 
   // Specialized queries for eMAR
-  async findDueMedicationsForVisit(visitId: string): Promise<any[]> {
+  async findDueMedicationsForVisit(visitId: string, organizationId: string): Promise<any[]> {
     return this.prisma.medicationAdministration.findMany({
       where: {
         visit_id: visitId,
         status: MedicationStatus.SCHEDULED,
-        deleted_at: null
+        deleted_at: null,
+        visit: {
+          organization_id: organizationId,
+          deleted_at: null,
+        },
       },
       include: {
         prescription: {
@@ -213,20 +312,45 @@ export class MedicationRepository {
     });
   }
 
-  async findTodaysMedicationsByClient(date: Date): Promise<MedicationAdministration[]> {
+  async findTodaysMedicationsByClient(
+    date: Date,
+    organizationId: string,
+    carerId?: string,
+  ): Promise<MedicationAdministration[]> {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
     
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
+    const where: Prisma.MedicationAdministrationWhereInput = {
+      scheduled_time: {
+        gte: startOfDay,
+        lte: endOfDay
+      },
+      deleted_at: null,
+      ...(carerId
+        ? {
+            visit: {
+              is: {
+                organization_id: organizationId,
+                carer_id: carerId,
+                deleted_at: null,
+              },
+            },
+          }
+        : {}),
+      prescription: {
+        client: {
+          organization_id: organizationId,
+          deleted_at: null,
+        },
+      },
+    };
+
     return this.prisma.medicationAdministration.findMany({
       where: {
-        scheduled_time: {
-          gte: startOfDay,
-          lte: endOfDay
-        },
-        deleted_at: null
+        ...where,
       },
       include: {
         prescription: {
@@ -247,7 +371,8 @@ export class MedicationRepository {
   async findOverlappingMedicationTimes(
     prescriptionId: string,
     scheduledTime: Date,
-    windowMinutes: number = 30
+    windowMinutes: number = 30,
+    organizationId: string,
   ): Promise<MedicationAdministration[]> {
     const startTime = new Date(scheduledTime.getTime() - windowMinutes * 60000);
     const endTime = new Date(scheduledTime.getTime() + windowMinutes * 60000);
@@ -262,13 +387,69 @@ export class MedicationRepository {
         status: {
           in: [MedicationStatus.SCHEDULED, MedicationStatus.ADMINISTERED]
         },
-        deleted_at: null
+        deleted_at: null,
+        prescription: {
+          client: {
+            organization_id: organizationId,
+            deleted_at: null,
+          },
+        },
       }
     });
   }
 
+  async findMedicationAdministrationTimesForPrescriptionWindow(
+    prescriptionId: string,
+    windowStart: Date,
+    windowEnd: Date,
+    organizationId: string,
+  ): Promise<Date[]> {
+    const rows = await this.prisma.medicationAdministration.findMany({
+      where: {
+        prescription_id: prescriptionId,
+        scheduled_time: {
+          gte: windowStart,
+          lte: windowEnd,
+        },
+        deleted_at: null,
+        prescription: {
+          client: {
+            organization_id: organizationId,
+            deleted_at: null,
+          },
+        },
+      },
+      select: { scheduled_time: true },
+    });
+    return rows.map((r) => r.scheduled_time);
+  }
+
+  async createMedicationAdministrationsBulk(
+    administrations: Array<{ prescription_id: string; scheduled_time: Date; status: MedicationStatus }>,
+  ): Promise<number> {
+    if (!administrations.length) {
+      return 0;
+    }
+
+    const res = await this.prisma.medicationAdministration.createMany({
+      data: administrations,
+    });
+    return res.count;
+  }
+
+  async findClientInOrganization(clientId: string, organizationId: string): Promise<boolean> {
+    const count = await this.prisma.client.count({
+      where: this.prisma.whereNotDeleted({
+        id: clientId,
+        organization_id: organizationId,
+      }),
+    });
+    return count > 0;
+  }
+
   // Audit logging
   async createMedicationAudit(data: {
+    organizationId: string;
     prescriptionId?: string;
     medicationAdministrationId?: string;
     action: MedicationAuditAction;
@@ -278,6 +459,7 @@ export class MedicationRepository {
   }) {
     return this.prisma.medicationAudit.create({
       data: {
+        organization_id: data.organizationId,
         prescription_id: data.prescriptionId,
         medication_administration_id: data.medicationAdministrationId,
         action: data.action,

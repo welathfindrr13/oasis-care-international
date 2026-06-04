@@ -15,6 +15,7 @@ const PII_PATTERNS = {
 };
 
 interface AuditLogEntry {
+  organizationId?: string | null;
   userId: string;
   action: string;
   resourceType: string;
@@ -24,6 +25,14 @@ interface AuditLogEntry {
   ipAddress?: string;
   userAgent?: string;
 }
+
+const AUDIT_FIELD_LIMITS = {
+  action: 50,
+  resourceType: 50,
+  ipAddress: 45,
+  userAgent: 500,
+  resourceId: 255,
+} as const;
 
 @Injectable()
 export class AuditLogInterceptor implements NestInterceptor {
@@ -45,6 +54,7 @@ export class AuditLogInterceptor implements NestInterceptor {
 
       auditInfo = {
         userId: req?.user?.sub || req?.user?.id || 'anonymous',
+        organizationId: req?.user?.organizationId ?? null,
         action: `GraphQL ${info?.parentType?.name || ''}.${info?.fieldName || 'unknown'}`,
         resourceType: info?.parentType?.name || 'GraphQL',
         resourceId: args?.id || args?.input?.id,
@@ -66,6 +76,7 @@ export class AuditLogInterceptor implements NestInterceptor {
 
       auditInfo = {
         userId: user?.id || 'anonymous',
+        organizationId: user?.organizationId ?? null,
         action: `${method} ${url}`,
         resourceType: this.extractResourceType(url),
         resourceId: this.extractResourceId(url),
@@ -93,7 +104,10 @@ export class AuditLogInterceptor implements NestInterceptor {
           const duration = Date.now() - startTime;
           await this.logToDatabase({
             ...auditInfo,
-            action: `${auditInfo.action} [ERROR ${duration}ms: ${error.message}]`,
+            action: `${auditInfo.action} [ERROR ${duration}ms]`,
+            newValues: this.mergeAuditNewValues(auditInfo.newValues, {
+              error: this.truncate(this.maskString(String(error?.message || 'unknown error')), 2000),
+            }),
           });
         },
       }),
@@ -107,16 +121,25 @@ export class AuditLogInterceptor implements NestInterceptor {
     }
 
     try {
+      const ipAddress = this.extractFirstIp(entry.ipAddress);
+      const userAgent = this.truncate(entry.userAgent, AUDIT_FIELD_LIMITS.userAgent);
+      const action =
+        this.truncate(entry.action, AUDIT_FIELD_LIMITS.action) || 'UNKNOWN_ACTION';
+      const resourceType =
+        this.truncate(entry.resourceType, AUDIT_FIELD_LIMITS.resourceType) || 'UNKNOWN_RESOURCE';
+      const resourceId = this.truncate(entry.resourceId, AUDIT_FIELD_LIMITS.resourceId);
+
       await this.prisma.auditLog.create({
         data: {
           user_id: entry.userId,
-          action: entry.action,
-          resource_type: entry.resourceType,
-          resource_id: entry.resourceId,
+          organization_id: entry.organizationId ?? null,
+          action,
+          resource_type: resourceType,
+          resource_id: resourceId,
           old_values: entry.oldValues || {},
           new_values: entry.newValues || {},
-          ip_address: entry.ipAddress,
-          user_agent: entry.userAgent,
+          ip_address: ipAddress,
+          user_agent: userAgent,
           timestamp: new Date(),
         },
       });
@@ -215,5 +238,30 @@ export class AuditLogInterceptor implements NestInterceptor {
     }
     
     return masked;
+  }
+
+  private truncate(value: unknown, maxLength: number): string | undefined {
+    if (value === null || value === undefined) return undefined;
+    const text = String(value);
+    if (!text) return undefined;
+    if (text.length <= maxLength) return text;
+    return text.slice(0, Math.max(1, maxLength - 1));
+  }
+
+  private extractFirstIp(value: unknown): string | undefined {
+    const text = this.truncate(value, 1000);
+    if (!text) return undefined;
+    const first = text.split(',')[0]?.trim();
+    return this.truncate(first, AUDIT_FIELD_LIMITS.ipAddress);
+  }
+
+  private mergeAuditNewValues(
+    current: Record<string, any> | undefined,
+    extra: Record<string, any>,
+  ): Record<string, any> {
+    return {
+      ...(current || {}),
+      ...extra,
+    };
   }
 }

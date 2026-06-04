@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Header } from '../../../components/oasis/Header';
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
+import { clientQuery } from '../../../lib/graphql/client-side';
 
 const CREATE_CLIENT_MUTATION = `
   mutation CreateClient($input: CreateClientInput!) {
@@ -58,35 +59,19 @@ export default function NewClientPage() {
     setError(null);
 
     try {
-      const response = await fetch(process.env.NEXT_PUBLIC_API_URL || 'https://api.oasis-care.co/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      // Use the GraphQL proxy which forwards auth tokens
+      await clientQuery(CREATE_CLIENT_MUTATION, {
+        input: {
+          fullName: formData.fullName,
+          addressLine1: formData.addressLine1,
+          addressLine2: formData.addressLine2 || null,
+          city: formData.city,
+          postcode: formData.postcode,
         },
-        credentials: 'include',
-        body: JSON.stringify({
-          query: CREATE_CLIENT_MUTATION,
-          variables: {
-            input: {
-              fullName: formData.fullName,
-              addressLine1: formData.addressLine1,
-              addressLine2: formData.addressLine2 || null,
-              city: formData.city,
-              postcode: formData.postcode,
-            },
-          },
-        }),
       });
 
-      const result = await response.json();
-
-      if (result.errors) {
-        throw new Error(result.errors[0]?.message || 'Failed to create client');
-      }
-
-      // Redirect to client list on success
-      router.push('/clients');
-      router.refresh();
+      // Redirect to the person-centred list on success.
+      router.push('/people');
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');
     } finally {
@@ -102,8 +87,8 @@ export default function NewClientPage() {
           <nav className="flex mb-4" aria-label="Breadcrumb">
             <ol role="list" className="flex items-center space-x-2">
               <li>
-                <Link href="/clients" className="text-sm font-medium text-slate-500 hover:text-slate-700">
-                  Clients
+                <Link href="/people" className="text-sm font-medium text-slate-500 hover:text-slate-700">
+                  People
                 </Link>
               </li>
               <li>
@@ -111,26 +96,26 @@ export default function NewClientPage() {
                   <svg className="h-5 w-5 flex-shrink-0 text-slate-300" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
                   </svg>
-                  <span className="ml-2 text-sm font-medium text-slate-900">Add New Client</span>
+                  <span className="ml-2 text-sm font-medium text-slate-900">Add person</span>
                 </div>
               </li>
             </ol>
           </nav>
           <h1 className="text-3xl font-bold text-slate-900 font-heading">
-            Add New Client
+            Add person
           </h1>
           <p className="text-slate-500 mt-1">
-            Register a new client for care services
+            Register a person for care services
           </p>
         </div>
 
         <Card>
           <CardHeader>
             <h2 className="text-xl font-semibold text-slate-900 font-heading">
-              Client Information
+              Person information
             </h2>
             <p className="text-sm text-slate-500">
-              Please provide the client&apos;s details below
+              Please provide the person&apos;s details below
             </p>
           </CardHeader>
           <CardContent>
@@ -234,7 +219,7 @@ export default function NewClientPage() {
                     <p className="text-sm text-blue-700 mb-3">
                       The personal information you provide will be processed for the purpose of providing 
                       domiciliary care services. This data will be stored securely and only accessed by 
-                      authorised care staff. Under UK GDPR, clients have the right to access, rectify, 
+                      authorised care staff. Under UK GDPR, people have the right to access, rectify, 
                       or request deletion of their personal data.
                     </p>
                     <label className="flex items-start gap-2 cursor-pointer">
@@ -245,7 +230,7 @@ export default function NewClientPage() {
                         className="mt-1 h-4 w-4 text-teal-600 border-slate-300 rounded focus:ring-teal-500"
                       />
                       <span className="text-sm text-blue-800">
-                        I confirm that the client has been informed about how their data will be processed 
+                        I confirm that the person has been informed about how their data will be processed 
                         and that I have legal basis to register their information for care services.
                       </span>
                     </label>
@@ -267,17 +252,17 @@ export default function NewClientPage() {
 
               {/* Actions */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-                <Link href="/clients">
-                  <Button type="button" variant="ghost">
+                <Button asChild variant="ghost">
+                  <Link href="/people">
                     Cancel
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
                 <Button 
                   type="submit" 
                   variant="primary" 
                   disabled={isSubmitting || !gdprConsent}
                 >
-                  {isSubmitting ? 'Creating...' : 'Create Client'}
+                  {isSubmitting ? 'Creating...' : 'Create person'}
                 </Button>
               </div>
             </form>
@@ -287,4 +272,3 @@ export default function NewClientPage() {
     </div>
   );
 }
-

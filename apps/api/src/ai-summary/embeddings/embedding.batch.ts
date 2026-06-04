@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@oasis/db';
 import { DateTime } from 'luxon';
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import * as fs from 'fs/promises';
+import * as fs from 'fs';
 import * as path from 'path';
 
 interface BatchMetrics {
@@ -28,14 +28,22 @@ export class EmbeddingBatchService {
     this.loadPromptTemplate();
   }
 
-  private async loadPromptTemplate(): Promise<void> {
-    try {
-      const promptPath = path.join(process.cwd(), 'prompts', 'health-summary.md');
-      this.healthSummaryPrompt = await fs.readFile(promptPath, 'utf-8');
-    } catch (error) {
-      this.logger.error('Failed to load health summary prompt template', error);
-      throw new Error('Health summary prompt template not found');
+  private loadPromptTemplate(): void {
+    const candidatePaths = [
+      path.join(process.cwd(), 'prompts', 'health-summary.md'),
+      path.join(process.cwd(), 'apps', 'api', 'prompts', 'health-summary.md'),
+      '/app/apps/api/prompts/health-summary.md',
+    ];
+
+    for (const promptPath of candidatePaths) {
+      if (fs.existsSync(promptPath)) {
+        this.healthSummaryPrompt = fs.readFileSync(promptPath, 'utf-8');
+        return;
+      }
     }
+
+    this.logger.warn('Health summary prompt template missing; using fallback prompt');
+    this.healthSummaryPrompt = `You are a clinical AI assistant. Review the provided care logs and output structured JSON with observations, risks, and recommendations.`;
   }
 
   /**

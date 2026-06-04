@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { HttpStatus } from '@nestjs/common';
 import { StatsService } from '../stats.service';
 import { PrismaService } from '@oasis/db';
+import { ErrorCode } from '../../common/errors/error-codes';
 
 describe('StatsService', () => {
   let service: StatsService;
@@ -8,6 +10,7 @@ describe('StatsService', () => {
 
   beforeEach(async () => {
     const mockPrisma = {
+      whereNotDeleted: jest.fn().mockImplementation((where) => where),
       $transaction: jest.fn(),
       visit: {
         count: jest.fn(),
@@ -37,7 +40,7 @@ describe('StatsService', () => {
       // Mock the transaction to return [5, 3]
       (prisma.$transaction as jest.Mock).mockResolvedValue([5, 3]);
 
-      const result = await service.getTodayStats();
+      const result = await service.getTodayStats('org-123');
 
       expect(result).toEqual({
         booked: 5,
@@ -68,7 +71,7 @@ describe('StatsService', () => {
         return Promise.resolve([10, 7]);
       });
 
-      const result = await service.getTodayStats();
+      const result = await service.getTodayStats('org-123');
 
       expect(result).toEqual({
         booked: 10,
@@ -81,12 +84,28 @@ describe('StatsService', () => {
     it('should handle zero counts', async () => {
       (prisma.$transaction as jest.Mock).mockResolvedValue([0, 0]);
 
-      const result = await service.getTodayStats();
+      const result = await service.getTodayStats('org-123');
 
       expect(result).toEqual({
         booked: 0,
         finished: 0,
       });
+    });
+
+    it('should reject when organization scope is missing', async () => {
+      await expect(service.getTodayStats()).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+        response: { code: ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS },
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('should reject even when a single organization exists but claim is missing', async () => {
+      await expect(service.getTodayStats()).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+        response: { code: ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS },
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
   });
 });

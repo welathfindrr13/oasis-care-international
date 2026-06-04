@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { PrometheusModule } from '@willsoto/nestjs-prometheus';
-import { RolesGuard } from '@oasis/auth';
 import { Controller, Get, UseGuards, Res } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { SetMetadata } from '@nestjs/common';
 import { Response } from 'express';
 import { register, Counter } from 'prom-client';
+import { DbModule } from '@oasis/db';
+import { ApiRolesGuard } from '../auth/api-roles.guard';
 
 // Roles decorator
 export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => 
@@ -14,7 +14,7 @@ export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
 // --- Controller exposes /metrics -------------
 @Controller('metrics')
 export class MetricsController {
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseGuards(ApiRolesGuard)
   @Roles('admin')
   @Get()
   async getMetrics(@Res() res: Response) {
@@ -43,9 +43,9 @@ const visitsCreatedCounterProvider = {
 
 @Module({
   // Import Prometheus exactly once here
-  imports: [PrometheusModule.register()],
+  imports: [PrometheusModule.register(), DbModule],
   controllers: [MetricsController],
-  providers: [visitOverlapCounterProvider, visitsCreatedCounterProvider],
+  providers: [ApiRolesGuard, visitOverlapCounterProvider, visitsCreatedCounterProvider],
   exports: [visitOverlapCounterProvider, visitsCreatedCounterProvider],
 })
 export class MetricsModule {}

@@ -1,7 +1,11 @@
 import { Metadata } from 'next'
-import { Nav } from '../../../components/oasis/Nav'
+import { redirect } from 'next/navigation'
+import { Header } from '../../../components/oasis/Header'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
 import { Button } from '../../../components/ui/Button'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '../../api/auth/[...nextauth]/authOptions'
+import { hasRole } from '../../../lib/auth/roles'
 
 export const metadata: Metadata = {
   title: 'Metrics - Oasis Care Admin',
@@ -10,31 +14,43 @@ export const metadata: Metadata = {
 
 async function getMetrics(): Promise<string> {
   try {
-    // Try to fetch metrics from API
-    const response = await fetch('http://localhost:4000/metrics', {
+    const session = await getServerSession(authOptions)
+    const accessToken = (session as any)?.accessToken
+    if (!accessToken) {
+      return 'Metrics unavailable: missing access token'
+    }
+
+    const fullApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql'
+    const apiUrl = fullApiUrl.replace(/\/graphql$/, '')
+    const response = await fetch(`${apiUrl}/metrics`, {
       cache: 'no-store',
       headers: {
-        'Authorization': 'Bearer DEMO_ADMIN'
-      }
-    });
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
     
     if (!response.ok) {
-      return 'Metrics endpoint not available or disabled';
+      return `Metrics unavailable (${response.status})`
     }
     
-    return await response.text();
+    return await response.text()
   } catch (error) {
-    return `Metrics unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    return `Metrics unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`
   }
 }
 
 export default async function MetricsPage() {
+  const session = await getServerSession(authOptions)
+  if (!hasRole((session as any)?.roles ?? [], 'admin')) {
+    redirect('/activity')
+  }
+
   const metrics = await getMetrics();
 
   return (
-    <div className="min-h-screen bg-background-secondary">
-      <div className="max-w-7xl mx-auto p-6">
-        <Nav />
+    <div className="min-h-screen bg-slate-50">
+      <Header />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-text-primary font-heading mb-2">
@@ -65,7 +81,7 @@ export default async function MetricsPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-text-secondary">Environment:</span>
-                  <span className="text-text-primary">Demo</span>
+                  <span className="text-text-primary">{process.env.NODE_ENV || 'unknown'}</span>
                 </div>
               </div>
             </CardContent>
@@ -104,16 +120,16 @@ export default async function MetricsPage() {
             <CardContent>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-text-secondary">Auth Bypass:</span>
-                  <span className="text-yellow-600 font-medium">⚠️ Enabled</span>
+                  <span className="text-text-secondary">Auth Mode:</span>
+                  <span className="text-green-600 font-medium">✅ JWT + RBAC</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-text-secondary">Seed Data:</span>
-                  <span className="text-green-600 font-medium">✅ Loaded</span>
+                  <span className="text-text-secondary">Metrics Endpoint:</span>
+                  <span className="text-text-primary">/metrics</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-text-secondary">Test DB:</span>
-                  <span className="text-green-600 font-medium">✅ Available</span>
+                  <span className="text-text-secondary">Access:</span>
+                  <span className="text-green-600 font-medium">✅ Admin only</span>
                 </div>
               </div>
             </CardContent>
@@ -164,7 +180,7 @@ export default async function MetricsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </main>
     </div>
   )
 }

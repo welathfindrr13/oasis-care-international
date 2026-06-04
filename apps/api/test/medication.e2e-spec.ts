@@ -570,9 +570,109 @@ describe('Medication (e2e)', () => {
       }
     `;
 
+    it('should return todays medications for admin users with resolved organization context', async () => {
+      mockJwtStrategy.validate.mockResolvedValue({
+        ...mockAdminUser,
+        organizationId: 'org-123',
+      });
+
+      const findManySpy = jest.spyOn(prisma.medicationAdministration, 'findMany').mockResolvedValue([
+        {
+          id: 'med-admin-admin',
+          prescription_id: 'prescription-admin',
+          visit_id: 'visit-admin',
+          scheduled_time: new Date('2025-01-08T10:00:00Z'),
+          administered_time: null,
+          administered_by: null,
+          status: 'SCHEDULED',
+          notes: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+          deleted_at: null,
+          prescription: {
+            id: 'prescription-admin',
+            client_id: 'client-admin',
+            medication_id: 'medication-admin',
+            start_date: new Date('2025-01-01'),
+            end_date: null,
+            frequency_per_day: 1,
+            frequency_interval_hours: null,
+            administration_times: ['10:00'],
+            special_instructions: null,
+            is_active: true,
+            created_at: new Date(),
+            updated_at: new Date(),
+            deleted_at: null,
+            client: {
+              id: 'client-admin',
+              full_name: 'Admin Client',
+              address_line1: '1 Admin St',
+              address_line2: null,
+              city: 'London',
+              postcode: 'SW1A 1AA',
+              created_at: new Date(),
+              updated_at: new Date(),
+              deleted_at: null,
+            },
+            medication: {
+              id: 'medication-admin',
+              name: 'Warfarin',
+              dosage: '2',
+              unit: 'mg',
+              instructions: null,
+              created_at: new Date(),
+              updated_at: new Date(),
+              deleted_at: null,
+            },
+          },
+          visit: {
+            id: 'visit-admin',
+            carer_id: 'carer-123',
+            client_id: 'client-admin',
+            scheduled_start: new Date('2025-01-08T09:30:00Z'),
+            scheduled_end: new Date('2025-01-08T10:30:00Z'),
+            actual_start: null,
+            actual_end: null,
+            status: 'SCHEDULED',
+            notes: null,
+            created_at: new Date(),
+            updated_at: new Date(),
+            deleted_at: null,
+          },
+        },
+      ] as any);
+
+      const response = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', 'Bearer mock-token')
+        .send({
+          query: GET_TODAYS_MEDICATIONS_QUERY,
+          variables: { date: '2025-01-08' },
+        })
+        .expect(200);
+
+      expect(response.body.errors).toBeUndefined();
+      expect(response.body.data.getTodaysMedicationsByClient).toHaveLength(1);
+      expect(findManySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            prescription: {
+              client: {
+                organization_id: 'org-123',
+                deleted_at: null,
+              },
+            },
+          }),
+        }),
+      );
+    });
+
     it('should return todays medications for office user', async () => {
       // Set user to office role
-      mockJwtStrategy.validate.mockResolvedValue(mockOfficeUser);
+      mockJwtStrategy.validate.mockResolvedValue({
+        ...mockOfficeUser,
+        organizationId: 'org-123',
+      });
 
       jest.spyOn(prisma.medicationAdministration, 'findMany').mockResolvedValue([
         {
@@ -672,9 +772,78 @@ describe('Medication (e2e)', () => {
       });
     });
 
-    it('should deny access for carer role', async () => {
-      // Reset to carer user
-      mockJwtStrategy.validate.mockResolvedValue(mockCarerUser);
+    it('should allow access for carer role', async () => {
+      mockJwtStrategy.validate.mockResolvedValue({
+        ...mockCarerUser,
+        organizationId: 'org-123',
+      });
+
+      const findManySpy = jest.spyOn(prisma.medicationAdministration, 'findMany').mockResolvedValue([
+        {
+          id: 'med-admin-2',
+          prescription_id: 'prescription-2',
+          visit_id: 'visit-456',
+          scheduled_time: new Date('2025-01-08T12:00:00Z'),
+          administered_time: null,
+          administered_by: null,
+          status: 'SCHEDULED',
+          notes: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+          deleted_at: null,
+          prescription: {
+            id: 'prescription-2',
+            client_id: 'client-2',
+            medication_id: 'medication-2',
+            start_date: new Date('2025-01-01'),
+            end_date: null,
+            frequency_per_day: 1,
+            frequency_interval_hours: 24,
+            administration_times: ['12:00'],
+            special_instructions: null,
+            is_active: true,
+            created_at: new Date(),
+            updated_at: new Date(),
+            deleted_at: null,
+            client: {
+              id: 'client-2',
+              full_name: 'Jane Doe',
+              address_line1: '456 High St',
+              address_line2: null,
+              city: 'London',
+              postcode: 'SW1A 1AA',
+              created_at: new Date(),
+              updated_at: new Date(),
+              deleted_at: null,
+            },
+            medication: {
+              id: 'medication-2',
+              name: 'Aspirin',
+              dosage: '75',
+              unit: 'mg',
+              instructions: null,
+              created_at: new Date(),
+              updated_at: new Date(),
+              deleted_at: null,
+            },
+            administrations: [],
+          },
+          visit: {
+            id: 'visit-456',
+            carer_id: 'carer-123',
+            client_id: 'client-2',
+            scheduled_start: new Date('2025-01-08T11:30:00Z'),
+            scheduled_end: new Date('2025-01-08T12:30:00Z'),
+            actual_start: null,
+            actual_end: null,
+            status: 'SCHEDULED',
+            notes: null,
+            created_at: new Date(),
+            updated_at: new Date(),
+            deleted_at: null,
+          },
+        },
+      ] as any);
 
       const response = await request(app.getHttpServer())
         .post('/graphql')
@@ -685,8 +854,58 @@ describe('Medication (e2e)', () => {
         })
         .expect(200);
 
-      expect(response.body.errors).toBeDefined();
-      expect(response.body.errors[0].extensions.code).toBe('FORBIDDEN_OFFICE_ACCESS');
+      expect(response.body.errors).toBeUndefined();
+      expect(response.body.data.getTodaysMedicationsByClient).toHaveLength(1);
+      expect(response.body.data.getTodaysMedicationsByClient[0]).toMatchObject({
+        id: 'med-admin-2',
+        status: 'SCHEDULED',
+        prescription: {
+          medication: {
+            name: 'Aspirin',
+            dosage: '75',
+            unit: 'mg',
+          },
+          client: {
+            fullName: 'Jane Doe',
+          },
+        },
+      });
+      expect(findManySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            visit: {
+              is: {
+                organization_id: 'org-123',
+                carer_id: 'carer-123',
+                deleted_at: null,
+              },
+            },
+          }),
+        }),
+      );
+    });
+
+    it('should return explicit forbidden when organization context cannot be resolved', async () => {
+      mockJwtStrategy.validate.mockResolvedValue({
+        ...mockAdminUser,
+        organizationId: null,
+      });
+
+      jest.spyOn(prisma.organizationIdentity, 'findMany').mockResolvedValue([]);
+      jest.spyOn(prisma.carer, 'findMany').mockResolvedValue([]);
+
+      const response = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', 'Bearer mock-token')
+        .send({
+          query: GET_TODAYS_MEDICATIONS_QUERY,
+          variables: { date: '2025-01-08' },
+        })
+        .expect(200);
+
+      expect(response.body.data).toBeNull();
+      expect(response.body.errors[0].extensions.code).toBe('FORBIDDEN_INSUFFICIENT_PERMISSIONS');
+      expect(response.body.errors[0].message).toBe('Organization context is required for this request');
     });
   });
 

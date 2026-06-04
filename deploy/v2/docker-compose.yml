@@ -1,0 +1,121 @@
+name: oasis-care-v2
+
+# Deployment V2 is a single-server production foundation: Caddy terminates public
+# traffic, web/API stay internal, and Postgres is private to the Compose network.
+# CareBridge is central to production health: later smoke tests must prove family
+# users stay in family-safe surfaces and cannot access raw operational records.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+      api:
+        condition: service_started
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://app.example.com/graphql}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://app.example.com}
+        NEXTAUTH_URL: ${NEXTAUTH_URL:-https://app.example.com}
+        COGNITO_ISSUER: ${COGNITO_ISSUER:-https://auth.example.com/oauth2/default}
+        COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-replace-me-client-id}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    expose:
+      - "3000"
+    environment:
+      NODE_ENV: production
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://app.example.com}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-replace-me-nextauth-secret-min-32-chars}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://app.example.com/graphql}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://app.example.com}
+      NEXT_PUBLIC_LOCAL_AUTH_ENABLED: "false"
+      LOCAL_AUTH_ENABLED: "false"
+      COGNITO_ISSUER: ${COGNITO_ISSUER:-https://auth.example.com/oauth2/default}
+      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-replace-me-client-id}
+      COGNITO_CLIENT_SECRET: ${COGNITO_CLIENT_SECRET:-replace-me-cognito-client-secret}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "4000"
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-oasis}:${POSTGRES_PASSWORD:-replace-me-postgres-password}@postgres:5432/${POSTGRES_DB:-oasis}
+      JWT_SECRET: ${JWT_SECRET:-replace-me-jwt-secret-min-32-chars}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-replace-me-nextauth-secret-min-32-chars}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://app.example.com}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://app.example.com}
+      LOCAL_AUTH_ENABLED: "false"
+      LOCAL_AUTH_ISSUER: ${LOCAL_AUTH_ISSUER:-oasis-local-dev}
+      LOCAL_AUTH_JWT_SECRET: ${LOCAL_AUTH_JWT_SECRET:-replace-me-local-auth-secret-disabled-in-production}
+      COGNITO_ISSUER: ${COGNITO_ISSUER:-https://auth.example.com/oauth2/default}
+      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-replace-me-client-id}
+      COGNITO_CLIENT_SECRET: ${COGNITO_CLIENT_SECRET:-replace-me-cognito-client-secret}
+      GDPR_ENABLED: ${GDPR_ENABLED:-false}
+      METRICS_ENABLED: ${METRICS_ENABLED:-false}
+      AI_SUMMARY_ENABLED: ${AI_SUMMARY_ENABLED:-false}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-false}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4000/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-oasis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-replace-me-postgres-password}
+      POSTGRES_DB: ${POSTGRES_DB:-oasis}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

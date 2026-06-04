@@ -35,6 +35,7 @@ export class ErasureService {
    * Enqueue a data erasure request
    */
   async enqueueDataErasure(
+    organizationId: string,
     userId: string,
     requestType: string,
     reason?: string,
@@ -42,6 +43,7 @@ export class ErasureService {
     // Check if there's already a pending request
     const existing = await this.prisma.erasureQueue.findFirst({
       where: {
+        organization_id: organizationId,
         user_id: userId,
         request_type: requestType,
         status: 'pending',
@@ -57,6 +59,7 @@ export class ErasureService {
 
     const request = await this.prisma.erasureQueue.create({
       data: {
+        organization_id: organizationId,
         user_id: userId,
         request_type: requestType,
         status: 'pending',
@@ -79,9 +82,9 @@ export class ErasureService {
    * Process data erasure for a user
    * This should be called by a scheduled job, not directly
    */
-  async processDataErasure(requestId: string): Promise<ErasureResult> {
-    const request = await this.prisma.erasureQueue.findUnique({
-      where: { id: requestId },
+  async processDataErasure(organizationId: string, requestId: string): Promise<ErasureResult> {
+    const request = await this.prisma.erasureQueue.findFirst({
+      where: { id: requestId, organization_id: organizationId },
     });
 
     if (!request) {
@@ -102,7 +105,7 @@ export class ErasureService {
     await this.prisma.$transaction(async (tx) => {
       // 1. Delete visit tasks first (foreign key constraint)
       const visits = await tx.visit.findMany({
-        where: { OR: [{ client_id: userId }, { carer_id: userId }] },
+        where: { organization_id: organizationId, OR: [{ client_id: userId }, { carer_id: userId }] },
         select: { id: true },
       });
       
@@ -112,7 +115,7 @@ export class ErasureService {
 
       // 2. Soft delete visits (keep for audit but anonymize)
       const visitResult = await tx.visit.updateMany({
-        where: { OR: [{ client_id: userId }, { carer_id: userId }] },
+        where: { organization_id: organizationId, OR: [{ client_id: userId }, { carer_id: userId }] },
         data: {
           notes: '[REDACTED]',
           deleted_at: new Date(),
@@ -122,13 +125,13 @@ export class ErasureService {
 
       // 3. Delete prescriptions (medications are linked via prescriptions)
       const medResult = await tx.prescription.deleteMany({
-        where: { client_id: userId },
+        where: { client_id: userId, client: { organization_id: organizationId } },
       });
       erasedRecords.medications = medResult.count;
 
       // 4. Delete health summaries
       const summaryResult = await tx.healthSummary.deleteMany({
-        where: { client_id: userId },
+        where: { client_id: userId, client: { organization_id: organizationId } },
       });
       erasedRecords.healthSummaries = summaryResult.count;
 
@@ -136,7 +139,7 @@ export class ErasureService {
       // Actually we should keep consent records for legal compliance
       // Just mark them as related to deleted user
       const consentResult = await tx.consentRecord.updateMany({
-        where: { user_id: userId },
+        where: { organization_id: organizationId, user_id: userId },
         data: {
           metadata: { erasureRequestId: requestId, erasedAt: new Date().toISOString() },
         },
@@ -145,7 +148,7 @@ export class ErasureService {
 
       // 6. Anonymize audit logs (keep for compliance but remove PII)
       const auditResult = await tx.auditLog.updateMany({
-        where: { user_id: userId },
+        where: { organization_id: organizationId, user_id: userId },
         data: {
           user_id: 'ANONYMIZED',
           ip_address: null,
@@ -156,12 +159,12 @@ export class ErasureService {
 
       // 7. Delete embeddings
       const embeddingResult = await tx.logEmbedding.deleteMany({
-        where: { visit: { OR: [{ client_id: userId }, { carer_id: userId }] } },
+        where: { visit: { organization_id: organizationId, OR: [{ client_id: userId }, { carer_id: userId }] } },
       });
       erasedRecords.embeddings = embeddingResult.count;
 
       // 8. Pseudonymize the user profile
-      const client = await tx.client.findFirst({ where: { id: userId } });
+      const client = await tx.client.findFirst({ where: { id: userId, organization_id: organizationId } });
       if (client) {
         await tx.client.update({
           where: { id: userId },
@@ -177,7 +180,7 @@ export class ErasureService {
         });
       }
 
-      const carer = await tx.carer.findFirst({ where: { id: userId } });
+      const carer = await tx.carer.findFirst({ where: { id: userId, organization_id: organizationId } });
       if (carer) {
         await tx.carer.update({
           where: { id: userId },
@@ -214,9 +217,9 @@ export class ErasureService {
   /**
    * Get erasure request status
    */
-  async getErasureStatus(requestId: string): Promise<ErasureRequest> {
-    const request = await this.prisma.erasureQueue.findUnique({
-      where: { id: requestId },
+  async getErasureStatus(organizationId: string, requestId: string): Promise<ErasureRequest> {
+    const request = await this.prisma.erasureQueue.findFirst({
+      where: { id: requestId, organization_id: organizationId },
     });
 
     if (!request) {
@@ -237,9 +240,9 @@ export class ErasureService {
   /**
    * Cancel an erasure request (only if still pending)
    */
-  async cancelErasureRequest(requestId: string): Promise<void> {
-    const request = await this.prisma.erasureQueue.findUnique({
-      where: { id: requestId },
+  async cancelErasureRequest(organizationId: string, requestId: string): Promise<void> {
+    const request = await this.prisma.erasureQueue.findFirst({
+      where: { id: requestId, organization_id: organizationId },
     });
 
     if (!request) {

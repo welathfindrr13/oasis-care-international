@@ -7,6 +7,8 @@ import { VisitModule } from '../src/visit/visit.module';
 import { VisitService } from '../src/visit/visit.service';
 import { VisitResolver } from '../src/visit/visit.resolver';
 import { VisitRepository } from '../src/visit/visit.repository';
+import { CareLogService } from '../src/care-log/care-log.service';
+import { CareLogRepository } from '../src/care-log/care-log.repository';
 import { MetricsModule } from '../src/metrics/metrics.module';
 import { ClsModule } from 'nestjs-cls';
 import { execSync } from 'child_process';
@@ -89,6 +91,8 @@ describe('Visit E2E Tests', () => {
         VisitService,
         VisitResolver,
         VisitRepository,
+        CareLogService,
+        CareLogRepository,
         PrismaService,
         // Stub the Prometheus counters for testing
         { provide: 'visit_overlap_total', useValue: { inc: jest.fn() } },
@@ -258,7 +262,7 @@ describe('Visit E2E Tests', () => {
       });
     });
 
-    it('should allow client to view only their visits (read-only)', async () => {
+    it('should prevent client from reading raw operational visits', async () => {
       const response = await request(app.getHttpServer())
         .post('/graphql')
         .set('Authorization', getBearerToken('client'))
@@ -283,9 +287,8 @@ describe('Visit E2E Tests', () => {
         })
         .expect(200);
 
-      // Should only see visits where they are the client
-      expect(response.body.data.visits.items).toHaveLength(1);
-      expect(response.body.data.visits.items[0].clientId).toBe(TEST_USERS.client.sub);
+      expect(response.body.errors).toBeDefined();
+      expect(response.body.errors[0].message).toContain('Forbidden');
     });
 
     it('should prevent client from creating visits', async () => {
@@ -418,6 +421,155 @@ describe('Visit E2E Tests', () => {
     });
   });
 
+  describe('Guided Visit Workflow Commands', () => {
+    it('should start, record outcome, submit care note, complete visit, and not create a family update', async () => {
+      const visitId = fixtures.visits.scheduledVisit.id;
+      const task = await prisma.visitTask.findFirstOrThrow({
+        where: { visit_id: visitId },
+        orderBy: { created_at: 'asc' },
+      });
+      const taskId = task.id;
+
+      const startResponse = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('carer'))
+        .send({
+          query: `
+            mutation StartVisit($visitId: String!) {
+              startVisit(visitId: $visitId) {
+                id
+                status
+                actualStart
+              }
+            }
+          `,
+          variables: { visitId },
+        })
+        .expect(200);
+
+      expect(startResponse.body.data.startVisit).toMatchObject({
+        id: visitId,
+        status: 'IN_PROGRESS',
+      });
+      expect(startResponse.body.data.startVisit.actualStart).toBeDefined();
+
+      const taskOutcomeResponse = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('carer'))
+        .send({
+          query: `
+            mutation RecordVisitTaskOutcome($input: RecordVisitTaskOutcomeInput!) {
+              recordVisitTaskOutcome(input: $input) {
+                id
+                isCompleted
+                notes
+              }
+            }
+          `,
+          variables: {
+            input: {
+              taskId,
+              outcome: 'NOT_REQUIRED',
+              notes: 'Not needed because client had already completed this safely.',
+            },
+          },
+        })
+        .expect(200);
+
+      expect(taskOutcomeResponse.body.data.recordVisitTaskOutcome).toMatchObject({
+        id: taskId,
+        isCompleted: false,
+      });
+      expect(taskOutcomeResponse.body.data.recordVisitTaskOutcome.notes).toContain('VISIT_TASK_OUTCOME::');
+      expect(taskOutcomeResponse.body.data.recordVisitTaskOutcome.notes).toContain('"outcome":"NOT_REQUIRED"');
+
+      const careNoteResponse = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('carer'))
+        .send({
+          query: `
+            mutation SubmitVisitCareNote($input: SubmitVisitCareNoteInput!) {
+              submitVisitCareNote(input: $input) {
+                id
+                visitId
+                clientId
+                carerId
+                category
+                notes
+                source
+              }
+            }
+          `,
+          variables: {
+            input: {
+              visitId,
+              category: 'OTHER',
+              notes: 'Client was comfortable and settled before departure.',
+              occurredAt: '2024-02-01T09:35:00Z',
+            },
+          },
+        })
+        .expect(200);
+
+      expect(careNoteResponse.body.data.submitVisitCareNote).toMatchObject({
+        visitId,
+        clientId: fixtures.clients.client.id,
+        carerId: fixtures.carers.carer.id,
+        category: 'OTHER',
+        source: 'visit_workflow',
+      });
+
+      const completeResponse = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('carer'))
+        .send({
+          query: `
+            mutation CompleteVisit($input: CompleteVisitInput!) {
+              completeVisit(input: $input) {
+                id
+                status
+                actualEnd
+                notes
+              }
+            }
+          `,
+          variables: {
+            input: {
+              visitId,
+              notes: 'Visit complete. Proof-of-care source records are available for later review.',
+              actualEnd: '2024-02-01T09:55:00Z',
+            },
+          },
+        })
+        .expect(200);
+
+      expect(completeResponse.body.data.completeVisit).toMatchObject({
+        id: visitId,
+        status: 'COMPLETED',
+      });
+      expect(completeResponse.body.data.completeVisit.actualEnd).toBe('2024-02-01T09:55:00.000Z');
+
+      const [visit, careLogCount, storyTableRows] = await Promise.all([
+        prisma.visit.findUnique({ where: { id: visitId } }),
+        prisma.careLog.count({ where: { visit_id: visitId } }),
+        prisma.$queryRaw<Array<{ exists: boolean }>>`
+          SELECT to_regclass('public.verified_visit_story') IS NOT NULL AS exists
+        `,
+      ]);
+      const storyRows = storyTableRows[0]?.exists
+        ? await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(
+            'SELECT COUNT(*)::bigint AS count FROM verified_visit_story WHERE visit_id = $1',
+            visitId,
+          )
+        : [{ count: BigInt(0) }];
+      const storyCount = Number(storyRows[0]?.count ?? 0);
+
+      expect(visit?.status).toBe('COMPLETED');
+      expect(careLogCount).toBe(1);
+      expect(storyCount).toBe(0);
+    });
+  });
+
   describe('Visit Updates', () => {
     it('should update visit schedule without conflicts', async () => {
       const visitId = fixtures.visits.scheduledVisit.id;
@@ -459,6 +611,7 @@ describe('Visit E2E Tests', () => {
         data: {
           carer_id: fixtures.carers.carer.id,
           client_id: fixtures.clients.otherClient.id,
+          organization_id: fixtures.organization.id,
           scheduled_start: new Date('2024-02-01T11:00:00Z'),
           scheduled_end: new Date('2024-02-01T12:00:00Z'),
           status: 'SCHEDULED',

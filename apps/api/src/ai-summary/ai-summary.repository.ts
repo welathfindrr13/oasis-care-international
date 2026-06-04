@@ -15,9 +15,15 @@ export class AiSummaryRepository {
     });
   }
 
-  async findById(id: string): Promise<HealthSummary | null> {
-    return this.prisma.healthSummary.findUnique({
-      where: { id },
+  async findById(id: string, organizationId: string): Promise<HealthSummary | null> {
+    return this.prisma.healthSummary.findFirst({
+      where: {
+        id,
+        client: {
+          organization_id: organizationId,
+          deleted_at: null,
+        },
+      },
       include: {
         client: true,
         approver: true,
@@ -30,12 +36,23 @@ export class AiSummaryRepository {
     skip?: number;
     take?: number;
     orderBy?: Prisma.HealthSummaryOrderByWithRelationInput;
-  }): Promise<{ items: HealthSummary[]; total: number }> {
+  }, organizationId: string): Promise<{ items: HealthSummary[]; total: number }> {
     const where = args.where || {};
+    const scopedWhere: Prisma.HealthSummaryWhereInput = {
+      AND: [
+        where,
+        {
+          client: {
+            organization_id: organizationId,
+            deleted_at: null,
+          },
+        },
+      ],
+    };
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.healthSummary.findMany({
-        where,
+        where: scopedWhere,
         skip: args.skip,
         take: args.take,
         orderBy: args.orderBy || { generated_at: 'desc' },
@@ -44,7 +61,7 @@ export class AiSummaryRepository {
           approver: true,
         },
       }),
-      this.prisma.healthSummary.count({ where }),
+      this.prisma.healthSummary.count({ where: scopedWhere }),
     ]);
 
     return { items, total };
@@ -53,10 +70,18 @@ export class AiSummaryRepository {
   async findPending(args?: {
     skip?: number;
     take?: number;
-  }): Promise<{ items: HealthSummary[]; total: number }> {
+  }, organizationId?: string): Promise<{ items: HealthSummary[]; total: number }> {
     const where: Prisma.HealthSummaryWhereInput = {
       approved_by: null,
       expires_at: { gt: new Date() },
+      ...(organizationId
+        ? {
+            client: {
+              organization_id: organizationId,
+              deleted_at: null,
+            },
+          }
+        : {}),
     };
 
     const [items, total] = await this.prisma.$transaction([
@@ -79,13 +104,18 @@ export class AiSummaryRepository {
   async findByClientAndPeriod(
     clientId: string,
     periodStart: Date,
-    periodEnd: Date
+    periodEnd: Date,
+    organizationId: string,
   ): Promise<HealthSummary | null> {
     return this.prisma.healthSummary.findFirst({
       where: {
         client_id: clientId,
         period_start: periodStart,
         period_end: periodEnd,
+        client: {
+          organization_id: organizationId,
+          deleted_at: null,
+        },
       },
       include: {
         client: true,
@@ -95,7 +125,7 @@ export class AiSummaryRepository {
     });
   }
 
-  async findCurrentWeekSummary(clientId: string): Promise<HealthSummary | null> {
+  async findCurrentWeekSummary(clientId: string, organizationId: string): Promise<HealthSummary | null> {
     const now = new Date();
     const weekStart = new Date(now);
     weekStart.setDate(now.getDate() - now.getDay()); // Start of current week
@@ -110,6 +140,10 @@ export class AiSummaryRepository {
         client_id: clientId,
         period_start: { gte: weekStart },
         period_end: { lte: weekEnd },
+        client: {
+          organization_id: organizationId,
+          deleted_at: null,
+        },
       },
       include: {
         client: true,
@@ -153,9 +187,12 @@ export class AiSummaryRepository {
     });
   }
 
-  async checkOrganizationAIEnabled(clientId: string): Promise<boolean> {
-    const client = await this.prisma.client.findUnique({
-      where: { id: clientId },
+  async checkOrganizationAIEnabled(clientId: string, organizationId: string): Promise<boolean> {
+    const client = await this.prisma.client.findFirst({
+      where: this.prisma.whereNotDeleted({
+        id: clientId,
+        organization_id: organizationId,
+      }),
       include: {
         organization: {
           select: { ai_summary_enabled: true },
@@ -164,6 +201,31 @@ export class AiSummaryRepository {
     });
 
     return client?.organization?.ai_summary_enabled ?? false;
+  }
+
+  async setOrganizationAIEnabledByClientId(
+    clientId: string,
+    enabled: boolean,
+    organizationId: string,
+  ): Promise<boolean> {
+    const client = await this.prisma.client.findFirst({
+      where: this.prisma.whereNotDeleted({
+        id: clientId,
+        organization_id: organizationId,
+      }),
+      select: { organization_id: true },
+    });
+
+    if (!client?.organization_id) {
+      return false;
+    }
+
+    await this.prisma.organization.update({
+      where: { id: client.organization_id },
+      data: { ai_summary_enabled: enabled },
+    });
+
+    return true;
   }
 
   async findExpiredSummaries(): Promise<HealthSummary[]> {

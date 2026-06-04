@@ -53,9 +53,12 @@ export class MedicationService {
   async createMedication(
     data: CreateMedicationInput,
     userId: string,
-    userRole: string
+    userRole: string,
+    organizationId?: string,
   ): Promise<Medication> {
-    this.checkAdminAccess(userRole);
+    await this.requireOrganizationId(organizationId);
+    const normalizedRole = this.normalizeRole(userRole);
+    this.checkAdminAccess(normalizedRole);
     
     const requestId = this.cls.get('requestId');
     this.logger.log(`Creating medication ${data.name}`, { requestId });
@@ -68,6 +71,7 @@ export class MedicationService {
     });
 
     await this.medicationRepository.createMedicationAudit({
+      organizationId: organizationId!,
       action: MedicationAuditAction.PRESCRIPTION_CREATED,
       actorId: userId,
       actorRole: userRole,
@@ -80,9 +84,12 @@ export class MedicationService {
   async createPrescription(
     data: CreatePrescriptionInput,
     userId: string,
-    userRole: string
+    userRole: string,
+    organizationId?: string,
   ): Promise<Prescription> {
-    this.checkAdminAccess(userRole);
+    const orgId = await this.requireOrganizationId(organizationId);
+    const normalizedRole = this.normalizeRole(userRole);
+    this.checkAdminAccess(normalizedRole);
     
     const requestId = this.cls.get('requestId');
     this.logger.log(`Creating prescription for client ${data.clientId}`, { requestId });
@@ -94,6 +101,15 @@ export class MedicationService {
         ErrorCode.MEDICATION_NOT_FOUND,
         'Medication not found',
         HttpStatus.NOT_FOUND
+      );
+    }
+
+    const clientExists = await this.medicationRepository.findClientInOrganization(data.clientId, orgId);
+    if (!clientExists) {
+      throw new BaseHttpException(
+        ErrorCode.CLIENT_NOT_FOUND,
+        'Client not found in organization',
+        HttpStatus.NOT_FOUND,
       );
     }
 
@@ -109,12 +125,18 @@ export class MedicationService {
       is_active: data.isActive ?? true,
     });
 
+    const administrationsCreated = await this.materializePrescriptionAdministrations(
+      prescription,
+      orgId,
+    );
+
     await this.medicationRepository.createMedicationAudit({
+      organizationId: orgId,
       prescriptionId: prescription.id,
       action: MedicationAuditAction.PRESCRIPTION_CREATED,
       actorId: userId,
       actorRole: userRole,
-      changes: data
+      changes: { ...data, administrationsCreated }
     });
 
     return prescription;
@@ -123,16 +145,20 @@ export class MedicationService {
   async listDueMeds(
     visitId: string,
     userId: string,
-    userRole: string
+    userRole: string,
+    organizationId?: string,
   ): Promise<any[]> {
+    const orgId = await this.requireOrganizationId(organizationId);
+    const normalizedRole = this.normalizeRole(userRole);
+    this.checkMedicationReadAccess(normalizedRole);
     const requestId = this.cls.get('requestId');
     this.logger.log(`Fetching due medications for visit ${visitId}`, { requestId });
 
     // Check if user has access to this visit (implement similar to visit service)
-    const dueMeds = await this.medicationRepository.findDueMedicationsForVisit(visitId);
+    const dueMeds = await this.medicationRepository.findDueMedicationsForVisit(visitId, orgId);
     
     // Role-based filtering if needed
-    if (userRole === 'carer') {
+    if (normalizedRole === 'carer') {
       // Ensure carer is assigned to this visit
       const visitMeds = dueMeds.filter(med => 
         med.visit && med.visit.carer_id === userId
@@ -146,12 +172,19 @@ export class MedicationService {
   async recordAdministration(
     data: RecordAdministrationInput,
     userId: string,
-    userRole: string
+    userRole: string,
+    organizationId?: string,
   ): Promise<MedicationAdministration> {
+    const orgId = await this.requireOrganizationId(organizationId);
+    const normalizedRole = this.normalizeRole(userRole);
+    this.checkMedicationReadAccess(normalizedRole);
     const requestId = this.cls.get('requestId');
     this.logger.log(`Recording medication administration ${data.administrationId}`, { requestId });
 
-    const administration = await this.medicationRepository.findMedicationAdministrationById(data.administrationId);
+    const administration = await this.medicationRepository.findMedicationAdministrationById(
+      data.administrationId,
+      orgId,
+    );
     if (!administration) {
       throw new BaseHttpException(
         ErrorCode.MEDICATION_ADMINISTRATION_NOT_FOUND,
@@ -161,7 +194,7 @@ export class MedicationService {
     }
 
     // Check permissions - carer must be assigned to the visit
-    if (userRole === 'carer' && (administration as any).visit?.carer_id !== userId) {
+    if (normalizedRole === 'carer' && (administration as any).visit?.carer_id !== userId) {
       throw new BaseHttpException(
         ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
         'You can only record medications for your own visits',
@@ -174,7 +207,8 @@ export class MedicationService {
       const overlaps = await this.medicationRepository.findOverlappingMedicationTimes(
         administration.prescription_id,
         administration.scheduled_time,
-        30 // 30-minute window
+        30,
+        orgId,
       );
 
       const alreadyAdministered = overlaps.filter(med => 
@@ -198,6 +232,7 @@ export class MedicationService {
 
     const updatedAdministration = await this.medicationRepository.updateMedicationAdministration(
       administration.id,
+      orgId,
       {
         status: data.status,
         administered_time: data.status === MedicationStatus.ADMINISTERED ? new Date() : null,
@@ -207,6 +242,7 @@ export class MedicationService {
     );
 
     await this.medicationRepository.createMedicationAudit({
+      organizationId: orgId,
       medicationAdministrationId: updatedAdministration.id,
       action: this.getAuditActionForStatus(data.status),
       actorId: userId,
@@ -227,21 +263,59 @@ export class MedicationService {
   async getTodaysMedicationsByClient(
     date: Date,
     userId: string,
-    userRole: string
+    userRole: string,
+    organizationId?: string,
   ): Promise<MedicationAdministration[]> {
-    this.checkOfficeAccess(userRole);
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'A valid medication date is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const orgId = await this.requireOrganizationId(organizationId);
+    const normalizedRole = this.normalizeRole(userRole);
+    this.checkClinicalAccess(normalizedRole);
     
     const requestId = this.cls.get('requestId');
     this.logger.log(`Fetching today's medications for date ${date.toISOString()}`, { requestId });
 
-    return this.medicationRepository.findTodaysMedicationsByClient(date);
+    const administrations = await this.medicationRepository.findTodaysMedicationsByClient(
+      date,
+      orgId,
+      normalizedRole === 'carer' ? userId : undefined,
+    );
+
+    return administrations.filter((administration) => {
+      const administrationWithRelations = administration as MedicationAdministration & {
+        prescription?: { client?: unknown; medication?: unknown } | null;
+      };
+      const hasPrescription = Boolean(administrationWithRelations.prescription);
+      const hasClient = Boolean(administrationWithRelations.prescription?.client);
+      const hasMedication = Boolean(administrationWithRelations.prescription?.medication);
+
+      if (hasPrescription && hasClient && hasMedication) {
+        return true;
+      }
+
+      this.logger.warn(
+        `Skipping incomplete medication administration ${administration.id} in organization ${orgId}`,
+        { requestId, userId, normalizedRole },
+      );
+      return false;
+    });
   }
 
   async findMedications(
     filter: MedicationFilterArgs,
     userId: string,
-    userRole: string
+    userRole: string,
+    organizationId?: string,
   ): Promise<{ items: Medication[]; total: number }> {
+    await this.requireOrganizationId(organizationId);
+    const normalizedRole = this.normalizeRole(userRole);
+    this.checkMedicationReadAccess(normalizedRole);
     const requestId = this.cls.get('requestId');
     const where: any = {};
 
@@ -270,14 +344,41 @@ export class MedicationService {
     }
   }
 
-  private checkOfficeAccess(userRole: string): void {
-    if (!['admin', 'office'].includes(userRole)) {
+  private checkClinicalAccess(userRole: string): void {
+    if (!['admin', 'office', 'manager', 'care_manager', 'carer'].includes(userRole)) {
       throw new BaseHttpException(
         ErrorCode.FORBIDDEN_OFFICE_ACCESS,
-        'Office or admin access required',
+        'Clinical staff access required',
         HttpStatus.FORBIDDEN
       );
     }
+  }
+
+  private checkMedicationReadAccess(userRole: string): void {
+    if (!['admin', 'carer'].includes(userRole)) {
+      throw new BaseHttpException(
+        ErrorCode.FORBIDDEN_ROLE_REQUIRED,
+        'Clinical staff access required',
+        HttpStatus.FORBIDDEN
+      );
+    }
+  }
+
+  private normalizeRole(userRole: string): string {
+    return (userRole || '').toLowerCase();
+  }
+
+  private async requireOrganizationId(organizationId?: string): Promise<string> {
+    const orgId = (organizationId || '').trim();
+    if (orgId) {
+      return orgId;
+    }
+
+    throw new BaseHttpException(
+      ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
+      'Organization context is required for this request',
+      HttpStatus.FORBIDDEN,
+    );
   }
 
   private getAuditActionForStatus(status: MedicationStatus): MedicationAuditAction {
@@ -293,5 +394,104 @@ export class MedicationService {
       default:
         return MedicationAuditAction.MEDICATION_SCHEDULED;
     }
+  }
+
+  private materializationWindowEnd(startDate: Date, endDate?: Date | null): Date {
+    if (endDate) {
+      const bounded = new Date(endDate);
+      bounded.setUTCHours(23, 59, 59, 999);
+      return bounded;
+    }
+    const fallback = new Date(startDate);
+    fallback.setUTCDate(fallback.getUTCDate() + 30);
+    fallback.setUTCHours(23, 59, 59, 999);
+    return fallback;
+  }
+
+  private parseTimeOfDay(time: string): { hours: number; minutes: number } | null {
+    const normalized = String(time || '').trim();
+    const match = normalized.match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+    return { hours, minutes };
+  }
+
+  private buildScheduleCandidates(
+    startDate: Date,
+    endDate: Date,
+    administrationTimes: string[],
+  ): Date[] {
+    const parsedTimes = administrationTimes
+      .map((time) => this.parseTimeOfDay(time))
+      .filter((value): value is { hours: number; minutes: number } => Boolean(value));
+
+    const candidates: Date[] = [];
+    const cursor = new Date(Date.UTC(
+      startDate.getUTCFullYear(),
+      startDate.getUTCMonth(),
+      startDate.getUTCDate(),
+      0,
+      0,
+      0,
+      0,
+    ));
+
+    while (cursor <= endDate) {
+      for (const t of parsedTimes) {
+        const scheduled = new Date(Date.UTC(
+          cursor.getUTCFullYear(),
+          cursor.getUTCMonth(),
+          cursor.getUTCDate(),
+          t.hours,
+          t.minutes,
+          0,
+          0,
+        ));
+        if (scheduled >= startDate && scheduled <= endDate) {
+          candidates.push(scheduled);
+        }
+      }
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    return candidates;
+  }
+
+  private async materializePrescriptionAdministrations(
+    prescription: Prescription,
+    organizationId: string,
+  ): Promise<number> {
+    const startDate = new Date(prescription.start_date);
+    const endDate = this.materializationWindowEnd(startDate, prescription.end_date);
+    const candidates = this.buildScheduleCandidates(
+      startDate,
+      endDate,
+      Array.isArray(prescription.administration_times) ? prescription.administration_times : [],
+    );
+
+    if (!candidates.length) {
+      return 0;
+    }
+
+    const existing = await this.medicationRepository.findMedicationAdministrationTimesForPrescriptionWindow(
+      prescription.id,
+      startDate,
+      endDate,
+      organizationId,
+    );
+    const existingSet = new Set(existing.map((d) => d.toISOString()));
+
+    const createPayload = candidates
+      .filter((scheduled) => !existingSet.has(scheduled.toISOString()))
+      .map((scheduled) => ({
+        prescription_id: prescription.id,
+        scheduled_time: scheduled,
+        status: MedicationStatus.SCHEDULED,
+      }));
+
+    return this.medicationRepository.createMedicationAdministrationsBulk(createPayload);
   }
 }

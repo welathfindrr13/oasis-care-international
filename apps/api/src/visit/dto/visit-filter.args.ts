@@ -1,12 +1,12 @@
 import { ArgsType, Field, ID, Int } from '@nestjs/graphql';
-import { IsOptional, IsUUID, IsEnum, IsDateString, IsInt, Min, Max } from 'class-validator';
+import { IsOptional, IsUUID, IsEnum, IsDateString, IsInt, Matches, Min, Max } from 'class-validator';
 import { VisitStatus } from '@oasis/db';
 
 @ArgsType()
 export class VisitFilterArgs {
   @Field(() => ID, { nullable: true })
   @IsOptional()
-  @IsUUID()
+  @Matches(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
   carerId?: string;
 
   @Field(() => ID, { nullable: true })

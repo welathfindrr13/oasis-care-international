@@ -7,7 +7,20 @@ registerEnumType(VisitStatus, {
   description: 'The status of a visit',
 });
 
-@ObjectType()
+export enum VisitTaskOutcome {
+  DONE = 'DONE',
+  NOT_DONE = 'NOT_DONE',
+  REFUSED = 'REFUSED',
+  NOT_REQUIRED = 'NOT_REQUIRED',
+  CONCERN_RAISED = 'CONCERN_RAISED',
+}
+
+registerEnumType(VisitTaskOutcome, {
+  name: 'VisitTaskOutcome',
+  description: 'The recorded outcome for a visit task',
+});
+
+@ObjectType('VisitCarerDTO')
 export class CarerDTO {
   @Field(() => ID)
   id!: string;
@@ -25,7 +38,7 @@ export class CarerDTO {
   phone?: string | null;
 }
 
-@ObjectType()
+@ObjectType('VisitClientDTO')
 export class ClientDTO {
   @Field(() => ID)
   id!: string;

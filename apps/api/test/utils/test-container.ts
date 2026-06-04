@@ -18,11 +18,19 @@ export async function startPostgres(): Promise<{
   const host = container.getHost();
   const dbUrl = `postgresql://test:test@${host}:${port}/oasis_test`;
 
-  // Create vector extension before running migrations
-  execSync(
-    `psql "${dbUrl}" -c "CREATE EXTENSION IF NOT EXISTS vector;"`,
-    { stdio: 'inherit' }
-  );
+  // Create vector extension from inside the running DB container.
+  const createExtension = await container.exec([
+    'psql',
+    '-U',
+    'test',
+    '-d',
+    'oasis_test',
+    '-c',
+    'CREATE EXTENSION IF NOT EXISTS vector;',
+  ]);
+  if (createExtension.exitCode !== 0) {
+    throw new Error(`Failed to create vector extension: ${createExtension.output}`);
+  }
 
   // apply migrations
   execSync(

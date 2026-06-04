@@ -5,14 +5,56 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { cn } from '../../lib/utils'
+import { InstallAppPrompt } from '../pwa/InstallAppPrompt'
+import { hasRole, normalizeAppRoles } from '../../lib/auth/roles'
+import { getAccessContext } from '../../lib/auth/access'
 
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: '📊' },
-  { href: '/visits', label: 'Visits', icon: '📅' },
-  { href: '/clients', label: 'Clients', icon: '👥' },
-  { href: '/emar', label: 'eMAR', icon: '💊' },
-  { href: '/activity', label: 'Activity', icon: '📋' },
+const staffNavItems = [
+  { href: '/today', label: 'Today', icon: '📊', aliases: ['/dashboard'] },
+  { href: '/people', label: 'People', icon: '👥', aliases: ['/clients'] },
+  { href: '/schedule', label: 'Schedule', icon: '📅', aliases: ['/visits'] },
+  { href: '/family-updates', label: 'Family Updates', icon: '🤝', aliases: ['/carebridge'] },
+  { href: '/medication', label: 'Medication Round', icon: '💊', aliases: ['/emar'] },
+  { href: '/shift', label: 'My Shift', icon: '⏱️', aliases: [] },
 ] as const
+
+const managementNavItems = [
+  { href: '/management', label: 'Management', icon: '🧭', aliases: ['/activity'] },
+  { href: '/staff', label: 'Workforce', icon: '👤', aliases: ['/admin/carers', '/admin/analytics'] },
+  { href: '/evidence', label: 'Reports', icon: '📋', aliases: ['/admin/metrics'] },
+  { href: '/settings', label: 'Settings', icon: '⚙️', aliases: [] },
+] as const
+
+const familyNavItems = [
+  { href: '/family', label: 'Family Assurance', icon: '🏠', aliases: [] },
+] as const
+
+function isNavItemActive(pathname: string, item: { href: string; aliases?: readonly string[] }): boolean {
+  const paths = [item.href, ...(item.aliases ?? [])]
+  return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+}
+
+function formatRoleLabel(role: string): string {
+  const normalized = role.trim().toLowerCase()
+  if (!normalized) return ''
+
+  switch (normalized) {
+    case 'admin':
+      return 'ADMIN'
+    case 'carer':
+      return 'CARER'
+    case 'care_manager':
+      return 'CARE MANAGER'
+    case 'manager':
+      return 'MANAGER'
+    case 'office':
+      return 'OFFICE'
+    case 'client':
+      return 'CLIENT'
+    default:
+      return normalized.replace(/_/g, ' ').toUpperCase()
+  }
+}
 
 export interface HeaderProps {
   className?: string
@@ -24,14 +66,40 @@ export function Header({
   notificationCount = 0 
 }: HeaderProps) {
   const pathname = usePathname()
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
 
-  // Get user info from session
-  const userName = session?.user?.name || session?.user?.email?.split('@')[0] || 'User'
+  const sessionRoles = normalizeAppRoles((session as any)?.roles ?? [])
+  const loadingFallbackRoles =
+    status === 'loading' && sessionRoles.length === 0
+      ? pathname.startsWith('/family')
+        ? ['user']
+        : ['admin']
+      : sessionRoles
+  const accessContext = getAccessContext(loadingFallbackRoles)
+  const primaryRole = loadingFallbackRoles[0]
+  const userRole = primaryRole ? formatRoleLabel(primaryRole) : ''
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+
+  // Get user info from session.
+  const userName = session?.user?.name || session?.user?.email?.split('@')[0] || (status === 'loading' ? '' : 'User')
   const userEmail = session?.user?.email || ''
-  const userRole = (session as any)?.roles?.[0] || 'Care Manager'
+  const userInitial = (session?.user?.name || session?.user?.email || 'U').charAt(0).toUpperCase()
+  const isAdmin = hasRole(loadingFallbackRoles, 'admin')
+  const navItems = accessContext.isExternal
+    ? familyNavItems
+    : isAdmin
+    ? [...staffNavItems, ...managementNavItems] as const
+    : staffNavItems
+
+  async function handleSignOut() {
+    try {
+      await signOut({ redirect: false });
+    } finally {
+      window.location.assign('/api/auth/cognito-logout');
+    }
+  }
 
   return (
     <header className={cn('bg-white border-b border-slate-200 sticky top-0 z-50', className)}>
@@ -39,13 +107,18 @@ export function Header({
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-teal-700 rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/25">
+            <Link href={accessContext.homePath} className="flex items-center gap-3">
+              <div className={cn(
+                'w-10 h-10 rounded-xl flex items-center justify-center shadow-lg',
+                accessContext.isExternal
+                  ? 'bg-gradient-to-br from-sky-500 to-cyan-700 shadow-sky-500/25'
+                  : 'bg-gradient-to-br from-teal-500 to-teal-700 shadow-teal-500/25'
+              )}>
                 <span className="text-white font-bold text-lg">O</span>
               </div>
               <div className="hidden sm:block">
                 <h1 className="font-heading font-bold text-lg text-slate-900 tracking-tight">
-                  Oasis Care
+                  {accessContext.isExternal ? 'Family Assurance Hub' : 'Oasis Care'}
                 </h1>
                 <p className="text-xs text-slate-500 -mt-0.5">International</p>
               </div>
@@ -55,8 +128,7 @@ export function Header({
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-1">
             {navItems.map((item) => {
-              const isActive = pathname === item.href || 
-                              (item.href === '/clients' && pathname.startsWith('/clients'))
+              const isActive = isNavItemActive(pathname, item)
               
               return (
                 <Link
@@ -80,8 +152,13 @@ export function Header({
 
           {/* Right side - notifications & profile */}
           <div className="flex items-center gap-3">
+            <div className="hidden lg:block">
+              <InstallAppPrompt compact />
+            </div>
+
             {/* Notifications */}
             <button 
+              onClick={() => setNotificationsOpen((open) => !open)}
               className="relative p-2 rounded-lg hover:bg-slate-100 transition-colors"
               aria-label={`Notifications ${notificationCount > 0 ? `(${notificationCount} new)` : ''}`}
             >
@@ -94,6 +171,23 @@ export function Header({
                 </span>
               )}
             </button>
+            {notificationsOpen && (
+              <div className="absolute right-20 top-14 z-50 w-80 rounded-xl border border-slate-200 bg-white p-4 shadow-lg">
+                <p className="text-sm font-semibold text-slate-900">Notifications</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Live notification delivery is coming with the outbox work. For now, use Today for urgent visits,
+                  Family Updates for approvals, and Management for system checks.
+                </p>
+                <div className="mt-3 grid gap-2">
+                  <Link href="/today" className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                    Open Today Command Centre
+                  </Link>
+                  <Link href="/family-updates" className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                    Review Family Updates
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {/* Profile dropdown */}
             <div className="relative">
@@ -102,11 +196,13 @@ export function Header({
                 className="flex items-center gap-2 p-1.5 pr-3 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-teal-600 rounded-lg flex items-center justify-center text-white font-semibold text-sm">
-                  {userName.charAt(0).toUpperCase()}
+                  {userInitial}
                 </div>
                 <div className="hidden sm:block text-left">
-                  <p className="text-sm font-medium text-slate-900">{userName}</p>
-                  <p className="text-xs text-slate-500">{userRole}</p>
+                  <p className="text-sm font-medium text-slate-900">{userName || ' '}</p>
+                  <p className="text-xs text-slate-500">
+                    {accessContext.isExternal ? 'FAMILY ACCESS' : userRole || (status === 'loading' ? '' : 'MEMBER')}
+                  </p>
                 </div>
                 <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -117,25 +213,59 @@ export function Header({
               {profileOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50">
                   <div className="px-4 py-2 border-b border-slate-100">
-                    <p className="text-sm font-medium text-slate-900">{userName}</p>
-                    <p className="text-xs text-slate-500">{userEmail || userRole}</p>
+                    <p className="text-sm font-medium text-slate-900">{userName || 'User'}</p>
+                    <p className="text-xs text-slate-500">{userEmail || userRole || 'No email available'}</p>
                   </div>
-                  <Link href="/settings" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    Settings
-                  </Link>
-                  <Link href="/admin" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                    </svg>
-                    Admin Panel
-                  </Link>
+                  {accessContext.isExternal ? (
+                    <Link href="/family" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7.5A2.5 2.5 0 015.5 5h13A2.5 2.5 0 0121 7.5v9a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 16.5v-9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10h10M7 14h6" />
+                      </svg>
+                      Family Assurance Hub
+                    </Link>
+                  ) : (
+                    <>
+                      <Link href="/settings" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Settings
+                      </Link>
+                      <Link href="/shift" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        My Shift
+                      </Link>
+                    </>
+                  )}
+                  {!accessContext.isExternal && isAdmin && (
+                    <>
+                      <Link href="/admin/analytics" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3v18m4-12v12m4-6v6M7 13v8M3 21h18" />
+                        </svg>
+                        Workforce Analytics
+                      </Link>
+                      <Link href="/admin/metrics" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                        </svg>
+                        System Health
+                      </Link>
+                      <Link href="/admin/carers" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Carer Directory
+                      </Link>
+                    </>
+                  )}
                   <div className="border-t border-slate-100 mt-2 pt-2">
                     <button 
-                      onClick={() => signOut({ callbackUrl: '/login' })}
+                      onClick={handleSignOut}
                       className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -170,8 +300,7 @@ export function Header({
           <nav className="md:hidden py-4 border-t border-slate-100">
             <div className="flex flex-col gap-1">
               {navItems.map((item) => {
-                const isActive = pathname === item.href || 
-                                (item.href === '/clients' && pathname.startsWith('/clients'))
+                const isActive = isNavItemActive(pathname, item)
                 
                 return (
                   <Link
@@ -198,4 +327,3 @@ export function Header({
     </header>
   )
 }
-

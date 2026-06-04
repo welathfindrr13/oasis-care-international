@@ -87,18 +87,27 @@ describe('eMAR real DB flow', () => {
     prisma = app.get<PrismaService>(PrismaService);
 
     // --- seed minimal data ---
+    await prisma.organization.create({
+      data: {
+        id: TEST_USERS.carer.organization_id!,
+        name: 'Test Organization',
+      },
+    });
+
     const client = await prisma.client.create({
       data: { 
         full_name: 'Test Client', 
         address_line1: '1 Demo St', 
         city: 'London', 
-        postcode: 'SW1A 1AA' 
+        postcode: 'SW1A 1AA',
+        organization_id: TEST_USERS.carer.organization_id,
       },
     });
 
     const carer = await prisma.carer.create({
       data: { 
         id: TEST_USERS.carer.sub, 
+        organization_id: TEST_USERS.carer.organization_id,
         first_name: 'Jane', 
         last_name: 'Doe', 
         email: 'jane@demo.com' 
@@ -129,6 +138,7 @@ describe('eMAR real DB flow', () => {
       data: {
         carer_id: carer.id,
         client_id: client.id,
+        organization_id: TEST_USERS.carer.organization_id!,
         scheduled_start: new Date(Date.now() + 60 * 60 * 1000), // 1 hour from now
         scheduled_end: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours from now
         status: VisitStatus.SCHEDULED,

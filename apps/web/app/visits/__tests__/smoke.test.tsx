@@ -78,11 +78,11 @@ describe('Visits Page', () => {
     render(page)
     
     // Check for navigation links
-    expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /overview/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /visits/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /activity/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /emar/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /clients/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /carebridge/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /medication/i })).toBeInTheDocument()
   })
 
   it('displays visits data with status chips', async () => {

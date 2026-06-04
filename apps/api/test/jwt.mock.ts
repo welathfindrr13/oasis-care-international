@@ -6,16 +6,20 @@ const TEST_JWT_SECRET = 'test-secret-key-for-oasis-testing-only';
 export interface TestUser {
   sub: string;
   preferred_username: string;
+  organization_id?: string;
   realm_access: {
     roles: string[];
   };
 }
+
+export const TEST_ORGANIZATION_ID = 'org-test-123';
 
 // Test users
 export const TEST_USERS = {
   admin: {
     sub: 'admin-123',
     preferred_username: 'admin.user',
+    organization_id: TEST_ORGANIZATION_ID,
     realm_access: {
       roles: ['admin'],
     },
@@ -23,6 +27,7 @@ export const TEST_USERS = {
   carer: {
     sub: 'carer-123',
     preferred_username: 'jane.doe',
+    organization_id: TEST_ORGANIZATION_ID,
     realm_access: {
       roles: ['carer'],
     },
@@ -30,6 +35,7 @@ export const TEST_USERS = {
   otherCarer: {
     sub: 'carer-456',
     preferred_username: 'john.smith',
+    organization_id: TEST_ORGANIZATION_ID,
     realm_access: {
       roles: ['carer'],
     },
@@ -37,6 +43,7 @@ export const TEST_USERS = {
   client: {
     sub: 'client-123',
     preferred_username: 'mary.jones',
+    organization_id: TEST_ORGANIZATION_ID,
     realm_access: {
       roles: ['client'],
     },

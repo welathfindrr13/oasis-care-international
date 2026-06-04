@@ -51,10 +51,51 @@ For productized secondary-use and monetization controls, see `docs/gdpr/MONETIZA
 - **Behavior**: Module only registers routes when flag is enabled
 - **Location**: AppModule imports array
 
+## Access Control Status
+
+- **Current production posture**: conservative staff-only gate.
+- **Controller guard**: `GdprController` uses `ApiRolesGuard`.
+- **Allowed roles**: `admin`, `manager`.
+- **Denied roles**: `user`, `carer`, family/external users, unauthenticated callers.
+- **Test coverage**: `apps/api/src/gdpr/gdpr.controller.spec.ts` verifies controller guard metadata, role metadata, unauthenticated denial, non-manager/non-admin denial, and authorised manager erasure request path.
+
+Self-service data subject access and proper-representative access are not enabled yet. They require a documented authority/access-basis model before production, especially for family users, attorneys, emergency contacts, and professional viewers.
+
 ## Audit Logging
 - **Component**: AuditLogInterceptor
 - **Status**: Stub implementation (logs to console, no PHI)
 - **Next Steps**: Wire to AuditLog table, implement PHI filtering
+
+## Deployment V2 Pre-Live Controls
+
+Deployment V2 is the single-server production foundation. These controls must be complete before real client data is used:
+
+- [ ] **Hosting region**: choose a UK/EU hosting region where possible and document the provider region.
+- [ ] **Provider DPA**: complete and retain the hosting provider DPA before processing real care data.
+- [ ] **HTTPS**: terminate public traffic through Caddy HTTPS; do not expose web, API, or Postgres directly.
+- [ ] **Secrets handling**: keep `deploy/v2/.env` and real secret values out of git; use strong runtime-only secrets.
+- [ ] **Backup and restore**: run and document a successful backup and restore rehearsal using Deployment V2 scripts.
+- [ ] **Access control**: verify role-based access remains enforced after deployment.
+- [ ] **CareBridge boundaries**: smoke-test that family users remain in family-safe surfaces and cannot access raw visits, care notes, medication rows, care-planning internals, evidence packs, staff/admin/reporting data, or staff review queues.
+- [ ] **Audit logs**: confirm audit/security logs remain available and are retained for the chosen operational period.
+- [ ] **Retention/deletion**: document retention, deletion, legal hold, SAR, and erasure operating procedures.
+- [ ] **Incident/breach response**: document first-response owner, notification process, evidence preservation, and escalation path.
+- [ ] **DPIA/security review**: complete DPIA and security checklist before using real client data.
+
+## Real Client Data Blockers
+
+Real client data must not be processed until all blockers below have evidence:
+
+- [ ] Provider DPA completed and stored.
+- [ ] DPIA/security review completed for the selected hosting and auth provider.
+- [ ] Production auth provider selected and tested with staff/admin/family users.
+- [ ] HTTPS, domain, session cookies, and logout behavior verified in browser.
+- [ ] Deployment V2 env preflight passes with real runtime values.
+- [ ] Backup and restore rehearsal completed on disposable infrastructure.
+- [ ] Authenticated CareBridge smoke proves family users cannot access raw visits, care notes, medication rows, care-planning internals, evidence packs, staff/admin/reporting data, or approval queues.
+- [ ] SAR/export/erasure/retention/legal-hold operating model documented.
+- [ ] Audit logs verified in deployed runtime and retention period chosen.
+- [ ] Incident/breach response owner, escalation path, and evidence preservation procedure documented.
 
 ## TODO - Implementation Requirements
 
@@ -68,12 +109,14 @@ For productized secondary-use and monetization controls, see `docs/gdpr/MONETIZA
 - [ ] Create structured export format (JSON/XML)
 - [ ] Add encryption for sensitive exports
 - [ ] Implement delivery mechanism (secure download/email)
+- [ ] Add self-service/proper-representative authority model before allowing non-staff SAR requests
 
 ### 3. Data Erasure
 - [ ] Implement cascading deletion logic
 - [ ] Handle pseudonymization for legal requirements
 - [ ] Create erasure verification reports
 - [ ] Implement backup/recovery considerations
+- [ ] Require staff review and documented lawful basis before acting on family/proxy erasure requests
 
 ### 4. Audit Logging
 - [ ] Wire interceptor to database

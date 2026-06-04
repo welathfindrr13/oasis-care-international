@@ -114,4 +114,20 @@ describe('GqlErrorFilter', () => {
     expect(result.extensions).toEqual({ code: ErrorCode.VISIT_NOT_FOUND });
     expect(result.stack).toBeDefined();
   });
+
+  it('maps HTTP 403 exceptions to FORBIDDEN code', () => {
+    const exception = {
+      response: {
+        statusCode: 403,
+        message: 'Forbidden resource',
+      },
+    };
+
+    const result = filter.catch(exception, mockHost);
+
+    expect(result).toBeInstanceOf(GraphQLError);
+    expect(result.message).toBe('Forbidden resource');
+    expect(result.extensions).toEqual({ code: ErrorCode.FORBIDDEN });
+    expect(result.stack).toBeDefined();
+  });
 });

@@ -1,10 +1,15 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
+import { getServerSession } from 'next-auth'
 import { Header } from '../../components/oasis/Header'
+
+// Mark page as dynamic since it uses searchParams
+export const dynamic = 'force-dynamic'
 import { FilterBar } from '../../components/oasis/FilterBar'
 import { StatusChip } from '../../components/oasis/StatusChip'
 import { Card, CardContent, CardHeader } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
+import { authOptions } from '../api/auth/[...nextauth]/authOptions'
 import { query } from '../../lib/graphql/client'
 import { 
   VISITS_QUERY, 
@@ -16,7 +21,7 @@ import {
 import { formatTime, formatDate } from '../../lib/time'
 
 export const metadata: Metadata = {
-  title: 'Visits - Oasis Care',
+  title: 'Schedule - Oasis Care',
   description: 'Manage and track care visits',
 }
 
@@ -24,6 +29,7 @@ interface VisitsPageProps {
   searchParams: {
     date?: string;
     carerId?: string;
+    clientId?: string;
     status?: string;
     page?: string;
   };
@@ -47,6 +53,7 @@ async function getVisits(searchParams: VisitsPageProps['searchParams']): Promise
       scheduledStartFrom,
       scheduledStartTo,
       carerId: searchParams.carerId || undefined,
+      clientId: searchParams.clientId || undefined,
       status: searchParams.status || undefined,
       take: DEFAULT_PAGE_SIZE,
       skip,
@@ -64,7 +71,7 @@ async function getVisits(searchParams: VisitsPageProps['searchParams']): Promise
   }
 }
 
-function EmptyState() {
+function EmptyState({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="text-center py-12">
       <div className="mb-4">
@@ -86,19 +93,29 @@ function EmptyState() {
         </div>
       </div>
       <h3 className="text-lg font-medium text-text-primary mb-2">
-        No visits found
+        No care visits found
       </h3>
-          <p className="text-text-secondary mb-4">
-            Try adjusting your filters or check back later.
-          </p>
-      <Button variant="primary">
-        Schedule New Visit
-      </Button>
+      <p className="text-text-secondary mb-4">
+        Try adjusting your filters or check back later.
+      </p>
+      {isAdmin && (
+        <Button asChild variant="primary">
+          <Link href="/schedule/new">
+            Schedule care visit
+          </Link>
+        </Button>
+      )}
     </div>
   )
 }
 
 export default async function VisitsPage({ searchParams }: VisitsPageProps) {
+  const session = await getServerSession(authOptions)
+  const roles = Array.isArray((session as any)?.roles) ? (session as any).roles : []
+  const isAdmin = roles.some((role: unknown) => String(role).toLowerCase() === 'admin')
+  const todayKey = new Date().toISOString().slice(0, 10)
+  const showTodayHeading = searchParams.date === todayKey
+
   const { visits, total } = await getVisits(searchParams);
   const hasVisits = visits.length > 0;
 
@@ -108,10 +125,10 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="mb-8">
           <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">
-            Visits
+            Schedule
           </h1>
           <p className="text-slate-500 mt-1">
-            Manage and track care visits for all clients
+            Manage care visits, assignments, exceptions, and completion status for people supported.
           </p>
         </div>
 
@@ -122,17 +139,26 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-text-primary font-heading">
-                  Today&apos;s Visits
+                  {showTodayHeading ? "Today's Visits" : 'Visits'}
                 </h2>
                 <p className="text-sm text-text-secondary">
                   {hasVisits ? `${visits.length} of ${total} visits` : 'No visits found'}
                 </p>
               </div>
-              <Link href="/visits/new">
-                <Button variant="primary" size="sm">
-                  Add Visit
-                </Button>
-              </Link>
+              <div className="flex items-center gap-2">
+                {!isAdmin && (
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href="/shift">My Shift</Link>
+                  </Button>
+                )}
+                {isAdmin && (
+                  <Button asChild variant="primary" size="sm">
+                    <Link href="/schedule/new">
+                      Schedule care visit
+                    </Link>
+                  </Button>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -188,7 +214,7 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                           <td className="py-3 px-4">
                             <div>
                               <div className="font-medium text-text-primary">
-                                {visit.client?.fullName || 'Unknown Client'}
+                                {visit.client?.fullName || 'Unknown person'}
                               </div>
                               <div className="text-sm text-text-secondary">
                                 {visit.client && (
@@ -212,12 +238,31 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                           </td>
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-2">
-                              <Button variant="ghost" size="sm">
-                                View
-                              </Button>
-                              <Button variant="ghost" size="sm">
-                                Edit
-                              </Button>
+                              {visit.clientId ? (
+                                <Button asChild variant="ghost" size="sm">
+                                  <Link href={`/people/${visit.clientId}`}>
+                                    Person
+                                  </Link>
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-slate-500 px-2">No client</span>
+                              )}
+                              {isAdmin && (
+                                <>
+                                  <Button asChild variant="ghost" size="sm">
+                                    <Link href={`/schedule/${visit.id}`}>
+                                      View
+                                    </Link>
+                                  </Button>
+                                  {visit.clientId && (
+                                    <Button asChild variant="ghost" size="sm">
+                                      <Link href={`/schedule/new?clientId=${visit.clientId}`}>
+                                        Reschedule
+                                      </Link>
+                                    </Button>
+                                  )}
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -227,7 +272,7 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                 </table>
               </div>
             ) : (
-              <EmptyState />
+              <EmptyState isAdmin={isAdmin} />
             )}
           </CardContent>
         </Card>
