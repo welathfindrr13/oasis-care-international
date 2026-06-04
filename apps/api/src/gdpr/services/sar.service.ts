@@ -29,6 +29,7 @@ export class SarService {
    * Enqueue a Subject Access Request
    */
   async enqueueSubjectAccessRequest(
+    organizationId: string,
     userId: string,
     requestType: string,
     email?: string,
@@ -36,6 +37,7 @@ export class SarService {
     // Create an erasure queue entry for tracking (reusing the model)
     const request = await this.prisma.erasureQueue.create({
       data: {
+        organization_id: organizationId,
         user_id: userId,
         request_type: `sar_${requestType}`,
         status: 'pending',
@@ -56,7 +58,7 @@ export class SarService {
   /**
    * Generate a Subject Access Report with all user data
    */
-  async generateSubjectAccessReport(userId: string): Promise<UserDataExport> {
+  async generateSubjectAccessReport(organizationId: string, userId: string): Promise<UserDataExport> {
     // Gather all user data across tables
     const [
       client,
@@ -68,12 +70,13 @@ export class SarService {
       auditLogs,
     ] = await Promise.all([
       // Try to find as client
-      this.prisma.client.findFirst({ where: { id: userId } }),
+      this.prisma.client.findFirst({ where: { id: userId, organization_id: organizationId } }),
       // Try to find as carer
-      this.prisma.carer.findFirst({ where: { id: userId } }),
+      this.prisma.carer.findFirst({ where: { id: userId, organization_id: organizationId } }),
       // Get visits (as client or carer)
       this.prisma.visit.findMany({
         where: {
+          organization_id: organizationId,
           OR: [
             { client_id: userId },
             { carer_id: userId },
@@ -85,20 +88,20 @@ export class SarService {
       }),
       // Get prescriptions (medications linked via prescriptions)
       this.prisma.prescription.findMany({
-        where: { client_id: userId },
+        where: { client_id: userId, client: { organization_id: organizationId } },
         include: { medication: true },
       }),
       // Get health summaries (if client)
       this.prisma.healthSummary.findMany({
-        where: { client_id: userId },
+        where: { client_id: userId, client: { organization_id: organizationId } },
       }),
       // Get consent records
       this.prisma.consentRecord.findMany({
-        where: { user_id: userId },
+        where: { organization_id: organizationId, user_id: userId },
       }),
       // Get audit logs
       this.prisma.auditLog.findMany({
-        where: { user_id: userId },
+        where: { organization_id: organizationId, user_id: userId },
         take: 1000, // Limit to last 1000 entries
         orderBy: { timestamp: 'desc' },
       }),
@@ -121,9 +124,9 @@ export class SarService {
   /**
    * Get the status of a SAR request
    */
-  async getSarStatus(requestId: string): Promise<SarRequest> {
-    const request = await this.prisma.erasureQueue.findUnique({
-      where: { id: requestId },
+  async getSarStatus(organizationId: string, requestId: string): Promise<SarRequest> {
+    const request = await this.prisma.erasureQueue.findFirst({
+      where: { id: requestId, organization_id: organizationId },
     });
 
     if (!request || !request.request_type.startsWith('sar_')) {

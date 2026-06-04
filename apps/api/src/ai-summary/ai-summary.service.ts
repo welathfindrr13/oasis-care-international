@@ -118,6 +118,7 @@ export class AiSummaryService {
 
     // Audit: Log AI summary generation
     await this.medicationRepository.createMedicationAudit({
+      organizationId: orgId,
       action: MedicationAuditAction.AI_SUMMARY_GENERATED,
       actorId: 'system',
       actorRole: 'ai',
@@ -349,6 +350,7 @@ export class AiSummaryService {
       : MedicationAuditAction.AI_SUMMARY_APPROVED;
 
     await this.medicationRepository.createMedicationAudit({
+      organizationId: orgId,
       action: auditAction,
       actorId: userId,
       actorRole: userRole,

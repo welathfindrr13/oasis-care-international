@@ -7,9 +7,15 @@ describe('ApiRolesGuard organization resolution', () => {
       getAllAndOverride: jest.fn().mockReturnValue(false),
     } as any;
     const prisma = {
+      organizationMembership: {
+        findMany: jest.fn(),
+      },
       organizationIdentity: {
         findMany: jest.fn(),
         upsert: jest.fn(),
+      },
+      organization: {
+        findFirst: jest.fn(),
       },
       carer: {
         findMany: jest.fn(),
@@ -21,33 +27,42 @@ describe('ApiRolesGuard organization resolution', () => {
     return { guard, prisma, reflector };
   }
 
-  it('resolves organization by unique email domain and persists the identity map', async () => {
+  it('resolves organization by an active explicit membership and applies tenant-scoped role', async () => {
     const { guard, prisma } = createGuard();
     const user = {
       id: 'boss-123',
       email: 'boss@yourdomain.com',
       organizationId: null,
+      role: 'user',
+      realm_access: { roles: ['user'] },
     };
 
-    prisma.organizationIdentity.findMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{ organization_id: 'org-123' }]);
+    prisma.organizationMembership.findMany.mockResolvedValueOnce([
+      {
+        id: 'membership-1',
+        organization_id: 'org-123',
+        role: 'admin',
+        status: 'ACTIVE',
+      },
+    ]);
 
     await (guard as any).enrichOrganizationContext(user);
 
     expect(user.organizationId).toBe('org-123');
-    expect(prisma.organizationIdentity.upsert).toHaveBeenCalledWith(
+    expect(user.role).toBe('admin');
+    expect(user.realm_access.roles[0]).toBe('admin');
+    expect(prisma.organizationMembership.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        create: expect.objectContaining({
-          organization_id: 'org-123',
-          normalized_email: 'boss@yourdomain.com',
+        where: expect.objectContaining({
+          auth_subject: 'boss-123',
+          status: 'ACTIVE',
         }),
       }),
     );
+    expect(prisma.organizationIdentity.upsert).not.toHaveBeenCalled();
   });
 
-  it('falls back to direct carer lookup when no identity mapping exists', async () => {
+  it('rejects missing explicit membership when tenant membership is required', async () => {
     const { guard, prisma } = createGuard();
     const user = {
       id: 'carer-123',
@@ -55,6 +70,49 @@ describe('ApiRolesGuard organization resolution', () => {
       organizationId: null,
     };
 
+    const previous = process.env.TENANT_MEMBERSHIP_REQUIRED;
+    process.env.TENANT_MEMBERSHIP_REQUIRED = 'true';
+    prisma.organizationMembership.findMany.mockResolvedValue([]);
+
+    await expect((guard as any).enrichOrganizationContext(user)).rejects.toThrow(
+      'Active organization membership is required',
+    );
+
+    expect(prisma.organizationIdentity.findMany).not.toHaveBeenCalled();
+    expect(prisma.carer.findMany).not.toHaveBeenCalled();
+    process.env.TENANT_MEMBERSHIP_REQUIRED = previous;
+  });
+
+  it('does not use email-domain inference when tenant membership is required', async () => {
+    const { guard, prisma } = createGuard();
+    const user = {
+      id: 'unknown-123',
+      email: 'unknown@yourdomain.com',
+      organizationId: null,
+    };
+
+    const previous = process.env.TENANT_MEMBERSHIP_REQUIRED;
+    process.env.TENANT_MEMBERSHIP_REQUIRED = 'true';
+    prisma.organizationMembership.findMany.mockResolvedValue([]);
+
+    await expect((guard as any).enrichOrganizationContext(user)).rejects.toThrow(
+      'Active organization membership is required',
+    );
+
+    expect(user.organizationId).toBeNull();
+    expect(prisma.organizationIdentity.findMany).not.toHaveBeenCalled();
+    process.env.TENANT_MEMBERSHIP_REQUIRED = previous;
+  });
+
+  it('keeps legacy carer lookup available outside the SaaS membership gate', async () => {
+    const { guard, prisma } = createGuard();
+    const user = {
+      id: 'carer-123',
+      email: 'carer@yourdomain.com',
+      organizationId: null,
+    };
+
+    prisma.organizationMembership.findMany.mockResolvedValue([]);
     prisma.organizationIdentity.findMany.mockResolvedValue([]);
     prisma.carer.findMany
       .mockResolvedValueOnce([{ organization_id: 'org-789' }])
@@ -63,29 +121,6 @@ describe('ApiRolesGuard organization resolution', () => {
     await (guard as any).enrichOrganizationContext(user);
 
     expect(user.organizationId).toBe('org-789');
-    expect(prisma.carer.findMany).toHaveBeenCalled();
-  });
-
-  it('leaves organization unset when no unique resolution path exists', async () => {
-    const { guard, prisma } = createGuard();
-    const user = {
-      id: 'unknown-123',
-      email: 'unknown@mixed-domain.com',
-      organizationId: null,
-    };
-
-    prisma.organizationIdentity.findMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        { organization_id: 'org-1' },
-        { organization_id: 'org-2' },
-      ]);
-    prisma.carer.findMany.mockResolvedValue([]);
-
-    await (guard as any).enrichOrganizationContext(user);
-
-    expect(user.organizationId).toBeNull();
   });
 
   it('blocks external users when legacy operational metadata is enabled', () => {

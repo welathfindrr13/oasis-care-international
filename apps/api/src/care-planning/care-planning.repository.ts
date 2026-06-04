@@ -445,6 +445,7 @@ export class CarePlanningRepository {
     await (this.prisma as any).auditLog.create({
       data: {
         user_id: actorUserId ?? null,
+        organization_id: organizationId,
         action: 'EVIDENCE_PACK_EXPORTED',
         resource_type: 'EvidencePack',
         resource_id: id,

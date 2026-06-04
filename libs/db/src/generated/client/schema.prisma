@@ -226,6 +226,7 @@ model MedicationAdministration {
 
 model MedicationAudit {
   id                           String                    @id @default(uuid())
+  organization_id              String?
   prescription_id              String?
   medication_administration_id String?
   action                       MedicationAuditAction
@@ -233,9 +234,11 @@ model MedicationAudit {
   actor_role                   String
   changes                      String // JSON object of what changed
   timestamp                    DateTime                  @default(now())
+  organization                 Organization?             @relation(fields: [organization_id], references: [id])
   prescription                 Prescription?             @relation(fields: [prescription_id], references: [id])
   medication_administration    MedicationAdministration? @relation(fields: [medication_administration_id], references: [id])
 
+  @@index([organization_id])
   @@index([prescription_id])
   @@index([medication_administration_id])
   @@index([timestamp])
@@ -309,6 +312,7 @@ model Organization {
   name               String
   ai_summary_enabled Boolean  @default(false)
   identities         OrganizationIdentity[]
+  memberships        OrganizationMembership[]
   carers             Carer[]
   clients            Client[]
   visits             Visit[]
@@ -321,6 +325,10 @@ model Organization {
   concerns           Concern[]
   weekly_care_summaries WeeklyCareSummary[]
   family_pulses      FamilyPulse[]
+  consent_records    ConsentRecord[]
+  audit_logs         AuditLog[]
+  erasure_queue      ErasureQueue[]
+  medication_audits  MedicationAudit[]
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
 
@@ -861,6 +869,35 @@ model OrganizationIdentity {
   @@map("organization_identity")
 }
 
+enum OrganizationMembershipStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+model OrganizationMembership {
+  id                       String                       @id @default(uuid())
+  organization_id          String
+  identity_provider        String                       @db.VarChar(50)
+  auth_subject             String                       @db.VarChar(191)
+  normalized_email         String?                      @db.VarChar(320)
+  role                     String                       @db.VarChar(50)
+  status                   OrganizationMembershipStatus @default(ACTIVE)
+  external_organization_id String?                      @db.VarChar(191)
+  external_membership_id   String?                      @db.VarChar(191)
+  metadata                 Json?
+  revoked_at               DateTime?
+  organization             Organization                 @relation(fields: [organization_id], references: [id])
+  created_at               DateTime                     @default(now())
+  updated_at               DateTime                     @updatedAt
+
+  @@index([organization_id])
+  @@index([identity_provider, auth_subject])
+  @@index([status])
+  @@unique([identity_provider, auth_subject, organization_id])
+  @@map("organization_membership")
+}
+
 model CareLog {
   id                             String                    @id @default(uuid())
   organization_id                String?
@@ -951,6 +988,7 @@ model HealthSummary {
 
 model ConsentRecord {
   id               String   @id @default(uuid())
+  organization_id  String?
   user_id          String
   consent_type     String   @db.VarChar(50)
   purpose          String   @db.VarChar(100)
@@ -959,9 +997,11 @@ model ConsentRecord {
   withdrawn_at     DateTime?
   legal_basis      String   @db.VarChar(50)
   metadata         Json?
+  organization     Organization? @relation(fields: [organization_id], references: [id])
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
 
+  @@index([organization_id])
   @@index([user_id])
   @@index([consent_type])
   @@index([granted_at])
@@ -970,6 +1010,7 @@ model ConsentRecord {
 
 model AuditLog {
   id             String   @id @default(uuid())
+  organization_id String?
   user_id        String?
   action         String   @db.VarChar(50)
   resource_type  String   @db.VarChar(50)
@@ -978,8 +1019,10 @@ model AuditLog {
   new_values     Json?
   ip_address     String?  @db.VarChar(45)
   user_agent     String?  @db.VarChar(500)
+  organization   Organization? @relation(fields: [organization_id], references: [id])
   timestamp      DateTime @default(now())
 
+  @@index([organization_id])
   @@index([user_id])
   @@index([action])
   @@index([resource_type, resource_id])
@@ -1004,6 +1047,7 @@ model RetentionPolicy {
 
 model ErasureQueue {
   id             String   @id @default(uuid())
+  organization_id String?
   user_id        String
   request_type   String   @db.VarChar(50)
   status         String   @db.VarChar(20) @default("PENDING")
@@ -1011,9 +1055,11 @@ model ErasureQueue {
   scheduled_for  DateTime?
   completed_at   DateTime?
   metadata       Json?
+  organization   Organization? @relation(fields: [organization_id], references: [id])
   created_at     DateTime @default(now())
   updated_at     DateTime @updatedAt
 
+  @@index([organization_id])
   @@index([user_id])
   @@index([status])
   @@index([scheduled_for])

@@ -72,7 +72,7 @@ describe('GdprController access control', () => {
 
     await expect(
       (controller.requestDataErasure as any)(
-        { user: { id: 'manager-1', role: 'manager' } },
+        { user: { id: 'manager-1', role: 'manager', organizationId: 'org-1' } },
         { userId: 'client-1', requestType: 'full', reason: 'subject request' },
       ),
     ).resolves.toEqual(
@@ -83,9 +83,21 @@ describe('GdprController access control', () => {
     );
 
     expect(erasureService.enqueueDataErasure).toHaveBeenCalledWith(
+      'org-1',
       'client-1',
       'full',
       'subject request',
     );
+  });
+
+  it('rejects GDPR operations without organisation context', async () => {
+    await expect(
+      (controller.requestSubjectAccessReport as any)(
+        { user: { id: 'admin-1', role: 'admin' } },
+        { userId: 'client-1', requestType: 'full' },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(sarService.enqueueSubjectAccessRequest).not.toHaveBeenCalled();
   });
 });

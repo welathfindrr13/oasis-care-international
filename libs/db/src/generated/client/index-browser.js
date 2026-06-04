@@ -232,6 +232,7 @@ exports.Prisma.MedicationAdministrationScalarFieldEnum = {
 
 exports.Prisma.MedicationAuditScalarFieldEnum = {
   id: 'id',
+  organization_id: 'organization_id',
   prescription_id: 'prescription_id',
   medication_administration_id: 'medication_administration_id',
   action: 'action',
@@ -505,6 +506,22 @@ exports.Prisma.OrganizationIdentityScalarFieldEnum = {
   updated_at: 'updated_at'
 };
 
+exports.Prisma.OrganizationMembershipScalarFieldEnum = {
+  id: 'id',
+  organization_id: 'organization_id',
+  identity_provider: 'identity_provider',
+  auth_subject: 'auth_subject',
+  normalized_email: 'normalized_email',
+  role: 'role',
+  status: 'status',
+  external_organization_id: 'external_organization_id',
+  external_membership_id: 'external_membership_id',
+  metadata: 'metadata',
+  revoked_at: 'revoked_at',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+};
+
 exports.Prisma.CareLogScalarFieldEnum = {
   id: 'id',
   organization_id: 'organization_id',
@@ -570,6 +587,7 @@ exports.Prisma.HealthSummaryScalarFieldEnum = {
 
 exports.Prisma.ConsentRecordScalarFieldEnum = {
   id: 'id',
+  organization_id: 'organization_id',
   user_id: 'user_id',
   consent_type: 'consent_type',
   purpose: 'purpose',
@@ -584,6 +602,7 @@ exports.Prisma.ConsentRecordScalarFieldEnum = {
 
 exports.Prisma.AuditLogScalarFieldEnum = {
   id: 'id',
+  organization_id: 'organization_id',
   user_id: 'user_id',
   action: 'action',
   resource_type: 'resource_type',
@@ -608,6 +627,7 @@ exports.Prisma.RetentionPolicyScalarFieldEnum = {
 
 exports.Prisma.ErasureQueueScalarFieldEnum = {
   id: 'id',
+  organization_id: 'organization_id',
   user_id: 'user_id',
   request_type: 'request_type',
   status: 'status',
@@ -836,6 +856,12 @@ exports.EvidenceSourceType = exports.$Enums.EvidenceSourceType = {
   MANUAL_NOTE: 'MANUAL_NOTE'
 };
 
+exports.OrganizationMembershipStatus = exports.$Enums.OrganizationMembershipStatus = {
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+  REVOKED: 'REVOKED'
+};
+
 exports.CareLogCategory = exports.$Enums.CareLogCategory = {
   TOILETING: 'TOILETING',
   NUTRITION: 'NUTRITION',
@@ -903,6 +929,7 @@ exports.Prisma.ModelName = {
   EvidencePack: 'EvidencePack',
   EvidenceItem: 'EvidenceItem',
   OrganizationIdentity: 'OrganizationIdentity',
+  OrganizationMembership: 'OrganizationMembership',
   CareLog: 'CareLog',
   LogEmbedding: 'LogEmbedding',
   HealthSummary: 'HealthSummary',

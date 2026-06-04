@@ -114,6 +114,7 @@ export class ClientService {
       await this.prisma.auditLog.create({
         data: {
           user_id: userId || 'system',
+          organization_id: orgId,
           action: 'CREATE_CLIENT',
           resource_type: 'client',
           resource_id: client.id,
@@ -160,6 +161,7 @@ export class ClientService {
       await this.prisma.auditLog.create({
         data: {
           user_id: userId || 'system',
+          organization_id: orgId,
           action: 'UPDATE_CLIENT',
           resource_type: 'client',
           resource_id: client.id,
@@ -227,6 +229,7 @@ export class ClientService {
       await this.prisma.auditLog.create({
         data: {
           user_id: userId || 'system',
+          organization_id: orgId,
           action: 'DELETE_CLIENT',
           resource_type: 'client',
           resource_id: id,

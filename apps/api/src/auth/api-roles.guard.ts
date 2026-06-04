@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RolesGuard } from '@oasis/auth';
 import { Prisma, PrismaService } from '@oasis/db';
@@ -12,7 +12,15 @@ type AuthUser = AuthRoleCarrier & {
   id?: string;
   email?: string;
   organizationId?: string | null;
+  organizationMembershipId?: string | null;
   authMode?: string | null;
+};
+
+type OrganizationMembershipRow = {
+  id: string;
+  organization_id: string;
+  role: string;
+  status: string;
 };
 
 @Injectable()
@@ -56,13 +64,34 @@ export class ApiRolesGuard extends RolesGuard implements CanActivate {
   }
 
   private async enrichOrganizationContext(user: AuthUser | undefined): Promise<void> {
-    if (!user || (user.organizationId || '').trim().length > 0) {
+    if (!user) {
       return;
     }
 
     const userId = (user.id || '').trim();
     const normalizedEmail = (user.email || '').trim().toLowerCase();
     const identityProvider = (process.env.AUTH_IDENTITY_PROVIDER || 'cognito').trim().toLowerCase();
+    const tokenOrganizationId = (user.organizationId || '').trim();
+
+    const membership = await this.resolveActiveMembership(
+      identityProvider,
+      userId,
+      tokenOrganizationId || undefined,
+    );
+    if (membership) {
+      this.applyMembershipToUser(user, membership);
+      return;
+    }
+
+    if (this.isTenantMembershipRequired()) {
+      throw new ForbiddenException(
+        'Active organization membership is required for tenant-scoped access',
+      );
+    }
+
+    if (tokenOrganizationId) {
+      return;
+    }
 
     const identityMapped = await this.resolveOrganizationViaIdentityMap(
       identityProvider,
@@ -121,6 +150,9 @@ export class ApiRolesGuard extends RolesGuard implements CanActivate {
     }
 
     if (user.authMode === 'local-dev') {
+      if (this.isProductionLike()) {
+        throw new ForbiddenException('Local development organization fallback is not allowed in production');
+      }
       const firstOrganization = await this.prisma.organization.findFirst({
         orderBy: { created_at: 'asc' },
         select: { id: true },
@@ -129,6 +161,74 @@ export class ApiRolesGuard extends RolesGuard implements CanActivate {
         user.organizationId = firstOrganization.id;
       }
     }
+  }
+
+  private async resolveActiveMembership(
+    identityProvider: string,
+    userId: string,
+    organizationId?: string,
+  ): Promise<OrganizationMembershipRow | null> {
+    if (!userId) {
+      return null;
+    }
+
+    try {
+      const memberships = await (this.prisma as any).organizationMembership.findMany({
+        where: {
+          identity_provider: identityProvider,
+          auth_subject: userId,
+          status: 'ACTIVE',
+          ...(organizationId ? { organization_id: organizationId } : {}),
+        },
+        select: {
+          id: true,
+          organization_id: true,
+          role: true,
+          status: true,
+        },
+        take: 2,
+      });
+
+      return memberships.length === 1 ? memberships[0] : null;
+    } catch (error) {
+      if (this.isMissingMembershipTableError(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private applyMembershipToUser(user: AuthUser, membership: OrganizationMembershipRow): void {
+    const normalizedRole = this.normalizeTenantRole(membership.role);
+    user.organizationId = membership.organization_id;
+    user.organizationMembershipId = membership.id;
+    user.role = normalizedRole;
+
+    const existingRoles = Array.isArray(user.realm_access?.roles)
+      ? user.realm_access.roles.map((role) => String(role || '').toLowerCase().trim()).filter(Boolean)
+      : [];
+    user.realm_access = {
+      roles: Array.from(new Set([normalizedRole, membership.role.toLowerCase().trim(), ...existingRoles])),
+    };
+  }
+
+  private normalizeTenantRole(role: string): string {
+    const normalized = (role || '').toLowerCase().trim().replace(/\s+/g, '_');
+    if (normalized === 'admin') return 'admin';
+    if (['carer', 'care_manager', 'manager', 'office'].includes(normalized)) return 'carer';
+    return 'user';
+  }
+
+  private isTenantMembershipRequired(): boolean {
+    if ((process.env.TENANT_MEMBERSHIP_REQUIRED || '').trim().toLowerCase() === 'true') {
+      return true;
+    }
+    return this.isProductionLike();
+  }
+
+  private isProductionLike(): boolean {
+    const nodeEnv = (process.env.NODE_ENV || '').trim().toLowerCase();
+    return nodeEnv === 'production' || nodeEnv === 'staging';
   }
 
   private async resolveOrganizationViaIdentityMap(
@@ -273,6 +373,13 @@ export class ApiRolesGuard extends RolesGuard implements CanActivate {
   }
 
   private isMissingIdentityTableError(error: unknown): boolean {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return error.code === 'P2021';
+    }
+    return false;
+  }
+
+  private isMissingMembershipTableError(error: unknown): boolean {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       return error.code === 'P2021';
     }

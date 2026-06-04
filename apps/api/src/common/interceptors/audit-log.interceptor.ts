@@ -15,6 +15,7 @@ const PII_PATTERNS = {
 };
 
 interface AuditLogEntry {
+  organizationId?: string | null;
   userId: string;
   action: string;
   resourceType: string;
@@ -53,6 +54,7 @@ export class AuditLogInterceptor implements NestInterceptor {
 
       auditInfo = {
         userId: req?.user?.sub || req?.user?.id || 'anonymous',
+        organizationId: req?.user?.organizationId ?? null,
         action: `GraphQL ${info?.parentType?.name || ''}.${info?.fieldName || 'unknown'}`,
         resourceType: info?.parentType?.name || 'GraphQL',
         resourceId: args?.id || args?.input?.id,
@@ -74,6 +76,7 @@ export class AuditLogInterceptor implements NestInterceptor {
 
       auditInfo = {
         userId: user?.id || 'anonymous',
+        organizationId: user?.organizationId ?? null,
         action: `${method} ${url}`,
         resourceType: this.extractResourceType(url),
         resourceId: this.extractResourceId(url),
@@ -129,6 +132,7 @@ export class AuditLogInterceptor implements NestInterceptor {
       await this.prisma.auditLog.create({
         data: {
           user_id: entry.userId,
+          organization_id: entry.organizationId ?? null,
           action,
           resource_type: resourceType,
           resource_id: resourceId,

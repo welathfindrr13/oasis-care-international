@@ -25,6 +25,7 @@ type GdprActor = {
   id?: string | null;
   sub?: string | null;
   role?: string | null;
+  organizationId?: string | null;
   realm_access?: {
     roles?: unknown;
   } | null;
@@ -71,10 +72,11 @@ export class GdprController {
     @Req() req: { user?: GdprActor },
     @Body() request: ConsentRequestDto,
   ) {
-    this.assertGdprStaffAccess(req.user);
+    const organizationId = this.assertGdprStaffAccess(req.user);
 
     if (request.granted) {
       const input: GrantConsentInput = {
+        organizationId,
         userId: request.userId,
         consentType: request.consentType,
         purpose: request.purpose,
@@ -92,6 +94,7 @@ export class GdprController {
       };
     } else {
       const record = await this.consentService.withdrawConsent(
+        organizationId,
         request.userId,
         request.consentType,
       );
@@ -114,9 +117,9 @@ export class GdprController {
     @Req() req: { user?: GdprActor },
     @Param('userId') userId: string,
   ) {
-    this.assertGdprStaffAccess(req.user);
+    const organizationId = this.assertGdprStaffAccess(req.user);
 
-    const status = await this.consentService.getConsentStatus(userId);
+    const status = await this.consentService.getConsentStatus(organizationId, userId);
     return {
       userId,
       consents: status,
@@ -132,9 +135,9 @@ export class GdprController {
     @Req() req: { user?: GdprActor },
     @Param('userId') userId: string,
   ) {
-    this.assertGdprStaffAccess(req.user);
+    const organizationId = this.assertGdprStaffAccess(req.user);
 
-    const history = await this.consentService.getConsentHistory(userId);
+    const history = await this.consentService.getConsentHistory(organizationId, userId);
     return {
       userId,
       history,
@@ -151,9 +154,9 @@ export class GdprController {
     @Param('userId') userId: string,
     @Query('type') consentType: string,
   ) {
-    this.assertGdprStaffAccess(req.user);
+    const organizationId = this.assertGdprStaffAccess(req.user);
 
-    const hasConsent = await this.consentService.hasConsent(userId, consentType);
+    const hasConsent = await this.consentService.hasConsent(organizationId, userId, consentType);
     return {
       userId,
       consentType,
@@ -171,9 +174,10 @@ export class GdprController {
     @Req() req: { user?: GdprActor },
     @Body() request: SarRequestDto,
   ) {
-    this.assertGdprStaffAccess(req.user);
+    const organizationId = this.assertGdprStaffAccess(req.user);
 
     const result = await this.sarService.enqueueSubjectAccessRequest(
+      organizationId,
       request.userId,
       request.requestType,
       request.email,
@@ -197,9 +201,10 @@ export class GdprController {
     @Req() req: { user?: GdprActor },
     @Body() request: ErasureRequestDto,
   ) {
-    this.assertGdprStaffAccess(req.user);
+    const organizationId = this.assertGdprStaffAccess(req.user);
 
     const result = await this.erasureService.enqueueDataErasure(
+      organizationId,
       request.userId,
       request.requestType,
       request.reason,
@@ -213,7 +218,7 @@ export class GdprController {
     };
   }
 
-  private assertGdprStaffAccess(actor?: GdprActor): void {
+  private assertGdprStaffAccess(actor?: GdprActor): string {
     if (!actor) {
       throw new UnauthorizedException('GDPR requests require authentication');
     }
@@ -235,7 +240,11 @@ export class GdprController {
     }
 
     if (roles.has('admin') || roles.has('manager')) {
-      return;
+      const organizationId = (actor.organizationId || '').trim();
+      if (!organizationId) {
+        throw new ForbiddenException('Organization context is required for GDPR operations.');
+      }
+      return organizationId;
     }
 
     throw new ForbiddenException(

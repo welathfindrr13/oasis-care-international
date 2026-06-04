@@ -117,10 +117,38 @@ export class MedicationRepository {
     return { items, total };
   }
 
-  async updatePrescription(id: string, data: Prisma.PrescriptionUpdateInput): Promise<Prescription> {
-    return this.prisma.prescription.update({
-      where: { id },
+  async updatePrescription(
+    id: string,
+    organizationId: string,
+    data: Prisma.PrescriptionUpdateInput,
+  ): Promise<Prescription> {
+    const result = await this.prisma.prescription.updateMany({
+      where: {
+        id,
+        deleted_at: null,
+        client: {
+          organization_id: organizationId,
+          deleted_at: null,
+        },
+      },
       data,
+    });
+    if (result.count !== 1) {
+      throw new Prisma.PrismaClientKnownRequestError('Prescription not found in organization', {
+        code: 'P2025',
+        clientVersion: Prisma.prismaVersion.client,
+      });
+    }
+
+    return this.prisma.prescription.findFirstOrThrow({
+      where: {
+        id,
+        deleted_at: null,
+        client: {
+          organization_id: organizationId,
+          deleted_at: null,
+        },
+      },
       include: {
         client: true,
         medication: true,
@@ -211,10 +239,42 @@ export class MedicationRepository {
     return { items, total };
   }
 
-  async updateMedicationAdministration(id: string, data: Prisma.MedicationAdministrationUpdateInput): Promise<MedicationAdministration> {
-    return this.prisma.medicationAdministration.update({
-      where: { id },
+  async updateMedicationAdministration(
+    id: string,
+    organizationId: string,
+    data: Prisma.MedicationAdministrationUpdateInput,
+  ): Promise<MedicationAdministration> {
+    const result = await this.prisma.medicationAdministration.updateMany({
+      where: {
+        id,
+        deleted_at: null,
+        prescription: {
+          client: {
+            organization_id: organizationId,
+            deleted_at: null,
+          },
+        },
+      },
       data,
+    });
+    if (result.count !== 1) {
+      throw new Prisma.PrismaClientKnownRequestError('Medication administration not found in organization', {
+        code: 'P2025',
+        clientVersion: Prisma.prismaVersion.client,
+      });
+    }
+
+    return this.prisma.medicationAdministration.findFirstOrThrow({
+      where: {
+        id,
+        deleted_at: null,
+        prescription: {
+          client: {
+            organization_id: organizationId,
+            deleted_at: null,
+          },
+        },
+      },
       include: {
         prescription: {
           include: {
@@ -389,6 +449,7 @@ export class MedicationRepository {
 
   // Audit logging
   async createMedicationAudit(data: {
+    organizationId: string;
     prescriptionId?: string;
     medicationAdministrationId?: string;
     action: MedicationAuditAction;
@@ -398,6 +459,7 @@ export class MedicationRepository {
   }) {
     return this.prisma.medicationAudit.create({
       data: {
+        organization_id: data.organizationId,
         prescription_id: data.prescriptionId,
         medication_administration_id: data.medicationAdministrationId,
         action: data.action,

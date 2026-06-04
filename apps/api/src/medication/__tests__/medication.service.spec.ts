@@ -158,7 +158,13 @@ describe('MedicationService', () => {
       expect(result.administered_by).toBe(mockUser.id);
       expect(result.notes).toBe(input.notes);
       expect(adminCounter.inc).toHaveBeenCalled();
+      expect(repository.updateMedicationAdministration).toHaveBeenCalledWith(
+        mockMedicationAdministration.id,
+        organizationId,
+        expect.any(Object),
+      );
       expect(repository.createMedicationAudit).toHaveBeenCalledWith({
+        organizationId,
         medicationAdministrationId: mockMedicationAdministration.id,
         action: MedicationAuditAction.MEDICATION_ADMINISTERED,
         actorId: mockUser.id,

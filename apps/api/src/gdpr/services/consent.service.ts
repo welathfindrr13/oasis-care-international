@@ -14,6 +14,7 @@ export interface ConsentRecord {
 }
 
 export interface GrantConsentInput {
+  organizationId: string;
   userId: string;
   consentType: string;
   purpose: string;
@@ -37,11 +38,12 @@ export class ConsentService {
    * Creates a new consent record or updates existing one
    */
   async grantConsent(input: GrantConsentInput): Promise<ConsentRecord> {
-    const { userId, consentType, purpose, legalBasis, metadata } = input;
+    const { organizationId, userId, consentType, purpose, legalBasis, metadata } = input;
 
     // Check if there's an existing consent record for this type
     const existing = await this.prisma.consentRecord.findFirst({
       where: {
+        organization_id: organizationId,
         user_id: userId,
         consent_type: consentType,
       },
@@ -58,6 +60,7 @@ export class ConsentService {
     // Create new consent record
     const record = await this.prisma.consentRecord.create({
       data: {
+        organization_id: organizationId,
         user_id: userId,
         consent_type: consentType,
         purpose,
@@ -74,10 +77,11 @@ export class ConsentService {
   /**
    * Withdraw consent for a specific type
    */
-  async withdrawConsent(userId: string, consentType: string): Promise<ConsentRecord> {
+  async withdrawConsent(organizationId: string, userId: string, consentType: string): Promise<ConsentRecord> {
     // Find the active consent record
     const existing = await this.prisma.consentRecord.findFirst({
       where: {
+        organization_id: organizationId,
         user_id: userId,
         consent_type: consentType,
         granted: true,
@@ -106,9 +110,9 @@ export class ConsentService {
   /**
    * Get all consent records for a user
    */
-  async getConsentHistory(userId: string): Promise<ConsentRecord[]> {
+  async getConsentHistory(organizationId: string, userId: string): Promise<ConsentRecord[]> {
     const records = await this.prisma.consentRecord.findMany({
-      where: { user_id: userId },
+      where: { organization_id: organizationId, user_id: userId },
       orderBy: { created_at: 'desc' },
     });
 
@@ -118,9 +122,9 @@ export class ConsentService {
   /**
    * Get current consent status for all types for a user
    */
-  async getConsentStatus(userId: string): Promise<ConsentStatus[]> {
+  async getConsentStatus(organizationId: string, userId: string): Promise<ConsentStatus[]> {
     const records = await this.prisma.consentRecord.findMany({
-      where: { user_id: userId },
+      where: { organization_id: organizationId, user_id: userId },
       orderBy: { created_at: 'desc' },
     });
 
@@ -144,9 +148,10 @@ export class ConsentService {
   /**
    * Check if a user has granted consent for a specific type
    */
-  async hasConsent(userId: string, consentType: string): Promise<boolean> {
+  async hasConsent(organizationId: string, userId: string, consentType: string): Promise<boolean> {
     const record = await this.prisma.consentRecord.findFirst({
       where: {
+        organization_id: organizationId,
         user_id: userId,
         consent_type: consentType,
         granted: true,
@@ -160,14 +165,14 @@ export class ConsentService {
   /**
    * Verify consent before data processing (middleware helper)
    */
-  async verifyConsentForProcessing(userId: string, requiredConsents: string[]): Promise<{
+  async verifyConsentForProcessing(organizationId: string, userId: string, requiredConsents: string[]): Promise<{
     allowed: boolean;
     missingConsents: string[];
   }> {
     const missingConsents: string[] = [];
 
     for (const consentType of requiredConsents) {
-      const hasIt = await this.hasConsent(userId, consentType);
+      const hasIt = await this.hasConsent(organizationId, userId, consentType);
       if (!hasIt) {
         missingConsents.push(consentType);
       }

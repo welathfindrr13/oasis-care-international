@@ -71,6 +71,7 @@ export class MedicationService {
     });
 
     await this.medicationRepository.createMedicationAudit({
+      organizationId: organizationId!,
       action: MedicationAuditAction.PRESCRIPTION_CREATED,
       actorId: userId,
       actorRole: userRole,
@@ -130,6 +131,7 @@ export class MedicationService {
     );
 
     await this.medicationRepository.createMedicationAudit({
+      organizationId: orgId,
       prescriptionId: prescription.id,
       action: MedicationAuditAction.PRESCRIPTION_CREATED,
       actorId: userId,
@@ -230,6 +232,7 @@ export class MedicationService {
 
     const updatedAdministration = await this.medicationRepository.updateMedicationAdministration(
       administration.id,
+      orgId,
       {
         status: data.status,
         administered_time: data.status === MedicationStatus.ADMINISTERED ? new Date() : null,
@@ -239,6 +242,7 @@ export class MedicationService {
     );
 
     await this.medicationRepository.createMedicationAudit({
+      organizationId: orgId,
       medicationAdministrationId: updatedAdministration.id,
       action: this.getAuditActionForStatus(data.status),
       actorId: userId,

@@ -144,6 +144,11 @@ export type EvidenceItem = $Result.DefaultSelection<Prisma.$EvidenceItemPayload>
  */
 export type OrganizationIdentity = $Result.DefaultSelection<Prisma.$OrganizationIdentityPayload>
 /**
+ * Model OrganizationMembership
+ *
+ */
+export type OrganizationMembership = $Result.DefaultSelection<Prisma.$OrganizationMembershipPayload>
+/**
  * Model CareLog
  *
  */
@@ -440,6 +445,15 @@ export const EvidenceSourceType: {
 export type EvidenceSourceType = (typeof EvidenceSourceType)[keyof typeof EvidenceSourceType]
 
 
+export const OrganizationMembershipStatus: {
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+  REVOKED: 'REVOKED'
+};
+
+export type OrganizationMembershipStatus = (typeof OrganizationMembershipStatus)[keyof typeof OrganizationMembershipStatus]
+
+
 export const CareLogCategory: {
   TOILETING: 'TOILETING',
   NUTRITION: 'NUTRITION',
@@ -584,6 +598,10 @@ export const EvidencePackStatus: typeof $Enums.EvidencePackStatus
 export type EvidenceSourceType = $Enums.EvidenceSourceType
 
 export const EvidenceSourceType: typeof $Enums.EvidenceSourceType
+
+export type OrganizationMembershipStatus = $Enums.OrganizationMembershipStatus
+
+export const OrganizationMembershipStatus: typeof $Enums.OrganizationMembershipStatus
 
 export type CareLogCategory = $Enums.CareLogCategory
 
@@ -982,6 +1000,16 @@ export class PrismaClient<
     * ```
     */
   get organizationIdentity(): Prisma.OrganizationIdentityDelegate<ExtArgs>;
+
+  /**
+   * `prisma.organizationMembership`: Exposes CRUD operations for the **OrganizationMembership** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more OrganizationMemberships
+    * const organizationMemberships = await prisma.organizationMembership.findMany()
+    * ```
+    */
+  get organizationMembership(): Prisma.OrganizationMembershipDelegate<ExtArgs>;
 
   /**
    * `prisma.careLog`: Exposes CRUD operations for the **CareLog** model.
@@ -1548,6 +1576,7 @@ export namespace Prisma {
     EvidencePack: 'EvidencePack',
     EvidenceItem: 'EvidenceItem',
     OrganizationIdentity: 'OrganizationIdentity',
+    OrganizationMembership: 'OrganizationMembership',
     CareLog: 'CareLog',
     LogEmbedding: 'LogEmbedding',
     HealthSummary: 'HealthSummary',
@@ -1571,7 +1600,7 @@ export namespace Prisma {
 
   export type TypeMap<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     meta: {
-      modelProps: 'carer' | 'client' | 'visit' | 'visitTask' | 'carerShift' | 'medication' | 'prescription' | 'medicationAdministration' | 'medicationAudit' | 'organization' | 'familyContact' | 'careRoom' | 'careRoomMembership' | 'accessGrant' | 'careBridgePolicy' | 'verifiedVisitStory' | 'concern' | 'concernMessage' | 'concernEvent' | 'weeklyCareSummary' | 'familyPulse' | 'assessment' | 'carePlan' | 'evidencePack' | 'evidenceItem' | 'organizationIdentity' | 'careLog' | 'logEmbedding' | 'healthSummary' | 'consentRecord' | 'auditLog' | 'retentionPolicy' | 'erasureQueue'
+      modelProps: 'carer' | 'client' | 'visit' | 'visitTask' | 'carerShift' | 'medication' | 'prescription' | 'medicationAdministration' | 'medicationAudit' | 'organization' | 'familyContact' | 'careRoom' | 'careRoomMembership' | 'accessGrant' | 'careBridgePolicy' | 'verifiedVisitStory' | 'concern' | 'concernMessage' | 'concernEvent' | 'weeklyCareSummary' | 'familyPulse' | 'assessment' | 'carePlan' | 'evidencePack' | 'evidenceItem' | 'organizationIdentity' | 'organizationMembership' | 'careLog' | 'logEmbedding' | 'healthSummary' | 'consentRecord' | 'auditLog' | 'retentionPolicy' | 'erasureQueue'
       txIsolationLevel: Prisma.TransactionIsolationLevel
     },
     model: {
@@ -3291,6 +3320,72 @@ export namespace Prisma {
           }
         }
       }
+      OrganizationMembership: {
+        payload: Prisma.$OrganizationMembershipPayload<ExtArgs>
+        fields: Prisma.OrganizationMembershipFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.OrganizationMembershipFindUniqueArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationMembershipPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.OrganizationMembershipFindUniqueOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationMembershipPayload>
+          }
+          findFirst: {
+            args: Prisma.OrganizationMembershipFindFirstArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationMembershipPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.OrganizationMembershipFindFirstOrThrowArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationMembershipPayload>
+          }
+          findMany: {
+            args: Prisma.OrganizationMembershipFindManyArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationMembershipPayload>[]
+          }
+          create: {
+            args: Prisma.OrganizationMembershipCreateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationMembershipPayload>
+          }
+          createMany: {
+            args: Prisma.OrganizationMembershipCreateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          delete: {
+            args: Prisma.OrganizationMembershipDeleteArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationMembershipPayload>
+          }
+          update: {
+            args: Prisma.OrganizationMembershipUpdateArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationMembershipPayload>
+          }
+          deleteMany: {
+            args: Prisma.OrganizationMembershipDeleteManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          updateMany: {
+            args: Prisma.OrganizationMembershipUpdateManyArgs<ExtArgs>,
+            result: Prisma.BatchPayload
+          }
+          upsert: {
+            args: Prisma.OrganizationMembershipUpsertArgs<ExtArgs>,
+            result: $Utils.PayloadToResult<Prisma.$OrganizationMembershipPayload>
+          }
+          aggregate: {
+            args: Prisma.OrganizationMembershipAggregateArgs<ExtArgs>,
+            result: $Utils.Optional<AggregateOrganizationMembership>
+          }
+          groupBy: {
+            args: Prisma.OrganizationMembershipGroupByArgs<ExtArgs>,
+            result: $Utils.Optional<OrganizationMembershipGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.OrganizationMembershipCountArgs<ExtArgs>,
+            result: $Utils.Optional<OrganizationMembershipCountAggregateOutputType> | number
+          }
+        }
+      }
       CareLog: {
         payload: Prisma.$CareLogPayload<ExtArgs>
         fields: Prisma.CareLogFieldRefs
@@ -4307,6 +4402,7 @@ export namespace Prisma {
 
   export type OrganizationCountOutputType = {
     identities: number
+    memberships: number
     carers: number
     clients: number
     visits: number
@@ -4319,10 +4415,15 @@ export namespace Prisma {
     concerns: number
     weekly_care_summaries: number
     family_pulses: number
+    consent_records: number
+    audit_logs: number
+    erasure_queue: number
+    medication_audits: number
   }
 
   export type OrganizationCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     identities?: boolean | OrganizationCountOutputTypeCountIdentitiesArgs
+    memberships?: boolean | OrganizationCountOutputTypeCountMembershipsArgs
     carers?: boolean | OrganizationCountOutputTypeCountCarersArgs
     clients?: boolean | OrganizationCountOutputTypeCountClientsArgs
     visits?: boolean | OrganizationCountOutputTypeCountVisitsArgs
@@ -4335,6 +4436,10 @@ export namespace Prisma {
     concerns?: boolean | OrganizationCountOutputTypeCountConcernsArgs
     weekly_care_summaries?: boolean | OrganizationCountOutputTypeCountWeekly_care_summariesArgs
     family_pulses?: boolean | OrganizationCountOutputTypeCountFamily_pulsesArgs
+    consent_records?: boolean | OrganizationCountOutputTypeCountConsent_recordsArgs
+    audit_logs?: boolean | OrganizationCountOutputTypeCountAudit_logsArgs
+    erasure_queue?: boolean | OrganizationCountOutputTypeCountErasure_queueArgs
+    medication_audits?: boolean | OrganizationCountOutputTypeCountMedication_auditsArgs
   }
 
   // Custom InputTypes
@@ -4355,6 +4460,14 @@ export namespace Prisma {
    */
   export type OrganizationCountOutputTypeCountIdentitiesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: OrganizationIdentityWhereInput
+  }
+
+
+  /**
+   * OrganizationCountOutputType without action
+   */
+  export type OrganizationCountOutputTypeCountMembershipsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: OrganizationMembershipWhereInput
   }
 
 
@@ -4451,6 +4564,38 @@ export namespace Prisma {
    */
   export type OrganizationCountOutputTypeCountFamily_pulsesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: FamilyPulseWhereInput
+  }
+
+
+  /**
+   * OrganizationCountOutputType without action
+   */
+  export type OrganizationCountOutputTypeCountConsent_recordsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ConsentRecordWhereInput
+  }
+
+
+  /**
+   * OrganizationCountOutputType without action
+   */
+  export type OrganizationCountOutputTypeCountAudit_logsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: AuditLogWhereInput
+  }
+
+
+  /**
+   * OrganizationCountOutputType without action
+   */
+  export type OrganizationCountOutputTypeCountErasure_queueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ErasureQueueWhereInput
+  }
+
+
+  /**
+   * OrganizationCountOutputType without action
+   */
+  export type OrganizationCountOutputTypeCountMedication_auditsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: MedicationAuditWhereInput
   }
 
 
@@ -13648,6 +13793,7 @@ export namespace Prisma {
 
   export type MedicationAuditMinAggregateOutputType = {
     id: string | null
+    organization_id: string | null
     prescription_id: string | null
     medication_administration_id: string | null
     action: $Enums.MedicationAuditAction | null
@@ -13659,6 +13805,7 @@ export namespace Prisma {
 
   export type MedicationAuditMaxAggregateOutputType = {
     id: string | null
+    organization_id: string | null
     prescription_id: string | null
     medication_administration_id: string | null
     action: $Enums.MedicationAuditAction | null
@@ -13670,6 +13817,7 @@ export namespace Prisma {
 
   export type MedicationAuditCountAggregateOutputType = {
     id: number
+    organization_id: number
     prescription_id: number
     medication_administration_id: number
     action: number
@@ -13683,6 +13831,7 @@ export namespace Prisma {
 
   export type MedicationAuditMinAggregateInputType = {
     id?: true
+    organization_id?: true
     prescription_id?: true
     medication_administration_id?: true
     action?: true
@@ -13694,6 +13843,7 @@ export namespace Prisma {
 
   export type MedicationAuditMaxAggregateInputType = {
     id?: true
+    organization_id?: true
     prescription_id?: true
     medication_administration_id?: true
     action?: true
@@ -13705,6 +13855,7 @@ export namespace Prisma {
 
   export type MedicationAuditCountAggregateInputType = {
     id?: true
+    organization_id?: true
     prescription_id?: true
     medication_administration_id?: true
     action?: true
@@ -13789,6 +13940,7 @@ export namespace Prisma {
 
   export type MedicationAuditGroupByOutputType = {
     id: string
+    organization_id: string | null
     prescription_id: string | null
     medication_administration_id: string | null
     action: $Enums.MedicationAuditAction
@@ -13817,6 +13969,7 @@ export namespace Prisma {
 
   export type MedicationAuditSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
+    organization_id?: boolean
     prescription_id?: boolean
     medication_administration_id?: boolean
     action?: boolean
@@ -13824,12 +13977,14 @@ export namespace Prisma {
     actor_role?: boolean
     changes?: boolean
     timestamp?: boolean
+    organization?: boolean | MedicationAudit$organizationArgs<ExtArgs>
     prescription?: boolean | MedicationAudit$prescriptionArgs<ExtArgs>
     medication_administration?: boolean | MedicationAudit$medication_administrationArgs<ExtArgs>
   }, ExtArgs["result"]["medicationAudit"]>
 
   export type MedicationAuditSelectScalar = {
     id?: boolean
+    organization_id?: boolean
     prescription_id?: boolean
     medication_administration_id?: boolean
     action?: boolean
@@ -13840,6 +13995,7 @@ export namespace Prisma {
   }
 
   export type MedicationAuditInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    organization?: boolean | MedicationAudit$organizationArgs<ExtArgs>
     prescription?: boolean | MedicationAudit$prescriptionArgs<ExtArgs>
     medication_administration?: boolean | MedicationAudit$medication_administrationArgs<ExtArgs>
   }
@@ -13848,11 +14004,13 @@ export namespace Prisma {
   export type $MedicationAuditPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "MedicationAudit"
     objects: {
+      organization: Prisma.$OrganizationPayload<ExtArgs> | null
       prescription: Prisma.$PrescriptionPayload<ExtArgs> | null
       medication_administration: Prisma.$MedicationAdministrationPayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
+      organization_id: string | null
       prescription_id: string | null
       medication_administration_id: string | null
       action: $Enums.MedicationAuditAction
@@ -14225,6 +14383,8 @@ export namespace Prisma {
   export interface Prisma__MedicationAuditClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: 'PrismaPromise';
 
+    organization<T extends MedicationAudit$organizationArgs<ExtArgs> = {}>(args?: Subset<T, MedicationAudit$organizationArgs<ExtArgs>>): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'findUniqueOrThrow'> | null, null, ExtArgs>;
+
     prescription<T extends MedicationAudit$prescriptionArgs<ExtArgs> = {}>(args?: Subset<T, MedicationAudit$prescriptionArgs<ExtArgs>>): Prisma__PrescriptionClient<$Result.GetResult<Prisma.$PrescriptionPayload<ExtArgs>, T, 'findUniqueOrThrow'> | null, null, ExtArgs>;
 
     medication_administration<T extends MedicationAudit$medication_administrationArgs<ExtArgs> = {}>(args?: Subset<T, MedicationAudit$medication_administrationArgs<ExtArgs>>): Prisma__MedicationAdministrationClient<$Result.GetResult<Prisma.$MedicationAdministrationPayload<ExtArgs>, T, 'findUniqueOrThrow'> | null, null, ExtArgs>;
@@ -14258,6 +14418,7 @@ export namespace Prisma {
    */
   interface MedicationAuditFieldRefs {
     readonly id: FieldRef<"MedicationAudit", 'String'>
+    readonly organization_id: FieldRef<"MedicationAudit", 'String'>
     readonly prescription_id: FieldRef<"MedicationAudit", 'String'>
     readonly medication_administration_id: FieldRef<"MedicationAudit", 'String'>
     readonly action: FieldRef<"MedicationAudit", 'MedicationAuditAction'>
@@ -14577,6 +14738,22 @@ export namespace Prisma {
 
 
   /**
+   * MedicationAudit.organization
+   */
+  export type MedicationAudit$organizationArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Organization
+     */
+    select?: OrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationInclude<ExtArgs> | null
+    where?: OrganizationWhereInput
+  }
+
+
+  /**
    * MedicationAudit.prescription
    */
   export type MedicationAudit$prescriptionArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -14789,6 +14966,7 @@ export namespace Prisma {
     created_at?: boolean
     updated_at?: boolean
     identities?: boolean | Organization$identitiesArgs<ExtArgs>
+    memberships?: boolean | Organization$membershipsArgs<ExtArgs>
     carers?: boolean | Organization$carersArgs<ExtArgs>
     clients?: boolean | Organization$clientsArgs<ExtArgs>
     visits?: boolean | Organization$visitsArgs<ExtArgs>
@@ -14801,6 +14979,10 @@ export namespace Prisma {
     concerns?: boolean | Organization$concernsArgs<ExtArgs>
     weekly_care_summaries?: boolean | Organization$weekly_care_summariesArgs<ExtArgs>
     family_pulses?: boolean | Organization$family_pulsesArgs<ExtArgs>
+    consent_records?: boolean | Organization$consent_recordsArgs<ExtArgs>
+    audit_logs?: boolean | Organization$audit_logsArgs<ExtArgs>
+    erasure_queue?: boolean | Organization$erasure_queueArgs<ExtArgs>
+    medication_audits?: boolean | Organization$medication_auditsArgs<ExtArgs>
     _count?: boolean | OrganizationCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["organization"]>
 
@@ -14814,6 +14996,7 @@ export namespace Prisma {
 
   export type OrganizationInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     identities?: boolean | Organization$identitiesArgs<ExtArgs>
+    memberships?: boolean | Organization$membershipsArgs<ExtArgs>
     carers?: boolean | Organization$carersArgs<ExtArgs>
     clients?: boolean | Organization$clientsArgs<ExtArgs>
     visits?: boolean | Organization$visitsArgs<ExtArgs>
@@ -14826,6 +15009,10 @@ export namespace Prisma {
     concerns?: boolean | Organization$concernsArgs<ExtArgs>
     weekly_care_summaries?: boolean | Organization$weekly_care_summariesArgs<ExtArgs>
     family_pulses?: boolean | Organization$family_pulsesArgs<ExtArgs>
+    consent_records?: boolean | Organization$consent_recordsArgs<ExtArgs>
+    audit_logs?: boolean | Organization$audit_logsArgs<ExtArgs>
+    erasure_queue?: boolean | Organization$erasure_queueArgs<ExtArgs>
+    medication_audits?: boolean | Organization$medication_auditsArgs<ExtArgs>
     _count?: boolean | OrganizationCountOutputTypeDefaultArgs<ExtArgs>
   }
 
@@ -14834,6 +15021,7 @@ export namespace Prisma {
     name: "Organization"
     objects: {
       identities: Prisma.$OrganizationIdentityPayload<ExtArgs>[]
+      memberships: Prisma.$OrganizationMembershipPayload<ExtArgs>[]
       carers: Prisma.$CarerPayload<ExtArgs>[]
       clients: Prisma.$ClientPayload<ExtArgs>[]
       visits: Prisma.$VisitPayload<ExtArgs>[]
@@ -14846,6 +15034,10 @@ export namespace Prisma {
       concerns: Prisma.$ConcernPayload<ExtArgs>[]
       weekly_care_summaries: Prisma.$WeeklyCareSummaryPayload<ExtArgs>[]
       family_pulses: Prisma.$FamilyPulsePayload<ExtArgs>[]
+      consent_records: Prisma.$ConsentRecordPayload<ExtArgs>[]
+      audit_logs: Prisma.$AuditLogPayload<ExtArgs>[]
+      erasure_queue: Prisma.$ErasureQueuePayload<ExtArgs>[]
+      medication_audits: Prisma.$MedicationAuditPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -15220,6 +15412,8 @@ export namespace Prisma {
 
     identities<T extends Organization$identitiesArgs<ExtArgs> = {}>(args?: Subset<T, Organization$identitiesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$OrganizationIdentityPayload<ExtArgs>, T, 'findMany'> | Null>;
 
+    memberships<T extends Organization$membershipsArgs<ExtArgs> = {}>(args?: Subset<T, Organization$membershipsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$OrganizationMembershipPayload<ExtArgs>, T, 'findMany'> | Null>;
+
     carers<T extends Organization$carersArgs<ExtArgs> = {}>(args?: Subset<T, Organization$carersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CarerPayload<ExtArgs>, T, 'findMany'> | Null>;
 
     clients<T extends Organization$clientsArgs<ExtArgs> = {}>(args?: Subset<T, Organization$clientsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ClientPayload<ExtArgs>, T, 'findMany'> | Null>;
@@ -15243,6 +15437,14 @@ export namespace Prisma {
     weekly_care_summaries<T extends Organization$weekly_care_summariesArgs<ExtArgs> = {}>(args?: Subset<T, Organization$weekly_care_summariesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WeeklyCareSummaryPayload<ExtArgs>, T, 'findMany'> | Null>;
 
     family_pulses<T extends Organization$family_pulsesArgs<ExtArgs> = {}>(args?: Subset<T, Organization$family_pulsesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$FamilyPulsePayload<ExtArgs>, T, 'findMany'> | Null>;
+
+    consent_records<T extends Organization$consent_recordsArgs<ExtArgs> = {}>(args?: Subset<T, Organization$consent_recordsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConsentRecordPayload<ExtArgs>, T, 'findMany'> | Null>;
+
+    audit_logs<T extends Organization$audit_logsArgs<ExtArgs> = {}>(args?: Subset<T, Organization$audit_logsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, 'findMany'> | Null>;
+
+    erasure_queue<T extends Organization$erasure_queueArgs<ExtArgs> = {}>(args?: Subset<T, Organization$erasure_queueArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ErasureQueuePayload<ExtArgs>, T, 'findMany'> | Null>;
+
+    medication_audits<T extends Organization$medication_auditsArgs<ExtArgs> = {}>(args?: Subset<T, Organization$medication_auditsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MedicationAuditPayload<ExtArgs>, T, 'findMany'> | Null>;
 
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -15610,6 +15812,27 @@ export namespace Prisma {
 
 
   /**
+   * Organization.memberships
+   */
+  export type Organization$membershipsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the OrganizationMembership
+     */
+    select?: OrganizationMembershipSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationMembershipInclude<ExtArgs> | null
+    where?: OrganizationMembershipWhereInput
+    orderBy?: OrganizationMembershipOrderByWithRelationInput | OrganizationMembershipOrderByWithRelationInput[]
+    cursor?: OrganizationMembershipWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: OrganizationMembershipScalarFieldEnum | OrganizationMembershipScalarFieldEnum[]
+  }
+
+
+  /**
    * Organization.carers
    */
   export type Organization$carersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -15858,6 +16081,90 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: FamilyPulseScalarFieldEnum | FamilyPulseScalarFieldEnum[]
+  }
+
+
+  /**
+   * Organization.consent_records
+   */
+  export type Organization$consent_recordsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ConsentRecord
+     */
+    select?: ConsentRecordSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ConsentRecordInclude<ExtArgs> | null
+    where?: ConsentRecordWhereInput
+    orderBy?: ConsentRecordOrderByWithRelationInput | ConsentRecordOrderByWithRelationInput[]
+    cursor?: ConsentRecordWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ConsentRecordScalarFieldEnum | ConsentRecordScalarFieldEnum[]
+  }
+
+
+  /**
+   * Organization.audit_logs
+   */
+  export type Organization$audit_logsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditLog
+     */
+    select?: AuditLogSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: AuditLogInclude<ExtArgs> | null
+    where?: AuditLogWhereInput
+    orderBy?: AuditLogOrderByWithRelationInput | AuditLogOrderByWithRelationInput[]
+    cursor?: AuditLogWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: AuditLogScalarFieldEnum | AuditLogScalarFieldEnum[]
+  }
+
+
+  /**
+   * Organization.erasure_queue
+   */
+  export type Organization$erasure_queueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ErasureQueue
+     */
+    select?: ErasureQueueSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ErasureQueueInclude<ExtArgs> | null
+    where?: ErasureQueueWhereInput
+    orderBy?: ErasureQueueOrderByWithRelationInput | ErasureQueueOrderByWithRelationInput[]
+    cursor?: ErasureQueueWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ErasureQueueScalarFieldEnum | ErasureQueueScalarFieldEnum[]
+  }
+
+
+  /**
+   * Organization.medication_audits
+   */
+  export type Organization$medication_auditsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MedicationAudit
+     */
+    select?: MedicationAuditSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: MedicationAuditInclude<ExtArgs> | null
+    where?: MedicationAuditWhereInput
+    orderBy?: MedicationAuditOrderByWithRelationInput | MedicationAuditOrderByWithRelationInput[]
+    cursor?: MedicationAuditWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: MedicationAuditScalarFieldEnum | MedicationAuditScalarFieldEnum[]
   }
 
 
@@ -32477,6 +32784,1008 @@ export namespace Prisma {
 
 
   /**
+   * Model OrganizationMembership
+   */
+
+  export type AggregateOrganizationMembership = {
+    _count: OrganizationMembershipCountAggregateOutputType | null
+    _min: OrganizationMembershipMinAggregateOutputType | null
+    _max: OrganizationMembershipMaxAggregateOutputType | null
+  }
+
+  export type OrganizationMembershipMinAggregateOutputType = {
+    id: string | null
+    organization_id: string | null
+    identity_provider: string | null
+    auth_subject: string | null
+    normalized_email: string | null
+    role: string | null
+    status: $Enums.OrganizationMembershipStatus | null
+    external_organization_id: string | null
+    external_membership_id: string | null
+    revoked_at: Date | null
+    created_at: Date | null
+    updated_at: Date | null
+  }
+
+  export type OrganizationMembershipMaxAggregateOutputType = {
+    id: string | null
+    organization_id: string | null
+    identity_provider: string | null
+    auth_subject: string | null
+    normalized_email: string | null
+    role: string | null
+    status: $Enums.OrganizationMembershipStatus | null
+    external_organization_id: string | null
+    external_membership_id: string | null
+    revoked_at: Date | null
+    created_at: Date | null
+    updated_at: Date | null
+  }
+
+  export type OrganizationMembershipCountAggregateOutputType = {
+    id: number
+    organization_id: number
+    identity_provider: number
+    auth_subject: number
+    normalized_email: number
+    role: number
+    status: number
+    external_organization_id: number
+    external_membership_id: number
+    metadata: number
+    revoked_at: number
+    created_at: number
+    updated_at: number
+    _all: number
+  }
+
+
+  export type OrganizationMembershipMinAggregateInputType = {
+    id?: true
+    organization_id?: true
+    identity_provider?: true
+    auth_subject?: true
+    normalized_email?: true
+    role?: true
+    status?: true
+    external_organization_id?: true
+    external_membership_id?: true
+    revoked_at?: true
+    created_at?: true
+    updated_at?: true
+  }
+
+  export type OrganizationMembershipMaxAggregateInputType = {
+    id?: true
+    organization_id?: true
+    identity_provider?: true
+    auth_subject?: true
+    normalized_email?: true
+    role?: true
+    status?: true
+    external_organization_id?: true
+    external_membership_id?: true
+    revoked_at?: true
+    created_at?: true
+    updated_at?: true
+  }
+
+  export type OrganizationMembershipCountAggregateInputType = {
+    id?: true
+    organization_id?: true
+    identity_provider?: true
+    auth_subject?: true
+    normalized_email?: true
+    role?: true
+    status?: true
+    external_organization_id?: true
+    external_membership_id?: true
+    metadata?: true
+    revoked_at?: true
+    created_at?: true
+    updated_at?: true
+    _all?: true
+  }
+
+  export type OrganizationMembershipAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which OrganizationMembership to aggregate.
+     */
+    where?: OrganizationMembershipWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of OrganizationMemberships to fetch.
+     */
+    orderBy?: OrganizationMembershipOrderByWithRelationInput | OrganizationMembershipOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the start position
+     */
+    cursor?: OrganizationMembershipWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` OrganizationMemberships from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` OrganizationMemberships.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Count returned OrganizationMemberships
+    **/
+    _count?: true | OrganizationMembershipCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Select which fields to find the minimum value
+    **/
+    _min?: OrganizationMembershipMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Select which fields to find the maximum value
+    **/
+    _max?: OrganizationMembershipMaxAggregateInputType
+  }
+
+  export type GetOrganizationMembershipAggregateType<T extends OrganizationMembershipAggregateArgs> = {
+        [P in keyof T & keyof AggregateOrganizationMembership]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateOrganizationMembership[P]>
+      : GetScalarType<T[P], AggregateOrganizationMembership[P]>
+  }
+
+
+
+
+  export type OrganizationMembershipGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: OrganizationMembershipWhereInput
+    orderBy?: OrganizationMembershipOrderByWithAggregationInput | OrganizationMembershipOrderByWithAggregationInput[]
+    by: OrganizationMembershipScalarFieldEnum[] | OrganizationMembershipScalarFieldEnum
+    having?: OrganizationMembershipScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: OrganizationMembershipCountAggregateInputType | true
+    _min?: OrganizationMembershipMinAggregateInputType
+    _max?: OrganizationMembershipMaxAggregateInputType
+  }
+
+  export type OrganizationMembershipGroupByOutputType = {
+    id: string
+    organization_id: string
+    identity_provider: string
+    auth_subject: string
+    normalized_email: string | null
+    role: string
+    status: $Enums.OrganizationMembershipStatus
+    external_organization_id: string | null
+    external_membership_id: string | null
+    metadata: JsonValue | null
+    revoked_at: Date | null
+    created_at: Date
+    updated_at: Date
+    _count: OrganizationMembershipCountAggregateOutputType | null
+    _min: OrganizationMembershipMinAggregateOutputType | null
+    _max: OrganizationMembershipMaxAggregateOutputType | null
+  }
+
+  type GetOrganizationMembershipGroupByPayload<T extends OrganizationMembershipGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<OrganizationMembershipGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof OrganizationMembershipGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], OrganizationMembershipGroupByOutputType[P]>
+            : GetScalarType<T[P], OrganizationMembershipGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type OrganizationMembershipSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    organization_id?: boolean
+    identity_provider?: boolean
+    auth_subject?: boolean
+    normalized_email?: boolean
+    role?: boolean
+    status?: boolean
+    external_organization_id?: boolean
+    external_membership_id?: boolean
+    metadata?: boolean
+    revoked_at?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+    organization?: boolean | OrganizationDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["organizationMembership"]>
+
+  export type OrganizationMembershipSelectScalar = {
+    id?: boolean
+    organization_id?: boolean
+    identity_provider?: boolean
+    auth_subject?: boolean
+    normalized_email?: boolean
+    role?: boolean
+    status?: boolean
+    external_organization_id?: boolean
+    external_membership_id?: boolean
+    metadata?: boolean
+    revoked_at?: boolean
+    created_at?: boolean
+    updated_at?: boolean
+  }
+
+  export type OrganizationMembershipInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    organization?: boolean | OrganizationDefaultArgs<ExtArgs>
+  }
+
+
+  export type $OrganizationMembershipPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "OrganizationMembership"
+    objects: {
+      organization: Prisma.$OrganizationPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      organization_id: string
+      identity_provider: string
+      auth_subject: string
+      normalized_email: string | null
+      role: string
+      status: $Enums.OrganizationMembershipStatus
+      external_organization_id: string | null
+      external_membership_id: string | null
+      metadata: Prisma.JsonValue | null
+      revoked_at: Date | null
+      created_at: Date
+      updated_at: Date
+    }, ExtArgs["result"]["organizationMembership"]>
+    composites: {}
+  }
+
+
+  type OrganizationMembershipGetPayload<S extends boolean | null | undefined | OrganizationMembershipDefaultArgs> = $Result.GetResult<Prisma.$OrganizationMembershipPayload, S>
+
+  type OrganizationMembershipCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<OrganizationMembershipFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: OrganizationMembershipCountAggregateInputType | true
+    }
+
+  export interface OrganizationMembershipDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['OrganizationMembership'], meta: { name: 'OrganizationMembership' } }
+    /**
+     * Find zero or one OrganizationMembership that matches the filter.
+     * @param {OrganizationMembershipFindUniqueArgs} args - Arguments to find a OrganizationMembership
+     * @example
+     * // Get one OrganizationMembership
+     * const organizationMembership = await prisma.organizationMembership.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUnique<T extends OrganizationMembershipFindUniqueArgs<ExtArgs>>(
+      args: SelectSubset<T, OrganizationMembershipFindUniqueArgs<ExtArgs>>
+    ): Prisma__OrganizationMembershipClient<$Result.GetResult<Prisma.$OrganizationMembershipPayload<ExtArgs>, T, 'findUnique'> | null, null, ExtArgs>
+
+    /**
+     * Find one OrganizationMembership that matches the filter or throw an error  with `error.code='P2025'`
+     *     if no matches were found.
+     * @param {OrganizationMembershipFindUniqueOrThrowArgs} args - Arguments to find a OrganizationMembership
+     * @example
+     * // Get one OrganizationMembership
+     * const organizationMembership = await prisma.organizationMembership.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findUniqueOrThrow<T extends OrganizationMembershipFindUniqueOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, OrganizationMembershipFindUniqueOrThrowArgs<ExtArgs>>
+    ): Prisma__OrganizationMembershipClient<$Result.GetResult<Prisma.$OrganizationMembershipPayload<ExtArgs>, T, 'findUniqueOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find the first OrganizationMembership that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {OrganizationMembershipFindFirstArgs} args - Arguments to find a OrganizationMembership
+     * @example
+     * // Get one OrganizationMembership
+     * const organizationMembership = await prisma.organizationMembership.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirst<T extends OrganizationMembershipFindFirstArgs<ExtArgs>>(
+      args?: SelectSubset<T, OrganizationMembershipFindFirstArgs<ExtArgs>>
+    ): Prisma__OrganizationMembershipClient<$Result.GetResult<Prisma.$OrganizationMembershipPayload<ExtArgs>, T, 'findFirst'> | null, null, ExtArgs>
+
+    /**
+     * Find the first OrganizationMembership that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {OrganizationMembershipFindFirstOrThrowArgs} args - Arguments to find a OrganizationMembership
+     * @example
+     * // Get one OrganizationMembership
+     * const organizationMembership = await prisma.organizationMembership.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+    **/
+    findFirstOrThrow<T extends OrganizationMembershipFindFirstOrThrowArgs<ExtArgs>>(
+      args?: SelectSubset<T, OrganizationMembershipFindFirstOrThrowArgs<ExtArgs>>
+    ): Prisma__OrganizationMembershipClient<$Result.GetResult<Prisma.$OrganizationMembershipPayload<ExtArgs>, T, 'findFirstOrThrow'>, never, ExtArgs>
+
+    /**
+     * Find zero or more OrganizationMemberships that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {OrganizationMembershipFindManyArgs=} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all OrganizationMemberships
+     * const organizationMemberships = await prisma.organizationMembership.findMany()
+     *
+     * // Get first 10 OrganizationMemberships
+     * const organizationMemberships = await prisma.organizationMembership.findMany({ take: 10 })
+     *
+     * // Only select the `id`
+     * const organizationMembershipWithIdOnly = await prisma.organizationMembership.findMany({ select: { id: true } })
+     *
+    **/
+    findMany<T extends OrganizationMembershipFindManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, OrganizationMembershipFindManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<$Result.GetResult<Prisma.$OrganizationMembershipPayload<ExtArgs>, T, 'findMany'>>
+
+    /**
+     * Create a OrganizationMembership.
+     * @param {OrganizationMembershipCreateArgs} args - Arguments to create a OrganizationMembership.
+     * @example
+     * // Create one OrganizationMembership
+     * const OrganizationMembership = await prisma.organizationMembership.create({
+     *   data: {
+     *     // ... data to create a OrganizationMembership
+     *   }
+     * })
+     *
+    **/
+    create<T extends OrganizationMembershipCreateArgs<ExtArgs>>(
+      args: SelectSubset<T, OrganizationMembershipCreateArgs<ExtArgs>>
+    ): Prisma__OrganizationMembershipClient<$Result.GetResult<Prisma.$OrganizationMembershipPayload<ExtArgs>, T, 'create'>, never, ExtArgs>
+
+    /**
+     * Create many OrganizationMemberships.
+     *     @param {OrganizationMembershipCreateManyArgs} args - Arguments to create many OrganizationMemberships.
+     *     @example
+     *     // Create many OrganizationMemberships
+     *     const organizationMembership = await prisma.organizationMembership.createMany({
+     *       data: {
+     *         // ... provide data here
+     *       }
+     *     })
+     *
+    **/
+    createMany<T extends OrganizationMembershipCreateManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, OrganizationMembershipCreateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Delete a OrganizationMembership.
+     * @param {OrganizationMembershipDeleteArgs} args - Arguments to delete one OrganizationMembership.
+     * @example
+     * // Delete one OrganizationMembership
+     * const OrganizationMembership = await prisma.organizationMembership.delete({
+     *   where: {
+     *     // ... filter to delete one OrganizationMembership
+     *   }
+     * })
+     *
+    **/
+    delete<T extends OrganizationMembershipDeleteArgs<ExtArgs>>(
+      args: SelectSubset<T, OrganizationMembershipDeleteArgs<ExtArgs>>
+    ): Prisma__OrganizationMembershipClient<$Result.GetResult<Prisma.$OrganizationMembershipPayload<ExtArgs>, T, 'delete'>, never, ExtArgs>
+
+    /**
+     * Update one OrganizationMembership.
+     * @param {OrganizationMembershipUpdateArgs} args - Arguments to update one OrganizationMembership.
+     * @example
+     * // Update one OrganizationMembership
+     * const organizationMembership = await prisma.organizationMembership.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     *
+    **/
+    update<T extends OrganizationMembershipUpdateArgs<ExtArgs>>(
+      args: SelectSubset<T, OrganizationMembershipUpdateArgs<ExtArgs>>
+    ): Prisma__OrganizationMembershipClient<$Result.GetResult<Prisma.$OrganizationMembershipPayload<ExtArgs>, T, 'update'>, never, ExtArgs>
+
+    /**
+     * Delete zero or more OrganizationMemberships.
+     * @param {OrganizationMembershipDeleteManyArgs} args - Arguments to filter OrganizationMemberships to delete.
+     * @example
+     * // Delete a few OrganizationMemberships
+     * const { count } = await prisma.organizationMembership.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     *
+    **/
+    deleteMany<T extends OrganizationMembershipDeleteManyArgs<ExtArgs>>(
+      args?: SelectSubset<T, OrganizationMembershipDeleteManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more OrganizationMemberships.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {OrganizationMembershipUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many OrganizationMemberships
+     * const organizationMembership = await prisma.organizationMembership.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     *
+    **/
+    updateMany<T extends OrganizationMembershipUpdateManyArgs<ExtArgs>>(
+      args: SelectSubset<T, OrganizationMembershipUpdateManyArgs<ExtArgs>>
+    ): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one OrganizationMembership.
+     * @param {OrganizationMembershipUpsertArgs} args - Arguments to update or create a OrganizationMembership.
+     * @example
+     * // Update or create a OrganizationMembership
+     * const organizationMembership = await prisma.organizationMembership.upsert({
+     *   create: {
+     *     // ... data to create a OrganizationMembership
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the OrganizationMembership we want to update
+     *   }
+     * })
+    **/
+    upsert<T extends OrganizationMembershipUpsertArgs<ExtArgs>>(
+      args: SelectSubset<T, OrganizationMembershipUpsertArgs<ExtArgs>>
+    ): Prisma__OrganizationMembershipClient<$Result.GetResult<Prisma.$OrganizationMembershipPayload<ExtArgs>, T, 'upsert'>, never, ExtArgs>
+
+    /**
+     * Count the number of OrganizationMemberships.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {OrganizationMembershipCountArgs} args - Arguments to filter OrganizationMemberships to count.
+     * @example
+     * // Count the number of OrganizationMemberships
+     * const count = await prisma.organizationMembership.count({
+     *   where: {
+     *     // ... the filter for the OrganizationMemberships we want to count
+     *   }
+     * })
+    **/
+    count<T extends OrganizationMembershipCountArgs>(
+      args?: Subset<T, OrganizationMembershipCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], OrganizationMembershipCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a OrganizationMembership.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {OrganizationMembershipAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends OrganizationMembershipAggregateArgs>(args: Subset<T, OrganizationMembershipAggregateArgs>): Prisma.PrismaPromise<GetOrganizationMembershipAggregateType<T>>
+
+    /**
+     * Group by OrganizationMembership.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {OrganizationMembershipGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     *
+    **/
+    groupBy<
+      T extends OrganizationMembershipGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: OrganizationMembershipGroupByArgs['orderBy'] }
+        : { orderBy?: OrganizationMembershipGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, OrganizationMembershipGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetOrganizationMembershipGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the OrganizationMembership model
+   */
+  readonly fields: OrganizationMembershipFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for OrganizationMembership.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__OrganizationMembershipClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: 'PrismaPromise';
+
+    organization<T extends OrganizationDefaultArgs<ExtArgs> = {}>(args?: Subset<T, OrganizationDefaultArgs<ExtArgs>>): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'findUniqueOrThrow'> | Null, Null, ExtArgs>;
+
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>;
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>;
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>;
+  }
+
+
+
+  /**
+   * Fields of the OrganizationMembership model
+   */
+  interface OrganizationMembershipFieldRefs {
+    readonly id: FieldRef<"OrganizationMembership", 'String'>
+    readonly organization_id: FieldRef<"OrganizationMembership", 'String'>
+    readonly identity_provider: FieldRef<"OrganizationMembership", 'String'>
+    readonly auth_subject: FieldRef<"OrganizationMembership", 'String'>
+    readonly normalized_email: FieldRef<"OrganizationMembership", 'String'>
+    readonly role: FieldRef<"OrganizationMembership", 'String'>
+    readonly status: FieldRef<"OrganizationMembership", 'OrganizationMembershipStatus'>
+    readonly external_organization_id: FieldRef<"OrganizationMembership", 'String'>
+    readonly external_membership_id: FieldRef<"OrganizationMembership", 'String'>
+    readonly metadata: FieldRef<"OrganizationMembership", 'Json'>
+    readonly revoked_at: FieldRef<"OrganizationMembership", 'DateTime'>
+    readonly created_at: FieldRef<"OrganizationMembership", 'DateTime'>
+    readonly updated_at: FieldRef<"OrganizationMembership", 'DateTime'>
+  }
+
+
+  // Custom InputTypes
+
+  /**
+   * OrganizationMembership findUnique
+   */
+  export type OrganizationMembershipFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the OrganizationMembership
+     */
+    select?: OrganizationMembershipSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationMembershipInclude<ExtArgs> | null
+    /**
+     * Filter, which OrganizationMembership to fetch.
+     */
+    where: OrganizationMembershipWhereUniqueInput
+  }
+
+
+  /**
+   * OrganizationMembership findUniqueOrThrow
+   */
+  export type OrganizationMembershipFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the OrganizationMembership
+     */
+    select?: OrganizationMembershipSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationMembershipInclude<ExtArgs> | null
+    /**
+     * Filter, which OrganizationMembership to fetch.
+     */
+    where: OrganizationMembershipWhereUniqueInput
+  }
+
+
+  /**
+   * OrganizationMembership findFirst
+   */
+  export type OrganizationMembershipFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the OrganizationMembership
+     */
+    select?: OrganizationMembershipSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationMembershipInclude<ExtArgs> | null
+    /**
+     * Filter, which OrganizationMembership to fetch.
+     */
+    where?: OrganizationMembershipWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of OrganizationMemberships to fetch.
+     */
+    orderBy?: OrganizationMembershipOrderByWithRelationInput | OrganizationMembershipOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the position for searching for OrganizationMemberships.
+     */
+    cursor?: OrganizationMembershipWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` OrganizationMemberships from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` OrganizationMemberships.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     *
+     * Filter by unique combinations of OrganizationMemberships.
+     */
+    distinct?: OrganizationMembershipScalarFieldEnum | OrganizationMembershipScalarFieldEnum[]
+  }
+
+
+  /**
+   * OrganizationMembership findFirstOrThrow
+   */
+  export type OrganizationMembershipFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the OrganizationMembership
+     */
+    select?: OrganizationMembershipSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationMembershipInclude<ExtArgs> | null
+    /**
+     * Filter, which OrganizationMembership to fetch.
+     */
+    where?: OrganizationMembershipWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of OrganizationMemberships to fetch.
+     */
+    orderBy?: OrganizationMembershipOrderByWithRelationInput | OrganizationMembershipOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the position for searching for OrganizationMemberships.
+     */
+    cursor?: OrganizationMembershipWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` OrganizationMemberships from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` OrganizationMemberships.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     *
+     * Filter by unique combinations of OrganizationMemberships.
+     */
+    distinct?: OrganizationMembershipScalarFieldEnum | OrganizationMembershipScalarFieldEnum[]
+  }
+
+
+  /**
+   * OrganizationMembership findMany
+   */
+  export type OrganizationMembershipFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the OrganizationMembership
+     */
+    select?: OrganizationMembershipSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationMembershipInclude<ExtArgs> | null
+    /**
+     * Filter, which OrganizationMemberships to fetch.
+     */
+    where?: OrganizationMembershipWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of OrganizationMemberships to fetch.
+     */
+    orderBy?: OrganizationMembershipOrderByWithRelationInput | OrganizationMembershipOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the position for listing OrganizationMemberships.
+     */
+    cursor?: OrganizationMembershipWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` OrganizationMemberships from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` OrganizationMemberships.
+     */
+    skip?: number
+    distinct?: OrganizationMembershipScalarFieldEnum | OrganizationMembershipScalarFieldEnum[]
+  }
+
+
+  /**
+   * OrganizationMembership create
+   */
+  export type OrganizationMembershipCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the OrganizationMembership
+     */
+    select?: OrganizationMembershipSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationMembershipInclude<ExtArgs> | null
+    /**
+     * The data needed to create a OrganizationMembership.
+     */
+    data: XOR<OrganizationMembershipCreateInput, OrganizationMembershipUncheckedCreateInput>
+  }
+
+
+  /**
+   * OrganizationMembership createMany
+   */
+  export type OrganizationMembershipCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many OrganizationMemberships.
+     */
+    data: OrganizationMembershipCreateManyInput | OrganizationMembershipCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+
+  /**
+   * OrganizationMembership update
+   */
+  export type OrganizationMembershipUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the OrganizationMembership
+     */
+    select?: OrganizationMembershipSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationMembershipInclude<ExtArgs> | null
+    /**
+     * The data needed to update a OrganizationMembership.
+     */
+    data: XOR<OrganizationMembershipUpdateInput, OrganizationMembershipUncheckedUpdateInput>
+    /**
+     * Choose, which OrganizationMembership to update.
+     */
+    where: OrganizationMembershipWhereUniqueInput
+  }
+
+
+  /**
+   * OrganizationMembership updateMany
+   */
+  export type OrganizationMembershipUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update OrganizationMemberships.
+     */
+    data: XOR<OrganizationMembershipUpdateManyMutationInput, OrganizationMembershipUncheckedUpdateManyInput>
+    /**
+     * Filter which OrganizationMemberships to update
+     */
+    where?: OrganizationMembershipWhereInput
+  }
+
+
+  /**
+   * OrganizationMembership upsert
+   */
+  export type OrganizationMembershipUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the OrganizationMembership
+     */
+    select?: OrganizationMembershipSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationMembershipInclude<ExtArgs> | null
+    /**
+     * The filter to search for the OrganizationMembership to update in case it exists.
+     */
+    where: OrganizationMembershipWhereUniqueInput
+    /**
+     * In case the OrganizationMembership found by the `where` argument doesn't exist, create a new OrganizationMembership with this data.
+     */
+    create: XOR<OrganizationMembershipCreateInput, OrganizationMembershipUncheckedCreateInput>
+    /**
+     * In case the OrganizationMembership was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<OrganizationMembershipUpdateInput, OrganizationMembershipUncheckedUpdateInput>
+  }
+
+
+  /**
+   * OrganizationMembership delete
+   */
+  export type OrganizationMembershipDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the OrganizationMembership
+     */
+    select?: OrganizationMembershipSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationMembershipInclude<ExtArgs> | null
+    /**
+     * Filter which OrganizationMembership to delete.
+     */
+    where: OrganizationMembershipWhereUniqueInput
+  }
+
+
+  /**
+   * OrganizationMembership deleteMany
+   */
+  export type OrganizationMembershipDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which OrganizationMemberships to delete
+     */
+    where?: OrganizationMembershipWhereInput
+  }
+
+
+  /**
+   * OrganizationMembership without action
+   */
+  export type OrganizationMembershipDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the OrganizationMembership
+     */
+    select?: OrganizationMembershipSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationMembershipInclude<ExtArgs> | null
+  }
+
+
+
+  /**
    * Model CareLog
    */
 
@@ -35786,6 +37095,7 @@ export namespace Prisma {
 
   export type ConsentRecordMinAggregateOutputType = {
     id: string | null
+    organization_id: string | null
     user_id: string | null
     consent_type: string | null
     purpose: string | null
@@ -35799,6 +37109,7 @@ export namespace Prisma {
 
   export type ConsentRecordMaxAggregateOutputType = {
     id: string | null
+    organization_id: string | null
     user_id: string | null
     consent_type: string | null
     purpose: string | null
@@ -35812,6 +37123,7 @@ export namespace Prisma {
 
   export type ConsentRecordCountAggregateOutputType = {
     id: number
+    organization_id: number
     user_id: number
     consent_type: number
     purpose: number
@@ -35828,6 +37140,7 @@ export namespace Prisma {
 
   export type ConsentRecordMinAggregateInputType = {
     id?: true
+    organization_id?: true
     user_id?: true
     consent_type?: true
     purpose?: true
@@ -35841,6 +37154,7 @@ export namespace Prisma {
 
   export type ConsentRecordMaxAggregateInputType = {
     id?: true
+    organization_id?: true
     user_id?: true
     consent_type?: true
     purpose?: true
@@ -35854,6 +37168,7 @@ export namespace Prisma {
 
   export type ConsentRecordCountAggregateInputType = {
     id?: true
+    organization_id?: true
     user_id?: true
     consent_type?: true
     purpose?: true
@@ -35941,6 +37256,7 @@ export namespace Prisma {
 
   export type ConsentRecordGroupByOutputType = {
     id: string
+    organization_id: string | null
     user_id: string
     consent_type: string
     purpose: string
@@ -35972,6 +37288,7 @@ export namespace Prisma {
 
   export type ConsentRecordSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
+    organization_id?: boolean
     user_id?: boolean
     consent_type?: boolean
     purpose?: boolean
@@ -35982,10 +37299,12 @@ export namespace Prisma {
     metadata?: boolean
     created_at?: boolean
     updated_at?: boolean
+    organization?: boolean | ConsentRecord$organizationArgs<ExtArgs>
   }, ExtArgs["result"]["consentRecord"]>
 
   export type ConsentRecordSelectScalar = {
     id?: boolean
+    organization_id?: boolean
     user_id?: boolean
     consent_type?: boolean
     purpose?: boolean
@@ -35998,12 +37317,19 @@ export namespace Prisma {
     updated_at?: boolean
   }
 
+  export type ConsentRecordInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    organization?: boolean | ConsentRecord$organizationArgs<ExtArgs>
+  }
+
 
   export type $ConsentRecordPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "ConsentRecord"
-    objects: {}
+    objects: {
+      organization: Prisma.$OrganizationPayload<ExtArgs> | null
+    }
     scalars: $Extensions.GetPayloadResult<{
       id: string
+      organization_id: string | null
       user_id: string
       consent_type: string
       purpose: string
@@ -36379,6 +37705,7 @@ export namespace Prisma {
   export interface Prisma__ConsentRecordClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: 'PrismaPromise';
 
+    organization<T extends ConsentRecord$organizationArgs<ExtArgs> = {}>(args?: Subset<T, ConsentRecord$organizationArgs<ExtArgs>>): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'findUniqueOrThrow'> | null, null, ExtArgs>;
 
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -36409,6 +37736,7 @@ export namespace Prisma {
    */
   interface ConsentRecordFieldRefs {
     readonly id: FieldRef<"ConsentRecord", 'String'>
+    readonly organization_id: FieldRef<"ConsentRecord", 'String'>
     readonly user_id: FieldRef<"ConsentRecord", 'String'>
     readonly consent_type: FieldRef<"ConsentRecord", 'String'>
     readonly purpose: FieldRef<"ConsentRecord", 'String'>
@@ -36433,6 +37761,10 @@ export namespace Prisma {
      */
     select?: ConsentRecordSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ConsentRecordInclude<ExtArgs> | null
+    /**
      * Filter, which ConsentRecord to fetch.
      */
     where: ConsentRecordWhereUniqueInput
@@ -36448,6 +37780,10 @@ export namespace Prisma {
      */
     select?: ConsentRecordSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ConsentRecordInclude<ExtArgs> | null
+    /**
      * Filter, which ConsentRecord to fetch.
      */
     where: ConsentRecordWhereUniqueInput
@@ -36462,6 +37798,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the ConsentRecord
      */
     select?: ConsentRecordSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ConsentRecordInclude<ExtArgs> | null
     /**
      * Filter, which ConsentRecord to fetch.
      */
@@ -36508,6 +37848,10 @@ export namespace Prisma {
      */
     select?: ConsentRecordSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ConsentRecordInclude<ExtArgs> | null
+    /**
      * Filter, which ConsentRecord to fetch.
      */
     where?: ConsentRecordWhereInput
@@ -36553,6 +37897,10 @@ export namespace Prisma {
      */
     select?: ConsentRecordSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ConsentRecordInclude<ExtArgs> | null
+    /**
      * Filter, which ConsentRecords to fetch.
      */
     where?: ConsentRecordWhereInput
@@ -36593,6 +37941,10 @@ export namespace Prisma {
      */
     select?: ConsentRecordSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ConsentRecordInclude<ExtArgs> | null
+    /**
      * The data needed to create a ConsentRecord.
      */
     data: XOR<ConsentRecordCreateInput, ConsentRecordUncheckedCreateInput>
@@ -36619,6 +37971,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the ConsentRecord
      */
     select?: ConsentRecordSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ConsentRecordInclude<ExtArgs> | null
     /**
      * The data needed to update a ConsentRecord.
      */
@@ -36654,6 +38010,10 @@ export namespace Prisma {
      */
     select?: ConsentRecordSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ConsentRecordInclude<ExtArgs> | null
+    /**
      * The filter to search for the ConsentRecord to update in case it exists.
      */
     where: ConsentRecordWhereUniqueInput
@@ -36677,6 +38037,10 @@ export namespace Prisma {
      */
     select?: ConsentRecordSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ConsentRecordInclude<ExtArgs> | null
+    /**
      * Filter which ConsentRecord to delete.
      */
     where: ConsentRecordWhereUniqueInput
@@ -36695,6 +38059,22 @@ export namespace Prisma {
 
 
   /**
+   * ConsentRecord.organization
+   */
+  export type ConsentRecord$organizationArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Organization
+     */
+    select?: OrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationInclude<ExtArgs> | null
+    where?: OrganizationWhereInput
+  }
+
+
+  /**
    * ConsentRecord without action
    */
   export type ConsentRecordDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -36702,6 +38082,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the ConsentRecord
      */
     select?: ConsentRecordSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ConsentRecordInclude<ExtArgs> | null
   }
 
 
@@ -36718,6 +38102,7 @@ export namespace Prisma {
 
   export type AuditLogMinAggregateOutputType = {
     id: string | null
+    organization_id: string | null
     user_id: string | null
     action: string | null
     resource_type: string | null
@@ -36729,6 +38114,7 @@ export namespace Prisma {
 
   export type AuditLogMaxAggregateOutputType = {
     id: string | null
+    organization_id: string | null
     user_id: string | null
     action: string | null
     resource_type: string | null
@@ -36740,6 +38126,7 @@ export namespace Prisma {
 
   export type AuditLogCountAggregateOutputType = {
     id: number
+    organization_id: number
     user_id: number
     action: number
     resource_type: number
@@ -36755,6 +38142,7 @@ export namespace Prisma {
 
   export type AuditLogMinAggregateInputType = {
     id?: true
+    organization_id?: true
     user_id?: true
     action?: true
     resource_type?: true
@@ -36766,6 +38154,7 @@ export namespace Prisma {
 
   export type AuditLogMaxAggregateInputType = {
     id?: true
+    organization_id?: true
     user_id?: true
     action?: true
     resource_type?: true
@@ -36777,6 +38166,7 @@ export namespace Prisma {
 
   export type AuditLogCountAggregateInputType = {
     id?: true
+    organization_id?: true
     user_id?: true
     action?: true
     resource_type?: true
@@ -36863,6 +38253,7 @@ export namespace Prisma {
 
   export type AuditLogGroupByOutputType = {
     id: string
+    organization_id: string | null
     user_id: string | null
     action: string
     resource_type: string
@@ -36893,6 +38284,7 @@ export namespace Prisma {
 
   export type AuditLogSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
+    organization_id?: boolean
     user_id?: boolean
     action?: boolean
     resource_type?: boolean
@@ -36902,10 +38294,12 @@ export namespace Prisma {
     ip_address?: boolean
     user_agent?: boolean
     timestamp?: boolean
+    organization?: boolean | AuditLog$organizationArgs<ExtArgs>
   }, ExtArgs["result"]["auditLog"]>
 
   export type AuditLogSelectScalar = {
     id?: boolean
+    organization_id?: boolean
     user_id?: boolean
     action?: boolean
     resource_type?: boolean
@@ -36917,12 +38311,19 @@ export namespace Prisma {
     timestamp?: boolean
   }
 
+  export type AuditLogInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    organization?: boolean | AuditLog$organizationArgs<ExtArgs>
+  }
+
 
   export type $AuditLogPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "AuditLog"
-    objects: {}
+    objects: {
+      organization: Prisma.$OrganizationPayload<ExtArgs> | null
+    }
     scalars: $Extensions.GetPayloadResult<{
       id: string
+      organization_id: string | null
       user_id: string | null
       action: string
       resource_type: string
@@ -37297,6 +38698,7 @@ export namespace Prisma {
   export interface Prisma__AuditLogClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: 'PrismaPromise';
 
+    organization<T extends AuditLog$organizationArgs<ExtArgs> = {}>(args?: Subset<T, AuditLog$organizationArgs<ExtArgs>>): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'findUniqueOrThrow'> | null, null, ExtArgs>;
 
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -37327,6 +38729,7 @@ export namespace Prisma {
    */
   interface AuditLogFieldRefs {
     readonly id: FieldRef<"AuditLog", 'String'>
+    readonly organization_id: FieldRef<"AuditLog", 'String'>
     readonly user_id: FieldRef<"AuditLog", 'String'>
     readonly action: FieldRef<"AuditLog", 'String'>
     readonly resource_type: FieldRef<"AuditLog", 'String'>
@@ -37350,6 +38753,10 @@ export namespace Prisma {
      */
     select?: AuditLogSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: AuditLogInclude<ExtArgs> | null
+    /**
      * Filter, which AuditLog to fetch.
      */
     where: AuditLogWhereUniqueInput
@@ -37365,6 +38772,10 @@ export namespace Prisma {
      */
     select?: AuditLogSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: AuditLogInclude<ExtArgs> | null
+    /**
      * Filter, which AuditLog to fetch.
      */
     where: AuditLogWhereUniqueInput
@@ -37379,6 +38790,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the AuditLog
      */
     select?: AuditLogSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: AuditLogInclude<ExtArgs> | null
     /**
      * Filter, which AuditLog to fetch.
      */
@@ -37425,6 +38840,10 @@ export namespace Prisma {
      */
     select?: AuditLogSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: AuditLogInclude<ExtArgs> | null
+    /**
      * Filter, which AuditLog to fetch.
      */
     where?: AuditLogWhereInput
@@ -37470,6 +38889,10 @@ export namespace Prisma {
      */
     select?: AuditLogSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: AuditLogInclude<ExtArgs> | null
+    /**
      * Filter, which AuditLogs to fetch.
      */
     where?: AuditLogWhereInput
@@ -37510,6 +38933,10 @@ export namespace Prisma {
      */
     select?: AuditLogSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: AuditLogInclude<ExtArgs> | null
+    /**
      * The data needed to create a AuditLog.
      */
     data: XOR<AuditLogCreateInput, AuditLogUncheckedCreateInput>
@@ -37536,6 +38963,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the AuditLog
      */
     select?: AuditLogSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: AuditLogInclude<ExtArgs> | null
     /**
      * The data needed to update a AuditLog.
      */
@@ -37571,6 +39002,10 @@ export namespace Prisma {
      */
     select?: AuditLogSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: AuditLogInclude<ExtArgs> | null
+    /**
      * The filter to search for the AuditLog to update in case it exists.
      */
     where: AuditLogWhereUniqueInput
@@ -37594,6 +39029,10 @@ export namespace Prisma {
      */
     select?: AuditLogSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: AuditLogInclude<ExtArgs> | null
+    /**
      * Filter which AuditLog to delete.
      */
     where: AuditLogWhereUniqueInput
@@ -37612,6 +39051,22 @@ export namespace Prisma {
 
 
   /**
+   * AuditLog.organization
+   */
+  export type AuditLog$organizationArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Organization
+     */
+    select?: OrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationInclude<ExtArgs> | null
+    where?: OrganizationWhereInput
+  }
+
+
+  /**
    * AuditLog without action
    */
   export type AuditLogDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -37619,6 +39074,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the AuditLog
      */
     select?: AuditLogSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: AuditLogInclude<ExtArgs> | null
   }
 
 
@@ -38572,6 +40031,7 @@ export namespace Prisma {
 
   export type ErasureQueueMinAggregateOutputType = {
     id: string | null
+    organization_id: string | null
     user_id: string | null
     request_type: string | null
     status: string | null
@@ -38584,6 +40044,7 @@ export namespace Prisma {
 
   export type ErasureQueueMaxAggregateOutputType = {
     id: string | null
+    organization_id: string | null
     user_id: string | null
     request_type: string | null
     status: string | null
@@ -38596,6 +40057,7 @@ export namespace Prisma {
 
   export type ErasureQueueCountAggregateOutputType = {
     id: number
+    organization_id: number
     user_id: number
     request_type: number
     status: number
@@ -38611,6 +40073,7 @@ export namespace Prisma {
 
   export type ErasureQueueMinAggregateInputType = {
     id?: true
+    organization_id?: true
     user_id?: true
     request_type?: true
     status?: true
@@ -38623,6 +40086,7 @@ export namespace Prisma {
 
   export type ErasureQueueMaxAggregateInputType = {
     id?: true
+    organization_id?: true
     user_id?: true
     request_type?: true
     status?: true
@@ -38635,6 +40099,7 @@ export namespace Prisma {
 
   export type ErasureQueueCountAggregateInputType = {
     id?: true
+    organization_id?: true
     user_id?: true
     request_type?: true
     status?: true
@@ -38721,6 +40186,7 @@ export namespace Prisma {
 
   export type ErasureQueueGroupByOutputType = {
     id: string
+    organization_id: string | null
     user_id: string
     request_type: string
     status: string
@@ -38751,6 +40217,7 @@ export namespace Prisma {
 
   export type ErasureQueueSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
+    organization_id?: boolean
     user_id?: boolean
     request_type?: boolean
     status?: boolean
@@ -38760,10 +40227,12 @@ export namespace Prisma {
     metadata?: boolean
     created_at?: boolean
     updated_at?: boolean
+    organization?: boolean | ErasureQueue$organizationArgs<ExtArgs>
   }, ExtArgs["result"]["erasureQueue"]>
 
   export type ErasureQueueSelectScalar = {
     id?: boolean
+    organization_id?: boolean
     user_id?: boolean
     request_type?: boolean
     status?: boolean
@@ -38775,12 +40244,19 @@ export namespace Prisma {
     updated_at?: boolean
   }
 
+  export type ErasureQueueInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    organization?: boolean | ErasureQueue$organizationArgs<ExtArgs>
+  }
+
 
   export type $ErasureQueuePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "ErasureQueue"
-    objects: {}
+    objects: {
+      organization: Prisma.$OrganizationPayload<ExtArgs> | null
+    }
     scalars: $Extensions.GetPayloadResult<{
       id: string
+      organization_id: string | null
       user_id: string
       request_type: string
       status: string
@@ -39155,6 +40631,7 @@ export namespace Prisma {
   export interface Prisma__ErasureQueueClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: 'PrismaPromise';
 
+    organization<T extends ErasureQueue$organizationArgs<ExtArgs> = {}>(args?: Subset<T, ErasureQueue$organizationArgs<ExtArgs>>): Prisma__OrganizationClient<$Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, 'findUniqueOrThrow'> | null, null, ExtArgs>;
 
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -39185,6 +40662,7 @@ export namespace Prisma {
    */
   interface ErasureQueueFieldRefs {
     readonly id: FieldRef<"ErasureQueue", 'String'>
+    readonly organization_id: FieldRef<"ErasureQueue", 'String'>
     readonly user_id: FieldRef<"ErasureQueue", 'String'>
     readonly request_type: FieldRef<"ErasureQueue", 'String'>
     readonly status: FieldRef<"ErasureQueue", 'String'>
@@ -39208,6 +40686,10 @@ export namespace Prisma {
      */
     select?: ErasureQueueSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ErasureQueueInclude<ExtArgs> | null
+    /**
      * Filter, which ErasureQueue to fetch.
      */
     where: ErasureQueueWhereUniqueInput
@@ -39223,6 +40705,10 @@ export namespace Prisma {
      */
     select?: ErasureQueueSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ErasureQueueInclude<ExtArgs> | null
+    /**
      * Filter, which ErasureQueue to fetch.
      */
     where: ErasureQueueWhereUniqueInput
@@ -39237,6 +40723,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the ErasureQueue
      */
     select?: ErasureQueueSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ErasureQueueInclude<ExtArgs> | null
     /**
      * Filter, which ErasureQueue to fetch.
      */
@@ -39283,6 +40773,10 @@ export namespace Prisma {
      */
     select?: ErasureQueueSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ErasureQueueInclude<ExtArgs> | null
+    /**
      * Filter, which ErasureQueue to fetch.
      */
     where?: ErasureQueueWhereInput
@@ -39328,6 +40822,10 @@ export namespace Prisma {
      */
     select?: ErasureQueueSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ErasureQueueInclude<ExtArgs> | null
+    /**
      * Filter, which ErasureQueues to fetch.
      */
     where?: ErasureQueueWhereInput
@@ -39368,6 +40866,10 @@ export namespace Prisma {
      */
     select?: ErasureQueueSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ErasureQueueInclude<ExtArgs> | null
+    /**
      * The data needed to create a ErasureQueue.
      */
     data: XOR<ErasureQueueCreateInput, ErasureQueueUncheckedCreateInput>
@@ -39394,6 +40896,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the ErasureQueue
      */
     select?: ErasureQueueSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ErasureQueueInclude<ExtArgs> | null
     /**
      * The data needed to update a ErasureQueue.
      */
@@ -39429,6 +40935,10 @@ export namespace Prisma {
      */
     select?: ErasureQueueSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ErasureQueueInclude<ExtArgs> | null
+    /**
      * The filter to search for the ErasureQueue to update in case it exists.
      */
     where: ErasureQueueWhereUniqueInput
@@ -39452,6 +40962,10 @@ export namespace Prisma {
      */
     select?: ErasureQueueSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ErasureQueueInclude<ExtArgs> | null
+    /**
      * Filter which ErasureQueue to delete.
      */
     where: ErasureQueueWhereUniqueInput
@@ -39470,6 +40984,22 @@ export namespace Prisma {
 
 
   /**
+   * ErasureQueue.organization
+   */
+  export type ErasureQueue$organizationArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Organization
+     */
+    select?: OrganizationSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: OrganizationInclude<ExtArgs> | null
+    where?: OrganizationWhereInput
+  }
+
+
+  /**
    * ErasureQueue without action
    */
   export type ErasureQueueDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -39477,6 +41007,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the ErasureQueue
      */
     select?: ErasureQueueSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well.
+     */
+    include?: ErasureQueueInclude<ExtArgs> | null
   }
 
 
@@ -39644,6 +41178,7 @@ export namespace Prisma {
 
   export const MedicationAuditScalarFieldEnum: {
     id: 'id',
+    organization_id: 'organization_id',
     prescription_id: 'prescription_id',
     medication_administration_id: 'medication_administration_id',
     action: 'action',
@@ -39971,6 +41506,25 @@ export namespace Prisma {
   export type OrganizationIdentityScalarFieldEnum = (typeof OrganizationIdentityScalarFieldEnum)[keyof typeof OrganizationIdentityScalarFieldEnum]
 
 
+  export const OrganizationMembershipScalarFieldEnum: {
+    id: 'id',
+    organization_id: 'organization_id',
+    identity_provider: 'identity_provider',
+    auth_subject: 'auth_subject',
+    normalized_email: 'normalized_email',
+    role: 'role',
+    status: 'status',
+    external_organization_id: 'external_organization_id',
+    external_membership_id: 'external_membership_id',
+    metadata: 'metadata',
+    revoked_at: 'revoked_at',
+    created_at: 'created_at',
+    updated_at: 'updated_at'
+  };
+
+  export type OrganizationMembershipScalarFieldEnum = (typeof OrganizationMembershipScalarFieldEnum)[keyof typeof OrganizationMembershipScalarFieldEnum]
+
+
   export const CareLogScalarFieldEnum: {
     id: 'id',
     organization_id: 'organization_id',
@@ -40045,6 +41599,7 @@ export namespace Prisma {
 
   export const ConsentRecordScalarFieldEnum: {
     id: 'id',
+    organization_id: 'organization_id',
     user_id: 'user_id',
     consent_type: 'consent_type',
     purpose: 'purpose',
@@ -40062,6 +41617,7 @@ export namespace Prisma {
 
   export const AuditLogScalarFieldEnum: {
     id: 'id',
+    organization_id: 'organization_id',
     user_id: 'user_id',
     action: 'action',
     resource_type: 'resource_type',
@@ -40092,6 +41648,7 @@ export namespace Prisma {
 
   export const ErasureQueueScalarFieldEnum: {
     id: 'id',
+    organization_id: 'organization_id',
     user_id: 'user_id',
     request_type: 'request_type',
     status: 'status',
@@ -40548,6 +42105,20 @@ export namespace Prisma {
    * Reference to a field of type 'EvidenceSourceType[]'
    */
   export type ListEnumEvidenceSourceTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EvidenceSourceType[]'>
+
+
+
+  /**
+   * Reference to a field of type 'OrganizationMembershipStatus'
+   */
+  export type EnumOrganizationMembershipStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrganizationMembershipStatus'>
+
+
+
+  /**
+   * Reference to a field of type 'OrganizationMembershipStatus[]'
+   */
+  export type ListEnumOrganizationMembershipStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrganizationMembershipStatus[]'>
 
 
 
@@ -41444,6 +43015,7 @@ export namespace Prisma {
     OR?: MedicationAuditWhereInput[]
     NOT?: MedicationAuditWhereInput | MedicationAuditWhereInput[]
     id?: StringFilter<"MedicationAudit"> | string
+    organization_id?: StringNullableFilter<"MedicationAudit"> | string | null
     prescription_id?: StringNullableFilter<"MedicationAudit"> | string | null
     medication_administration_id?: StringNullableFilter<"MedicationAudit"> | string | null
     action?: EnumMedicationAuditActionFilter<"MedicationAudit"> | $Enums.MedicationAuditAction
@@ -41451,12 +43023,14 @@ export namespace Prisma {
     actor_role?: StringFilter<"MedicationAudit"> | string
     changes?: StringFilter<"MedicationAudit"> | string
     timestamp?: DateTimeFilter<"MedicationAudit"> | Date | string
+    organization?: XOR<OrganizationNullableRelationFilter, OrganizationWhereInput> | null
     prescription?: XOR<PrescriptionNullableRelationFilter, PrescriptionWhereInput> | null
     medication_administration?: XOR<MedicationAdministrationNullableRelationFilter, MedicationAdministrationWhereInput> | null
   }
 
   export type MedicationAuditOrderByWithRelationInput = {
     id?: SortOrder
+    organization_id?: SortOrderInput | SortOrder
     prescription_id?: SortOrderInput | SortOrder
     medication_administration_id?: SortOrderInput | SortOrder
     action?: SortOrder
@@ -41464,6 +43038,7 @@ export namespace Prisma {
     actor_role?: SortOrder
     changes?: SortOrder
     timestamp?: SortOrder
+    organization?: OrganizationOrderByWithRelationInput
     prescription?: PrescriptionOrderByWithRelationInput
     medication_administration?: MedicationAdministrationOrderByWithRelationInput
   }
@@ -41473,6 +43048,7 @@ export namespace Prisma {
     AND?: MedicationAuditWhereInput | MedicationAuditWhereInput[]
     OR?: MedicationAuditWhereInput[]
     NOT?: MedicationAuditWhereInput | MedicationAuditWhereInput[]
+    organization_id?: StringNullableFilter<"MedicationAudit"> | string | null
     prescription_id?: StringNullableFilter<"MedicationAudit"> | string | null
     medication_administration_id?: StringNullableFilter<"MedicationAudit"> | string | null
     action?: EnumMedicationAuditActionFilter<"MedicationAudit"> | $Enums.MedicationAuditAction
@@ -41480,12 +43056,14 @@ export namespace Prisma {
     actor_role?: StringFilter<"MedicationAudit"> | string
     changes?: StringFilter<"MedicationAudit"> | string
     timestamp?: DateTimeFilter<"MedicationAudit"> | Date | string
+    organization?: XOR<OrganizationNullableRelationFilter, OrganizationWhereInput> | null
     prescription?: XOR<PrescriptionNullableRelationFilter, PrescriptionWhereInput> | null
     medication_administration?: XOR<MedicationAdministrationNullableRelationFilter, MedicationAdministrationWhereInput> | null
   }, "id">
 
   export type MedicationAuditOrderByWithAggregationInput = {
     id?: SortOrder
+    organization_id?: SortOrderInput | SortOrder
     prescription_id?: SortOrderInput | SortOrder
     medication_administration_id?: SortOrderInput | SortOrder
     action?: SortOrder
@@ -41503,6 +43081,7 @@ export namespace Prisma {
     OR?: MedicationAuditScalarWhereWithAggregatesInput[]
     NOT?: MedicationAuditScalarWhereWithAggregatesInput | MedicationAuditScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"MedicationAudit"> | string
+    organization_id?: StringNullableWithAggregatesFilter<"MedicationAudit"> | string | null
     prescription_id?: StringNullableWithAggregatesFilter<"MedicationAudit"> | string | null
     medication_administration_id?: StringNullableWithAggregatesFilter<"MedicationAudit"> | string | null
     action?: EnumMedicationAuditActionWithAggregatesFilter<"MedicationAudit"> | $Enums.MedicationAuditAction
@@ -41522,6 +43101,7 @@ export namespace Prisma {
     created_at?: DateTimeFilter<"Organization"> | Date | string
     updated_at?: DateTimeFilter<"Organization"> | Date | string
     identities?: OrganizationIdentityListRelationFilter
+    memberships?: OrganizationMembershipListRelationFilter
     carers?: CarerListRelationFilter
     clients?: ClientListRelationFilter
     visits?: VisitListRelationFilter
@@ -41534,6 +43114,10 @@ export namespace Prisma {
     concerns?: ConcernListRelationFilter
     weekly_care_summaries?: WeeklyCareSummaryListRelationFilter
     family_pulses?: FamilyPulseListRelationFilter
+    consent_records?: ConsentRecordListRelationFilter
+    audit_logs?: AuditLogListRelationFilter
+    erasure_queue?: ErasureQueueListRelationFilter
+    medication_audits?: MedicationAuditListRelationFilter
   }
 
   export type OrganizationOrderByWithRelationInput = {
@@ -41543,6 +43127,7 @@ export namespace Prisma {
     created_at?: SortOrder
     updated_at?: SortOrder
     identities?: OrganizationIdentityOrderByRelationAggregateInput
+    memberships?: OrganizationMembershipOrderByRelationAggregateInput
     carers?: CarerOrderByRelationAggregateInput
     clients?: ClientOrderByRelationAggregateInput
     visits?: VisitOrderByRelationAggregateInput
@@ -41555,6 +43140,10 @@ export namespace Prisma {
     concerns?: ConcernOrderByRelationAggregateInput
     weekly_care_summaries?: WeeklyCareSummaryOrderByRelationAggregateInput
     family_pulses?: FamilyPulseOrderByRelationAggregateInput
+    consent_records?: ConsentRecordOrderByRelationAggregateInput
+    audit_logs?: AuditLogOrderByRelationAggregateInput
+    erasure_queue?: ErasureQueueOrderByRelationAggregateInput
+    medication_audits?: MedicationAuditOrderByRelationAggregateInput
   }
 
   export type OrganizationWhereUniqueInput = Prisma.AtLeast<{
@@ -41567,6 +43156,7 @@ export namespace Prisma {
     created_at?: DateTimeFilter<"Organization"> | Date | string
     updated_at?: DateTimeFilter<"Organization"> | Date | string
     identities?: OrganizationIdentityListRelationFilter
+    memberships?: OrganizationMembershipListRelationFilter
     carers?: CarerListRelationFilter
     clients?: ClientListRelationFilter
     visits?: VisitListRelationFilter
@@ -41579,6 +43169,10 @@ export namespace Prisma {
     concerns?: ConcernListRelationFilter
     weekly_care_summaries?: WeeklyCareSummaryListRelationFilter
     family_pulses?: FamilyPulseListRelationFilter
+    consent_records?: ConsentRecordListRelationFilter
+    audit_logs?: AuditLogListRelationFilter
+    erasure_queue?: ErasureQueueListRelationFilter
+    medication_audits?: MedicationAuditListRelationFilter
   }, "id">
 
   export type OrganizationOrderByWithAggregationInput = {
@@ -43214,6 +44808,102 @@ export namespace Prisma {
     updated_at?: DateTimeWithAggregatesFilter<"OrganizationIdentity"> | Date | string
   }
 
+  export type OrganizationMembershipWhereInput = {
+    AND?: OrganizationMembershipWhereInput | OrganizationMembershipWhereInput[]
+    OR?: OrganizationMembershipWhereInput[]
+    NOT?: OrganizationMembershipWhereInput | OrganizationMembershipWhereInput[]
+    id?: StringFilter<"OrganizationMembership"> | string
+    organization_id?: StringFilter<"OrganizationMembership"> | string
+    identity_provider?: StringFilter<"OrganizationMembership"> | string
+    auth_subject?: StringFilter<"OrganizationMembership"> | string
+    normalized_email?: StringNullableFilter<"OrganizationMembership"> | string | null
+    role?: StringFilter<"OrganizationMembership"> | string
+    status?: EnumOrganizationMembershipStatusFilter<"OrganizationMembership"> | $Enums.OrganizationMembershipStatus
+    external_organization_id?: StringNullableFilter<"OrganizationMembership"> | string | null
+    external_membership_id?: StringNullableFilter<"OrganizationMembership"> | string | null
+    metadata?: JsonNullableFilter<"OrganizationMembership">
+    revoked_at?: DateTimeNullableFilter<"OrganizationMembership"> | Date | string | null
+    created_at?: DateTimeFilter<"OrganizationMembership"> | Date | string
+    updated_at?: DateTimeFilter<"OrganizationMembership"> | Date | string
+    organization?: XOR<OrganizationRelationFilter, OrganizationWhereInput>
+  }
+
+  export type OrganizationMembershipOrderByWithRelationInput = {
+    id?: SortOrder
+    organization_id?: SortOrder
+    identity_provider?: SortOrder
+    auth_subject?: SortOrder
+    normalized_email?: SortOrderInput | SortOrder
+    role?: SortOrder
+    status?: SortOrder
+    external_organization_id?: SortOrderInput | SortOrder
+    external_membership_id?: SortOrderInput | SortOrder
+    metadata?: SortOrderInput | SortOrder
+    revoked_at?: SortOrderInput | SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    organization?: OrganizationOrderByWithRelationInput
+  }
+
+  export type OrganizationMembershipWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    identity_provider_auth_subject_organization_id?: OrganizationMembershipIdentity_providerAuth_subjectOrganization_idCompoundUniqueInput
+    AND?: OrganizationMembershipWhereInput | OrganizationMembershipWhereInput[]
+    OR?: OrganizationMembershipWhereInput[]
+    NOT?: OrganizationMembershipWhereInput | OrganizationMembershipWhereInput[]
+    organization_id?: StringFilter<"OrganizationMembership"> | string
+    identity_provider?: StringFilter<"OrganizationMembership"> | string
+    auth_subject?: StringFilter<"OrganizationMembership"> | string
+    normalized_email?: StringNullableFilter<"OrganizationMembership"> | string | null
+    role?: StringFilter<"OrganizationMembership"> | string
+    status?: EnumOrganizationMembershipStatusFilter<"OrganizationMembership"> | $Enums.OrganizationMembershipStatus
+    external_organization_id?: StringNullableFilter<"OrganizationMembership"> | string | null
+    external_membership_id?: StringNullableFilter<"OrganizationMembership"> | string | null
+    metadata?: JsonNullableFilter<"OrganizationMembership">
+    revoked_at?: DateTimeNullableFilter<"OrganizationMembership"> | Date | string | null
+    created_at?: DateTimeFilter<"OrganizationMembership"> | Date | string
+    updated_at?: DateTimeFilter<"OrganizationMembership"> | Date | string
+    organization?: XOR<OrganizationRelationFilter, OrganizationWhereInput>
+  }, "id" | "identity_provider_auth_subject_organization_id">
+
+  export type OrganizationMembershipOrderByWithAggregationInput = {
+    id?: SortOrder
+    organization_id?: SortOrder
+    identity_provider?: SortOrder
+    auth_subject?: SortOrder
+    normalized_email?: SortOrderInput | SortOrder
+    role?: SortOrder
+    status?: SortOrder
+    external_organization_id?: SortOrderInput | SortOrder
+    external_membership_id?: SortOrderInput | SortOrder
+    metadata?: SortOrderInput | SortOrder
+    revoked_at?: SortOrderInput | SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+    _count?: OrganizationMembershipCountOrderByAggregateInput
+    _max?: OrganizationMembershipMaxOrderByAggregateInput
+    _min?: OrganizationMembershipMinOrderByAggregateInput
+  }
+
+  export type OrganizationMembershipScalarWhereWithAggregatesInput = {
+    AND?: OrganizationMembershipScalarWhereWithAggregatesInput | OrganizationMembershipScalarWhereWithAggregatesInput[]
+    OR?: OrganizationMembershipScalarWhereWithAggregatesInput[]
+    NOT?: OrganizationMembershipScalarWhereWithAggregatesInput | OrganizationMembershipScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"OrganizationMembership"> | string
+    organization_id?: StringWithAggregatesFilter<"OrganizationMembership"> | string
+    identity_provider?: StringWithAggregatesFilter<"OrganizationMembership"> | string
+    auth_subject?: StringWithAggregatesFilter<"OrganizationMembership"> | string
+    normalized_email?: StringNullableWithAggregatesFilter<"OrganizationMembership"> | string | null
+    role?: StringWithAggregatesFilter<"OrganizationMembership"> | string
+    status?: EnumOrganizationMembershipStatusWithAggregatesFilter<"OrganizationMembership"> | $Enums.OrganizationMembershipStatus
+    external_organization_id?: StringNullableWithAggregatesFilter<"OrganizationMembership"> | string | null
+    external_membership_id?: StringNullableWithAggregatesFilter<"OrganizationMembership"> | string | null
+    metadata?: JsonNullableWithAggregatesFilter<"OrganizationMembership">
+    revoked_at?: DateTimeNullableWithAggregatesFilter<"OrganizationMembership"> | Date | string | null
+    created_at?: DateTimeWithAggregatesFilter<"OrganizationMembership"> | Date | string
+    updated_at?: DateTimeWithAggregatesFilter<"OrganizationMembership"> | Date | string
+  }
+
   export type CareLogWhereInput = {
     AND?: CareLogWhereInput | CareLogWhereInput[]
     OR?: CareLogWhereInput[]
@@ -43596,6 +45286,7 @@ export namespace Prisma {
     OR?: ConsentRecordWhereInput[]
     NOT?: ConsentRecordWhereInput | ConsentRecordWhereInput[]
     id?: StringFilter<"ConsentRecord"> | string
+    organization_id?: StringNullableFilter<"ConsentRecord"> | string | null
     user_id?: StringFilter<"ConsentRecord"> | string
     consent_type?: StringFilter<"ConsentRecord"> | string
     purpose?: StringFilter<"ConsentRecord"> | string
@@ -43606,10 +45297,12 @@ export namespace Prisma {
     metadata?: JsonNullableFilter<"ConsentRecord">
     created_at?: DateTimeFilter<"ConsentRecord"> | Date | string
     updated_at?: DateTimeFilter<"ConsentRecord"> | Date | string
+    organization?: XOR<OrganizationNullableRelationFilter, OrganizationWhereInput> | null
   }
 
   export type ConsentRecordOrderByWithRelationInput = {
     id?: SortOrder
+    organization_id?: SortOrderInput | SortOrder
     user_id?: SortOrder
     consent_type?: SortOrder
     purpose?: SortOrder
@@ -43620,6 +45313,7 @@ export namespace Prisma {
     metadata?: SortOrderInput | SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
+    organization?: OrganizationOrderByWithRelationInput
   }
 
   export type ConsentRecordWhereUniqueInput = Prisma.AtLeast<{
@@ -43627,6 +45321,7 @@ export namespace Prisma {
     AND?: ConsentRecordWhereInput | ConsentRecordWhereInput[]
     OR?: ConsentRecordWhereInput[]
     NOT?: ConsentRecordWhereInput | ConsentRecordWhereInput[]
+    organization_id?: StringNullableFilter<"ConsentRecord"> | string | null
     user_id?: StringFilter<"ConsentRecord"> | string
     consent_type?: StringFilter<"ConsentRecord"> | string
     purpose?: StringFilter<"ConsentRecord"> | string
@@ -43637,10 +45332,12 @@ export namespace Prisma {
     metadata?: JsonNullableFilter<"ConsentRecord">
     created_at?: DateTimeFilter<"ConsentRecord"> | Date | string
     updated_at?: DateTimeFilter<"ConsentRecord"> | Date | string
+    organization?: XOR<OrganizationNullableRelationFilter, OrganizationWhereInput> | null
   }, "id">
 
   export type ConsentRecordOrderByWithAggregationInput = {
     id?: SortOrder
+    organization_id?: SortOrderInput | SortOrder
     user_id?: SortOrder
     consent_type?: SortOrder
     purpose?: SortOrder
@@ -43661,6 +45358,7 @@ export namespace Prisma {
     OR?: ConsentRecordScalarWhereWithAggregatesInput[]
     NOT?: ConsentRecordScalarWhereWithAggregatesInput | ConsentRecordScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"ConsentRecord"> | string
+    organization_id?: StringNullableWithAggregatesFilter<"ConsentRecord"> | string | null
     user_id?: StringWithAggregatesFilter<"ConsentRecord"> | string
     consent_type?: StringWithAggregatesFilter<"ConsentRecord"> | string
     purpose?: StringWithAggregatesFilter<"ConsentRecord"> | string
@@ -43678,6 +45376,7 @@ export namespace Prisma {
     OR?: AuditLogWhereInput[]
     NOT?: AuditLogWhereInput | AuditLogWhereInput[]
     id?: StringFilter<"AuditLog"> | string
+    organization_id?: StringNullableFilter<"AuditLog"> | string | null
     user_id?: StringNullableFilter<"AuditLog"> | string | null
     action?: StringFilter<"AuditLog"> | string
     resource_type?: StringFilter<"AuditLog"> | string
@@ -43687,10 +45386,12 @@ export namespace Prisma {
     ip_address?: StringNullableFilter<"AuditLog"> | string | null
     user_agent?: StringNullableFilter<"AuditLog"> | string | null
     timestamp?: DateTimeFilter<"AuditLog"> | Date | string
+    organization?: XOR<OrganizationNullableRelationFilter, OrganizationWhereInput> | null
   }
 
   export type AuditLogOrderByWithRelationInput = {
     id?: SortOrder
+    organization_id?: SortOrderInput | SortOrder
     user_id?: SortOrderInput | SortOrder
     action?: SortOrder
     resource_type?: SortOrder
@@ -43700,6 +45401,7 @@ export namespace Prisma {
     ip_address?: SortOrderInput | SortOrder
     user_agent?: SortOrderInput | SortOrder
     timestamp?: SortOrder
+    organization?: OrganizationOrderByWithRelationInput
   }
 
   export type AuditLogWhereUniqueInput = Prisma.AtLeast<{
@@ -43707,6 +45409,7 @@ export namespace Prisma {
     AND?: AuditLogWhereInput | AuditLogWhereInput[]
     OR?: AuditLogWhereInput[]
     NOT?: AuditLogWhereInput | AuditLogWhereInput[]
+    organization_id?: StringNullableFilter<"AuditLog"> | string | null
     user_id?: StringNullableFilter<"AuditLog"> | string | null
     action?: StringFilter<"AuditLog"> | string
     resource_type?: StringFilter<"AuditLog"> | string
@@ -43716,10 +45419,12 @@ export namespace Prisma {
     ip_address?: StringNullableFilter<"AuditLog"> | string | null
     user_agent?: StringNullableFilter<"AuditLog"> | string | null
     timestamp?: DateTimeFilter<"AuditLog"> | Date | string
+    organization?: XOR<OrganizationNullableRelationFilter, OrganizationWhereInput> | null
   }, "id">
 
   export type AuditLogOrderByWithAggregationInput = {
     id?: SortOrder
+    organization_id?: SortOrderInput | SortOrder
     user_id?: SortOrderInput | SortOrder
     action?: SortOrder
     resource_type?: SortOrder
@@ -43739,6 +45444,7 @@ export namespace Prisma {
     OR?: AuditLogScalarWhereWithAggregatesInput[]
     NOT?: AuditLogScalarWhereWithAggregatesInput | AuditLogScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"AuditLog"> | string
+    organization_id?: StringNullableWithAggregatesFilter<"AuditLog"> | string | null
     user_id?: StringNullableWithAggregatesFilter<"AuditLog"> | string | null
     action?: StringWithAggregatesFilter<"AuditLog"> | string
     resource_type?: StringWithAggregatesFilter<"AuditLog"> | string
@@ -43824,6 +45530,7 @@ export namespace Prisma {
     OR?: ErasureQueueWhereInput[]
     NOT?: ErasureQueueWhereInput | ErasureQueueWhereInput[]
     id?: StringFilter<"ErasureQueue"> | string
+    organization_id?: StringNullableFilter<"ErasureQueue"> | string | null
     user_id?: StringFilter<"ErasureQueue"> | string
     request_type?: StringFilter<"ErasureQueue"> | string
     status?: StringFilter<"ErasureQueue"> | string
@@ -43833,10 +45540,12 @@ export namespace Prisma {
     metadata?: JsonNullableFilter<"ErasureQueue">
     created_at?: DateTimeFilter<"ErasureQueue"> | Date | string
     updated_at?: DateTimeFilter<"ErasureQueue"> | Date | string
+    organization?: XOR<OrganizationNullableRelationFilter, OrganizationWhereInput> | null
   }
 
   export type ErasureQueueOrderByWithRelationInput = {
     id?: SortOrder
+    organization_id?: SortOrderInput | SortOrder
     user_id?: SortOrder
     request_type?: SortOrder
     status?: SortOrder
@@ -43846,6 +45555,7 @@ export namespace Prisma {
     metadata?: SortOrderInput | SortOrder
     created_at?: SortOrder
     updated_at?: SortOrder
+    organization?: OrganizationOrderByWithRelationInput
   }
 
   export type ErasureQueueWhereUniqueInput = Prisma.AtLeast<{
@@ -43853,6 +45563,7 @@ export namespace Prisma {
     AND?: ErasureQueueWhereInput | ErasureQueueWhereInput[]
     OR?: ErasureQueueWhereInput[]
     NOT?: ErasureQueueWhereInput | ErasureQueueWhereInput[]
+    organization_id?: StringNullableFilter<"ErasureQueue"> | string | null
     user_id?: StringFilter<"ErasureQueue"> | string
     request_type?: StringFilter<"ErasureQueue"> | string
     status?: StringFilter<"ErasureQueue"> | string
@@ -43862,10 +45573,12 @@ export namespace Prisma {
     metadata?: JsonNullableFilter<"ErasureQueue">
     created_at?: DateTimeFilter<"ErasureQueue"> | Date | string
     updated_at?: DateTimeFilter<"ErasureQueue"> | Date | string
+    organization?: XOR<OrganizationNullableRelationFilter, OrganizationWhereInput> | null
   }, "id">
 
   export type ErasureQueueOrderByWithAggregationInput = {
     id?: SortOrder
+    organization_id?: SortOrderInput | SortOrder
     user_id?: SortOrder
     request_type?: SortOrder
     status?: SortOrder
@@ -43885,6 +45598,7 @@ export namespace Prisma {
     OR?: ErasureQueueScalarWhereWithAggregatesInput[]
     NOT?: ErasureQueueScalarWhereWithAggregatesInput | ErasureQueueScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"ErasureQueue"> | string
+    organization_id?: StringNullableWithAggregatesFilter<"ErasureQueue"> | string | null
     user_id?: StringWithAggregatesFilter<"ErasureQueue"> | string
     request_type?: StringWithAggregatesFilter<"ErasureQueue"> | string
     status?: StringWithAggregatesFilter<"ErasureQueue"> | string
@@ -44856,12 +46570,14 @@ export namespace Prisma {
     actor_role: string
     changes: string
     timestamp?: Date | string
+    organization?: OrganizationCreateNestedOneWithoutMedication_auditsInput
     prescription?: PrescriptionCreateNestedOneWithoutAuditsInput
     medication_administration?: MedicationAdministrationCreateNestedOneWithoutAuditsInput
   }
 
   export type MedicationAuditUncheckedCreateInput = {
     id?: string
+    organization_id?: string | null
     prescription_id?: string | null
     medication_administration_id?: string | null
     action: $Enums.MedicationAuditAction
@@ -44878,12 +46594,14 @@ export namespace Prisma {
     actor_role?: StringFieldUpdateOperationsInput | string
     changes?: StringFieldUpdateOperationsInput | string
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    organization?: OrganizationUpdateOneWithoutMedication_auditsNestedInput
     prescription?: PrescriptionUpdateOneWithoutAuditsNestedInput
     medication_administration?: MedicationAdministrationUpdateOneWithoutAuditsNestedInput
   }
 
   export type MedicationAuditUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     prescription_id?: NullableStringFieldUpdateOperationsInput | string | null
     medication_administration_id?: NullableStringFieldUpdateOperationsInput | string | null
     action?: EnumMedicationAuditActionFieldUpdateOperationsInput | $Enums.MedicationAuditAction
@@ -44895,6 +46613,7 @@ export namespace Prisma {
 
   export type MedicationAuditCreateManyInput = {
     id?: string
+    organization_id?: string | null
     prescription_id?: string | null
     medication_administration_id?: string | null
     action: $Enums.MedicationAuditAction
@@ -44915,6 +46634,7 @@ export namespace Prisma {
 
   export type MedicationAuditUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     prescription_id?: NullableStringFieldUpdateOperationsInput | string | null
     medication_administration_id?: NullableStringFieldUpdateOperationsInput | string | null
     action?: EnumMedicationAuditActionFieldUpdateOperationsInput | $Enums.MedicationAuditAction
@@ -44931,6 +46651,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
     carers?: CarerCreateNestedManyWithoutOrganizationInput
     clients?: ClientCreateNestedManyWithoutOrganizationInput
     visits?: VisitCreateNestedManyWithoutOrganizationInput
@@ -44943,6 +46664,10 @@ export namespace Prisma {
     concerns?: ConcernCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateInput = {
@@ -44952,6 +46677,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
     carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
     clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
     visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
@@ -44964,6 +46690,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUpdateInput = {
@@ -44973,6 +46703,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUpdateManyWithoutOrganizationNestedInput
@@ -44985,6 +46716,10 @@ export namespace Prisma {
     concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateInput = {
@@ -44994,6 +46729,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
@@ -45006,6 +46742,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationCreateManyInput = {
@@ -46849,6 +48589,117 @@ export namespace Prisma {
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type OrganizationMembershipCreateInput = {
+    id?: string
+    identity_provider: string
+    auth_subject: string
+    normalized_email?: string | null
+    role: string
+    status?: $Enums.OrganizationMembershipStatus
+    external_organization_id?: string | null
+    external_membership_id?: string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    revoked_at?: Date | string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+    organization: OrganizationCreateNestedOneWithoutMembershipsInput
+  }
+
+  export type OrganizationMembershipUncheckedCreateInput = {
+    id?: string
+    organization_id: string
+    identity_provider: string
+    auth_subject: string
+    normalized_email?: string | null
+    role: string
+    status?: $Enums.OrganizationMembershipStatus
+    external_organization_id?: string | null
+    external_membership_id?: string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    revoked_at?: Date | string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type OrganizationMembershipUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    identity_provider?: StringFieldUpdateOperationsInput | string
+    auth_subject?: StringFieldUpdateOperationsInput | string
+    normalized_email?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
+    status?: EnumOrganizationMembershipStatusFieldUpdateOperationsInput | $Enums.OrganizationMembershipStatus
+    external_organization_id?: NullableStringFieldUpdateOperationsInput | string | null
+    external_membership_id?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    revoked_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    organization?: OrganizationUpdateOneRequiredWithoutMembershipsNestedInput
+  }
+
+  export type OrganizationMembershipUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    organization_id?: StringFieldUpdateOperationsInput | string
+    identity_provider?: StringFieldUpdateOperationsInput | string
+    auth_subject?: StringFieldUpdateOperationsInput | string
+    normalized_email?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
+    status?: EnumOrganizationMembershipStatusFieldUpdateOperationsInput | $Enums.OrganizationMembershipStatus
+    external_organization_id?: NullableStringFieldUpdateOperationsInput | string | null
+    external_membership_id?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    revoked_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type OrganizationMembershipCreateManyInput = {
+    id?: string
+    organization_id: string
+    identity_provider: string
+    auth_subject: string
+    normalized_email?: string | null
+    role: string
+    status?: $Enums.OrganizationMembershipStatus
+    external_organization_id?: string | null
+    external_membership_id?: string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    revoked_at?: Date | string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type OrganizationMembershipUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    identity_provider?: StringFieldUpdateOperationsInput | string
+    auth_subject?: StringFieldUpdateOperationsInput | string
+    normalized_email?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
+    status?: EnumOrganizationMembershipStatusFieldUpdateOperationsInput | $Enums.OrganizationMembershipStatus
+    external_organization_id?: NullableStringFieldUpdateOperationsInput | string | null
+    external_membership_id?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    revoked_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type OrganizationMembershipUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    organization_id?: StringFieldUpdateOperationsInput | string
+    identity_provider?: StringFieldUpdateOperationsInput | string
+    auth_subject?: StringFieldUpdateOperationsInput | string
+    normalized_email?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
+    status?: EnumOrganizationMembershipStatusFieldUpdateOperationsInput | $Enums.OrganizationMembershipStatus
+    external_organization_id?: NullableStringFieldUpdateOperationsInput | string | null
+    external_membership_id?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    revoked_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type CareLogCreateInput = {
     id?: string
     occurred_at: Date | string
@@ -47294,10 +49145,12 @@ export namespace Prisma {
     metadata?: NullableJsonNullValueInput | InputJsonValue
     created_at?: Date | string
     updated_at?: Date | string
+    organization?: OrganizationCreateNestedOneWithoutConsent_recordsInput
   }
 
   export type ConsentRecordUncheckedCreateInput = {
     id?: string
+    organization_id?: string | null
     user_id: string
     consent_type: string
     purpose: string
@@ -47322,10 +49175,12 @@ export namespace Prisma {
     metadata?: NullableJsonNullValueInput | InputJsonValue
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    organization?: OrganizationUpdateOneWithoutConsent_recordsNestedInput
   }
 
   export type ConsentRecordUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     user_id?: StringFieldUpdateOperationsInput | string
     consent_type?: StringFieldUpdateOperationsInput | string
     purpose?: StringFieldUpdateOperationsInput | string
@@ -47340,6 +49195,7 @@ export namespace Prisma {
 
   export type ConsentRecordCreateManyInput = {
     id?: string
+    organization_id?: string | null
     user_id: string
     consent_type: string
     purpose: string
@@ -47368,6 +49224,7 @@ export namespace Prisma {
 
   export type ConsentRecordUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     user_id?: StringFieldUpdateOperationsInput | string
     consent_type?: StringFieldUpdateOperationsInput | string
     purpose?: StringFieldUpdateOperationsInput | string
@@ -47391,10 +49248,12 @@ export namespace Prisma {
     ip_address?: string | null
     user_agent?: string | null
     timestamp?: Date | string
+    organization?: OrganizationCreateNestedOneWithoutAudit_logsInput
   }
 
   export type AuditLogUncheckedCreateInput = {
     id?: string
+    organization_id?: string | null
     user_id?: string | null
     action: string
     resource_type: string
@@ -47417,10 +49276,12 @@ export namespace Prisma {
     ip_address?: NullableStringFieldUpdateOperationsInput | string | null
     user_agent?: NullableStringFieldUpdateOperationsInput | string | null
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    organization?: OrganizationUpdateOneWithoutAudit_logsNestedInput
   }
 
   export type AuditLogUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     user_id?: NullableStringFieldUpdateOperationsInput | string | null
     action?: StringFieldUpdateOperationsInput | string
     resource_type?: StringFieldUpdateOperationsInput | string
@@ -47434,6 +49295,7 @@ export namespace Prisma {
 
   export type AuditLogCreateManyInput = {
     id?: string
+    organization_id?: string | null
     user_id?: string | null
     action: string
     resource_type: string
@@ -47460,6 +49322,7 @@ export namespace Prisma {
 
   export type AuditLogUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     user_id?: NullableStringFieldUpdateOperationsInput | string | null
     action?: StringFieldUpdateOperationsInput | string
     resource_type?: StringFieldUpdateOperationsInput | string
@@ -47559,10 +49422,12 @@ export namespace Prisma {
     metadata?: NullableJsonNullValueInput | InputJsonValue
     created_at?: Date | string
     updated_at?: Date | string
+    organization?: OrganizationCreateNestedOneWithoutErasure_queueInput
   }
 
   export type ErasureQueueUncheckedCreateInput = {
     id?: string
+    organization_id?: string | null
     user_id: string
     request_type: string
     status?: string
@@ -47585,10 +49450,12 @@ export namespace Prisma {
     metadata?: NullableJsonNullValueInput | InputJsonValue
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    organization?: OrganizationUpdateOneWithoutErasure_queueNestedInput
   }
 
   export type ErasureQueueUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     user_id?: StringFieldUpdateOperationsInput | string
     request_type?: StringFieldUpdateOperationsInput | string
     status?: StringFieldUpdateOperationsInput | string
@@ -47602,6 +49469,7 @@ export namespace Prisma {
 
   export type ErasureQueueCreateManyInput = {
     id?: string
+    organization_id?: string | null
     user_id: string
     request_type: string
     status?: string
@@ -47628,6 +49496,7 @@ export namespace Prisma {
 
   export type ErasureQueueUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     user_id?: StringFieldUpdateOperationsInput | string
     request_type?: StringFieldUpdateOperationsInput | string
     status?: StringFieldUpdateOperationsInput | string
@@ -48549,6 +50418,7 @@ export namespace Prisma {
 
   export type MedicationAuditCountOrderByAggregateInput = {
     id?: SortOrder
+    organization_id?: SortOrder
     prescription_id?: SortOrder
     medication_administration_id?: SortOrder
     action?: SortOrder
@@ -48560,6 +50430,7 @@ export namespace Prisma {
 
   export type MedicationAuditMaxOrderByAggregateInput = {
     id?: SortOrder
+    organization_id?: SortOrder
     prescription_id?: SortOrder
     medication_administration_id?: SortOrder
     action?: SortOrder
@@ -48571,6 +50442,7 @@ export namespace Prisma {
 
   export type MedicationAuditMinOrderByAggregateInput = {
     id?: SortOrder
+    organization_id?: SortOrder
     prescription_id?: SortOrder
     medication_administration_id?: SortOrder
     action?: SortOrder
@@ -48594,6 +50466,12 @@ export namespace Prisma {
     every?: OrganizationIdentityWhereInput
     some?: OrganizationIdentityWhereInput
     none?: OrganizationIdentityWhereInput
+  }
+
+  export type OrganizationMembershipListRelationFilter = {
+    every?: OrganizationMembershipWhereInput
+    some?: OrganizationMembershipWhereInput
+    none?: OrganizationMembershipWhereInput
   }
 
   export type CarerListRelationFilter = {
@@ -48620,7 +50498,29 @@ export namespace Prisma {
     none?: FamilyPulseWhereInput
   }
 
+  export type ConsentRecordListRelationFilter = {
+    every?: ConsentRecordWhereInput
+    some?: ConsentRecordWhereInput
+    none?: ConsentRecordWhereInput
+  }
+
+  export type AuditLogListRelationFilter = {
+    every?: AuditLogWhereInput
+    some?: AuditLogWhereInput
+    none?: AuditLogWhereInput
+  }
+
+  export type ErasureQueueListRelationFilter = {
+    every?: ErasureQueueWhereInput
+    some?: ErasureQueueWhereInput
+    none?: ErasureQueueWhereInput
+  }
+
   export type OrganizationIdentityOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type OrganizationMembershipOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -48637,6 +50537,18 @@ export namespace Prisma {
   }
 
   export type FamilyPulseOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type ConsentRecordOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type AuditLogOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type ErasureQueueOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -49943,6 +51855,75 @@ export namespace Prisma {
     updated_at?: SortOrder
   }
 
+  export type EnumOrganizationMembershipStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.OrganizationMembershipStatus | EnumOrganizationMembershipStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.OrganizationMembershipStatus[] | ListEnumOrganizationMembershipStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.OrganizationMembershipStatus[] | ListEnumOrganizationMembershipStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumOrganizationMembershipStatusFilter<$PrismaModel> | $Enums.OrganizationMembershipStatus
+  }
+
+  export type OrganizationMembershipIdentity_providerAuth_subjectOrganization_idCompoundUniqueInput = {
+    identity_provider: string
+    auth_subject: string
+    organization_id: string
+  }
+
+  export type OrganizationMembershipCountOrderByAggregateInput = {
+    id?: SortOrder
+    organization_id?: SortOrder
+    identity_provider?: SortOrder
+    auth_subject?: SortOrder
+    normalized_email?: SortOrder
+    role?: SortOrder
+    status?: SortOrder
+    external_organization_id?: SortOrder
+    external_membership_id?: SortOrder
+    metadata?: SortOrder
+    revoked_at?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type OrganizationMembershipMaxOrderByAggregateInput = {
+    id?: SortOrder
+    organization_id?: SortOrder
+    identity_provider?: SortOrder
+    auth_subject?: SortOrder
+    normalized_email?: SortOrder
+    role?: SortOrder
+    status?: SortOrder
+    external_organization_id?: SortOrder
+    external_membership_id?: SortOrder
+    revoked_at?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type OrganizationMembershipMinOrderByAggregateInput = {
+    id?: SortOrder
+    organization_id?: SortOrder
+    identity_provider?: SortOrder
+    auth_subject?: SortOrder
+    normalized_email?: SortOrder
+    role?: SortOrder
+    status?: SortOrder
+    external_organization_id?: SortOrder
+    external_membership_id?: SortOrder
+    revoked_at?: SortOrder
+    created_at?: SortOrder
+    updated_at?: SortOrder
+  }
+
+  export type EnumOrganizationMembershipStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.OrganizationMembershipStatus | EnumOrganizationMembershipStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.OrganizationMembershipStatus[] | ListEnumOrganizationMembershipStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.OrganizationMembershipStatus[] | ListEnumOrganizationMembershipStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumOrganizationMembershipStatusWithAggregatesFilter<$PrismaModel> | $Enums.OrganizationMembershipStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumOrganizationMembershipStatusFilter<$PrismaModel>
+    _max?: NestedEnumOrganizationMembershipStatusFilter<$PrismaModel>
+  }
+
   export type EnumCareLogCategoryFilter<$PrismaModel = never> = {
     equals?: $Enums.CareLogCategory | EnumCareLogCategoryFieldRefInput<$PrismaModel>
     in?: $Enums.CareLogCategory[] | ListEnumCareLogCategoryFieldRefInput<$PrismaModel>
@@ -50224,6 +52205,7 @@ export namespace Prisma {
 
   export type ConsentRecordCountOrderByAggregateInput = {
     id?: SortOrder
+    organization_id?: SortOrder
     user_id?: SortOrder
     consent_type?: SortOrder
     purpose?: SortOrder
@@ -50238,6 +52220,7 @@ export namespace Prisma {
 
   export type ConsentRecordMaxOrderByAggregateInput = {
     id?: SortOrder
+    organization_id?: SortOrder
     user_id?: SortOrder
     consent_type?: SortOrder
     purpose?: SortOrder
@@ -50251,6 +52234,7 @@ export namespace Prisma {
 
   export type ConsentRecordMinOrderByAggregateInput = {
     id?: SortOrder
+    organization_id?: SortOrder
     user_id?: SortOrder
     consent_type?: SortOrder
     purpose?: SortOrder
@@ -50264,6 +52248,7 @@ export namespace Prisma {
 
   export type AuditLogCountOrderByAggregateInput = {
     id?: SortOrder
+    organization_id?: SortOrder
     user_id?: SortOrder
     action?: SortOrder
     resource_type?: SortOrder
@@ -50277,6 +52262,7 @@ export namespace Prisma {
 
   export type AuditLogMaxOrderByAggregateInput = {
     id?: SortOrder
+    organization_id?: SortOrder
     user_id?: SortOrder
     action?: SortOrder
     resource_type?: SortOrder
@@ -50288,6 +52274,7 @@ export namespace Prisma {
 
   export type AuditLogMinOrderByAggregateInput = {
     id?: SortOrder
+    organization_id?: SortOrder
     user_id?: SortOrder
     action?: SortOrder
     resource_type?: SortOrder
@@ -50340,6 +52327,7 @@ export namespace Prisma {
 
   export type ErasureQueueCountOrderByAggregateInput = {
     id?: SortOrder
+    organization_id?: SortOrder
     user_id?: SortOrder
     request_type?: SortOrder
     status?: SortOrder
@@ -50353,6 +52341,7 @@ export namespace Prisma {
 
   export type ErasureQueueMaxOrderByAggregateInput = {
     id?: SortOrder
+    organization_id?: SortOrder
     user_id?: SortOrder
     request_type?: SortOrder
     status?: SortOrder
@@ -50365,6 +52354,7 @@ export namespace Prisma {
 
   export type ErasureQueueMinOrderByAggregateInput = {
     id?: SortOrder
+    organization_id?: SortOrder
     user_id?: SortOrder
     request_type?: SortOrder
     status?: SortOrder
@@ -51714,6 +53704,12 @@ export namespace Prisma {
     deleteMany?: MedicationAuditScalarWhereInput | MedicationAuditScalarWhereInput[]
   }
 
+  export type OrganizationCreateNestedOneWithoutMedication_auditsInput = {
+    create?: XOR<OrganizationCreateWithoutMedication_auditsInput, OrganizationUncheckedCreateWithoutMedication_auditsInput>
+    connectOrCreate?: OrganizationCreateOrConnectWithoutMedication_auditsInput
+    connect?: OrganizationWhereUniqueInput
+  }
+
   export type PrescriptionCreateNestedOneWithoutAuditsInput = {
     create?: XOR<PrescriptionCreateWithoutAuditsInput, PrescriptionUncheckedCreateWithoutAuditsInput>
     connectOrCreate?: PrescriptionCreateOrConnectWithoutAuditsInput
@@ -51728,6 +53724,16 @@ export namespace Prisma {
 
   export type EnumMedicationAuditActionFieldUpdateOperationsInput = {
     set?: $Enums.MedicationAuditAction
+  }
+
+  export type OrganizationUpdateOneWithoutMedication_auditsNestedInput = {
+    create?: XOR<OrganizationCreateWithoutMedication_auditsInput, OrganizationUncheckedCreateWithoutMedication_auditsInput>
+    connectOrCreate?: OrganizationCreateOrConnectWithoutMedication_auditsInput
+    upsert?: OrganizationUpsertWithoutMedication_auditsInput
+    disconnect?: OrganizationWhereInput | boolean
+    delete?: OrganizationWhereInput | boolean
+    connect?: OrganizationWhereUniqueInput
+    update?: XOR<XOR<OrganizationUpdateToOneWithWhereWithoutMedication_auditsInput, OrganizationUpdateWithoutMedication_auditsInput>, OrganizationUncheckedUpdateWithoutMedication_auditsInput>
   }
 
   export type PrescriptionUpdateOneWithoutAuditsNestedInput = {
@@ -51755,6 +53761,13 @@ export namespace Prisma {
     connectOrCreate?: OrganizationIdentityCreateOrConnectWithoutOrganizationInput | OrganizationIdentityCreateOrConnectWithoutOrganizationInput[]
     createMany?: OrganizationIdentityCreateManyOrganizationInputEnvelope
     connect?: OrganizationIdentityWhereUniqueInput | OrganizationIdentityWhereUniqueInput[]
+  }
+
+  export type OrganizationMembershipCreateNestedManyWithoutOrganizationInput = {
+    create?: XOR<OrganizationMembershipCreateWithoutOrganizationInput, OrganizationMembershipUncheckedCreateWithoutOrganizationInput> | OrganizationMembershipCreateWithoutOrganizationInput[] | OrganizationMembershipUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: OrganizationMembershipCreateOrConnectWithoutOrganizationInput | OrganizationMembershipCreateOrConnectWithoutOrganizationInput[]
+    createMany?: OrganizationMembershipCreateManyOrganizationInputEnvelope
+    connect?: OrganizationMembershipWhereUniqueInput | OrganizationMembershipWhereUniqueInput[]
   }
 
   export type CarerCreateNestedManyWithoutOrganizationInput = {
@@ -51841,11 +53854,46 @@ export namespace Prisma {
     connect?: FamilyPulseWhereUniqueInput | FamilyPulseWhereUniqueInput[]
   }
 
+  export type ConsentRecordCreateNestedManyWithoutOrganizationInput = {
+    create?: XOR<ConsentRecordCreateWithoutOrganizationInput, ConsentRecordUncheckedCreateWithoutOrganizationInput> | ConsentRecordCreateWithoutOrganizationInput[] | ConsentRecordUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ConsentRecordCreateOrConnectWithoutOrganizationInput | ConsentRecordCreateOrConnectWithoutOrganizationInput[]
+    createMany?: ConsentRecordCreateManyOrganizationInputEnvelope
+    connect?: ConsentRecordWhereUniqueInput | ConsentRecordWhereUniqueInput[]
+  }
+
+  export type AuditLogCreateNestedManyWithoutOrganizationInput = {
+    create?: XOR<AuditLogCreateWithoutOrganizationInput, AuditLogUncheckedCreateWithoutOrganizationInput> | AuditLogCreateWithoutOrganizationInput[] | AuditLogUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: AuditLogCreateOrConnectWithoutOrganizationInput | AuditLogCreateOrConnectWithoutOrganizationInput[]
+    createMany?: AuditLogCreateManyOrganizationInputEnvelope
+    connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+  }
+
+  export type ErasureQueueCreateNestedManyWithoutOrganizationInput = {
+    create?: XOR<ErasureQueueCreateWithoutOrganizationInput, ErasureQueueUncheckedCreateWithoutOrganizationInput> | ErasureQueueCreateWithoutOrganizationInput[] | ErasureQueueUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ErasureQueueCreateOrConnectWithoutOrganizationInput | ErasureQueueCreateOrConnectWithoutOrganizationInput[]
+    createMany?: ErasureQueueCreateManyOrganizationInputEnvelope
+    connect?: ErasureQueueWhereUniqueInput | ErasureQueueWhereUniqueInput[]
+  }
+
+  export type MedicationAuditCreateNestedManyWithoutOrganizationInput = {
+    create?: XOR<MedicationAuditCreateWithoutOrganizationInput, MedicationAuditUncheckedCreateWithoutOrganizationInput> | MedicationAuditCreateWithoutOrganizationInput[] | MedicationAuditUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: MedicationAuditCreateOrConnectWithoutOrganizationInput | MedicationAuditCreateOrConnectWithoutOrganizationInput[]
+    createMany?: MedicationAuditCreateManyOrganizationInputEnvelope
+    connect?: MedicationAuditWhereUniqueInput | MedicationAuditWhereUniqueInput[]
+  }
+
   export type OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput = {
     create?: XOR<OrganizationIdentityCreateWithoutOrganizationInput, OrganizationIdentityUncheckedCreateWithoutOrganizationInput> | OrganizationIdentityCreateWithoutOrganizationInput[] | OrganizationIdentityUncheckedCreateWithoutOrganizationInput[]
     connectOrCreate?: OrganizationIdentityCreateOrConnectWithoutOrganizationInput | OrganizationIdentityCreateOrConnectWithoutOrganizationInput[]
     createMany?: OrganizationIdentityCreateManyOrganizationInputEnvelope
     connect?: OrganizationIdentityWhereUniqueInput | OrganizationIdentityWhereUniqueInput[]
+  }
+
+  export type OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput = {
+    create?: XOR<OrganizationMembershipCreateWithoutOrganizationInput, OrganizationMembershipUncheckedCreateWithoutOrganizationInput> | OrganizationMembershipCreateWithoutOrganizationInput[] | OrganizationMembershipUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: OrganizationMembershipCreateOrConnectWithoutOrganizationInput | OrganizationMembershipCreateOrConnectWithoutOrganizationInput[]
+    createMany?: OrganizationMembershipCreateManyOrganizationInputEnvelope
+    connect?: OrganizationMembershipWhereUniqueInput | OrganizationMembershipWhereUniqueInput[]
   }
 
   export type CarerUncheckedCreateNestedManyWithoutOrganizationInput = {
@@ -51932,6 +53980,34 @@ export namespace Prisma {
     connect?: FamilyPulseWhereUniqueInput | FamilyPulseWhereUniqueInput[]
   }
 
+  export type ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput = {
+    create?: XOR<ConsentRecordCreateWithoutOrganizationInput, ConsentRecordUncheckedCreateWithoutOrganizationInput> | ConsentRecordCreateWithoutOrganizationInput[] | ConsentRecordUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ConsentRecordCreateOrConnectWithoutOrganizationInput | ConsentRecordCreateOrConnectWithoutOrganizationInput[]
+    createMany?: ConsentRecordCreateManyOrganizationInputEnvelope
+    connect?: ConsentRecordWhereUniqueInput | ConsentRecordWhereUniqueInput[]
+  }
+
+  export type AuditLogUncheckedCreateNestedManyWithoutOrganizationInput = {
+    create?: XOR<AuditLogCreateWithoutOrganizationInput, AuditLogUncheckedCreateWithoutOrganizationInput> | AuditLogCreateWithoutOrganizationInput[] | AuditLogUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: AuditLogCreateOrConnectWithoutOrganizationInput | AuditLogCreateOrConnectWithoutOrganizationInput[]
+    createMany?: AuditLogCreateManyOrganizationInputEnvelope
+    connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+  }
+
+  export type ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput = {
+    create?: XOR<ErasureQueueCreateWithoutOrganizationInput, ErasureQueueUncheckedCreateWithoutOrganizationInput> | ErasureQueueCreateWithoutOrganizationInput[] | ErasureQueueUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ErasureQueueCreateOrConnectWithoutOrganizationInput | ErasureQueueCreateOrConnectWithoutOrganizationInput[]
+    createMany?: ErasureQueueCreateManyOrganizationInputEnvelope
+    connect?: ErasureQueueWhereUniqueInput | ErasureQueueWhereUniqueInput[]
+  }
+
+  export type MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput = {
+    create?: XOR<MedicationAuditCreateWithoutOrganizationInput, MedicationAuditUncheckedCreateWithoutOrganizationInput> | MedicationAuditCreateWithoutOrganizationInput[] | MedicationAuditUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: MedicationAuditCreateOrConnectWithoutOrganizationInput | MedicationAuditCreateOrConnectWithoutOrganizationInput[]
+    createMany?: MedicationAuditCreateManyOrganizationInputEnvelope
+    connect?: MedicationAuditWhereUniqueInput | MedicationAuditWhereUniqueInput[]
+  }
+
   export type OrganizationIdentityUpdateManyWithoutOrganizationNestedInput = {
     create?: XOR<OrganizationIdentityCreateWithoutOrganizationInput, OrganizationIdentityUncheckedCreateWithoutOrganizationInput> | OrganizationIdentityCreateWithoutOrganizationInput[] | OrganizationIdentityUncheckedCreateWithoutOrganizationInput[]
     connectOrCreate?: OrganizationIdentityCreateOrConnectWithoutOrganizationInput | OrganizationIdentityCreateOrConnectWithoutOrganizationInput[]
@@ -51944,6 +54020,20 @@ export namespace Prisma {
     update?: OrganizationIdentityUpdateWithWhereUniqueWithoutOrganizationInput | OrganizationIdentityUpdateWithWhereUniqueWithoutOrganizationInput[]
     updateMany?: OrganizationIdentityUpdateManyWithWhereWithoutOrganizationInput | OrganizationIdentityUpdateManyWithWhereWithoutOrganizationInput[]
     deleteMany?: OrganizationIdentityScalarWhereInput | OrganizationIdentityScalarWhereInput[]
+  }
+
+  export type OrganizationMembershipUpdateManyWithoutOrganizationNestedInput = {
+    create?: XOR<OrganizationMembershipCreateWithoutOrganizationInput, OrganizationMembershipUncheckedCreateWithoutOrganizationInput> | OrganizationMembershipCreateWithoutOrganizationInput[] | OrganizationMembershipUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: OrganizationMembershipCreateOrConnectWithoutOrganizationInput | OrganizationMembershipCreateOrConnectWithoutOrganizationInput[]
+    upsert?: OrganizationMembershipUpsertWithWhereUniqueWithoutOrganizationInput | OrganizationMembershipUpsertWithWhereUniqueWithoutOrganizationInput[]
+    createMany?: OrganizationMembershipCreateManyOrganizationInputEnvelope
+    set?: OrganizationMembershipWhereUniqueInput | OrganizationMembershipWhereUniqueInput[]
+    disconnect?: OrganizationMembershipWhereUniqueInput | OrganizationMembershipWhereUniqueInput[]
+    delete?: OrganizationMembershipWhereUniqueInput | OrganizationMembershipWhereUniqueInput[]
+    connect?: OrganizationMembershipWhereUniqueInput | OrganizationMembershipWhereUniqueInput[]
+    update?: OrganizationMembershipUpdateWithWhereUniqueWithoutOrganizationInput | OrganizationMembershipUpdateWithWhereUniqueWithoutOrganizationInput[]
+    updateMany?: OrganizationMembershipUpdateManyWithWhereWithoutOrganizationInput | OrganizationMembershipUpdateManyWithWhereWithoutOrganizationInput[]
+    deleteMany?: OrganizationMembershipScalarWhereInput | OrganizationMembershipScalarWhereInput[]
   }
 
   export type CarerUpdateManyWithoutOrganizationNestedInput = {
@@ -52114,6 +54204,62 @@ export namespace Prisma {
     deleteMany?: FamilyPulseScalarWhereInput | FamilyPulseScalarWhereInput[]
   }
 
+  export type ConsentRecordUpdateManyWithoutOrganizationNestedInput = {
+    create?: XOR<ConsentRecordCreateWithoutOrganizationInput, ConsentRecordUncheckedCreateWithoutOrganizationInput> | ConsentRecordCreateWithoutOrganizationInput[] | ConsentRecordUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ConsentRecordCreateOrConnectWithoutOrganizationInput | ConsentRecordCreateOrConnectWithoutOrganizationInput[]
+    upsert?: ConsentRecordUpsertWithWhereUniqueWithoutOrganizationInput | ConsentRecordUpsertWithWhereUniqueWithoutOrganizationInput[]
+    createMany?: ConsentRecordCreateManyOrganizationInputEnvelope
+    set?: ConsentRecordWhereUniqueInput | ConsentRecordWhereUniqueInput[]
+    disconnect?: ConsentRecordWhereUniqueInput | ConsentRecordWhereUniqueInput[]
+    delete?: ConsentRecordWhereUniqueInput | ConsentRecordWhereUniqueInput[]
+    connect?: ConsentRecordWhereUniqueInput | ConsentRecordWhereUniqueInput[]
+    update?: ConsentRecordUpdateWithWhereUniqueWithoutOrganizationInput | ConsentRecordUpdateWithWhereUniqueWithoutOrganizationInput[]
+    updateMany?: ConsentRecordUpdateManyWithWhereWithoutOrganizationInput | ConsentRecordUpdateManyWithWhereWithoutOrganizationInput[]
+    deleteMany?: ConsentRecordScalarWhereInput | ConsentRecordScalarWhereInput[]
+  }
+
+  export type AuditLogUpdateManyWithoutOrganizationNestedInput = {
+    create?: XOR<AuditLogCreateWithoutOrganizationInput, AuditLogUncheckedCreateWithoutOrganizationInput> | AuditLogCreateWithoutOrganizationInput[] | AuditLogUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: AuditLogCreateOrConnectWithoutOrganizationInput | AuditLogCreateOrConnectWithoutOrganizationInput[]
+    upsert?: AuditLogUpsertWithWhereUniqueWithoutOrganizationInput | AuditLogUpsertWithWhereUniqueWithoutOrganizationInput[]
+    createMany?: AuditLogCreateManyOrganizationInputEnvelope
+    set?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    disconnect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    delete?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    update?: AuditLogUpdateWithWhereUniqueWithoutOrganizationInput | AuditLogUpdateWithWhereUniqueWithoutOrganizationInput[]
+    updateMany?: AuditLogUpdateManyWithWhereWithoutOrganizationInput | AuditLogUpdateManyWithWhereWithoutOrganizationInput[]
+    deleteMany?: AuditLogScalarWhereInput | AuditLogScalarWhereInput[]
+  }
+
+  export type ErasureQueueUpdateManyWithoutOrganizationNestedInput = {
+    create?: XOR<ErasureQueueCreateWithoutOrganizationInput, ErasureQueueUncheckedCreateWithoutOrganizationInput> | ErasureQueueCreateWithoutOrganizationInput[] | ErasureQueueUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ErasureQueueCreateOrConnectWithoutOrganizationInput | ErasureQueueCreateOrConnectWithoutOrganizationInput[]
+    upsert?: ErasureQueueUpsertWithWhereUniqueWithoutOrganizationInput | ErasureQueueUpsertWithWhereUniqueWithoutOrganizationInput[]
+    createMany?: ErasureQueueCreateManyOrganizationInputEnvelope
+    set?: ErasureQueueWhereUniqueInput | ErasureQueueWhereUniqueInput[]
+    disconnect?: ErasureQueueWhereUniqueInput | ErasureQueueWhereUniqueInput[]
+    delete?: ErasureQueueWhereUniqueInput | ErasureQueueWhereUniqueInput[]
+    connect?: ErasureQueueWhereUniqueInput | ErasureQueueWhereUniqueInput[]
+    update?: ErasureQueueUpdateWithWhereUniqueWithoutOrganizationInput | ErasureQueueUpdateWithWhereUniqueWithoutOrganizationInput[]
+    updateMany?: ErasureQueueUpdateManyWithWhereWithoutOrganizationInput | ErasureQueueUpdateManyWithWhereWithoutOrganizationInput[]
+    deleteMany?: ErasureQueueScalarWhereInput | ErasureQueueScalarWhereInput[]
+  }
+
+  export type MedicationAuditUpdateManyWithoutOrganizationNestedInput = {
+    create?: XOR<MedicationAuditCreateWithoutOrganizationInput, MedicationAuditUncheckedCreateWithoutOrganizationInput> | MedicationAuditCreateWithoutOrganizationInput[] | MedicationAuditUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: MedicationAuditCreateOrConnectWithoutOrganizationInput | MedicationAuditCreateOrConnectWithoutOrganizationInput[]
+    upsert?: MedicationAuditUpsertWithWhereUniqueWithoutOrganizationInput | MedicationAuditUpsertWithWhereUniqueWithoutOrganizationInput[]
+    createMany?: MedicationAuditCreateManyOrganizationInputEnvelope
+    set?: MedicationAuditWhereUniqueInput | MedicationAuditWhereUniqueInput[]
+    disconnect?: MedicationAuditWhereUniqueInput | MedicationAuditWhereUniqueInput[]
+    delete?: MedicationAuditWhereUniqueInput | MedicationAuditWhereUniqueInput[]
+    connect?: MedicationAuditWhereUniqueInput | MedicationAuditWhereUniqueInput[]
+    update?: MedicationAuditUpdateWithWhereUniqueWithoutOrganizationInput | MedicationAuditUpdateWithWhereUniqueWithoutOrganizationInput[]
+    updateMany?: MedicationAuditUpdateManyWithWhereWithoutOrganizationInput | MedicationAuditUpdateManyWithWhereWithoutOrganizationInput[]
+    deleteMany?: MedicationAuditScalarWhereInput | MedicationAuditScalarWhereInput[]
+  }
+
   export type OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput = {
     create?: XOR<OrganizationIdentityCreateWithoutOrganizationInput, OrganizationIdentityUncheckedCreateWithoutOrganizationInput> | OrganizationIdentityCreateWithoutOrganizationInput[] | OrganizationIdentityUncheckedCreateWithoutOrganizationInput[]
     connectOrCreate?: OrganizationIdentityCreateOrConnectWithoutOrganizationInput | OrganizationIdentityCreateOrConnectWithoutOrganizationInput[]
@@ -52126,6 +54272,20 @@ export namespace Prisma {
     update?: OrganizationIdentityUpdateWithWhereUniqueWithoutOrganizationInput | OrganizationIdentityUpdateWithWhereUniqueWithoutOrganizationInput[]
     updateMany?: OrganizationIdentityUpdateManyWithWhereWithoutOrganizationInput | OrganizationIdentityUpdateManyWithWhereWithoutOrganizationInput[]
     deleteMany?: OrganizationIdentityScalarWhereInput | OrganizationIdentityScalarWhereInput[]
+  }
+
+  export type OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput = {
+    create?: XOR<OrganizationMembershipCreateWithoutOrganizationInput, OrganizationMembershipUncheckedCreateWithoutOrganizationInput> | OrganizationMembershipCreateWithoutOrganizationInput[] | OrganizationMembershipUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: OrganizationMembershipCreateOrConnectWithoutOrganizationInput | OrganizationMembershipCreateOrConnectWithoutOrganizationInput[]
+    upsert?: OrganizationMembershipUpsertWithWhereUniqueWithoutOrganizationInput | OrganizationMembershipUpsertWithWhereUniqueWithoutOrganizationInput[]
+    createMany?: OrganizationMembershipCreateManyOrganizationInputEnvelope
+    set?: OrganizationMembershipWhereUniqueInput | OrganizationMembershipWhereUniqueInput[]
+    disconnect?: OrganizationMembershipWhereUniqueInput | OrganizationMembershipWhereUniqueInput[]
+    delete?: OrganizationMembershipWhereUniqueInput | OrganizationMembershipWhereUniqueInput[]
+    connect?: OrganizationMembershipWhereUniqueInput | OrganizationMembershipWhereUniqueInput[]
+    update?: OrganizationMembershipUpdateWithWhereUniqueWithoutOrganizationInput | OrganizationMembershipUpdateWithWhereUniqueWithoutOrganizationInput[]
+    updateMany?: OrganizationMembershipUpdateManyWithWhereWithoutOrganizationInput | OrganizationMembershipUpdateManyWithWhereWithoutOrganizationInput[]
+    deleteMany?: OrganizationMembershipScalarWhereInput | OrganizationMembershipScalarWhereInput[]
   }
 
   export type CarerUncheckedUpdateManyWithoutOrganizationNestedInput = {
@@ -52294,6 +54454,62 @@ export namespace Prisma {
     update?: FamilyPulseUpdateWithWhereUniqueWithoutOrganizationInput | FamilyPulseUpdateWithWhereUniqueWithoutOrganizationInput[]
     updateMany?: FamilyPulseUpdateManyWithWhereWithoutOrganizationInput | FamilyPulseUpdateManyWithWhereWithoutOrganizationInput[]
     deleteMany?: FamilyPulseScalarWhereInput | FamilyPulseScalarWhereInput[]
+  }
+
+  export type ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput = {
+    create?: XOR<ConsentRecordCreateWithoutOrganizationInput, ConsentRecordUncheckedCreateWithoutOrganizationInput> | ConsentRecordCreateWithoutOrganizationInput[] | ConsentRecordUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ConsentRecordCreateOrConnectWithoutOrganizationInput | ConsentRecordCreateOrConnectWithoutOrganizationInput[]
+    upsert?: ConsentRecordUpsertWithWhereUniqueWithoutOrganizationInput | ConsentRecordUpsertWithWhereUniqueWithoutOrganizationInput[]
+    createMany?: ConsentRecordCreateManyOrganizationInputEnvelope
+    set?: ConsentRecordWhereUniqueInput | ConsentRecordWhereUniqueInput[]
+    disconnect?: ConsentRecordWhereUniqueInput | ConsentRecordWhereUniqueInput[]
+    delete?: ConsentRecordWhereUniqueInput | ConsentRecordWhereUniqueInput[]
+    connect?: ConsentRecordWhereUniqueInput | ConsentRecordWhereUniqueInput[]
+    update?: ConsentRecordUpdateWithWhereUniqueWithoutOrganizationInput | ConsentRecordUpdateWithWhereUniqueWithoutOrganizationInput[]
+    updateMany?: ConsentRecordUpdateManyWithWhereWithoutOrganizationInput | ConsentRecordUpdateManyWithWhereWithoutOrganizationInput[]
+    deleteMany?: ConsentRecordScalarWhereInput | ConsentRecordScalarWhereInput[]
+  }
+
+  export type AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput = {
+    create?: XOR<AuditLogCreateWithoutOrganizationInput, AuditLogUncheckedCreateWithoutOrganizationInput> | AuditLogCreateWithoutOrganizationInput[] | AuditLogUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: AuditLogCreateOrConnectWithoutOrganizationInput | AuditLogCreateOrConnectWithoutOrganizationInput[]
+    upsert?: AuditLogUpsertWithWhereUniqueWithoutOrganizationInput | AuditLogUpsertWithWhereUniqueWithoutOrganizationInput[]
+    createMany?: AuditLogCreateManyOrganizationInputEnvelope
+    set?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    disconnect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    delete?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    update?: AuditLogUpdateWithWhereUniqueWithoutOrganizationInput | AuditLogUpdateWithWhereUniqueWithoutOrganizationInput[]
+    updateMany?: AuditLogUpdateManyWithWhereWithoutOrganizationInput | AuditLogUpdateManyWithWhereWithoutOrganizationInput[]
+    deleteMany?: AuditLogScalarWhereInput | AuditLogScalarWhereInput[]
+  }
+
+  export type ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput = {
+    create?: XOR<ErasureQueueCreateWithoutOrganizationInput, ErasureQueueUncheckedCreateWithoutOrganizationInput> | ErasureQueueCreateWithoutOrganizationInput[] | ErasureQueueUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: ErasureQueueCreateOrConnectWithoutOrganizationInput | ErasureQueueCreateOrConnectWithoutOrganizationInput[]
+    upsert?: ErasureQueueUpsertWithWhereUniqueWithoutOrganizationInput | ErasureQueueUpsertWithWhereUniqueWithoutOrganizationInput[]
+    createMany?: ErasureQueueCreateManyOrganizationInputEnvelope
+    set?: ErasureQueueWhereUniqueInput | ErasureQueueWhereUniqueInput[]
+    disconnect?: ErasureQueueWhereUniqueInput | ErasureQueueWhereUniqueInput[]
+    delete?: ErasureQueueWhereUniqueInput | ErasureQueueWhereUniqueInput[]
+    connect?: ErasureQueueWhereUniqueInput | ErasureQueueWhereUniqueInput[]
+    update?: ErasureQueueUpdateWithWhereUniqueWithoutOrganizationInput | ErasureQueueUpdateWithWhereUniqueWithoutOrganizationInput[]
+    updateMany?: ErasureQueueUpdateManyWithWhereWithoutOrganizationInput | ErasureQueueUpdateManyWithWhereWithoutOrganizationInput[]
+    deleteMany?: ErasureQueueScalarWhereInput | ErasureQueueScalarWhereInput[]
+  }
+
+  export type MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput = {
+    create?: XOR<MedicationAuditCreateWithoutOrganizationInput, MedicationAuditUncheckedCreateWithoutOrganizationInput> | MedicationAuditCreateWithoutOrganizationInput[] | MedicationAuditUncheckedCreateWithoutOrganizationInput[]
+    connectOrCreate?: MedicationAuditCreateOrConnectWithoutOrganizationInput | MedicationAuditCreateOrConnectWithoutOrganizationInput[]
+    upsert?: MedicationAuditUpsertWithWhereUniqueWithoutOrganizationInput | MedicationAuditUpsertWithWhereUniqueWithoutOrganizationInput[]
+    createMany?: MedicationAuditCreateManyOrganizationInputEnvelope
+    set?: MedicationAuditWhereUniqueInput | MedicationAuditWhereUniqueInput[]
+    disconnect?: MedicationAuditWhereUniqueInput | MedicationAuditWhereUniqueInput[]
+    delete?: MedicationAuditWhereUniqueInput | MedicationAuditWhereUniqueInput[]
+    connect?: MedicationAuditWhereUniqueInput | MedicationAuditWhereUniqueInput[]
+    update?: MedicationAuditUpdateWithWhereUniqueWithoutOrganizationInput | MedicationAuditUpdateWithWhereUniqueWithoutOrganizationInput[]
+    updateMany?: MedicationAuditUpdateManyWithWhereWithoutOrganizationInput | MedicationAuditUpdateManyWithWhereWithoutOrganizationInput[]
+    deleteMany?: MedicationAuditScalarWhereInput | MedicationAuditScalarWhereInput[]
   }
 
   export type OrganizationCreateNestedOneWithoutFamily_contactsInput = {
@@ -53402,6 +55618,24 @@ export namespace Prisma {
     update?: XOR<XOR<OrganizationUpdateToOneWithWhereWithoutIdentitiesInput, OrganizationUpdateWithoutIdentitiesInput>, OrganizationUncheckedUpdateWithoutIdentitiesInput>
   }
 
+  export type OrganizationCreateNestedOneWithoutMembershipsInput = {
+    create?: XOR<OrganizationCreateWithoutMembershipsInput, OrganizationUncheckedCreateWithoutMembershipsInput>
+    connectOrCreate?: OrganizationCreateOrConnectWithoutMembershipsInput
+    connect?: OrganizationWhereUniqueInput
+  }
+
+  export type EnumOrganizationMembershipStatusFieldUpdateOperationsInput = {
+    set?: $Enums.OrganizationMembershipStatus
+  }
+
+  export type OrganizationUpdateOneRequiredWithoutMembershipsNestedInput = {
+    create?: XOR<OrganizationCreateWithoutMembershipsInput, OrganizationUncheckedCreateWithoutMembershipsInput>
+    connectOrCreate?: OrganizationCreateOrConnectWithoutMembershipsInput
+    upsert?: OrganizationUpsertWithoutMembershipsInput
+    connect?: OrganizationWhereUniqueInput
+    update?: XOR<XOR<OrganizationUpdateToOneWithWhereWithoutMembershipsInput, OrganizationUpdateWithoutMembershipsInput>, OrganizationUncheckedUpdateWithoutMembershipsInput>
+  }
+
   export type OrganizationCreateNestedOneWithoutCare_logsInput = {
     create?: XOR<OrganizationCreateWithoutCare_logsInput, OrganizationUncheckedCreateWithoutCare_logsInput>
     connectOrCreate?: OrganizationCreateOrConnectWithoutCare_logsInput
@@ -53540,6 +55774,54 @@ export namespace Prisma {
     delete?: CarerWhereInput | boolean
     connect?: CarerWhereUniqueInput
     update?: XOR<XOR<CarerUpdateToOneWithWhereWithoutApproved_summariesInput, CarerUpdateWithoutApproved_summariesInput>, CarerUncheckedUpdateWithoutApproved_summariesInput>
+  }
+
+  export type OrganizationCreateNestedOneWithoutConsent_recordsInput = {
+    create?: XOR<OrganizationCreateWithoutConsent_recordsInput, OrganizationUncheckedCreateWithoutConsent_recordsInput>
+    connectOrCreate?: OrganizationCreateOrConnectWithoutConsent_recordsInput
+    connect?: OrganizationWhereUniqueInput
+  }
+
+  export type OrganizationUpdateOneWithoutConsent_recordsNestedInput = {
+    create?: XOR<OrganizationCreateWithoutConsent_recordsInput, OrganizationUncheckedCreateWithoutConsent_recordsInput>
+    connectOrCreate?: OrganizationCreateOrConnectWithoutConsent_recordsInput
+    upsert?: OrganizationUpsertWithoutConsent_recordsInput
+    disconnect?: OrganizationWhereInput | boolean
+    delete?: OrganizationWhereInput | boolean
+    connect?: OrganizationWhereUniqueInput
+    update?: XOR<XOR<OrganizationUpdateToOneWithWhereWithoutConsent_recordsInput, OrganizationUpdateWithoutConsent_recordsInput>, OrganizationUncheckedUpdateWithoutConsent_recordsInput>
+  }
+
+  export type OrganizationCreateNestedOneWithoutAudit_logsInput = {
+    create?: XOR<OrganizationCreateWithoutAudit_logsInput, OrganizationUncheckedCreateWithoutAudit_logsInput>
+    connectOrCreate?: OrganizationCreateOrConnectWithoutAudit_logsInput
+    connect?: OrganizationWhereUniqueInput
+  }
+
+  export type OrganizationUpdateOneWithoutAudit_logsNestedInput = {
+    create?: XOR<OrganizationCreateWithoutAudit_logsInput, OrganizationUncheckedCreateWithoutAudit_logsInput>
+    connectOrCreate?: OrganizationCreateOrConnectWithoutAudit_logsInput
+    upsert?: OrganizationUpsertWithoutAudit_logsInput
+    disconnect?: OrganizationWhereInput | boolean
+    delete?: OrganizationWhereInput | boolean
+    connect?: OrganizationWhereUniqueInput
+    update?: XOR<XOR<OrganizationUpdateToOneWithWhereWithoutAudit_logsInput, OrganizationUpdateWithoutAudit_logsInput>, OrganizationUncheckedUpdateWithoutAudit_logsInput>
+  }
+
+  export type OrganizationCreateNestedOneWithoutErasure_queueInput = {
+    create?: XOR<OrganizationCreateWithoutErasure_queueInput, OrganizationUncheckedCreateWithoutErasure_queueInput>
+    connectOrCreate?: OrganizationCreateOrConnectWithoutErasure_queueInput
+    connect?: OrganizationWhereUniqueInput
+  }
+
+  export type OrganizationUpdateOneWithoutErasure_queueNestedInput = {
+    create?: XOR<OrganizationCreateWithoutErasure_queueInput, OrganizationUncheckedCreateWithoutErasure_queueInput>
+    connectOrCreate?: OrganizationCreateOrConnectWithoutErasure_queueInput
+    upsert?: OrganizationUpsertWithoutErasure_queueInput
+    disconnect?: OrganizationWhereInput | boolean
+    delete?: OrganizationWhereInput | boolean
+    connect?: OrganizationWhereUniqueInput
+    update?: XOR<XOR<OrganizationUpdateToOneWithWhereWithoutErasure_queueInput, OrganizationUpdateWithoutErasure_queueInput>, OrganizationUncheckedUpdateWithoutErasure_queueInput>
   }
 
   export type NestedStringFilter<$PrismaModel = never> = {
@@ -54211,6 +56493,23 @@ export namespace Prisma {
     _max?: NestedEnumEvidenceSourceTypeFilter<$PrismaModel>
   }
 
+  export type NestedEnumOrganizationMembershipStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.OrganizationMembershipStatus | EnumOrganizationMembershipStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.OrganizationMembershipStatus[] | ListEnumOrganizationMembershipStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.OrganizationMembershipStatus[] | ListEnumOrganizationMembershipStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumOrganizationMembershipStatusFilter<$PrismaModel> | $Enums.OrganizationMembershipStatus
+  }
+
+  export type NestedEnumOrganizationMembershipStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.OrganizationMembershipStatus | EnumOrganizationMembershipStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.OrganizationMembershipStatus[] | ListEnumOrganizationMembershipStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.OrganizationMembershipStatus[] | ListEnumOrganizationMembershipStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumOrganizationMembershipStatusWithAggregatesFilter<$PrismaModel> | $Enums.OrganizationMembershipStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumOrganizationMembershipStatusFilter<$PrismaModel>
+    _max?: NestedEnumOrganizationMembershipStatusFilter<$PrismaModel>
+  }
+
   export type NestedEnumCareLogCategoryFilter<$PrismaModel = never> = {
     equals?: $Enums.CareLogCategory | EnumCareLogCategoryFieldRefInput<$PrismaModel>
     in?: $Enums.CareLogCategory[] | ListEnumCareLogCategoryFieldRefInput<$PrismaModel>
@@ -54529,6 +56828,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
     clients?: ClientCreateNestedManyWithoutOrganizationInput
     visits?: VisitCreateNestedManyWithoutOrganizationInput
     carer_shifts?: CarerShiftCreateNestedManyWithoutOrganizationInput
@@ -54540,6 +56840,10 @@ export namespace Prisma {
     concerns?: ConcernCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateWithoutCarersInput = {
@@ -54549,6 +56853,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
     clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
     visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
     carer_shifts?: CarerShiftUncheckedCreateNestedManyWithoutOrganizationInput
@@ -54560,6 +56865,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationCreateOrConnectWithoutCarersInput = {
@@ -54755,6 +57064,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUpdateManyWithoutOrganizationNestedInput
     carer_shifts?: CarerShiftUpdateManyWithoutOrganizationNestedInput
@@ -54766,6 +57076,10 @@ export namespace Prisma {
     concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateWithoutCarersInput = {
@@ -54775,6 +57089,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
     carer_shifts?: CarerShiftUncheckedUpdateManyWithoutOrganizationNestedInput
@@ -54786,6 +57101,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type VisitCreateWithoutClientInput = {
@@ -54969,6 +57288,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
     carers?: CarerCreateNestedManyWithoutOrganizationInput
     visits?: VisitCreateNestedManyWithoutOrganizationInput
     carer_shifts?: CarerShiftCreateNestedManyWithoutOrganizationInput
@@ -54980,6 +57300,10 @@ export namespace Prisma {
     concerns?: ConcernCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateWithoutClientsInput = {
@@ -54989,6 +57313,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
     carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
     visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
     carer_shifts?: CarerShiftUncheckedCreateNestedManyWithoutOrganizationInput
@@ -55000,6 +57325,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationCreateOrConnectWithoutClientsInput = {
@@ -55534,6 +57863,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUpdateManyWithoutOrganizationNestedInput
     carer_shifts?: CarerShiftUpdateManyWithoutOrganizationNestedInput
@@ -55545,6 +57875,10 @@ export namespace Prisma {
     concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateWithoutClientsInput = {
@@ -55554,6 +57888,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
     carer_shifts?: CarerShiftUncheckedUpdateManyWithoutOrganizationNestedInput
@@ -55565,6 +57900,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type HealthSummaryUpsertWithWhereUniqueWithoutClientInput = {
@@ -55993,6 +58332,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
     carers?: CarerCreateNestedManyWithoutOrganizationInput
     clients?: ClientCreateNestedManyWithoutOrganizationInput
     carer_shifts?: CarerShiftCreateNestedManyWithoutOrganizationInput
@@ -56004,6 +58344,10 @@ export namespace Prisma {
     concerns?: ConcernCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateWithoutVisitsInput = {
@@ -56013,6 +58357,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
     carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
     clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
     carer_shifts?: CarerShiftUncheckedCreateNestedManyWithoutOrganizationInput
@@ -56024,6 +58369,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationCreateOrConnectWithoutVisitsInput = {
@@ -56387,6 +58736,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUpdateManyWithoutOrganizationNestedInput
     carer_shifts?: CarerShiftUpdateManyWithoutOrganizationNestedInput
@@ -56398,6 +58748,10 @@ export namespace Prisma {
     concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateWithoutVisitsInput = {
@@ -56407,6 +58761,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
     carer_shifts?: CarerShiftUncheckedUpdateManyWithoutOrganizationNestedInput
@@ -56418,6 +58773,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type VisitTaskUpsertWithWhereUniqueWithoutVisitInput = {
@@ -56688,6 +59047,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
     carers?: CarerCreateNestedManyWithoutOrganizationInput
     clients?: ClientCreateNestedManyWithoutOrganizationInput
     visits?: VisitCreateNestedManyWithoutOrganizationInput
@@ -56699,6 +59059,10 @@ export namespace Prisma {
     concerns?: ConcernCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateWithoutCarer_shiftsInput = {
@@ -56708,6 +59072,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
     carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
     clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
     visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
@@ -56719,6 +59084,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationCreateOrConnectWithoutCarer_shiftsInput = {
@@ -56789,6 +59158,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUpdateManyWithoutOrganizationNestedInput
@@ -56800,6 +59170,10 @@ export namespace Prisma {
     concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateWithoutCarer_shiftsInput = {
@@ -56809,6 +59183,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
@@ -56820,6 +59195,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type PrescriptionCreateWithoutMedicationInput = {
@@ -57011,11 +59390,13 @@ export namespace Prisma {
     actor_role: string
     changes: string
     timestamp?: Date | string
+    organization?: OrganizationCreateNestedOneWithoutMedication_auditsInput
     medication_administration?: MedicationAdministrationCreateNestedOneWithoutAuditsInput
   }
 
   export type MedicationAuditUncheckedCreateWithoutPrescriptionInput = {
     id?: string
+    organization_id?: string | null
     medication_administration_id?: string | null
     action: $Enums.MedicationAuditAction
     actor_id: string
@@ -57165,6 +59546,7 @@ export namespace Prisma {
     OR?: MedicationAuditScalarWhereInput[]
     NOT?: MedicationAuditScalarWhereInput | MedicationAuditScalarWhereInput[]
     id?: StringFilter<"MedicationAudit"> | string
+    organization_id?: StringNullableFilter<"MedicationAudit"> | string | null
     prescription_id?: StringNullableFilter<"MedicationAudit"> | string | null
     medication_administration_id?: StringNullableFilter<"MedicationAudit"> | string | null
     action?: EnumMedicationAuditActionFilter<"MedicationAudit"> | $Enums.MedicationAuditAction
@@ -57345,11 +59727,13 @@ export namespace Prisma {
     actor_role: string
     changes: string
     timestamp?: Date | string
+    organization?: OrganizationCreateNestedOneWithoutMedication_auditsInput
     prescription?: PrescriptionCreateNestedOneWithoutAuditsInput
   }
 
   export type MedicationAuditUncheckedCreateWithoutMedication_administrationInput = {
     id?: string
+    organization_id?: string | null
     prescription_id?: string | null
     action: $Enums.MedicationAuditAction
     actor_id: string
@@ -57496,6 +59880,61 @@ export namespace Prisma {
     data: XOR<MedicationAuditUpdateManyMutationInput, MedicationAuditUncheckedUpdateManyWithoutMedication_administrationInput>
   }
 
+  export type OrganizationCreateWithoutMedication_auditsInput = {
+    id?: string
+    name: string
+    ai_summary_enabled?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+    identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
+    carers?: CarerCreateNestedManyWithoutOrganizationInput
+    clients?: ClientCreateNestedManyWithoutOrganizationInput
+    visits?: VisitCreateNestedManyWithoutOrganizationInput
+    carer_shifts?: CarerShiftCreateNestedManyWithoutOrganizationInput
+    care_logs?: CareLogCreateNestedManyWithoutOrganizationInput
+    family_contacts?: FamilyContactCreateNestedManyWithoutOrganizationInput
+    care_rooms?: CareRoomCreateNestedManyWithoutOrganizationInput
+    carebridge_policies?: CareBridgePolicyCreateNestedManyWithoutOrganizationInput
+    verified_visit_stories?: VerifiedVisitStoryCreateNestedManyWithoutOrganizationInput
+    concerns?: ConcernCreateNestedManyWithoutOrganizationInput
+    weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
+    family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+  }
+
+  export type OrganizationUncheckedCreateWithoutMedication_auditsInput = {
+    id?: string
+    name: string
+    ai_summary_enabled?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+    identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
+    carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
+    clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
+    visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
+    carer_shifts?: CarerShiftUncheckedCreateNestedManyWithoutOrganizationInput
+    care_logs?: CareLogUncheckedCreateNestedManyWithoutOrganizationInput
+    family_contacts?: FamilyContactUncheckedCreateNestedManyWithoutOrganizationInput
+    care_rooms?: CareRoomUncheckedCreateNestedManyWithoutOrganizationInput
+    carebridge_policies?: CareBridgePolicyUncheckedCreateNestedManyWithoutOrganizationInput
+    verified_visit_stories?: VerifiedVisitStoryUncheckedCreateNestedManyWithoutOrganizationInput
+    concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
+    weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
+    family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+  }
+
+  export type OrganizationCreateOrConnectWithoutMedication_auditsInput = {
+    where: OrganizationWhereUniqueInput
+    create: XOR<OrganizationCreateWithoutMedication_auditsInput, OrganizationUncheckedCreateWithoutMedication_auditsInput>
+  }
+
   export type PrescriptionCreateWithoutAuditsInput = {
     id?: string
     start_date: Date | string
@@ -57568,6 +60007,67 @@ export namespace Prisma {
   export type MedicationAdministrationCreateOrConnectWithoutAuditsInput = {
     where: MedicationAdministrationWhereUniqueInput
     create: XOR<MedicationAdministrationCreateWithoutAuditsInput, MedicationAdministrationUncheckedCreateWithoutAuditsInput>
+  }
+
+  export type OrganizationUpsertWithoutMedication_auditsInput = {
+    update: XOR<OrganizationUpdateWithoutMedication_auditsInput, OrganizationUncheckedUpdateWithoutMedication_auditsInput>
+    create: XOR<OrganizationCreateWithoutMedication_auditsInput, OrganizationUncheckedCreateWithoutMedication_auditsInput>
+    where?: OrganizationWhereInput
+  }
+
+  export type OrganizationUpdateToOneWithWhereWithoutMedication_auditsInput = {
+    where?: OrganizationWhereInput
+    data: XOR<OrganizationUpdateWithoutMedication_auditsInput, OrganizationUncheckedUpdateWithoutMedication_auditsInput>
+  }
+
+  export type OrganizationUpdateWithoutMedication_auditsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
+    carers?: CarerUpdateManyWithoutOrganizationNestedInput
+    clients?: ClientUpdateManyWithoutOrganizationNestedInput
+    visits?: VisitUpdateManyWithoutOrganizationNestedInput
+    carer_shifts?: CarerShiftUpdateManyWithoutOrganizationNestedInput
+    care_logs?: CareLogUpdateManyWithoutOrganizationNestedInput
+    family_contacts?: FamilyContactUpdateManyWithoutOrganizationNestedInput
+    care_rooms?: CareRoomUpdateManyWithoutOrganizationNestedInput
+    carebridge_policies?: CareBridgePolicyUpdateManyWithoutOrganizationNestedInput
+    verified_visit_stories?: VerifiedVisitStoryUpdateManyWithoutOrganizationNestedInput
+    concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
+    weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
+    family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+  }
+
+  export type OrganizationUncheckedUpdateWithoutMedication_auditsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
+    carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
+    clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
+    visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
+    carer_shifts?: CarerShiftUncheckedUpdateManyWithoutOrganizationNestedInput
+    care_logs?: CareLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    family_contacts?: FamilyContactUncheckedUpdateManyWithoutOrganizationNestedInput
+    care_rooms?: CareRoomUncheckedUpdateManyWithoutOrganizationNestedInput
+    carebridge_policies?: CareBridgePolicyUncheckedUpdateManyWithoutOrganizationNestedInput
+    verified_visit_stories?: VerifiedVisitStoryUncheckedUpdateManyWithoutOrganizationNestedInput
+    concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
+    weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
+    family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type PrescriptionUpsertWithoutAuditsInput = {
@@ -57683,6 +60183,46 @@ export namespace Prisma {
 
   export type OrganizationIdentityCreateManyOrganizationInputEnvelope = {
     data: OrganizationIdentityCreateManyOrganizationInput | OrganizationIdentityCreateManyOrganizationInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type OrganizationMembershipCreateWithoutOrganizationInput = {
+    id?: string
+    identity_provider: string
+    auth_subject: string
+    normalized_email?: string | null
+    role: string
+    status?: $Enums.OrganizationMembershipStatus
+    external_organization_id?: string | null
+    external_membership_id?: string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    revoked_at?: Date | string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type OrganizationMembershipUncheckedCreateWithoutOrganizationInput = {
+    id?: string
+    identity_provider: string
+    auth_subject: string
+    normalized_email?: string | null
+    role: string
+    status?: $Enums.OrganizationMembershipStatus
+    external_organization_id?: string | null
+    external_membership_id?: string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    revoked_at?: Date | string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type OrganizationMembershipCreateOrConnectWithoutOrganizationInput = {
+    where: OrganizationMembershipWhereUniqueInput
+    create: XOR<OrganizationMembershipCreateWithoutOrganizationInput, OrganizationMembershipUncheckedCreateWithoutOrganizationInput>
+  }
+
+  export type OrganizationMembershipCreateManyOrganizationInputEnvelope = {
+    data: OrganizationMembershipCreateManyOrganizationInput | OrganizationMembershipCreateManyOrganizationInput[]
     skipDuplicates?: boolean
   }
 
@@ -58296,6 +60836,148 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type ConsentRecordCreateWithoutOrganizationInput = {
+    id?: string
+    user_id: string
+    consent_type: string
+    purpose: string
+    granted: boolean
+    granted_at: Date | string
+    withdrawn_at?: Date | string | null
+    legal_basis: string
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type ConsentRecordUncheckedCreateWithoutOrganizationInput = {
+    id?: string
+    user_id: string
+    consent_type: string
+    purpose: string
+    granted: boolean
+    granted_at: Date | string
+    withdrawn_at?: Date | string | null
+    legal_basis: string
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type ConsentRecordCreateOrConnectWithoutOrganizationInput = {
+    where: ConsentRecordWhereUniqueInput
+    create: XOR<ConsentRecordCreateWithoutOrganizationInput, ConsentRecordUncheckedCreateWithoutOrganizationInput>
+  }
+
+  export type ConsentRecordCreateManyOrganizationInputEnvelope = {
+    data: ConsentRecordCreateManyOrganizationInput | ConsentRecordCreateManyOrganizationInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type AuditLogCreateWithoutOrganizationInput = {
+    id?: string
+    user_id?: string | null
+    action: string
+    resource_type: string
+    resource_id?: string | null
+    old_values?: NullableJsonNullValueInput | InputJsonValue
+    new_values?: NullableJsonNullValueInput | InputJsonValue
+    ip_address?: string | null
+    user_agent?: string | null
+    timestamp?: Date | string
+  }
+
+  export type AuditLogUncheckedCreateWithoutOrganizationInput = {
+    id?: string
+    user_id?: string | null
+    action: string
+    resource_type: string
+    resource_id?: string | null
+    old_values?: NullableJsonNullValueInput | InputJsonValue
+    new_values?: NullableJsonNullValueInput | InputJsonValue
+    ip_address?: string | null
+    user_agent?: string | null
+    timestamp?: Date | string
+  }
+
+  export type AuditLogCreateOrConnectWithoutOrganizationInput = {
+    where: AuditLogWhereUniqueInput
+    create: XOR<AuditLogCreateWithoutOrganizationInput, AuditLogUncheckedCreateWithoutOrganizationInput>
+  }
+
+  export type AuditLogCreateManyOrganizationInputEnvelope = {
+    data: AuditLogCreateManyOrganizationInput | AuditLogCreateManyOrganizationInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type ErasureQueueCreateWithoutOrganizationInput = {
+    id?: string
+    user_id: string
+    request_type: string
+    status?: string
+    requested_at?: Date | string
+    scheduled_for?: Date | string | null
+    completed_at?: Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type ErasureQueueUncheckedCreateWithoutOrganizationInput = {
+    id?: string
+    user_id: string
+    request_type: string
+    status?: string
+    requested_at?: Date | string
+    scheduled_for?: Date | string | null
+    completed_at?: Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type ErasureQueueCreateOrConnectWithoutOrganizationInput = {
+    where: ErasureQueueWhereUniqueInput
+    create: XOR<ErasureQueueCreateWithoutOrganizationInput, ErasureQueueUncheckedCreateWithoutOrganizationInput>
+  }
+
+  export type ErasureQueueCreateManyOrganizationInputEnvelope = {
+    data: ErasureQueueCreateManyOrganizationInput | ErasureQueueCreateManyOrganizationInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type MedicationAuditCreateWithoutOrganizationInput = {
+    id?: string
+    action: $Enums.MedicationAuditAction
+    actor_id: string
+    actor_role: string
+    changes: string
+    timestamp?: Date | string
+    prescription?: PrescriptionCreateNestedOneWithoutAuditsInput
+    medication_administration?: MedicationAdministrationCreateNestedOneWithoutAuditsInput
+  }
+
+  export type MedicationAuditUncheckedCreateWithoutOrganizationInput = {
+    id?: string
+    prescription_id?: string | null
+    medication_administration_id?: string | null
+    action: $Enums.MedicationAuditAction
+    actor_id: string
+    actor_role: string
+    changes: string
+    timestamp?: Date | string
+  }
+
+  export type MedicationAuditCreateOrConnectWithoutOrganizationInput = {
+    where: MedicationAuditWhereUniqueInput
+    create: XOR<MedicationAuditCreateWithoutOrganizationInput, MedicationAuditUncheckedCreateWithoutOrganizationInput>
+  }
+
+  export type MedicationAuditCreateManyOrganizationInputEnvelope = {
+    data: MedicationAuditCreateManyOrganizationInput | MedicationAuditCreateManyOrganizationInput[]
+    skipDuplicates?: boolean
+  }
+
   export type OrganizationIdentityUpsertWithWhereUniqueWithoutOrganizationInput = {
     where: OrganizationIdentityWhereUniqueInput
     update: XOR<OrganizationIdentityUpdateWithoutOrganizationInput, OrganizationIdentityUncheckedUpdateWithoutOrganizationInput>
@@ -58324,6 +61006,41 @@ export namespace Prisma {
     notes?: StringNullableFilter<"OrganizationIdentity"> | string | null
     created_at?: DateTimeFilter<"OrganizationIdentity"> | Date | string
     updated_at?: DateTimeFilter<"OrganizationIdentity"> | Date | string
+  }
+
+  export type OrganizationMembershipUpsertWithWhereUniqueWithoutOrganizationInput = {
+    where: OrganizationMembershipWhereUniqueInput
+    update: XOR<OrganizationMembershipUpdateWithoutOrganizationInput, OrganizationMembershipUncheckedUpdateWithoutOrganizationInput>
+    create: XOR<OrganizationMembershipCreateWithoutOrganizationInput, OrganizationMembershipUncheckedCreateWithoutOrganizationInput>
+  }
+
+  export type OrganizationMembershipUpdateWithWhereUniqueWithoutOrganizationInput = {
+    where: OrganizationMembershipWhereUniqueInput
+    data: XOR<OrganizationMembershipUpdateWithoutOrganizationInput, OrganizationMembershipUncheckedUpdateWithoutOrganizationInput>
+  }
+
+  export type OrganizationMembershipUpdateManyWithWhereWithoutOrganizationInput = {
+    where: OrganizationMembershipScalarWhereInput
+    data: XOR<OrganizationMembershipUpdateManyMutationInput, OrganizationMembershipUncheckedUpdateManyWithoutOrganizationInput>
+  }
+
+  export type OrganizationMembershipScalarWhereInput = {
+    AND?: OrganizationMembershipScalarWhereInput | OrganizationMembershipScalarWhereInput[]
+    OR?: OrganizationMembershipScalarWhereInput[]
+    NOT?: OrganizationMembershipScalarWhereInput | OrganizationMembershipScalarWhereInput[]
+    id?: StringFilter<"OrganizationMembership"> | string
+    organization_id?: StringFilter<"OrganizationMembership"> | string
+    identity_provider?: StringFilter<"OrganizationMembership"> | string
+    auth_subject?: StringFilter<"OrganizationMembership"> | string
+    normalized_email?: StringNullableFilter<"OrganizationMembership"> | string | null
+    role?: StringFilter<"OrganizationMembership"> | string
+    status?: EnumOrganizationMembershipStatusFilter<"OrganizationMembership"> | $Enums.OrganizationMembershipStatus
+    external_organization_id?: StringNullableFilter<"OrganizationMembership"> | string | null
+    external_membership_id?: StringNullableFilter<"OrganizationMembership"> | string | null
+    metadata?: JsonNullableFilter<"OrganizationMembership">
+    revoked_at?: DateTimeNullableFilter<"OrganizationMembership"> | Date | string | null
+    created_at?: DateTimeFilter<"OrganizationMembership"> | Date | string
+    updated_at?: DateTimeFilter<"OrganizationMembership"> | Date | string
   }
 
   export type CarerUpsertWithWhereUniqueWithoutOrganizationInput = {
@@ -58583,6 +61300,122 @@ export namespace Prisma {
     updated_at?: DateTimeFilter<"FamilyPulse"> | Date | string
   }
 
+  export type ConsentRecordUpsertWithWhereUniqueWithoutOrganizationInput = {
+    where: ConsentRecordWhereUniqueInput
+    update: XOR<ConsentRecordUpdateWithoutOrganizationInput, ConsentRecordUncheckedUpdateWithoutOrganizationInput>
+    create: XOR<ConsentRecordCreateWithoutOrganizationInput, ConsentRecordUncheckedCreateWithoutOrganizationInput>
+  }
+
+  export type ConsentRecordUpdateWithWhereUniqueWithoutOrganizationInput = {
+    where: ConsentRecordWhereUniqueInput
+    data: XOR<ConsentRecordUpdateWithoutOrganizationInput, ConsentRecordUncheckedUpdateWithoutOrganizationInput>
+  }
+
+  export type ConsentRecordUpdateManyWithWhereWithoutOrganizationInput = {
+    where: ConsentRecordScalarWhereInput
+    data: XOR<ConsentRecordUpdateManyMutationInput, ConsentRecordUncheckedUpdateManyWithoutOrganizationInput>
+  }
+
+  export type ConsentRecordScalarWhereInput = {
+    AND?: ConsentRecordScalarWhereInput | ConsentRecordScalarWhereInput[]
+    OR?: ConsentRecordScalarWhereInput[]
+    NOT?: ConsentRecordScalarWhereInput | ConsentRecordScalarWhereInput[]
+    id?: StringFilter<"ConsentRecord"> | string
+    organization_id?: StringNullableFilter<"ConsentRecord"> | string | null
+    user_id?: StringFilter<"ConsentRecord"> | string
+    consent_type?: StringFilter<"ConsentRecord"> | string
+    purpose?: StringFilter<"ConsentRecord"> | string
+    granted?: BoolFilter<"ConsentRecord"> | boolean
+    granted_at?: DateTimeFilter<"ConsentRecord"> | Date | string
+    withdrawn_at?: DateTimeNullableFilter<"ConsentRecord"> | Date | string | null
+    legal_basis?: StringFilter<"ConsentRecord"> | string
+    metadata?: JsonNullableFilter<"ConsentRecord">
+    created_at?: DateTimeFilter<"ConsentRecord"> | Date | string
+    updated_at?: DateTimeFilter<"ConsentRecord"> | Date | string
+  }
+
+  export type AuditLogUpsertWithWhereUniqueWithoutOrganizationInput = {
+    where: AuditLogWhereUniqueInput
+    update: XOR<AuditLogUpdateWithoutOrganizationInput, AuditLogUncheckedUpdateWithoutOrganizationInput>
+    create: XOR<AuditLogCreateWithoutOrganizationInput, AuditLogUncheckedCreateWithoutOrganizationInput>
+  }
+
+  export type AuditLogUpdateWithWhereUniqueWithoutOrganizationInput = {
+    where: AuditLogWhereUniqueInput
+    data: XOR<AuditLogUpdateWithoutOrganizationInput, AuditLogUncheckedUpdateWithoutOrganizationInput>
+  }
+
+  export type AuditLogUpdateManyWithWhereWithoutOrganizationInput = {
+    where: AuditLogScalarWhereInput
+    data: XOR<AuditLogUpdateManyMutationInput, AuditLogUncheckedUpdateManyWithoutOrganizationInput>
+  }
+
+  export type AuditLogScalarWhereInput = {
+    AND?: AuditLogScalarWhereInput | AuditLogScalarWhereInput[]
+    OR?: AuditLogScalarWhereInput[]
+    NOT?: AuditLogScalarWhereInput | AuditLogScalarWhereInput[]
+    id?: StringFilter<"AuditLog"> | string
+    organization_id?: StringNullableFilter<"AuditLog"> | string | null
+    user_id?: StringNullableFilter<"AuditLog"> | string | null
+    action?: StringFilter<"AuditLog"> | string
+    resource_type?: StringFilter<"AuditLog"> | string
+    resource_id?: StringNullableFilter<"AuditLog"> | string | null
+    old_values?: JsonNullableFilter<"AuditLog">
+    new_values?: JsonNullableFilter<"AuditLog">
+    ip_address?: StringNullableFilter<"AuditLog"> | string | null
+    user_agent?: StringNullableFilter<"AuditLog"> | string | null
+    timestamp?: DateTimeFilter<"AuditLog"> | Date | string
+  }
+
+  export type ErasureQueueUpsertWithWhereUniqueWithoutOrganizationInput = {
+    where: ErasureQueueWhereUniqueInput
+    update: XOR<ErasureQueueUpdateWithoutOrganizationInput, ErasureQueueUncheckedUpdateWithoutOrganizationInput>
+    create: XOR<ErasureQueueCreateWithoutOrganizationInput, ErasureQueueUncheckedCreateWithoutOrganizationInput>
+  }
+
+  export type ErasureQueueUpdateWithWhereUniqueWithoutOrganizationInput = {
+    where: ErasureQueueWhereUniqueInput
+    data: XOR<ErasureQueueUpdateWithoutOrganizationInput, ErasureQueueUncheckedUpdateWithoutOrganizationInput>
+  }
+
+  export type ErasureQueueUpdateManyWithWhereWithoutOrganizationInput = {
+    where: ErasureQueueScalarWhereInput
+    data: XOR<ErasureQueueUpdateManyMutationInput, ErasureQueueUncheckedUpdateManyWithoutOrganizationInput>
+  }
+
+  export type ErasureQueueScalarWhereInput = {
+    AND?: ErasureQueueScalarWhereInput | ErasureQueueScalarWhereInput[]
+    OR?: ErasureQueueScalarWhereInput[]
+    NOT?: ErasureQueueScalarWhereInput | ErasureQueueScalarWhereInput[]
+    id?: StringFilter<"ErasureQueue"> | string
+    organization_id?: StringNullableFilter<"ErasureQueue"> | string | null
+    user_id?: StringFilter<"ErasureQueue"> | string
+    request_type?: StringFilter<"ErasureQueue"> | string
+    status?: StringFilter<"ErasureQueue"> | string
+    requested_at?: DateTimeFilter<"ErasureQueue"> | Date | string
+    scheduled_for?: DateTimeNullableFilter<"ErasureQueue"> | Date | string | null
+    completed_at?: DateTimeNullableFilter<"ErasureQueue"> | Date | string | null
+    metadata?: JsonNullableFilter<"ErasureQueue">
+    created_at?: DateTimeFilter<"ErasureQueue"> | Date | string
+    updated_at?: DateTimeFilter<"ErasureQueue"> | Date | string
+  }
+
+  export type MedicationAuditUpsertWithWhereUniqueWithoutOrganizationInput = {
+    where: MedicationAuditWhereUniqueInput
+    update: XOR<MedicationAuditUpdateWithoutOrganizationInput, MedicationAuditUncheckedUpdateWithoutOrganizationInput>
+    create: XOR<MedicationAuditCreateWithoutOrganizationInput, MedicationAuditUncheckedCreateWithoutOrganizationInput>
+  }
+
+  export type MedicationAuditUpdateWithWhereUniqueWithoutOrganizationInput = {
+    where: MedicationAuditWhereUniqueInput
+    data: XOR<MedicationAuditUpdateWithoutOrganizationInput, MedicationAuditUncheckedUpdateWithoutOrganizationInput>
+  }
+
+  export type MedicationAuditUpdateManyWithWhereWithoutOrganizationInput = {
+    where: MedicationAuditScalarWhereInput
+    data: XOR<MedicationAuditUpdateManyMutationInput, MedicationAuditUncheckedUpdateManyWithoutOrganizationInput>
+  }
+
   export type OrganizationCreateWithoutFamily_contactsInput = {
     id?: string
     name: string
@@ -58590,6 +61423,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
     carers?: CarerCreateNestedManyWithoutOrganizationInput
     clients?: ClientCreateNestedManyWithoutOrganizationInput
     visits?: VisitCreateNestedManyWithoutOrganizationInput
@@ -58601,6 +61435,10 @@ export namespace Prisma {
     concerns?: ConcernCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateWithoutFamily_contactsInput = {
@@ -58610,6 +61448,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
     carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
     clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
     visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
@@ -58621,6 +61460,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationCreateOrConnectWithoutFamily_contactsInput = {
@@ -58696,6 +61539,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUpdateManyWithoutOrganizationNestedInput
@@ -58707,6 +61551,10 @@ export namespace Prisma {
     concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateWithoutFamily_contactsInput = {
@@ -58716,6 +61564,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
@@ -58727,6 +61576,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type CareRoomMembershipUpsertWithWhereUniqueWithoutFamily_contactInput = {
@@ -58774,6 +61627,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
     carers?: CarerCreateNestedManyWithoutOrganizationInput
     clients?: ClientCreateNestedManyWithoutOrganizationInput
     visits?: VisitCreateNestedManyWithoutOrganizationInput
@@ -58785,6 +61639,10 @@ export namespace Prisma {
     concerns?: ConcernCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateWithoutCare_roomsInput = {
@@ -58794,6 +61652,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
     carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
     clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
     visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
@@ -58805,6 +61664,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationCreateOrConnectWithoutCare_roomsInput = {
@@ -59177,6 +62040,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUpdateManyWithoutOrganizationNestedInput
@@ -59188,6 +62052,10 @@ export namespace Prisma {
     concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateWithoutCare_roomsInput = {
@@ -59197,6 +62065,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
@@ -59208,6 +62077,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type ClientUpsertWithoutCare_roomsInput = {
@@ -59717,6 +62590,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
     carers?: CarerCreateNestedManyWithoutOrganizationInput
     clients?: ClientCreateNestedManyWithoutOrganizationInput
     visits?: VisitCreateNestedManyWithoutOrganizationInput
@@ -59728,6 +62602,10 @@ export namespace Prisma {
     concerns?: ConcernCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateWithoutCarebridge_policiesInput = {
@@ -59737,6 +62615,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
     carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
     clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
     visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
@@ -59748,6 +62627,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationCreateOrConnectWithoutCarebridge_policiesInput = {
@@ -59861,6 +62744,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUpdateManyWithoutOrganizationNestedInput
@@ -59872,6 +62756,10 @@ export namespace Prisma {
     concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateWithoutCarebridge_policiesInput = {
@@ -59881,6 +62769,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
@@ -59892,6 +62781,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type CareRoomUpsertWithoutPoliciesInput = {
@@ -60001,6 +62894,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
     carers?: CarerCreateNestedManyWithoutOrganizationInput
     clients?: ClientCreateNestedManyWithoutOrganizationInput
     visits?: VisitCreateNestedManyWithoutOrganizationInput
@@ -60012,6 +62906,10 @@ export namespace Prisma {
     concerns?: ConcernCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateWithoutVerified_visit_storiesInput = {
@@ -60021,6 +62919,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
     carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
     clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
     visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
@@ -60032,6 +62931,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationCreateOrConnectWithoutVerified_visit_storiesInput = {
@@ -60190,6 +63093,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUpdateManyWithoutOrganizationNestedInput
@@ -60201,6 +63105,10 @@ export namespace Prisma {
     concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateWithoutVerified_visit_storiesInput = {
@@ -60210,6 +63118,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
@@ -60221,6 +63130,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type CareRoomUpsertWithoutVerified_visit_storiesInput = {
@@ -60381,6 +63294,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
     carers?: CarerCreateNestedManyWithoutOrganizationInput
     clients?: ClientCreateNestedManyWithoutOrganizationInput
     visits?: VisitCreateNestedManyWithoutOrganizationInput
@@ -60392,6 +63306,10 @@ export namespace Prisma {
     verified_visit_stories?: VerifiedVisitStoryCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateWithoutConcernsInput = {
@@ -60401,6 +63319,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
     carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
     clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
     visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
@@ -60412,6 +63331,10 @@ export namespace Prisma {
     verified_visit_stories?: VerifiedVisitStoryUncheckedCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationCreateOrConnectWithoutConcernsInput = {
@@ -60583,6 +63506,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUpdateManyWithoutOrganizationNestedInput
@@ -60594,6 +63518,10 @@ export namespace Prisma {
     verified_visit_stories?: VerifiedVisitStoryUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateWithoutConcernsInput = {
@@ -60603,6 +63531,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
@@ -60614,6 +63543,10 @@ export namespace Prisma {
     verified_visit_stories?: VerifiedVisitStoryUncheckedUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type CareRoomUpsertWithoutConcernsInput = {
@@ -61030,6 +63963,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
     carers?: CarerCreateNestedManyWithoutOrganizationInput
     clients?: ClientCreateNestedManyWithoutOrganizationInput
     visits?: VisitCreateNestedManyWithoutOrganizationInput
@@ -61041,6 +63975,10 @@ export namespace Prisma {
     verified_visit_stories?: VerifiedVisitStoryCreateNestedManyWithoutOrganizationInput
     concerns?: ConcernCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateWithoutWeekly_care_summariesInput = {
@@ -61050,6 +63988,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
     carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
     clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
     visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
@@ -61061,6 +64000,10 @@ export namespace Prisma {
     verified_visit_stories?: VerifiedVisitStoryUncheckedCreateNestedManyWithoutOrganizationInput
     concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationCreateOrConnectWithoutWeekly_care_summariesInput = {
@@ -61174,6 +64117,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUpdateManyWithoutOrganizationNestedInput
@@ -61185,6 +64129,10 @@ export namespace Prisma {
     verified_visit_stories?: VerifiedVisitStoryUpdateManyWithoutOrganizationNestedInput
     concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateWithoutWeekly_care_summariesInput = {
@@ -61194,6 +64142,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
@@ -61205,6 +64154,10 @@ export namespace Prisma {
     verified_visit_stories?: VerifiedVisitStoryUncheckedUpdateManyWithoutOrganizationNestedInput
     concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type CareRoomUpsertWithoutWeekly_care_summariesInput = {
@@ -61314,6 +64267,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
     carers?: CarerCreateNestedManyWithoutOrganizationInput
     clients?: ClientCreateNestedManyWithoutOrganizationInput
     visits?: VisitCreateNestedManyWithoutOrganizationInput
@@ -61325,6 +64279,10 @@ export namespace Prisma {
     verified_visit_stories?: VerifiedVisitStoryCreateNestedManyWithoutOrganizationInput
     concerns?: ConcernCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateWithoutFamily_pulsesInput = {
@@ -61334,6 +64292,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
     carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
     clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
     visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
@@ -61345,6 +64304,10 @@ export namespace Prisma {
     verified_visit_stories?: VerifiedVisitStoryUncheckedCreateNestedManyWithoutOrganizationInput
     concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationCreateOrConnectWithoutFamily_pulsesInput = {
@@ -61448,6 +64411,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUpdateManyWithoutOrganizationNestedInput
@@ -61459,6 +64423,10 @@ export namespace Prisma {
     verified_visit_stories?: VerifiedVisitStoryUpdateManyWithoutOrganizationNestedInput
     concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateWithoutFamily_pulsesInput = {
@@ -61468,6 +64436,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
@@ -61479,6 +64448,10 @@ export namespace Prisma {
     verified_visit_stories?: VerifiedVisitStoryUncheckedUpdateManyWithoutOrganizationNestedInput
     concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type CareRoomUpsertWithoutFamily_pulsesInput = {
@@ -62411,6 +65384,7 @@ export namespace Prisma {
     ai_summary_enabled?: boolean
     created_at?: Date | string
     updated_at?: Date | string
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
     carers?: CarerCreateNestedManyWithoutOrganizationInput
     clients?: ClientCreateNestedManyWithoutOrganizationInput
     visits?: VisitCreateNestedManyWithoutOrganizationInput
@@ -62423,6 +65397,10 @@ export namespace Prisma {
     concerns?: ConcernCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateWithoutIdentitiesInput = {
@@ -62431,6 +65409,7 @@ export namespace Prisma {
     ai_summary_enabled?: boolean
     created_at?: Date | string
     updated_at?: Date | string
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
     carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
     clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
     visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
@@ -62443,6 +65422,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationCreateOrConnectWithoutIdentitiesInput = {
@@ -62467,6 +65450,7 @@ export namespace Prisma {
     ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUpdateManyWithoutOrganizationNestedInput
@@ -62479,6 +65463,10 @@ export namespace Prisma {
     concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateWithoutIdentitiesInput = {
@@ -62487,6 +65475,7 @@ export namespace Prisma {
     ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
@@ -62499,6 +65488,126 @@ export namespace Prisma {
     concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
+  }
+
+  export type OrganizationCreateWithoutMembershipsInput = {
+    id?: string
+    name: string
+    ai_summary_enabled?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+    identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    carers?: CarerCreateNestedManyWithoutOrganizationInput
+    clients?: ClientCreateNestedManyWithoutOrganizationInput
+    visits?: VisitCreateNestedManyWithoutOrganizationInput
+    carer_shifts?: CarerShiftCreateNestedManyWithoutOrganizationInput
+    care_logs?: CareLogCreateNestedManyWithoutOrganizationInput
+    family_contacts?: FamilyContactCreateNestedManyWithoutOrganizationInput
+    care_rooms?: CareRoomCreateNestedManyWithoutOrganizationInput
+    carebridge_policies?: CareBridgePolicyCreateNestedManyWithoutOrganizationInput
+    verified_visit_stories?: VerifiedVisitStoryCreateNestedManyWithoutOrganizationInput
+    concerns?: ConcernCreateNestedManyWithoutOrganizationInput
+    weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
+    family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
+  }
+
+  export type OrganizationUncheckedCreateWithoutMembershipsInput = {
+    id?: string
+    name: string
+    ai_summary_enabled?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+    identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
+    clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
+    visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
+    carer_shifts?: CarerShiftUncheckedCreateNestedManyWithoutOrganizationInput
+    care_logs?: CareLogUncheckedCreateNestedManyWithoutOrganizationInput
+    family_contacts?: FamilyContactUncheckedCreateNestedManyWithoutOrganizationInput
+    care_rooms?: CareRoomUncheckedCreateNestedManyWithoutOrganizationInput
+    carebridge_policies?: CareBridgePolicyUncheckedCreateNestedManyWithoutOrganizationInput
+    verified_visit_stories?: VerifiedVisitStoryUncheckedCreateNestedManyWithoutOrganizationInput
+    concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
+    weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
+    family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
+  }
+
+  export type OrganizationCreateOrConnectWithoutMembershipsInput = {
+    where: OrganizationWhereUniqueInput
+    create: XOR<OrganizationCreateWithoutMembershipsInput, OrganizationUncheckedCreateWithoutMembershipsInput>
+  }
+
+  export type OrganizationUpsertWithoutMembershipsInput = {
+    update: XOR<OrganizationUpdateWithoutMembershipsInput, OrganizationUncheckedUpdateWithoutMembershipsInput>
+    create: XOR<OrganizationCreateWithoutMembershipsInput, OrganizationUncheckedCreateWithoutMembershipsInput>
+    where?: OrganizationWhereInput
+  }
+
+  export type OrganizationUpdateToOneWithWhereWithoutMembershipsInput = {
+    where?: OrganizationWhereInput
+    data: XOR<OrganizationUpdateWithoutMembershipsInput, OrganizationUncheckedUpdateWithoutMembershipsInput>
+  }
+
+  export type OrganizationUpdateWithoutMembershipsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    carers?: CarerUpdateManyWithoutOrganizationNestedInput
+    clients?: ClientUpdateManyWithoutOrganizationNestedInput
+    visits?: VisitUpdateManyWithoutOrganizationNestedInput
+    carer_shifts?: CarerShiftUpdateManyWithoutOrganizationNestedInput
+    care_logs?: CareLogUpdateManyWithoutOrganizationNestedInput
+    family_contacts?: FamilyContactUpdateManyWithoutOrganizationNestedInput
+    care_rooms?: CareRoomUpdateManyWithoutOrganizationNestedInput
+    carebridge_policies?: CareBridgePolicyUpdateManyWithoutOrganizationNestedInput
+    verified_visit_stories?: VerifiedVisitStoryUpdateManyWithoutOrganizationNestedInput
+    concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
+    weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
+    family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
+  }
+
+  export type OrganizationUncheckedUpdateWithoutMembershipsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
+    clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
+    visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
+    carer_shifts?: CarerShiftUncheckedUpdateManyWithoutOrganizationNestedInput
+    care_logs?: CareLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    family_contacts?: FamilyContactUncheckedUpdateManyWithoutOrganizationNestedInput
+    care_rooms?: CareRoomUncheckedUpdateManyWithoutOrganizationNestedInput
+    carebridge_policies?: CareBridgePolicyUncheckedUpdateManyWithoutOrganizationNestedInput
+    verified_visit_stories?: VerifiedVisitStoryUncheckedUpdateManyWithoutOrganizationNestedInput
+    concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
+    weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
+    family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationCreateWithoutCare_logsInput = {
@@ -62508,6 +65617,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
     carers?: CarerCreateNestedManyWithoutOrganizationInput
     clients?: ClientCreateNestedManyWithoutOrganizationInput
     visits?: VisitCreateNestedManyWithoutOrganizationInput
@@ -62519,6 +65629,10 @@ export namespace Prisma {
     concerns?: ConcernCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationUncheckedCreateWithoutCare_logsInput = {
@@ -62528,6 +65642,7 @@ export namespace Prisma {
     created_at?: Date | string
     updated_at?: Date | string
     identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
     carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
     clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
     visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
@@ -62539,6 +65654,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
     family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
   }
 
   export type OrganizationCreateOrConnectWithoutCare_logsInput = {
@@ -62738,6 +65857,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUpdateManyWithoutOrganizationNestedInput
@@ -62749,6 +65869,10 @@ export namespace Prisma {
     concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
   }
 
   export type OrganizationUncheckedUpdateWithoutCare_logsInput = {
@@ -62758,6 +65882,7 @@ export namespace Prisma {
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
     identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
     carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
     clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
     visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
@@ -62769,6 +65894,10 @@ export namespace Prisma {
     concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
     weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
     family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type VisitUpsertWithoutCare_logsInput = {
@@ -63263,6 +66392,354 @@ export namespace Prisma {
     visits?: VisitUncheckedUpdateManyWithoutCarerNestedInput
     shifts?: CarerShiftUncheckedUpdateManyWithoutCarerNestedInput
     care_logs?: CareLogUncheckedUpdateManyWithoutCarerNestedInput
+  }
+
+  export type OrganizationCreateWithoutConsent_recordsInput = {
+    id?: string
+    name: string
+    ai_summary_enabled?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+    identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
+    carers?: CarerCreateNestedManyWithoutOrganizationInput
+    clients?: ClientCreateNestedManyWithoutOrganizationInput
+    visits?: VisitCreateNestedManyWithoutOrganizationInput
+    carer_shifts?: CarerShiftCreateNestedManyWithoutOrganizationInput
+    care_logs?: CareLogCreateNestedManyWithoutOrganizationInput
+    family_contacts?: FamilyContactCreateNestedManyWithoutOrganizationInput
+    care_rooms?: CareRoomCreateNestedManyWithoutOrganizationInput
+    carebridge_policies?: CareBridgePolicyCreateNestedManyWithoutOrganizationInput
+    verified_visit_stories?: VerifiedVisitStoryCreateNestedManyWithoutOrganizationInput
+    concerns?: ConcernCreateNestedManyWithoutOrganizationInput
+    weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
+    family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
+  }
+
+  export type OrganizationUncheckedCreateWithoutConsent_recordsInput = {
+    id?: string
+    name: string
+    ai_summary_enabled?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+    identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
+    carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
+    clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
+    visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
+    carer_shifts?: CarerShiftUncheckedCreateNestedManyWithoutOrganizationInput
+    care_logs?: CareLogUncheckedCreateNestedManyWithoutOrganizationInput
+    family_contacts?: FamilyContactUncheckedCreateNestedManyWithoutOrganizationInput
+    care_rooms?: CareRoomUncheckedCreateNestedManyWithoutOrganizationInput
+    carebridge_policies?: CareBridgePolicyUncheckedCreateNestedManyWithoutOrganizationInput
+    verified_visit_stories?: VerifiedVisitStoryUncheckedCreateNestedManyWithoutOrganizationInput
+    concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
+    weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
+    family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
+  }
+
+  export type OrganizationCreateOrConnectWithoutConsent_recordsInput = {
+    where: OrganizationWhereUniqueInput
+    create: XOR<OrganizationCreateWithoutConsent_recordsInput, OrganizationUncheckedCreateWithoutConsent_recordsInput>
+  }
+
+  export type OrganizationUpsertWithoutConsent_recordsInput = {
+    update: XOR<OrganizationUpdateWithoutConsent_recordsInput, OrganizationUncheckedUpdateWithoutConsent_recordsInput>
+    create: XOR<OrganizationCreateWithoutConsent_recordsInput, OrganizationUncheckedCreateWithoutConsent_recordsInput>
+    where?: OrganizationWhereInput
+  }
+
+  export type OrganizationUpdateToOneWithWhereWithoutConsent_recordsInput = {
+    where?: OrganizationWhereInput
+    data: XOR<OrganizationUpdateWithoutConsent_recordsInput, OrganizationUncheckedUpdateWithoutConsent_recordsInput>
+  }
+
+  export type OrganizationUpdateWithoutConsent_recordsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
+    carers?: CarerUpdateManyWithoutOrganizationNestedInput
+    clients?: ClientUpdateManyWithoutOrganizationNestedInput
+    visits?: VisitUpdateManyWithoutOrganizationNestedInput
+    carer_shifts?: CarerShiftUpdateManyWithoutOrganizationNestedInput
+    care_logs?: CareLogUpdateManyWithoutOrganizationNestedInput
+    family_contacts?: FamilyContactUpdateManyWithoutOrganizationNestedInput
+    care_rooms?: CareRoomUpdateManyWithoutOrganizationNestedInput
+    carebridge_policies?: CareBridgePolicyUpdateManyWithoutOrganizationNestedInput
+    verified_visit_stories?: VerifiedVisitStoryUpdateManyWithoutOrganizationNestedInput
+    concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
+    weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
+    family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
+  }
+
+  export type OrganizationUncheckedUpdateWithoutConsent_recordsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
+    carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
+    clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
+    visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
+    carer_shifts?: CarerShiftUncheckedUpdateManyWithoutOrganizationNestedInput
+    care_logs?: CareLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    family_contacts?: FamilyContactUncheckedUpdateManyWithoutOrganizationNestedInput
+    care_rooms?: CareRoomUncheckedUpdateManyWithoutOrganizationNestedInput
+    carebridge_policies?: CareBridgePolicyUncheckedUpdateManyWithoutOrganizationNestedInput
+    verified_visit_stories?: VerifiedVisitStoryUncheckedUpdateManyWithoutOrganizationNestedInput
+    concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
+    weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
+    family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
+  }
+
+  export type OrganizationCreateWithoutAudit_logsInput = {
+    id?: string
+    name: string
+    ai_summary_enabled?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+    identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
+    carers?: CarerCreateNestedManyWithoutOrganizationInput
+    clients?: ClientCreateNestedManyWithoutOrganizationInput
+    visits?: VisitCreateNestedManyWithoutOrganizationInput
+    carer_shifts?: CarerShiftCreateNestedManyWithoutOrganizationInput
+    care_logs?: CareLogCreateNestedManyWithoutOrganizationInput
+    family_contacts?: FamilyContactCreateNestedManyWithoutOrganizationInput
+    care_rooms?: CareRoomCreateNestedManyWithoutOrganizationInput
+    carebridge_policies?: CareBridgePolicyCreateNestedManyWithoutOrganizationInput
+    verified_visit_stories?: VerifiedVisitStoryCreateNestedManyWithoutOrganizationInput
+    concerns?: ConcernCreateNestedManyWithoutOrganizationInput
+    weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
+    family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
+  }
+
+  export type OrganizationUncheckedCreateWithoutAudit_logsInput = {
+    id?: string
+    name: string
+    ai_summary_enabled?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+    identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
+    carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
+    clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
+    visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
+    carer_shifts?: CarerShiftUncheckedCreateNestedManyWithoutOrganizationInput
+    care_logs?: CareLogUncheckedCreateNestedManyWithoutOrganizationInput
+    family_contacts?: FamilyContactUncheckedCreateNestedManyWithoutOrganizationInput
+    care_rooms?: CareRoomUncheckedCreateNestedManyWithoutOrganizationInput
+    carebridge_policies?: CareBridgePolicyUncheckedCreateNestedManyWithoutOrganizationInput
+    verified_visit_stories?: VerifiedVisitStoryUncheckedCreateNestedManyWithoutOrganizationInput
+    concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
+    weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
+    family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    erasure_queue?: ErasureQueueUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
+  }
+
+  export type OrganizationCreateOrConnectWithoutAudit_logsInput = {
+    where: OrganizationWhereUniqueInput
+    create: XOR<OrganizationCreateWithoutAudit_logsInput, OrganizationUncheckedCreateWithoutAudit_logsInput>
+  }
+
+  export type OrganizationUpsertWithoutAudit_logsInput = {
+    update: XOR<OrganizationUpdateWithoutAudit_logsInput, OrganizationUncheckedUpdateWithoutAudit_logsInput>
+    create: XOR<OrganizationCreateWithoutAudit_logsInput, OrganizationUncheckedCreateWithoutAudit_logsInput>
+    where?: OrganizationWhereInput
+  }
+
+  export type OrganizationUpdateToOneWithWhereWithoutAudit_logsInput = {
+    where?: OrganizationWhereInput
+    data: XOR<OrganizationUpdateWithoutAudit_logsInput, OrganizationUncheckedUpdateWithoutAudit_logsInput>
+  }
+
+  export type OrganizationUpdateWithoutAudit_logsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
+    carers?: CarerUpdateManyWithoutOrganizationNestedInput
+    clients?: ClientUpdateManyWithoutOrganizationNestedInput
+    visits?: VisitUpdateManyWithoutOrganizationNestedInput
+    carer_shifts?: CarerShiftUpdateManyWithoutOrganizationNestedInput
+    care_logs?: CareLogUpdateManyWithoutOrganizationNestedInput
+    family_contacts?: FamilyContactUpdateManyWithoutOrganizationNestedInput
+    care_rooms?: CareRoomUpdateManyWithoutOrganizationNestedInput
+    carebridge_policies?: CareBridgePolicyUpdateManyWithoutOrganizationNestedInput
+    verified_visit_stories?: VerifiedVisitStoryUpdateManyWithoutOrganizationNestedInput
+    concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
+    weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
+    family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
+  }
+
+  export type OrganizationUncheckedUpdateWithoutAudit_logsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
+    carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
+    clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
+    visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
+    carer_shifts?: CarerShiftUncheckedUpdateManyWithoutOrganizationNestedInput
+    care_logs?: CareLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    family_contacts?: FamilyContactUncheckedUpdateManyWithoutOrganizationNestedInput
+    care_rooms?: CareRoomUncheckedUpdateManyWithoutOrganizationNestedInput
+    carebridge_policies?: CareBridgePolicyUncheckedUpdateManyWithoutOrganizationNestedInput
+    verified_visit_stories?: VerifiedVisitStoryUncheckedUpdateManyWithoutOrganizationNestedInput
+    concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
+    weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
+    family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    erasure_queue?: ErasureQueueUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
+  }
+
+  export type OrganizationCreateWithoutErasure_queueInput = {
+    id?: string
+    name: string
+    ai_summary_enabled?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+    identities?: OrganizationIdentityCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipCreateNestedManyWithoutOrganizationInput
+    carers?: CarerCreateNestedManyWithoutOrganizationInput
+    clients?: ClientCreateNestedManyWithoutOrganizationInput
+    visits?: VisitCreateNestedManyWithoutOrganizationInput
+    carer_shifts?: CarerShiftCreateNestedManyWithoutOrganizationInput
+    care_logs?: CareLogCreateNestedManyWithoutOrganizationInput
+    family_contacts?: FamilyContactCreateNestedManyWithoutOrganizationInput
+    care_rooms?: CareRoomCreateNestedManyWithoutOrganizationInput
+    carebridge_policies?: CareBridgePolicyCreateNestedManyWithoutOrganizationInput
+    verified_visit_stories?: VerifiedVisitStoryCreateNestedManyWithoutOrganizationInput
+    concerns?: ConcernCreateNestedManyWithoutOrganizationInput
+    weekly_care_summaries?: WeeklyCareSummaryCreateNestedManyWithoutOrganizationInput
+    family_pulses?: FamilyPulseCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditCreateNestedManyWithoutOrganizationInput
+  }
+
+  export type OrganizationUncheckedCreateWithoutErasure_queueInput = {
+    id?: string
+    name: string
+    ai_summary_enabled?: boolean
+    created_at?: Date | string
+    updated_at?: Date | string
+    identities?: OrganizationIdentityUncheckedCreateNestedManyWithoutOrganizationInput
+    memberships?: OrganizationMembershipUncheckedCreateNestedManyWithoutOrganizationInput
+    carers?: CarerUncheckedCreateNestedManyWithoutOrganizationInput
+    clients?: ClientUncheckedCreateNestedManyWithoutOrganizationInput
+    visits?: VisitUncheckedCreateNestedManyWithoutOrganizationInput
+    carer_shifts?: CarerShiftUncheckedCreateNestedManyWithoutOrganizationInput
+    care_logs?: CareLogUncheckedCreateNestedManyWithoutOrganizationInput
+    family_contacts?: FamilyContactUncheckedCreateNestedManyWithoutOrganizationInput
+    care_rooms?: CareRoomUncheckedCreateNestedManyWithoutOrganizationInput
+    carebridge_policies?: CareBridgePolicyUncheckedCreateNestedManyWithoutOrganizationInput
+    verified_visit_stories?: VerifiedVisitStoryUncheckedCreateNestedManyWithoutOrganizationInput
+    concerns?: ConcernUncheckedCreateNestedManyWithoutOrganizationInput
+    weekly_care_summaries?: WeeklyCareSummaryUncheckedCreateNestedManyWithoutOrganizationInput
+    family_pulses?: FamilyPulseUncheckedCreateNestedManyWithoutOrganizationInput
+    consent_records?: ConsentRecordUncheckedCreateNestedManyWithoutOrganizationInput
+    audit_logs?: AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+    medication_audits?: MedicationAuditUncheckedCreateNestedManyWithoutOrganizationInput
+  }
+
+  export type OrganizationCreateOrConnectWithoutErasure_queueInput = {
+    where: OrganizationWhereUniqueInput
+    create: XOR<OrganizationCreateWithoutErasure_queueInput, OrganizationUncheckedCreateWithoutErasure_queueInput>
+  }
+
+  export type OrganizationUpsertWithoutErasure_queueInput = {
+    update: XOR<OrganizationUpdateWithoutErasure_queueInput, OrganizationUncheckedUpdateWithoutErasure_queueInput>
+    create: XOR<OrganizationCreateWithoutErasure_queueInput, OrganizationUncheckedCreateWithoutErasure_queueInput>
+    where?: OrganizationWhereInput
+  }
+
+  export type OrganizationUpdateToOneWithWhereWithoutErasure_queueInput = {
+    where?: OrganizationWhereInput
+    data: XOR<OrganizationUpdateWithoutErasure_queueInput, OrganizationUncheckedUpdateWithoutErasure_queueInput>
+  }
+
+  export type OrganizationUpdateWithoutErasure_queueInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    identities?: OrganizationIdentityUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUpdateManyWithoutOrganizationNestedInput
+    carers?: CarerUpdateManyWithoutOrganizationNestedInput
+    clients?: ClientUpdateManyWithoutOrganizationNestedInput
+    visits?: VisitUpdateManyWithoutOrganizationNestedInput
+    carer_shifts?: CarerShiftUpdateManyWithoutOrganizationNestedInput
+    care_logs?: CareLogUpdateManyWithoutOrganizationNestedInput
+    family_contacts?: FamilyContactUpdateManyWithoutOrganizationNestedInput
+    care_rooms?: CareRoomUpdateManyWithoutOrganizationNestedInput
+    carebridge_policies?: CareBridgePolicyUpdateManyWithoutOrganizationNestedInput
+    verified_visit_stories?: VerifiedVisitStoryUpdateManyWithoutOrganizationNestedInput
+    concerns?: ConcernUpdateManyWithoutOrganizationNestedInput
+    weekly_care_summaries?: WeeklyCareSummaryUpdateManyWithoutOrganizationNestedInput
+    family_pulses?: FamilyPulseUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUpdateManyWithoutOrganizationNestedInput
+  }
+
+  export type OrganizationUncheckedUpdateWithoutErasure_queueInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ai_summary_enabled?: BoolFieldUpdateOperationsInput | boolean
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    identities?: OrganizationIdentityUncheckedUpdateManyWithoutOrganizationNestedInput
+    memberships?: OrganizationMembershipUncheckedUpdateManyWithoutOrganizationNestedInput
+    carers?: CarerUncheckedUpdateManyWithoutOrganizationNestedInput
+    clients?: ClientUncheckedUpdateManyWithoutOrganizationNestedInput
+    visits?: VisitUncheckedUpdateManyWithoutOrganizationNestedInput
+    carer_shifts?: CarerShiftUncheckedUpdateManyWithoutOrganizationNestedInput
+    care_logs?: CareLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    family_contacts?: FamilyContactUncheckedUpdateManyWithoutOrganizationNestedInput
+    care_rooms?: CareRoomUncheckedUpdateManyWithoutOrganizationNestedInput
+    carebridge_policies?: CareBridgePolicyUncheckedUpdateManyWithoutOrganizationNestedInput
+    verified_visit_stories?: VerifiedVisitStoryUncheckedUpdateManyWithoutOrganizationNestedInput
+    concerns?: ConcernUncheckedUpdateManyWithoutOrganizationNestedInput
+    weekly_care_summaries?: WeeklyCareSummaryUncheckedUpdateManyWithoutOrganizationNestedInput
+    family_pulses?: FamilyPulseUncheckedUpdateManyWithoutOrganizationNestedInput
+    consent_records?: ConsentRecordUncheckedUpdateManyWithoutOrganizationNestedInput
+    audit_logs?: AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+    medication_audits?: MedicationAuditUncheckedUpdateManyWithoutOrganizationNestedInput
   }
 
   export type VisitCreateManyCarerInput = {
@@ -65030,6 +68507,7 @@ export namespace Prisma {
 
   export type MedicationAuditCreateManyPrescriptionInput = {
     id?: string
+    organization_id?: string | null
     medication_administration_id?: string | null
     action: $Enums.MedicationAuditAction
     actor_id: string
@@ -65088,11 +68566,13 @@ export namespace Prisma {
     actor_role?: StringFieldUpdateOperationsInput | string
     changes?: StringFieldUpdateOperationsInput | string
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    organization?: OrganizationUpdateOneWithoutMedication_auditsNestedInput
     medication_administration?: MedicationAdministrationUpdateOneWithoutAuditsNestedInput
   }
 
   export type MedicationAuditUncheckedUpdateWithoutPrescriptionInput = {
     id?: StringFieldUpdateOperationsInput | string
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     medication_administration_id?: NullableStringFieldUpdateOperationsInput | string | null
     action?: EnumMedicationAuditActionFieldUpdateOperationsInput | $Enums.MedicationAuditAction
     actor_id?: StringFieldUpdateOperationsInput | string
@@ -65103,6 +68583,7 @@ export namespace Prisma {
 
   export type MedicationAuditUncheckedUpdateManyWithoutPrescriptionInput = {
     id?: StringFieldUpdateOperationsInput | string
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     medication_administration_id?: NullableStringFieldUpdateOperationsInput | string | null
     action?: EnumMedicationAuditActionFieldUpdateOperationsInput | $Enums.MedicationAuditAction
     actor_id?: StringFieldUpdateOperationsInput | string
@@ -65148,6 +68629,7 @@ export namespace Prisma {
 
   export type MedicationAuditCreateManyMedication_administrationInput = {
     id?: string
+    organization_id?: string | null
     prescription_id?: string | null
     action: $Enums.MedicationAuditAction
     actor_id: string
@@ -65268,11 +68750,13 @@ export namespace Prisma {
     actor_role?: StringFieldUpdateOperationsInput | string
     changes?: StringFieldUpdateOperationsInput | string
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    organization?: OrganizationUpdateOneWithoutMedication_auditsNestedInput
     prescription?: PrescriptionUpdateOneWithoutAuditsNestedInput
   }
 
   export type MedicationAuditUncheckedUpdateWithoutMedication_administrationInput = {
     id?: StringFieldUpdateOperationsInput | string
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     prescription_id?: NullableStringFieldUpdateOperationsInput | string | null
     action?: EnumMedicationAuditActionFieldUpdateOperationsInput | $Enums.MedicationAuditAction
     actor_id?: StringFieldUpdateOperationsInput | string
@@ -65283,6 +68767,7 @@ export namespace Prisma {
 
   export type MedicationAuditUncheckedUpdateManyWithoutMedication_administrationInput = {
     id?: StringFieldUpdateOperationsInput | string
+    organization_id?: NullableStringFieldUpdateOperationsInput | string | null
     prescription_id?: NullableStringFieldUpdateOperationsInput | string | null
     action?: EnumMedicationAuditActionFieldUpdateOperationsInput | $Enums.MedicationAuditAction
     actor_id?: StringFieldUpdateOperationsInput | string
@@ -65297,6 +68782,21 @@ export namespace Prisma {
     identity_subject?: string | null
     normalized_email?: string | null
     notes?: string | null
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type OrganizationMembershipCreateManyOrganizationInput = {
+    id?: string
+    identity_provider: string
+    auth_subject: string
+    normalized_email?: string | null
+    role: string
+    status?: $Enums.OrganizationMembershipStatus
+    external_organization_id?: string | null
+    external_membership_id?: string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    revoked_at?: Date | string | null
     created_at?: Date | string
     updated_at?: Date | string
   }
@@ -65516,6 +69016,57 @@ export namespace Prisma {
     updated_at?: Date | string
   }
 
+  export type ConsentRecordCreateManyOrganizationInput = {
+    id?: string
+    user_id: string
+    consent_type: string
+    purpose: string
+    granted: boolean
+    granted_at: Date | string
+    withdrawn_at?: Date | string | null
+    legal_basis: string
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type AuditLogCreateManyOrganizationInput = {
+    id?: string
+    user_id?: string | null
+    action: string
+    resource_type: string
+    resource_id?: string | null
+    old_values?: NullableJsonNullValueInput | InputJsonValue
+    new_values?: NullableJsonNullValueInput | InputJsonValue
+    ip_address?: string | null
+    user_agent?: string | null
+    timestamp?: Date | string
+  }
+
+  export type ErasureQueueCreateManyOrganizationInput = {
+    id?: string
+    user_id: string
+    request_type: string
+    status?: string
+    requested_at?: Date | string
+    scheduled_for?: Date | string | null
+    completed_at?: Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: Date | string
+    updated_at?: Date | string
+  }
+
+  export type MedicationAuditCreateManyOrganizationInput = {
+    id?: string
+    prescription_id?: string | null
+    medication_administration_id?: string | null
+    action: $Enums.MedicationAuditAction
+    actor_id: string
+    actor_role: string
+    changes: string
+    timestamp?: Date | string
+  }
+
   export type OrganizationIdentityUpdateWithoutOrganizationInput = {
     id?: StringFieldUpdateOperationsInput | string
     identity_provider?: StringFieldUpdateOperationsInput | string
@@ -65542,6 +69093,51 @@ export namespace Prisma {
     identity_subject?: NullableStringFieldUpdateOperationsInput | string | null
     normalized_email?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type OrganizationMembershipUpdateWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    identity_provider?: StringFieldUpdateOperationsInput | string
+    auth_subject?: StringFieldUpdateOperationsInput | string
+    normalized_email?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
+    status?: EnumOrganizationMembershipStatusFieldUpdateOperationsInput | $Enums.OrganizationMembershipStatus
+    external_organization_id?: NullableStringFieldUpdateOperationsInput | string | null
+    external_membership_id?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    revoked_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type OrganizationMembershipUncheckedUpdateWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    identity_provider?: StringFieldUpdateOperationsInput | string
+    auth_subject?: StringFieldUpdateOperationsInput | string
+    normalized_email?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
+    status?: EnumOrganizationMembershipStatusFieldUpdateOperationsInput | $Enums.OrganizationMembershipStatus
+    external_organization_id?: NullableStringFieldUpdateOperationsInput | string | null
+    external_membership_id?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    revoked_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type OrganizationMembershipUncheckedUpdateManyWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    identity_provider?: StringFieldUpdateOperationsInput | string
+    auth_subject?: StringFieldUpdateOperationsInput | string
+    normalized_email?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
+    status?: EnumOrganizationMembershipStatusFieldUpdateOperationsInput | $Enums.OrganizationMembershipStatus
+    external_organization_id?: NullableStringFieldUpdateOperationsInput | string | null
+    external_membership_id?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    revoked_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -66249,6 +69845,159 @@ export namespace Prisma {
     note?: NullableStringFieldUpdateOperationsInput | string | null
     created_at?: DateTimeFieldUpdateOperationsInput | Date | string
     updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ConsentRecordUpdateWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: StringFieldUpdateOperationsInput | string
+    consent_type?: StringFieldUpdateOperationsInput | string
+    purpose?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    granted_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    withdrawn_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    legal_basis?: StringFieldUpdateOperationsInput | string
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ConsentRecordUncheckedUpdateWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: StringFieldUpdateOperationsInput | string
+    consent_type?: StringFieldUpdateOperationsInput | string
+    purpose?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    granted_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    withdrawn_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    legal_basis?: StringFieldUpdateOperationsInput | string
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ConsentRecordUncheckedUpdateManyWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: StringFieldUpdateOperationsInput | string
+    consent_type?: StringFieldUpdateOperationsInput | string
+    purpose?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    granted_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    withdrawn_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    legal_basis?: StringFieldUpdateOperationsInput | string
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AuditLogUpdateWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: NullableStringFieldUpdateOperationsInput | string | null
+    action?: StringFieldUpdateOperationsInput | string
+    resource_type?: StringFieldUpdateOperationsInput | string
+    resource_id?: NullableStringFieldUpdateOperationsInput | string | null
+    old_values?: NullableJsonNullValueInput | InputJsonValue
+    new_values?: NullableJsonNullValueInput | InputJsonValue
+    ip_address?: NullableStringFieldUpdateOperationsInput | string | null
+    user_agent?: NullableStringFieldUpdateOperationsInput | string | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AuditLogUncheckedUpdateWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: NullableStringFieldUpdateOperationsInput | string | null
+    action?: StringFieldUpdateOperationsInput | string
+    resource_type?: StringFieldUpdateOperationsInput | string
+    resource_id?: NullableStringFieldUpdateOperationsInput | string | null
+    old_values?: NullableJsonNullValueInput | InputJsonValue
+    new_values?: NullableJsonNullValueInput | InputJsonValue
+    ip_address?: NullableStringFieldUpdateOperationsInput | string | null
+    user_agent?: NullableStringFieldUpdateOperationsInput | string | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AuditLogUncheckedUpdateManyWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: NullableStringFieldUpdateOperationsInput | string | null
+    action?: StringFieldUpdateOperationsInput | string
+    resource_type?: StringFieldUpdateOperationsInput | string
+    resource_id?: NullableStringFieldUpdateOperationsInput | string | null
+    old_values?: NullableJsonNullValueInput | InputJsonValue
+    new_values?: NullableJsonNullValueInput | InputJsonValue
+    ip_address?: NullableStringFieldUpdateOperationsInput | string | null
+    user_agent?: NullableStringFieldUpdateOperationsInput | string | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ErasureQueueUpdateWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: StringFieldUpdateOperationsInput | string
+    request_type?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    requested_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    scheduled_for?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completed_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ErasureQueueUncheckedUpdateWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: StringFieldUpdateOperationsInput | string
+    request_type?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    requested_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    scheduled_for?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completed_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ErasureQueueUncheckedUpdateManyWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    user_id?: StringFieldUpdateOperationsInput | string
+    request_type?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    requested_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    scheduled_for?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completed_at?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    created_at?: DateTimeFieldUpdateOperationsInput | Date | string
+    updated_at?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type MedicationAuditUpdateWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    action?: EnumMedicationAuditActionFieldUpdateOperationsInput | $Enums.MedicationAuditAction
+    actor_id?: StringFieldUpdateOperationsInput | string
+    actor_role?: StringFieldUpdateOperationsInput | string
+    changes?: StringFieldUpdateOperationsInput | string
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    prescription?: PrescriptionUpdateOneWithoutAuditsNestedInput
+    medication_administration?: MedicationAdministrationUpdateOneWithoutAuditsNestedInput
+  }
+
+  export type MedicationAuditUncheckedUpdateWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    prescription_id?: NullableStringFieldUpdateOperationsInput | string | null
+    medication_administration_id?: NullableStringFieldUpdateOperationsInput | string | null
+    action?: EnumMedicationAuditActionFieldUpdateOperationsInput | $Enums.MedicationAuditAction
+    actor_id?: StringFieldUpdateOperationsInput | string
+    actor_role?: StringFieldUpdateOperationsInput | string
+    changes?: StringFieldUpdateOperationsInput | string
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type MedicationAuditUncheckedUpdateManyWithoutOrganizationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    prescription_id?: NullableStringFieldUpdateOperationsInput | string | null
+    medication_administration_id?: NullableStringFieldUpdateOperationsInput | string | null
+    action?: EnumMedicationAuditActionFieldUpdateOperationsInput | $Enums.MedicationAuditAction
+    actor_id?: StringFieldUpdateOperationsInput | string
+    actor_role?: StringFieldUpdateOperationsInput | string
+    changes?: StringFieldUpdateOperationsInput | string
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type CareRoomMembershipCreateManyFamily_contactInput = {
@@ -67304,6 +71053,10 @@ export namespace Prisma {
      * @deprecated Use OrganizationIdentityDefaultArgs instead
      */
     export type OrganizationIdentityArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = OrganizationIdentityDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use OrganizationMembershipDefaultArgs instead
+     */
+    export type OrganizationMembershipArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = OrganizationMembershipDefaultArgs<ExtArgs>
     /**
      * @deprecated Use CareLogDefaultArgs instead
      */

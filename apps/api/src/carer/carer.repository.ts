@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '@oasis/db';
 
 @Injectable()
@@ -22,27 +22,37 @@ export class CarerRepository {
     is_active: boolean;
   }) {
     // `id` is the Cognito sub.
-    return this.prisma.carer.upsert({
+    const existing = await this.prisma.carer.findUnique({
       where: { id: input.id },
-      create: {
-        id: input.id,
-        organization_id: input.organization_id,
-        first_name: input.first_name,
-        last_name: input.last_name,
-        email: input.email,
-        phone: input.phone ?? null,
-        is_active: input.is_active,
-        // hire_date default is now()
-      },
-      update: {
-        organization_id: input.organization_id,
-        first_name: input.first_name,
-        last_name: input.last_name,
-        email: input.email,
-        phone: input.phone ?? null,
-        is_active: input.is_active,
-        deleted_at: null,
-      },
+      select: { id: true, organization_id: true },
+    });
+
+    if (existing && existing.organization_id !== input.organization_id) {
+      throw new ForbiddenException('Carer profile already belongs to another organization');
+    }
+
+    const data = {
+      organization_id: input.organization_id,
+      first_name: input.first_name,
+      last_name: input.last_name,
+      email: input.email,
+      phone: input.phone ?? null,
+      is_active: input.is_active,
+      deleted_at: null,
+    };
+
+    if (!existing) {
+      return this.prisma.carer.create({
+        data: {
+          id: input.id,
+          ...data,
+        },
+      });
+    }
+
+    return this.prisma.carer.update({
+      where: { id: input.id },
+      data,
     });
   }
 }

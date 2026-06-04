@@ -541,9 +541,14 @@ export class CarebridgeService {
   }
 
   private async createAudit(userId: string | undefined, action: string, resourceType: string, resourceId: string, newValues: unknown) {
+    const organizationId =
+      typeof (newValues as any)?.organizationId === 'string'
+        ? (newValues as any).organizationId
+        : null;
     await this.prisma.auditLog.create({
       data: {
         user_id: userId ?? null,
+        organization_id: organizationId,
         action,
         resource_type: resourceType,
         resource_id: resourceId,
