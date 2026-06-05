@@ -11,22 +11,28 @@ export async function POST(request: NextRequest) {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql';
     const body = await request.text();
     
-    // Read NextAuth JWT from request cookies in route handlers.
-    // Prefer the Cognito *access token* for backend API calls (it typically carries groups/roles
-    // and is used consistently elsewhere in the app, e.g. `/api/stats/today`).
-    const token = await getToken({
-      req: request as any,
-      secret: process.env.NEXTAUTH_SECRET,
-    });
+    const directAuthorization = request.headers.get('authorization') || '';
+    const directBearer = directAuthorization.toLowerCase().startsWith('bearer ')
+      ? directAuthorization.slice('bearer '.length).trim()
+      : '';
 
-    const session = await getServerSession(authOptions);
+    // Clerk production UI will supply a bearer token for the active organisation.
+    // Until live Clerk is configured, preserve the existing NextAuth token path.
+    const token = directBearer
+      ? null
+      : await getToken({
+          req: request as any,
+          secret: process.env.NEXTAUTH_SECRET,
+        });
+
+    const session = directBearer ? null : await getServerSession(authOptions);
 
     const tokenAccessToken = (token as any)?.accessToken;
     const sessionAccessToken = (session as any)?.accessToken;
     const tokenIdToken = (token as any)?.idToken;
     const sessionIdToken = (session as any)?.idToken;
 
-    const accessToken = tokenAccessToken || sessionAccessToken || tokenIdToken || sessionIdToken;
+    const accessToken = directBearer || tokenAccessToken || sessionAccessToken || tokenIdToken || sessionIdToken;
 
     if (!accessToken) {
       return new NextResponse('Unauthorized', { status: 401 });

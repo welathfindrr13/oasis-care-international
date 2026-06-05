@@ -53,3 +53,22 @@ test('NEXT_PUBLIC_LOCAL_AUTH_ENABLED also enables local mode in development', ()
 
   assert.equal(mode, 'local');
 });
+
+test('AUTH_IDENTITY_PROVIDER=clerk selects Clerk mode even outside local auth', () => {
+  const mode = resolveAuthMode({
+    NODE_ENV: 'production',
+    AUTH_IDENTITY_PROVIDER: 'clerk',
+    LOCAL_AUTH_ENABLED: 'false',
+  } as NodeJS.ProcessEnv);
+
+  assert.equal(mode, 'clerk');
+});
+
+test('NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk selects Clerk mode for browser-side login', () => {
+  const mode = resolveAuthMode({
+    NODE_ENV: 'production',
+    NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: 'clerk',
+  } as NodeJS.ProcessEnv);
+
+  assert.equal(mode, 'clerk');
+});

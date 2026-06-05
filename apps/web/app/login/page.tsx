@@ -4,7 +4,7 @@ import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 
-import { isLocalAuthEnabled } from '../../lib/auth/mode';
+import { isLocalAuthEnabled, resolveAuthMode } from '../../lib/auth/mode';
 
 function LoginContent() {
   const router = useRouter();
@@ -15,10 +15,16 @@ function LoginContent() {
     NODE_ENV: process.env.NODE_ENV,
     NEXT_PUBLIC_LOCAL_AUTH_ENABLED: process.env.NEXT_PUBLIC_LOCAL_AUTH_ENABLED,
   } as NodeJS.ProcessEnv);
+  const authMode = resolveAuthMode({
+    NODE_ENV: process.env.NODE_ENV,
+    AUTH_IDENTITY_PROVIDER: process.env.NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER,
+    NEXT_PUBLIC_LOCAL_AUTH_ENABLED: process.env.NEXT_PUBLIC_LOCAL_AUTH_ENABLED,
+  } as NodeJS.ProcessEnv);
+  const clerkSignInUrl = process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL;
   const [role, setRole] = useState('admin');
   const errorMessage =
     error === 'OAuthSignin'
-      ? 'Authentication provider configuration is invalid. Please check Cognito issuer/client settings.'
+      ? 'Authentication provider configuration is invalid. Please check the production auth provider settings.'
       : error === 'OAuthCallback'
       ? 'There was a problem signing in. Please try again.'
       : error === 'Configuration'
@@ -70,6 +76,8 @@ function LoginContent() {
               <p className="mt-2 text-sm text-slate-500">
                 {localAuthEnabled
                   ? 'Choose a local workspace for product testing'
+                  : authMode === 'clerk'
+                  ? 'Sign in with the configured Clerk workspace'
                   : 'Sign in to access your care command centre'}
               </p>
             </div>
@@ -109,6 +117,17 @@ function LoginContent() {
                   Continue
                 </button>
               </div>
+            ) : authMode === 'clerk' ? (
+              <a
+                href={clerkSignInUrl || '#'}
+                aria-disabled={!clerkSignInUrl}
+                className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                </svg>
+                Continue with Clerk
+              </a>
             ) : (
               <button
                 onClick={() => signIn('cognito', { callbackUrl }, { prompt: 'login' })}

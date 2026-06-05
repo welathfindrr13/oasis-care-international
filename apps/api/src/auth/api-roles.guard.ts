@@ -173,12 +173,23 @@ export class ApiRolesGuard extends RolesGuard implements CanActivate {
     }
 
     try {
+      const organizationFilter = organizationId
+        ? identityProvider === 'clerk'
+          ? {
+              OR: [
+                { organization_id: organizationId },
+                { external_organization_id: organizationId },
+              ],
+            }
+          : { organization_id: organizationId }
+        : {};
+
       const memberships = await (this.prisma as any).organizationMembership.findMany({
         where: {
           identity_provider: identityProvider,
           auth_subject: userId,
           status: 'ACTIVE',
-          ...(organizationId ? { organization_id: organizationId } : {}),
+          ...organizationFilter,
         },
         select: {
           id: true,

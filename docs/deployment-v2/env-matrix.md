@@ -18,10 +18,14 @@ This matrix is generated from current code references and Deployment V2 template
 | `NEXT_PUBLIC_API_URL` | Web | Yes | Yes | web GraphQL clients and route proxy | `https://care.example.com/graphql` | Web routes proxy to wrong API; build may bake wrong public URL. |
 | `NEXT_PUBLIC_SITE_URL` | Web | Yes | Yes | `apps/web/lib/url.ts`, Compose | `https://care.example.com` | Absolute app links may be wrong. |
 | `ALLOWED_ORIGINS` | API | Yes | No | `apps/api/src/main.ts` | `https://care.example.com` | CORS may reject web or allow unsafe fallback. |
-| `AUTH_IDENTITY_PROVIDER` | API/auth | Yes | No | `apps/api/src/auth/api-roles.guard.ts` | `cognito` | Org identity mapping uses default; preflight requires explicit value. |
-| `COGNITO_ISSUER` | Web/API auth | Yes for current code | No | NextAuth and JWT strategy | `https://issuer.example.com/...` | Web/API auth initialization fails. |
-| `COGNITO_CLIENT_ID` | Web/API auth | Yes for current code | No | NextAuth and JWT strategy | provider client id | Token validation fails or auth init fails. |
-| `COGNITO_CLIENT_SECRET` | Web auth | Yes for current code | No | NextAuth provider | provider client secret | Sign-in fails. |
+| `AUTH_IDENTITY_PROVIDER` | API/auth | Yes | No | API JWT strategy, web auth mode, Compose | `clerk` | Preflight fails unless production-like Deployment V2 uses Clerk. |
+| `CLERK_ISSUER` | API auth | Yes | No | JWT strategy, preflight | `https://<clerk-instance>` | API JWT verification fails closed. |
+| `CLERK_JWKS_URL` | API auth | Yes | No | JWT strategy, preflight | `https://<clerk-instance>/.well-known/jwks.json` | API cannot resolve Clerk signing keys. |
+| `CLERK_AUDIENCE` | API auth | Required unless `CLERK_AUTHORIZED_PARTIES` is set | No | JWT strategy, preflight | `oasis-api` | Token audience validation is unavailable. |
+| `CLERK_AUTHORIZED_PARTIES` | API auth | Required unless `CLERK_AUDIENCE` is set | No | JWT strategy, preflight | `https://care.example.com` | Token authorized-party validation is unavailable. |
+| `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER` | Web auth | Yes | Yes | login/auth mode, Compose | `clerk` | Login may render the wrong provider path. |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Web auth | Yes | Yes | Compose/build args, preflight | `pk_live_...` | Clerk browser session cannot be initialized once live Clerk UI is wired. |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Web auth | Yes | Yes | login page, Compose/build args, preflight | `https://care.example.com/sign-in` | Staff/family users cannot reach Clerk sign-in. |
 | `LOCAL_AUTH_ENABLED` | Web/API | Yes, must be `false` | No | local auth mode checks | `false` | Preflight fails if true in production. |
 | `NEXT_PUBLIC_LOCAL_AUTH_ENABLED` | Web | Yes, must be `false` | Yes | login/local auth mode | `false` | Preflight fails if true in production. |
 | `DEMO_MODE` | API | Yes, must be `false` or absent | No | demo seed guard, health | `false` | Preflight fails if true in production. |
@@ -38,10 +42,11 @@ This matrix is generated from current code references and Deployment V2 template
 | `BEDROCK_MODEL` | API AI only | No for core runtime | No | AI summary service | Required only if AI summary generation is enabled. |
 | `BEDROCK_MODEL_FALLBACKS` | API AI only | No | No | AI summary service | Optional comma-separated fallback model ids. |
 | `JWT_JWKS_TIMEOUT_MS` | API auth | No | No | JWT strategy | Optional JWKS timeout override. |
-| `COGNITO_LOGOUT_URL` | Web auth | No | No | logout route | Optional explicit logout URL. |
-| `COGNITO_DOMAIN` | Web auth | No | No | logout route | Optional hosted UI domain. |
-| `COGNITO_HOSTED_UI_DOMAIN` | Web auth | No | No | logout route | Optional hosted UI domain alias. |
-| `COGNITO_LOGOUT_REDIRECT_URI` | Web auth | No | No | logout route | Optional post-logout redirect. |
+| `CLERK_SECRET_KEY` | API/web auth | No until server-side Clerk SDK operations are added | No | preflight warning | Optional server-side Clerk secret. Never commit it. |
+| `COGNITO_LOGOUT_URL` | Legacy web auth | No | No | logout route | Legacy Cognito-only logout support. Not part of Deployment V2 production auth. |
+| `COGNITO_DOMAIN` | Legacy web auth | No | No | logout route | Legacy Cognito-only hosted UI domain. Not part of Deployment V2 production auth. |
+| `COGNITO_HOSTED_UI_DOMAIN` | Legacy web auth | No | No | logout route | Legacy Cognito-only hosted UI domain alias. Not part of Deployment V2 production auth. |
+| `COGNITO_LOGOUT_REDIRECT_URI` | Legacy web auth | No | No | logout route | Legacy Cognito-only post-logout redirect. Not part of Deployment V2 production auth. |
 | `APP_VERSION` / `VERSION` | API/web health | No | No | health endpoints | Useful for releases. |
 | `APP_COMMIT_SHA` / `COMMIT_SHA` | API/web health | No | No | health endpoints | Useful for incident triage. |
 | `APP_ENVIRONMENT` / `ENVIRONMENT` / `STAGE` | API/web health | No | No | health endpoints | Useful for dashboards. |
@@ -50,4 +55,4 @@ This matrix is generated from current code references and Deployment V2 template
 
 ## Production Auth Caveat
 
-The current production implementation remains Cognito-shaped. If Oasis moves to a non-AWS OIDC provider, the provider decision must include code/config changes and fresh staff/family/CareBridge QA. Do not treat `AUTH_IDENTITY_PROVIDER` alone as proof of generic OIDC support.
+Deployment V2 now expects Clerk-shaped production auth configuration in repo-side preflight and API JWT validation. This is not a live-auth sign-off. The Clerk dashboard, organization mapping, staff/family sessions, browser callback flow, and authenticated CareBridge boundary checks still need to be configured and proven before any real client data is used.

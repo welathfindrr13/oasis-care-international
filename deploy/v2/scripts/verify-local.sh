@@ -25,10 +25,14 @@ NEXTAUTH_URL=https://care.example.org
 NEXT_PUBLIC_API_URL=https://care.example.org/graphql
 NEXT_PUBLIC_SITE_URL=https://care.example.org
 ALLOWED_ORIGINS=https://care.example.org
-AUTH_IDENTITY_PROVIDER=cognito
-COGNITO_ISSUER=https://auth.provider.org/oauth2/default
-COGNITO_CLIENT_ID=oasis-production-client
-COGNITO_CLIENT_SECRET=0123456789abcdef0123456789abcdefcognito
+AUTH_IDENTITY_PROVIDER=clerk
+CLERK_ISSUER=https://clerk.provider.org
+CLERK_JWKS_URL=https://clerk.provider.org/.well-known/jwks.json
+CLERK_AUDIENCE=oasis-production-api
+CLERK_AUTHORIZED_PARTIES=https://care.example.org
+NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_abcdefghijklmnopqrstuvwxyz1234567890
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=https://care.example.org/sign-in
 LOCAL_AUTH_ENABLED=false
 NEXT_PUBLIC_LOCAL_AUTH_ENABLED=false
 DEMO_MODE=false
@@ -40,7 +44,8 @@ ENV
 
 cd "$REPO_ROOT"
 
-pnpm --dir libs/db exec prisma validate
+DATABASE_URL=postgresql://oasis:0123456789abcdef0123456789abcdef@postgres:5432/oasis \
+  pnpm --dir libs/db exec prisma validate
 pnpm --filter @oasis/api test
 pnpm --filter @oasis/api build
 pnpm --filter @oasis/web build

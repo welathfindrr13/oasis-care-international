@@ -68,11 +68,11 @@ Required areas:
 - Postgres database/user/password;
 - `JWT_SECRET` and `NEXTAUTH_SECRET`;
 - public app/API URLs, with GraphQL routed at `/graphql`;
-- production auth provider values.
+- Clerk production auth provider values, including issuer, JWKS URL, public key, sign-in URL, and audience or authorized-party validation.
 
 See `docs/deployment-v2/env-matrix.md` for the canonical variable matrix.
 
-Known blocker: production auth provider selection is still unresolved if Oasis moves away from AWS Cognito. Do not use real client data until this is decided and tested.
+Known blocker: repo-side Deployment V2 config now expects Clerk, but the live Clerk dashboard, organization mapping, browser session flow, and authenticated staff/family/CareBridge QA are not complete. Do not use real client data until those checks pass.
 
 ## Startup Flow
 

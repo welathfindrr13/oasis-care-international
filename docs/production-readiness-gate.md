@@ -8,7 +8,7 @@ Deployment V2 means the cost-controlled, production-grade but not over-engineere
 
 | Area | Severity | Current evidence | Fixed by this gate | Remaining blocker |
 | --- | --- | --- | --- | --- |
-| Production auth provider | P0 | Web/API still expect Cognito-shaped production auth unless local dev mode is used. | Env preflight now fails if production auth config is missing or placeholder. | Choose and test the production provider; prove staff/family role and organisation claims. |
+| Production auth provider | P0 | Deployment V2 now has repo-side Clerk JWT/env support and rejects Cognito/local auth as the production gate. | API validates Clerk issuer/audience/authorized-party/org/role claims, web forwards bearer tokens, and env preflight requires Clerk-shaped values. | Configure the live Clerk dashboard; prove staff/family role, organization claims, browser session flow, and CareBridge boundaries. |
 | Authenticated CareBridge boundary QA | P0 | Smoke script had unauthenticated route checks and family-cookie TODOs. | Smoke script now supports bearer/cookie staff and family probes with explicit skips when credentials are absent. | Run with real staff/family sessions after auth provider exists. |
 | Real VPS runtime | P1 | Docker images, Compose config, and Caddy validation can pass locally. | Verification script collects the safe local gates in one place. | Run `docker compose up` on a disposable VPS with real domain/env. |
 | Env/preflight safety | P1 | Deployment V2 env template existed, but placeholders could be missed. | Preflight validator fails on missing vars, placeholder values, unsafe localhost, local/demo auth in production, and weak obvious defaults. | Operator must run preflight against the real runtime env before any rehearsal. |
@@ -21,7 +21,7 @@ Deployment V2 means the cost-controlled, production-grade but not over-engineere
 
 Real client data is blocked until all of these are complete and evidenced:
 
-- Production auth provider selected, configured, and tested with staff/admin/family users.
+- Live Clerk production auth configured and tested with staff/admin/family users.
 - Authenticated CareBridge smoke passes with staff and family credentials/tokens.
 - Family users cannot access raw visits, care notes, medication rows, care-planning internals, evidence packs, staff/admin/reporting data, or approval queues.
 - Medication visibility for family remains status-only by default: no names, no doses, no advice.

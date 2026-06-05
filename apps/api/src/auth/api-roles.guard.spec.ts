@@ -2,6 +2,12 @@ import { Reflector } from '@nestjs/core';
 import { ApiRolesGuard } from './api-roles.guard';
 
 describe('ApiRolesGuard organization resolution', () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
   function createGuard() {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(false),
@@ -70,7 +76,6 @@ describe('ApiRolesGuard organization resolution', () => {
       organizationId: null,
     };
 
-    const previous = process.env.TENANT_MEMBERSHIP_REQUIRED;
     process.env.TENANT_MEMBERSHIP_REQUIRED = 'true';
     prisma.organizationMembership.findMany.mockResolvedValue([]);
 
@@ -80,7 +85,6 @@ describe('ApiRolesGuard organization resolution', () => {
 
     expect(prisma.organizationIdentity.findMany).not.toHaveBeenCalled();
     expect(prisma.carer.findMany).not.toHaveBeenCalled();
-    process.env.TENANT_MEMBERSHIP_REQUIRED = previous;
   });
 
   it('does not use email-domain inference when tenant membership is required', async () => {
@@ -91,7 +95,6 @@ describe('ApiRolesGuard organization resolution', () => {
       organizationId: null,
     };
 
-    const previous = process.env.TENANT_MEMBERSHIP_REQUIRED;
     process.env.TENANT_MEMBERSHIP_REQUIRED = 'true';
     prisma.organizationMembership.findMany.mockResolvedValue([]);
 
@@ -101,7 +104,48 @@ describe('ApiRolesGuard organization resolution', () => {
 
     expect(user.organizationId).toBeNull();
     expect(prisma.organizationIdentity.findMany).not.toHaveBeenCalled();
-    process.env.TENANT_MEMBERSHIP_REQUIRED = previous;
+  });
+
+  it('resolves Clerk membership through external organization id from token org claim', async () => {
+    const { guard, prisma } = createGuard();
+    process.env.AUTH_IDENTITY_PROVIDER = 'clerk';
+    process.env.TENANT_MEMBERSHIP_REQUIRED = 'true';
+
+    const user: any = {
+      id: 'user_clerk_123',
+      email: 'manager@example.org',
+      organizationId: 'org_clerk_external',
+      role: 'user',
+      realm_access: { roles: ['user'] },
+    };
+
+    prisma.organizationMembership.findMany.mockResolvedValueOnce([
+      {
+        id: 'membership-clerk-1',
+        organization_id: 'org_internal_123',
+        role: 'admin',
+        status: 'ACTIVE',
+      },
+    ]);
+
+    await (guard as any).enrichOrganizationContext(user);
+
+    expect(user.organizationId).toBe('org_internal_123');
+    expect(user.organizationMembershipId).toBe('membership-clerk-1');
+    expect(user.role).toBe('admin');
+    expect(prisma.organizationMembership.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          identity_provider: 'clerk',
+          auth_subject: 'user_clerk_123',
+          status: 'ACTIVE',
+          OR: [
+            { organization_id: 'org_clerk_external' },
+            { external_organization_id: 'org_clerk_external' },
+          ],
+        }),
+      }),
+    );
   });
 
   it('keeps legacy carer lookup available outside the SaaS membership gate', async () => {
