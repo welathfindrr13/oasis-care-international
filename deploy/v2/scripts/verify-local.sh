@@ -30,8 +30,9 @@ CLERK_ISSUER=https://clerk.provider.org
 CLERK_JWKS_URL=https://clerk.provider.org/.well-known/jwks.json
 CLERK_AUDIENCE=oasis-production-api
 CLERK_AUTHORIZED_PARTIES=https://care.example.org
+CLERK_SECRET_KEY=0123456789abcdef0123456789abcdefclerk
 NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_abcdefghijklmnopqrstuvwxyz1234567890
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_Y2FyZS5leGFtcGxlLm9yZyQ=
 NEXT_PUBLIC_CLERK_SIGN_IN_URL=https://care.example.org/sign-in
 LOCAL_AUTH_ENABLED=false
 NEXT_PUBLIC_LOCAL_AUTH_ENABLED=false

@@ -16,7 +16,7 @@ ARG NEXT_PUBLIC_API_URL=https://app.oasis-care.local/api/graphql
 ARG NEXT_PUBLIC_SITE_URL=https://app.oasis-care.local
 ARG NEXTAUTH_URL=https://app.oasis-care.local
 ARG NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk
-ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_synthetic_build_only_0000000000000000000000000000
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_c3ludGhldGljLWNsZXJrLm9hc2lzLmludmFsaWQk
 ARG NEXT_PUBLIC_CLERK_SIGN_IN_URL=https://app.oasis-care.local/sign-in
 
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL

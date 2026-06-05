@@ -24,8 +24,9 @@ function validEnv(overrides = {}) {
     CLERK_JWKS_URL: 'https://clerk.provider.org/.well-known/jwks.json',
     CLERK_AUDIENCE: 'oasis-production-api',
     CLERK_AUTHORIZED_PARTIES: 'https://care.example.org',
+    CLERK_SECRET_KEY: `${strongSecret}clerk`,
     NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: 'clerk',
-    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_live_abcdefghijklmnopqrstuvwxyz1234567890',
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_Y2FyZS5leGFtcGxlLm9yZyQ=',
     NEXT_PUBLIC_CLERK_SIGN_IN_URL: 'https://care.example.org/sign-in',
     LOCAL_AUTH_ENABLED: 'false',
     NEXT_PUBLIC_LOCAL_AUTH_ENABLED: 'false',
@@ -83,6 +84,7 @@ test('Clerk production env requires issuer, JWKS, public key, sign-in URL, and a
   const result = validate(validEnv({
     CLERK_ISSUER: '',
     CLERK_JWKS_URL: '',
+    CLERK_SECRET_KEY: '',
     CLERK_AUDIENCE: '',
     CLERK_AUTHORIZED_PARTIES: '',
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: '',
@@ -91,6 +93,7 @@ test('Clerk production env requires issuer, JWKS, public key, sign-in URL, and a
 
   assert(result.errors.some((error) => error.includes('CLERK_ISSUER')));
   assert(result.errors.some((error) => error.includes('CLERK_JWKS_URL')));
+  assert(result.errors.some((error) => error.includes('CLERK_SECRET_KEY')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_SIGN_IN_URL')));
   assert(result.errors.some((error) => error.includes('CLERK_AUDIENCE or CLERK_AUTHORIZED_PARTIES')));

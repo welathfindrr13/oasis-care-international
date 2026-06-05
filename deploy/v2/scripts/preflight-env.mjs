@@ -29,6 +29,7 @@ const REQUIRED = [
 const CLERK_REQUIRED = [
   'CLERK_ISSUER',
   'CLERK_JWKS_URL',
+  'CLERK_SECRET_KEY',
   'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
   'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
 ];
@@ -152,10 +153,6 @@ function validate(values) {
       add(errors, 'BEDROCK_MODEL is required only when AI_SUMMARY_ENABLED=true');
     }
     warnings.push('AI summary is enabled; this is outside the no-AWS core runtime gate.');
-  }
-
-  if (authProvider === 'clerk' && !String(values.CLERK_SECRET_KEY || '').trim()) {
-    warnings.push('CLERK_SECRET_KEY is not set; this is acceptable unless server-side Clerk SDK operations are added.');
   }
 
   if (authProvider === 'cognito') {

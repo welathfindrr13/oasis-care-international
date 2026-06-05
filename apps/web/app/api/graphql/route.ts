@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { getToken } from 'next-auth/jwt';
 import { authOptions } from '../auth/[...nextauth]/authOptions';
+import { getClerkBearerTokenFromCookieHeader } from '../../../lib/auth/clerk';
+import { resolveAuthMode } from '../../../lib/auth/mode';
 
 // Next.js build: mark as dynamic so /api/graphql isn't prerendered
 export const dynamic = 'force-dynamic';
@@ -15,24 +17,29 @@ export async function POST(request: NextRequest) {
     const directBearer = directAuthorization.toLowerCase().startsWith('bearer ')
       ? directAuthorization.slice('bearer '.length).trim()
       : '';
+    const clerkBearer = directBearer
+      ? ''
+      : resolveAuthMode(process.env) === 'clerk'
+      ? getClerkBearerTokenFromCookieHeader(request.headers.get('cookie'))
+      : '';
 
     // Clerk production UI will supply a bearer token for the active organisation.
     // Until live Clerk is configured, preserve the existing NextAuth token path.
-    const token = directBearer
+    const token = directBearer || clerkBearer
       ? null
       : await getToken({
           req: request as any,
           secret: process.env.NEXTAUTH_SECRET,
         });
 
-    const session = directBearer ? null : await getServerSession(authOptions);
+    const session = directBearer || clerkBearer ? null : await getServerSession(authOptions);
 
     const tokenAccessToken = (token as any)?.accessToken;
     const sessionAccessToken = (session as any)?.accessToken;
     const tokenIdToken = (token as any)?.idToken;
     const sessionIdToken = (session as any)?.idToken;
 
-    const accessToken = directBearer || tokenAccessToken || sessionAccessToken || tokenIdToken || sessionIdToken;
+    const accessToken = directBearer || clerkBearer || tokenAccessToken || sessionAccessToken || tokenIdToken || sessionIdToken;
 
     if (!accessToken) {
       return new NextResponse('Unauthorized', { status: 401 });

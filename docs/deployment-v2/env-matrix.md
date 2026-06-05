@@ -23,6 +23,7 @@ This matrix is generated from current code references and Deployment V2 template
 | `CLERK_JWKS_URL` | API auth | Yes | No | JWT strategy, preflight | `https://<clerk-instance>/.well-known/jwks.json` | API cannot resolve Clerk signing keys. |
 | `CLERK_AUDIENCE` | API auth | Required unless `CLERK_AUTHORIZED_PARTIES` is set | No | JWT strategy, preflight | `oasis-api` | Token audience validation is unavailable. |
 | `CLERK_AUTHORIZED_PARTIES` | API auth | Required unless `CLERK_AUDIENCE` is set | No | JWT strategy, preflight | `https://care.example.com` | Token authorized-party validation is unavailable. |
+| `CLERK_SECRET_KEY` | Web auth | Yes | No | Clerk middleware/provider, preflight | `sk_live_...` | Clerk server-side middleware cannot verify authenticated sessions safely. |
 | `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER` | Web auth | Yes | Yes | login/auth mode, Compose | `clerk` | Login may render the wrong provider path. |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Web auth | Yes | Yes | Compose/build args, preflight | `pk_live_...` | Clerk browser session cannot be initialized once live Clerk UI is wired. |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Web auth | Yes | Yes | login page, Compose/build args, preflight | `https://care.example.com/sign-in` | Staff/family users cannot reach Clerk sign-in. |
@@ -42,7 +43,6 @@ This matrix is generated from current code references and Deployment V2 template
 | `BEDROCK_MODEL` | API AI only | No for core runtime | No | AI summary service | Required only if AI summary generation is enabled. |
 | `BEDROCK_MODEL_FALLBACKS` | API AI only | No | No | AI summary service | Optional comma-separated fallback model ids. |
 | `JWT_JWKS_TIMEOUT_MS` | API auth | No | No | JWT strategy | Optional JWKS timeout override. |
-| `CLERK_SECRET_KEY` | API/web auth | No until server-side Clerk SDK operations are added | No | preflight warning | Optional server-side Clerk secret. Never commit it. |
 | `COGNITO_LOGOUT_URL` | Legacy web auth | No | No | logout route | Legacy Cognito-only logout support. Not part of Deployment V2 production auth. |
 | `COGNITO_DOMAIN` | Legacy web auth | No | No | logout route | Legacy Cognito-only hosted UI domain. Not part of Deployment V2 production auth. |
 | `COGNITO_HOSTED_UI_DOMAIN` | Legacy web auth | No | No | logout route | Legacy Cognito-only hosted UI domain alias. Not part of Deployment V2 production auth. |

@@ -1,5 +1,8 @@
 import { getServerSession } from 'next-auth'
+import { cookies } from 'next/headers'
 import { authOptions } from '../../app/api/auth/[...nextauth]/authOptions'
+import { getClerkBearerTokenFromCookieHeader } from '../auth/clerk'
+import { resolveAuthMode } from '../auth/mode'
 
 /**
  * Simple GraphQL client for server components.
@@ -37,8 +40,11 @@ export async function executeGraphQLQuery<T = any>(
 
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql';
-    const session = await getServerSession(authOptions);
-    const accessToken = (session as any)?.accessToken || (session as any)?.idToken;
+    const clerkBearer = resolveAuthMode(process.env) === 'clerk'
+      ? getClerkBearerTokenFromCookieHeader(cookies().toString())
+      : '';
+    const session = clerkBearer ? null : await getServerSession(authOptions);
+    const accessToken = clerkBearer || (session as any)?.accessToken || (session as any)?.idToken;
 
     if (!accessToken) {
       throw new Error('Unauthorized');
