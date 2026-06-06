@@ -17,22 +17,32 @@ export interface GraphQLResponse<T = any> {
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
+export interface ClientQueryOptions {
+  getBearerToken?: () => Promise<string | null | undefined>;
+}
+
 /**
  * Execute GraphQL query from client components
  * Uses credentials: 'include' to forward cookies for authentication
  */
 export async function clientQuery<T = any>(
   query: string,
-  variables?: Record<string, any>
+  variables?: Record<string, any>,
+  options?: ClientQueryOptions,
 ): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const bearerToken = await options?.getBearerToken?.();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (bearerToken) {
+    headers.Authorization = `Bearer ${bearerToken}`;
+  }
 
   let response: Response;
   try {
     response = await fetch('/api/graphql', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       credentials: 'include',
       body: JSON.stringify({ query, variables: variables || {} }),
       signal: controller.signal,

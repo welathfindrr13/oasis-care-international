@@ -19,10 +19,15 @@ function validEnv(overrides = {}) {
     NEXT_PUBLIC_API_URL: 'https://care.example.org/graphql',
     NEXT_PUBLIC_SITE_URL: 'https://care.example.org',
     ALLOWED_ORIGINS: 'https://care.example.org',
-    AUTH_IDENTITY_PROVIDER: 'cognito',
-    COGNITO_ISSUER: 'https://auth.provider.org/oauth2/default',
-    COGNITO_CLIENT_ID: 'oasis-production-client',
-    COGNITO_CLIENT_SECRET: `${strongSecret}cognito`,
+    AUTH_IDENTITY_PROVIDER: 'clerk',
+    CLERK_ISSUER: 'https://clerk.provider.org',
+    CLERK_JWKS_URL: 'https://clerk.provider.org/.well-known/jwks.json',
+    CLERK_AUDIENCE: 'oasis-production-api',
+    CLERK_AUTHORIZED_PARTIES: 'https://care.example.org',
+    CLERK_SECRET_KEY: `${strongSecret}clerk`,
+    NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: 'clerk',
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_Y2FyZS5leGFtcGxlLm9yZyQ=',
+    NEXT_PUBLIC_CLERK_SIGN_IN_URL: 'https://care.example.org/sign-in',
     LOCAL_AUTH_ENABLED: 'false',
     NEXT_PUBLIC_LOCAL_AUTH_ENABLED: 'false',
     DEMO_MODE: 'false',
@@ -40,10 +45,10 @@ test('valid production-shaped environment passes', () => {
 test('placeholders and localhost fail', () => {
   const result = validate(validEnv({
     NEXTAUTH_URL: 'http://localhost:3000',
-    COGNITO_CLIENT_SECRET: 'replace-me-cognito-client-secret',
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'replace-me-clerk-publishable-key',
   }));
   assert(result.errors.some((error) => error.includes('NEXTAUTH_URL')));
-  assert(result.errors.some((error) => error.includes('COGNITO_CLIENT_SECRET')));
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY')));
 });
 
 test('local auth and demo mode are forbidden in production-like env', () => {
@@ -62,4 +67,34 @@ test('AI summary enabled requires AWS/model configuration and warns', () => {
   assert(result.errors.some((error) => error.includes('AWS_REGION')));
   assert(result.errors.some((error) => error.includes('BEDROCK_MODEL')));
   assert(result.warnings.some((warning) => warning.includes('AI summary is enabled')));
+});
+
+test('production-like env rejects Cognito as the Deployment V2 auth provider', () => {
+  const result = validate(validEnv({
+    AUTH_IDENTITY_PROVIDER: 'cognito',
+    COGNITO_ISSUER: 'https://auth.provider.org/oauth2/default',
+    COGNITO_CLIENT_ID: 'oasis-production-client',
+    COGNITO_CLIENT_SECRET: `${strongSecret}cognito`,
+  }));
+
+  assert(result.errors.some((error) => error.includes('AUTH_IDENTITY_PROVIDER=clerk')));
+});
+
+test('Clerk production env requires issuer, JWKS, public key, sign-in URL, and audience or azp', () => {
+  const result = validate(validEnv({
+    CLERK_ISSUER: '',
+    CLERK_JWKS_URL: '',
+    CLERK_SECRET_KEY: '',
+    CLERK_AUDIENCE: '',
+    CLERK_AUTHORIZED_PARTIES: '',
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: '',
+    NEXT_PUBLIC_CLERK_SIGN_IN_URL: '',
+  }));
+
+  assert(result.errors.some((error) => error.includes('CLERK_ISSUER')));
+  assert(result.errors.some((error) => error.includes('CLERK_JWKS_URL')));
+  assert(result.errors.some((error) => error.includes('CLERK_SECRET_KEY')));
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY')));
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_SIGN_IN_URL')));
+  assert(result.errors.some((error) => error.includes('CLERK_AUDIENCE or CLERK_AUTHORIZED_PARTIES')));
 });

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
 import { getToken } from 'next-auth/jwt';
-import { authOptions } from '../auth/[...nextauth]/authOptions';
+import { resolveAuthMode } from '../../../lib/auth/mode';
+import { getServerAuthContext } from '../../../lib/auth/server-auth';
 
 // Next.js build: mark as dynamic so /api/graphql isn't prerendered
 export const dynamic = 'force-dynamic';
@@ -11,22 +11,21 @@ export async function POST(request: NextRequest) {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql';
     const body = await request.text();
     
-    // Read NextAuth JWT from request cookies in route handlers.
-    // Prefer the Cognito *access token* for backend API calls (it typically carries groups/roles
-    // and is used consistently elsewhere in the app, e.g. `/api/stats/today`).
-    const token = await getToken({
-      req: request as any,
-      secret: process.env.NEXTAUTH_SECRET,
-    });
-
-    const session = await getServerSession(authOptions);
-
+    const directAuthorization = request.headers.get('authorization') || '';
+    const directBearer = directAuthorization.toLowerCase().startsWith('bearer ')
+      ? directAuthorization.slice('bearer '.length).trim()
+      : '';
+    const clerkMode = resolveAuthMode(process.env) === 'clerk';
+    const token = directBearer || clerkMode
+      ? null
+      : await getToken({
+          req: request as any,
+          secret: process.env.NEXTAUTH_SECRET,
+        });
+    const serverAuth = directBearer ? null : await getServerAuthContext();
     const tokenAccessToken = (token as any)?.accessToken;
-    const sessionAccessToken = (session as any)?.accessToken;
     const tokenIdToken = (token as any)?.idToken;
-    const sessionIdToken = (session as any)?.idToken;
-
-    const accessToken = tokenAccessToken || sessionAccessToken || tokenIdToken || sessionIdToken;
+    const accessToken = directBearer || serverAuth?.accessToken || tokenAccessToken || tokenIdToken;
 
     if (!accessToken) {
       return new NextResponse('Unauthorized', { status: 401 });

@@ -2,7 +2,7 @@ import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import Cognito from 'next-auth/providers/cognito';
 import { createLocalSessionUser } from '../../../../lib/auth/local-auth.server';
-import { isLocalAuthEnabled } from '../../../../lib/auth/mode';
+import { isLocalAuthEnabled, resolveAuthMode } from '../../../../lib/auth/mode';
 import { extractRolesFromClaims, normalizeAppRoles } from '../../../../lib/auth/roles';
 
 function decodeJwtPayload(tokenValue: unknown): Record<string, any> | null {
@@ -49,9 +49,11 @@ function getConfiguredCognitoProvider() {
 }
 
 const localAuthEnabled = isLocalAuthEnabled(process.env);
+const authMode = resolveAuthMode(process.env);
 const cognitoProvider = getConfiguredCognitoProvider();
+const isProductionBuild = process.env.NEXT_PHASE === 'phase-production-build';
 
-if (!localAuthEnabled && !cognitoProvider) {
+if (!isProductionBuild && !localAuthEnabled && authMode === 'cognito' && !cognitoProvider) {
   requireEnv('COGNITO_ISSUER');
   requireEnv('COGNITO_CLIENT_ID');
   requireEnv('COGNITO_CLIENT_SECRET');
@@ -86,6 +88,12 @@ if (cognitoProvider) {
   providers.push(cognitoProvider);
 }
 
+if (!isProductionBuild && authMode === 'clerk' && !process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL) {
+  // Live Clerk UI/session wiring is completed outside this repo once the Clerk
+  // dashboard exists. API bearer-token verification is still enforced server-side.
+  requireEnv('NEXT_PUBLIC_CLERK_SIGN_IN_URL');
+}
+
 export const authOptions: NextAuthOptions = {
   providers,
   pages: {
@@ -112,13 +120,13 @@ export const authOptions: NextAuthOptions = {
         return token;
       }
 
-      // On initial sign-in, store the Cognito access token
+      // On initial sign-in, store the configured provider token.
       if (account) {
         token.accessToken = account.access_token;
         token.idToken = account.id_token;
         token.refreshToken = account.refresh_token;
         token.expiresAt = account.expires_at;
-        token.authMode = 'cognito';
+        token.authMode = authMode;
       }
 
       // Keep roles synced from token claims (not only initial profile payload).
@@ -138,7 +146,7 @@ export const authOptions: NextAuthOptions = {
       (session as any).accessToken = token.accessToken;
       (session as any).idToken = token.idToken;
       (session as any).roles = token.roles ?? [];
-      (session as any).authMode = token.authMode ?? 'cognito';
+      (session as any).authMode = token.authMode ?? authMode;
       return session;
     },
   },

@@ -1,10 +1,9 @@
 import { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
-import { getServerSession } from 'next-auth'
 import { Header } from '../../components/oasis/Header'
 import { Button } from '../../components/ui/Button'
-import { authOptions } from '../api/auth/[...nextauth]/authOptions'
+import { getServerAuthContext } from '../../lib/auth/server-auth'
 import { getSiteBaseUrl } from '../../lib/url'
 import { query } from '../../lib/graphql/client'
 import {
@@ -435,8 +434,7 @@ const statusConfig = {
 }
 
 export default async function DashboardPage() {
-  const session = await getServerSession(authOptions)
-  const roles = Array.isArray((session as any)?.roles) ? (session as any).roles : []
+  const { roles } = await getServerAuthContext()
   const isAdmin = roles.some((role: unknown) => String(role).toLowerCase() === 'admin')
 
   const [stats, activeClientTotal, shiftData, todayVisitsData, familyUpdateReviewCount, openConcernCount, careSpineSignalData, medicationExceptionCount] = await Promise.all([

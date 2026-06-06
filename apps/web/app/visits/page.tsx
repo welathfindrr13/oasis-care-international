@@ -1,6 +1,5 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import { getServerSession } from 'next-auth'
 import { Header } from '../../components/oasis/Header'
 
 // Mark page as dynamic since it uses searchParams
@@ -9,7 +8,7 @@ import { FilterBar } from '../../components/oasis/FilterBar'
 import { StatusChip } from '../../components/oasis/StatusChip'
 import { Card, CardContent, CardHeader } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
-import { authOptions } from '../api/auth/[...nextauth]/authOptions'
+import { getServerAuthContext } from '../../lib/auth/server-auth'
 import { query } from '../../lib/graphql/client'
 import { 
   VISITS_QUERY, 
@@ -110,8 +109,7 @@ function EmptyState({ isAdmin }: { isAdmin: boolean }) {
 }
 
 export default async function VisitsPage({ searchParams }: VisitsPageProps) {
-  const session = await getServerSession(authOptions)
-  const roles = Array.isArray((session as any)?.roles) ? (session as any).roles : []
+  const { roles } = await getServerAuthContext()
   const isAdmin = roles.some((role: unknown) => String(role).toLowerCase() === 'admin')
   const todayKey = new Date().toISOString().slice(0, 10)
   const showTodayHeading = searchParams.date === todayKey

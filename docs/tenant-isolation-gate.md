@@ -38,8 +38,8 @@ External-company SaaS use is blocked until all P0 tenant isolation tests pass.
 - Sensitive nullable `organization_id` columns still require a production-safe backfill and NOT NULL migration.
 - `Carer` is still a global profile keyed by auth subject, so true multi-organization staff profiles need a later membership-aware staff profile design.
 - Legacy global uniqueness remains on `Carer.email`, `FamilyContact.auth_subject`, and `OrganizationIdentity`.
-- Clerk is not wired yet; the documented future mapping is:
-  - Clerk `org_id` maps to `Organization.id` or a future external organization mapping.
+- Clerk is repo-wired for API token validation and explicit membership lookup, but live Clerk dashboard/session QA is still blocked:
+  - Clerk `org_id` maps to `Organization.id` or `OrganizationMembership.external_organization_id`.
   - Clerk user subject maps to `OrganizationMembership.auth_subject`.
   - Clerk organization role maps to `OrganizationMembership.role`.
   - Clerk membership status maps to `OrganizationMembership.status`.

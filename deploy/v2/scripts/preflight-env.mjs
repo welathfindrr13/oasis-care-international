@@ -21,12 +21,17 @@ const REQUIRED = [
   'NEXT_PUBLIC_SITE_URL',
   'ALLOWED_ORIGINS',
   'AUTH_IDENTITY_PROVIDER',
-  'COGNITO_ISSUER',
-  'COGNITO_CLIENT_ID',
-  'COGNITO_CLIENT_SECRET',
   'LOCAL_AUTH_ENABLED',
   'NEXT_PUBLIC_LOCAL_AUTH_ENABLED',
   'RUN_MIGRATIONS',
+];
+
+const CLERK_REQUIRED = [
+  'CLERK_ISSUER',
+  'CLERK_JWKS_URL',
+  'CLERK_SECRET_KEY',
+  'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
+  'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
 ];
 
 const SECRET_NAMES = new Set([
@@ -35,6 +40,7 @@ const SECRET_NAMES = new Set([
   'NEXTAUTH_SECRET',
   'COGNITO_CLIENT_SECRET',
   'LOCAL_AUTH_JWT_SECRET',
+  'CLERK_SECRET_KEY',
   'DEMO_SEED_TOKEN',
 ]);
 
@@ -44,6 +50,9 @@ const URL_NAMES = new Set([
   'NEXT_PUBLIC_SITE_URL',
   'ALLOWED_ORIGINS',
   'COGNITO_ISSUER',
+  'CLERK_ISSUER',
+  'CLERK_JWKS_URL',
+  'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
 ]);
 
 function parseEnvFile(filePath) {
@@ -83,6 +92,22 @@ function validate(values) {
   for (const name of REQUIRED) {
     if (!String(values[name] || '').trim()) {
       add(errors, `${name} is required for Deployment V2 preflight`);
+    }
+  }
+
+  const authProvider = String(values.AUTH_IDENTITY_PROVIDER || '').trim().toLowerCase();
+  if (isProductionLike && authProvider !== 'clerk') {
+    add(errors, 'AUTH_IDENTITY_PROVIDER=clerk is required for production Deployment V2 auth');
+  }
+
+  if (authProvider === 'clerk') {
+    for (const name of CLERK_REQUIRED) {
+      if (!String(values[name] || '').trim()) {
+        add(errors, `${name} is required when AUTH_IDENTITY_PROVIDER=clerk`);
+      }
+    }
+    if (!String(values.CLERK_AUDIENCE || '').trim() && !String(values.CLERK_AUTHORIZED_PARTIES || '').trim()) {
+      add(errors, 'CLERK_AUDIENCE or CLERK_AUTHORIZED_PARTIES is required when AUTH_IDENTITY_PROVIDER=clerk');
     }
   }
 
@@ -130,8 +155,8 @@ function validate(values) {
     warnings.push('AI summary is enabled; this is outside the no-AWS core runtime gate.');
   }
 
-  if (String(values.AUTH_IDENTITY_PROVIDER || '').trim().toLowerCase() !== 'cognito') {
-    warnings.push('AUTH_IDENTITY_PROVIDER is not cognito; current production auth code is still Cognito-shaped and needs explicit QA/code review.');
+  if (authProvider === 'cognito') {
+    warnings.push('Cognito is legacy-only for Deployment V2 and is not accepted as completed production auth.');
   }
 
   return { errors, warnings };

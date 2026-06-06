@@ -36,8 +36,9 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://app.example.com/graphql}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://app.example.com}
         NEXTAUTH_URL: ${NEXTAUTH_URL:-https://app.example.com}
-        COGNITO_ISSUER: ${COGNITO_ISSUER:-https://auth.example.com/oauth2/default}
-        COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-replace-me-client-id}
+        NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: ${NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER:-clerk}
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-pk_test_c3ludGhldGljLWNsZXJrLm9hc2lzLmludmFsaWQk}
+        NEXT_PUBLIC_CLERK_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_SIGN_IN_URL:-https://app.example.com/sign-in}
     restart: unless-stopped
     depends_on:
       api:
@@ -50,11 +51,15 @@ services:
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-replace-me-nextauth-secret-min-32-chars}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://app.example.com/graphql}
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://app.example.com}
+      NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: ${NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER:-clerk}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-pk_test_c3ludGhldGljLWNsZXJrLm9hc2lzLmludmFsaWQk}
+      NEXT_PUBLIC_CLERK_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_SIGN_IN_URL:-https://app.example.com/sign-in}
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_URL:-https://app.example.com/sign-up}
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL:-https://app.example.com/today}
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL:-https://app.example.com/today}
       NEXT_PUBLIC_LOCAL_AUTH_ENABLED: "false"
       LOCAL_AUTH_ENABLED: "false"
-      COGNITO_ISSUER: ${COGNITO_ISSUER:-https://auth.example.com/oauth2/default}
-      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-replace-me-client-id}
-      COGNITO_CLIENT_SECRET: ${COGNITO_CLIENT_SECRET:-replace-me-cognito-client-secret}
+      AUTH_IDENTITY_PROVIDER: ${AUTH_IDENTITY_PROVIDER:-clerk}
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/health"]
       interval: 30s
@@ -80,12 +85,15 @@ services:
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-replace-me-nextauth-secret-min-32-chars}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-https://app.example.com}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://app.example.com}
+      AUTH_IDENTITY_PROVIDER: ${AUTH_IDENTITY_PROVIDER:-clerk}
       LOCAL_AUTH_ENABLED: "false"
       LOCAL_AUTH_ISSUER: ${LOCAL_AUTH_ISSUER:-oasis-local-dev}
       LOCAL_AUTH_JWT_SECRET: ${LOCAL_AUTH_JWT_SECRET:-replace-me-local-auth-secret-disabled-in-production}
-      COGNITO_ISSUER: ${COGNITO_ISSUER:-https://auth.example.com/oauth2/default}
-      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-replace-me-client-id}
-      COGNITO_CLIENT_SECRET: ${COGNITO_CLIENT_SECRET:-replace-me-cognito-client-secret}
+      CLERK_ISSUER: ${CLERK_ISSUER:-https://clerk.example.com}
+      CLERK_JWKS_URL: ${CLERK_JWKS_URL:-https://clerk.example.com/.well-known/jwks.json}
+      CLERK_AUDIENCE: ${CLERK_AUDIENCE:-oasis-api}
+      CLERK_AUTHORIZED_PARTIES: ${CLERK_AUTHORIZED_PARTIES:-https://app.example.com}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
       GDPR_ENABLED: ${GDPR_ENABLED:-false}
       METRICS_ENABLED: ${METRICS_ENABLED:-false}
       AI_SUMMARY_ENABLED: ${AI_SUMMARY_ENABLED:-false}

@@ -1,4 +1,4 @@
-export type AuthMode = 'cognito' | 'local';
+export type AuthMode = 'clerk' | 'cognito' | 'local';
 
 function isTruthy(value: string | undefined): boolean {
   if (!value) return false;
@@ -19,6 +19,10 @@ export function isLocalAuthEnabled(env: NodeJS.ProcessEnv = process.env): boolea
 }
 
 export function resolveAuthMode(env: NodeJS.ProcessEnv = process.env): AuthMode {
+  const provider = (env.AUTH_IDENTITY_PROVIDER || env.NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER || '').trim().toLowerCase();
+  if (provider === 'clerk') {
+    return 'clerk';
+  }
+
   return isLocalAuthEnabled(env) ? 'local' : 'cognito';
 }
-

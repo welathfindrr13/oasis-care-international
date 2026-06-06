@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { SessionProvider } from '../components/providers/SessionProvider'
+import { AppAuthProviders } from '../components/providers/AppAuthProviders'
 import { ServiceWorkerRegistration } from '../components/pwa/ServiceWorkerRegistration'
 import './globals.css'
 
@@ -26,10 +26,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <SessionProvider>
+        <AppAuthProviders>
           <ServiceWorkerRegistration />
           {children}
-        </SessionProvider>
+        </AppAuthProviders>
       </body>
     </html>
   )
