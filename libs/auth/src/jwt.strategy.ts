@@ -25,7 +25,6 @@ export interface JwtPayload {
   roles?: string[];
   email?: string;
   public_metadata?: Record<string, unknown>;
-  unsafe_metadata?: Record<string, unknown>;
   realm_access?: {
     roles: string[];
   };
@@ -341,8 +340,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   private static extractRawRoles(payload: JwtPayload, provider: string): string[] {
     if (provider === 'clerk') {
-      const metadataRole = JwtStrategy.valueFromMetadata(payload.public_metadata, 'role')
-        || JwtStrategy.valueFromMetadata(payload.unsafe_metadata, 'role');
+      const metadataRole = JwtStrategy.valueFromMetadata(payload.public_metadata, 'role');
       return [
         payload.org_role,
         payload.organization_role,
@@ -379,10 +377,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (hasAny(['admin', 'org:admin'])) return 'admin';
     if (hasAny(['manager', 'org:manager'])) return 'admin';
-    if (hasAny(['carer', 'care_manager', 'staff', 'office', 'org:member', 'org:staff', 'org:carer'])) {
+    if (hasAny(['carer', 'care_manager', 'staff', 'office', 'org:staff', 'org:carer'])) {
       return 'carer';
     }
-    if (hasAny(['family', 'user', 'viewer', 'org:family', 'org:user', 'org:viewer'])) {
+    if (hasAny(['family', 'user', 'viewer', 'org:member', 'org:family', 'org:user', 'org:viewer'])) {
       return 'user';
     }
 

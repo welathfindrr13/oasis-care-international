@@ -1,9 +1,7 @@
 import React from 'react'
 import { NextRequest, NextResponse } from 'next/server'
 import { renderToBuffer } from '@react-pdf/renderer'
-import { getServerSession } from 'next-auth'
-import { getToken } from 'next-auth/jwt'
-import { authOptions } from '../../../auth/[...nextauth]/authOptions'
+import { getServerAuthContext } from '../../../../../lib/auth/server-auth'
 import {
   EVIDENCE_PACK_QUERY,
   RECORD_EVIDENCE_PACK_EXPORT_MUTATION,
@@ -36,21 +34,12 @@ function statusFromGraphQLError(error: any): number {
 }
 
 async function executeBackendGraphQL<T>(
-  request: NextRequest,
+  _request: NextRequest,
   query: string,
   variables: Record<string, unknown>,
 ) {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql'
-  const token = await getToken({
-    req: request as any,
-    secret: process.env.NEXTAUTH_SECRET,
-  })
-  const session = await getServerSession(authOptions)
-  const accessToken =
-    (token as any)?.accessToken ||
-    (session as any)?.accessToken ||
-    (token as any)?.idToken ||
-    (session as any)?.idToken
+  const { accessToken } = await getServerAuthContext()
 
   if (!accessToken) {
     return { status: 401 as const, body: null as T | null }

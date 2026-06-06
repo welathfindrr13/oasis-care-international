@@ -72,7 +72,7 @@ describe('JwtStrategy local auth gating', () => {
 
   it.each([
     ['org:admin', 'admin'],
-    ['org:member', 'carer'],
+    ['org:member', 'user'],
     ['org:family', 'user'],
   ])('maps Clerk tenant role %s to canonical API role %s', async (orgRole, expectedRole) => {
     process.env.NODE_ENV = 'test';
@@ -99,6 +99,28 @@ describe('JwtStrategy local auth gating', () => {
       organizationId: 'org_clerk_123',
       role: expectedRole,
       authMode: 'clerk',
+    });
+  });
+
+  it.each(['admin', 'carer'])('ignores unsafe_metadata.role=%s for Clerk authorization', async (unsafeRole) => {
+    process.env.NODE_ENV = 'test';
+    process.env.AUTH_IDENTITY_PROVIDER = 'clerk';
+    process.env.CLERK_ISSUER = 'https://clerk.example.org';
+
+    const strategy = new JwtStrategy();
+
+    await expect(
+      strategy.validate({
+        sub: 'user_unsafe_metadata',
+        iss: 'https://clerk.example.org',
+        org_id: 'org_clerk_123',
+        org_role: 'org:member',
+        unsafe_metadata: { role: unsafeRole },
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        iat: Math.floor(Date.now() / 1000),
+      } as any),
+    ).resolves.toMatchObject({
+      role: 'user',
     });
   });
 

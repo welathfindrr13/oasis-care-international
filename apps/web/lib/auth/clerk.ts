@@ -38,7 +38,6 @@ function mapClerkRole(value: unknown): string | null {
 function collectClaimRoles(claims: ClaimRecord): string[] {
   const publicMetadata = claims.public_metadata ?? claims.publicMetadata ?? {};
   const privateMetadata = claims.private_metadata ?? claims.privateMetadata ?? {};
-  const unsafeMetadata = claims.unsafe_metadata ?? claims.unsafeMetadata ?? {};
   const organizationMetadata = claims.organization_metadata ?? claims.organizationMetadata ?? {};
 
   return [
@@ -53,8 +52,6 @@ function collectClaimRoles(claims: ClaimRecord): string[] {
     publicMetadata.roles,
     privateMetadata.role,
     privateMetadata.roles,
-    unsafeMetadata.role,
-    unsafeMetadata.roles,
     organizationMetadata.role,
     organizationMetadata.roles,
   ]

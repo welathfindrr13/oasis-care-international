@@ -3,9 +3,8 @@ import { redirect } from 'next/navigation'
 import { Header } from '../../../components/oasis/Header'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
 import { Button } from '../../../components/ui/Button'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '../../api/auth/[...nextauth]/authOptions'
 import { hasRole } from '../../../lib/auth/roles'
+import { getServerAuthContext } from '../../../lib/auth/server-auth'
 
 export const metadata: Metadata = {
   title: 'Metrics - Oasis Care Admin',
@@ -14,8 +13,7 @@ export const metadata: Metadata = {
 
 async function getMetrics(): Promise<string> {
   try {
-    const session = await getServerSession(authOptions)
-    const accessToken = (session as any)?.accessToken
+    const { accessToken } = await getServerAuthContext()
     if (!accessToken) {
       return 'Metrics unavailable: missing access token'
     }
@@ -40,8 +38,8 @@ async function getMetrics(): Promise<string> {
 }
 
 export default async function MetricsPage() {
-  const session = await getServerSession(authOptions)
-  if (!hasRole((session as any)?.roles ?? [], 'admin')) {
+  const { roles } = await getServerAuthContext()
+  if (!hasRole(roles, 'admin')) {
     redirect('/activity')
   }
 

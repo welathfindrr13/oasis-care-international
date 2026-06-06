@@ -1,16 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '../../auth/[...nextauth]/authOptions';
+import { getServerAuthContext } from '../../../../lib/auth/server-auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    const accessToken = (session as any)?.accessToken;
-    const roles = Array.isArray((session as any)?.roles)
-      ? (session as any).roles.map((r: unknown) => String(r).toLowerCase().trim())
-      : [];
+    const { accessToken, roles } = await getServerAuthContext();
 
     if (!accessToken) {
       return new NextResponse('Unauthorized', { status: 401 });

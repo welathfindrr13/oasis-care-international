@@ -12,7 +12,15 @@ This repo is Clerk-ready at the code boundary, but it is not production-auth app
 
 ## Required Token Claims
 
-The backend requires an auth subject, active organization id, tenant-scoped role, and active membership. Browser/API calls must carry a bearer token for the active Clerk organization. Clerk's default `org:member` role is not staff-authoritative in the web route guard; Oasis staff/family roles must be supplied through explicit Oasis role claims or verified membership.
+The backend requires an auth subject, active organization id, tenant-scoped role, and active membership. Browser/API calls must carry a bearer token for the active Clerk organization. Clerk's default `org:member` role and all token-derived roles are untrusted context only. API `@Roles` checks run after the active `OrganizationMembership` is loaded, and the verified membership role is authoritative.
+
+The web uses a shared Clerk-compatible server auth context for server pages, admin layouts, GraphQL requests, dashboard stats, and evidence-pack export. Web route and navigation decisions remain presentation controls only; the API membership guard is the authorization boundary.
+
+## Remaining Session Migration Gaps
+
+- Client components still using NextAuth `useSession()` must migrate to a shared Clerk-compatible client session before staff/family runtime QA can be considered complete. Current gaps include the header/navigation, visit workspace, medication round, shift, settings, person care notes/summary, and delete-person control.
+- A Clerk user with only the default `org:member` role is intentionally not treated as Oasis staff by web route/navigation controls. Staff smoke testing requires an explicit non-default staff role claim or a future verified-membership web context bridge.
+- Until those client paths are migrated and real admin/staff/family sessions are tested, Issue #10 remains incomplete and real client data remains blocked.
 
 ## Runtime QA Still Required
 

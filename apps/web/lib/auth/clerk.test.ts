@@ -26,6 +26,15 @@ test('extractClerkRolesFromClaims uses explicit Oasis metadata role for staff/fa
   assert(extractClerkRolesFromClaims({ public_metadata: { role: 'family' } }).includes('client'));
 });
 
+test('extractClerkRolesFromClaims ignores unsafe metadata roles', () => {
+  const roles = extractClerkRolesFromClaims({
+    org_role: 'org:member',
+    unsafe_metadata: { role: 'admin', roles: ['carer'] },
+  });
+
+  assert.deepEqual(roles, ['user']);
+});
+
 test('getClerkOrganizationIdFromClaims resolves active organization claim variants', () => {
   assert.equal(getClerkOrganizationIdFromClaims({ org_id: 'org_123' }), 'org_123');
   assert.equal(getClerkOrganizationIdFromClaims({ organizationId: 'org_456' }), 'org_456');

@@ -43,8 +43,16 @@ export class ApiRolesGuard extends RolesGuard implements CanActivate {
 
     const request = this.getRequest(context);
     await this.enrichOrganizationContext(request?.user);
+    this.assertRequiredRoles(context, request?.user);
     this.enforceLegacyOperationalAccess(context, request?.user);
     return true;
+  }
+
+  handleRequest(err: unknown, user: any): any {
+    // Authenticate first. Tenant-scoped authorization runs only after the
+    // verified OrganizationMembership has replaced untrusted token roles.
+    this.assertAuthenticated(err, user);
+    return user;
   }
 
   private enforceLegacyOperationalAccess(
@@ -215,22 +223,23 @@ export class ApiRolesGuard extends RolesGuard implements CanActivate {
     user.organizationMembershipId = membership.id;
     user.role = normalizedRole;
 
-    const existingRoles = Array.isArray(user.realm_access?.roles)
-      ? user.realm_access.roles.map((role) => String(role || '').toLowerCase().trim()).filter(Boolean)
-      : [];
     user.realm_access = {
-      roles: Array.from(new Set([normalizedRole, membership.role.toLowerCase().trim(), ...existingRoles])),
+      roles: Array.from(new Set([normalizedRole, membership.role.toLowerCase().trim()])),
     };
   }
 
   private normalizeTenantRole(role: string): string {
     const normalized = (role || '').toLowerCase().trim().replace(/\s+/g, '_');
     if (normalized === 'admin') return 'admin';
-    if (['carer', 'care_manager', 'manager', 'office'].includes(normalized)) return 'carer';
-    return 'user';
+    if (['carer', 'staff', 'care_manager', 'manager', 'office'].includes(normalized)) return 'carer';
+    if (['user', 'family', 'client', 'viewer'].includes(normalized)) return 'user';
+    throw new ForbiddenException('Unsupported organization membership role');
   }
 
   private isTenantMembershipRequired(): boolean {
+    if ((process.env.AUTH_IDENTITY_PROVIDER || '').trim().toLowerCase() === 'clerk') {
+      return true;
+    }
     if ((process.env.TENANT_MEMBERSHIP_REQUIRED || '').trim().toLowerCase() === 'true') {
       return true;
     }

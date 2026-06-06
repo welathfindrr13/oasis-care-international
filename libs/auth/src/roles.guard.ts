@@ -23,13 +23,21 @@ export class RolesGuard extends JwtAuthGuard implements CanActivate {
   }
 
   handleRequest(err: unknown, user: any, _info: unknown, context: ExecutionContext): any {
+    this.assertAuthenticated(err, user);
+    this.assertRequiredRoles(context, user);
+    return user;
+  }
+
+  protected assertAuthenticated(err: unknown, user: any): void {
     if (err || !user) {
       throw (err as Error) || new UnauthorizedException('Unauthorized');
     }
+  }
 
+  protected assertRequiredRoles(context: ExecutionContext, user: any): void {
     const requiredRoles = this.reflector.get<string[]>('roles', context.getHandler());
     if (!requiredRoles || requiredRoles.length === 0) {
-      return user;
+      return;
     }
 
     const normalizedUserRoles = new Set<string>();
@@ -50,8 +58,6 @@ export class RolesGuard extends JwtAuthGuard implements CanActivate {
     if (!hasRole) {
       throw new ForbiddenException('Forbidden resource');
     }
-
-    return user;
   }
 
   getRequest(context: ExecutionContext) {

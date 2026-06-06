@@ -1,11 +1,10 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import { getServerSession } from 'next-auth'
 import { Header } from '../../../components/oasis/Header'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
 import { Button } from '../../../components/ui/Button'
 import { DeleteClientButton } from '../../../components/oasis/DeleteClientButton'
-import { authOptions } from '../../api/auth/[...nextauth]/authOptions'
+import { getServerAuthContext } from '../../../lib/auth/server-auth'
 import { query } from '../../../lib/graphql/client'
 import {
   CARE_PLANNING_QUERY,
@@ -112,8 +111,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 }
 
 export default async function ClientDetailPage({ params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  const roles = Array.isArray((session as any)?.roles) ? (session as any).roles : []
+  const { roles } = await getServerAuthContext()
   const isAdmin = roles.some((role: unknown) => String(role).toLowerCase() === 'admin')
 
   const { client, error: clientError } = await getClientSafe(params.id)

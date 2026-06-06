@@ -1,13 +1,12 @@
 import { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '../api/auth/[...nextauth]/authOptions'
 import { hasRole } from '../../lib/auth/roles'
+import { getServerAuthContext } from '../../lib/auth/server-auth'
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  const session = await getServerSession(authOptions)
+  const auth = await getServerAuthContext()
 
-  if (!hasRole((session as any)?.roles ?? [], 'admin')) {
+  if (!hasRole(auth.roles, 'admin')) {
     redirect('/activity')
   }
 
