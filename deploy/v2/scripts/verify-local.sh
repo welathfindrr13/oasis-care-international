@@ -57,5 +57,7 @@ docker run --rm -v "$PWD/deploy/v2/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 ca
 bash -n deploy/v2/scripts/smoke-test.sh
 bash -n deploy/v2/scripts/backup-postgres.sh
 bash -n deploy/v2/scripts/restore-postgres.sh
+node --test apps/web/next.config.test.js
 node --test deploy/v2/scripts/preflight-env.test.mjs
+node --test deploy/v2/scripts/smoke-test.test.mjs
 node deploy/v2/scripts/preflight-env.mjs "$TEMP_ENV"

@@ -165,7 +165,9 @@ jobs:
         METRICS_ENABLED=false
         AI_SUMMARY_ENABLED=false
         ENV
+        node --test apps/web/next.config.test.js
         node --test deploy/v2/scripts/preflight-env.test.mjs
+        node --test deploy/v2/scripts/smoke-test.test.mjs
         node deploy/v2/scripts/preflight-env.mjs "$TEMP_ENV"
         docker compose -f deploy/v2/docker-compose.yml config
         docker run --rm -v "$PWD/deploy/v2/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile
