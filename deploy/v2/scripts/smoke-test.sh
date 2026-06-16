@@ -4,6 +4,14 @@ set -euo pipefail
 BASE_URL="${BASE_URL:-http://localhost}"
 API_URL="${API_URL:-${BASE_URL%/}/graphql}"
 TIMEOUT_SECONDS="${SMOKE_TIMEOUT_SECONDS:-15}"
+ALLOW_INSECURE_TLS="${ALLOW_INSECURE_TLS:-0}"
+CURL_TLS_ARGS=()
+
+case "$(printf '%s' "$ALLOW_INSECURE_TLS" | tr '[:upper:]' '[:lower:]')" in
+  1|true|yes)
+    CURL_TLS_ARGS=(--insecure)
+    ;;
+esac
 
 # Optional future authenticated checks. Do not print these values.
 STAFF_EMAIL="${STAFF_EMAIL:-}"
@@ -36,7 +44,7 @@ fail() {
 
 http_status() {
   local url="$1"
-  curl -k -sS -o /tmp/oasis-smoke-response.txt -w '%{http_code}' --max-time "$TIMEOUT_SECONDS" "$url" || true
+  curl "${CURL_TLS_ARGS[@]}" -sS -o /tmp/oasis-smoke-response.txt -w '%{http_code}' --max-time "$TIMEOUT_SECONDS" "$url" || true
 }
 
 post_graphql() {
@@ -44,17 +52,17 @@ post_graphql() {
   local cookie="${2:-}"
   local bearer="${3:-}"
   if [[ -n "$bearer" ]]; then
-    curl -k -sS --max-time "$TIMEOUT_SECONDS" -X POST "$API_URL" \
+    curl "${CURL_TLS_ARGS[@]}" -sS --max-time "$TIMEOUT_SECONDS" -X POST "$API_URL" \
       -H 'Content-Type: application/json' \
       -H "Authorization: Bearer $bearer" \
       --data "{\"query\":\"$query\"}" || true
   elif [[ -n "$cookie" ]]; then
-    curl -k -sS --max-time "$TIMEOUT_SECONDS" -X POST "$API_URL" \
+    curl "${CURL_TLS_ARGS[@]}" -sS --max-time "$TIMEOUT_SECONDS" -X POST "$API_URL" \
       -H 'Content-Type: application/json' \
       -H "Cookie: $cookie" \
       --data "{\"query\":\"$query\"}" || true
   else
-    curl -k -sS --max-time "$TIMEOUT_SECONDS" -X POST "$API_URL" \
+    curl "${CURL_TLS_ARGS[@]}" -sS --max-time "$TIMEOUT_SECONDS" -X POST "$API_URL" \
       -H 'Content-Type: application/json' \
       --data "{\"query\":\"$query\"}" || true
   fi
@@ -147,6 +155,9 @@ expect_graphql_allowed_for_staff() {
 log "Deployment V2 smoke test"
 log "Base URL: $BASE_URL"
 log "GraphQL URL: $API_URL"
+if [[ "${#CURL_TLS_ARGS[@]}" -gt 0 ]]; then
+  log "WARNING: ALLOW_INSECURE_TLS is enabled. This is for local/debug use only and is not valid HTTPS/domain proof."
+fi
 
 expect_status_class "Web login" "${BASE_URL%/}/login" "2"
 expect_status_class "API health" "${BASE_URL%/}/health" "2"

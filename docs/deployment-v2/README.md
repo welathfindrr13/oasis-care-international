@@ -43,6 +43,7 @@ Use a VPS or single-server provider with:
 - `deploy/v2/scripts/smoke-test.sh`: health and CareBridge boundary smoke checks.
 - `deploy/v2/scripts/backup-postgres.sh`: local Postgres backup.
 - `deploy/v2/scripts/restore-postgres.sh`: guarded restore procedure.
+- `docs/deployment-v2/https-domain-cookie-proof.md`: Issue #11 HTTPS, domain, cookie, CORS, and Clerk callback proof runbook.
 
 ## Environment Setup
 
@@ -72,7 +73,7 @@ Required areas:
 
 See `docs/deployment-v2/env-matrix.md` for the canonical variable matrix.
 
-Known blocker: repo-side Deployment V2 config now expects Clerk, but the live Clerk dashboard, organization mapping, browser session flow, and authenticated staff/family/CareBridge QA are not complete. Do not use real client data until those checks pass.
+Known blocker: Clerk auth foundation and synthetic CareBridge QA are complete, but Issue #11 HTTPS/domain/cookie proof is still open. Do not use real client data until the public domain, TLS, secure cookie, Clerk callback/logout, and CORS checks in `docs/deployment-v2/https-domain-cookie-proof.md` pass.
 
 ## Startup Flow
 
@@ -105,6 +106,8 @@ Unauthenticated smoke:
 ```bash
 BASE_URL=https://your-domain.example deploy/v2/scripts/smoke-test.sh
 ```
+
+Smoke tests verify TLS by default. `ALLOW_INSECURE_TLS=1` is available only for local/debug certificate troubleshooting and is not valid Issue #11 evidence.
 
 Authenticated CareBridge smoke requires a chosen auth-provider flow or session cookies:
 

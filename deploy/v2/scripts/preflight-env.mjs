@@ -83,6 +83,40 @@ function isTruthy(value) {
   return ['true', '1', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
 }
 
+function splitCsv(value) {
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseUrl(name, value, errors) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw);
+  } catch {
+    add(errors, `${name} must be a valid URL`);
+    return null;
+  }
+}
+
+function requireHttpsUrl(name, value, errors) {
+  const url = parseUrl(name, value, errors);
+  if (!url) return null;
+  if (url.protocol !== 'https:') {
+    add(errors, `${name} must use https for production-like Deployment V2 proof`);
+  }
+  if (LOCALHOST_RE.test(url.href)) {
+    add(errors, `${name} must not point at localhost in production-like env`);
+  }
+  return url;
+}
+
+function normalizeOrigin(url) {
+  return url ? url.origin.replace(/\/$/, '') : '';
+}
+
 function validate(values) {
   const errors = [];
   const warnings = [];
@@ -157,6 +191,72 @@ function validate(values) {
 
   if (authProvider === 'cognito') {
     warnings.push('Cognito is legacy-only for Deployment V2 and is not accepted as completed production auth.');
+  }
+
+  if (isProductionLike) {
+    const appDomain = String(values.APP_DOMAIN || '').trim().toLowerCase();
+    if (appDomain.includes('://')) {
+      add(errors, 'APP_DOMAIN must be a bare domain, not a URL');
+    }
+    if (LOCALHOST_RE.test(appDomain)) {
+      add(errors, 'APP_DOMAIN must not be localhost in production-like env');
+    }
+
+    const siteUrl = requireHttpsUrl('NEXT_PUBLIC_SITE_URL', values.NEXT_PUBLIC_SITE_URL, errors);
+    const nextAuthUrl = requireHttpsUrl('NEXTAUTH_URL', values.NEXTAUTH_URL, errors);
+    requireHttpsUrl('NEXT_PUBLIC_API_URL', values.NEXT_PUBLIC_API_URL, errors);
+    const clerkSignInUrl = requireHttpsUrl('NEXT_PUBLIC_CLERK_SIGN_IN_URL', values.NEXT_PUBLIC_CLERK_SIGN_IN_URL, errors);
+
+    const siteOrigin = normalizeOrigin(siteUrl);
+    if (siteUrl && appDomain && siteUrl.hostname.toLowerCase() !== appDomain) {
+      add(errors, 'NEXT_PUBLIC_SITE_URL host must match APP_DOMAIN for HTTPS/domain proof');
+    }
+    if (nextAuthUrl && siteOrigin && normalizeOrigin(nextAuthUrl) !== siteOrigin) {
+      add(errors, 'NEXTAUTH_URL origin must match NEXT_PUBLIC_SITE_URL origin');
+    }
+    if (clerkSignInUrl && siteOrigin && normalizeOrigin(clerkSignInUrl) !== siteOrigin) {
+      add(errors, 'NEXT_PUBLIC_CLERK_SIGN_IN_URL origin must match NEXT_PUBLIC_SITE_URL origin');
+    }
+
+    for (const name of [
+      'NEXT_PUBLIC_CLERK_SIGN_UP_URL',
+      'NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL',
+      'NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL',
+    ]) {
+      if (!String(values[name] || '').trim()) continue;
+      const url = requireHttpsUrl(name, values[name], errors);
+      if (url && siteOrigin && normalizeOrigin(url) !== siteOrigin) {
+        add(errors, `${name} origin must match NEXT_PUBLIC_SITE_URL origin`);
+      }
+    }
+
+    const allowedOrigins = splitCsv(values.ALLOWED_ORIGINS);
+    if (allowedOrigins.length === 0) {
+      add(errors, 'ALLOWED_ORIGINS must include the public web origin');
+    }
+    const normalizedAllowedOrigins = [];
+    for (const [index, origin] of allowedOrigins.entries()) {
+      const url = requireHttpsUrl(`ALLOWED_ORIGINS[${index}]`, origin, errors);
+      if (url) normalizedAllowedOrigins.push(normalizeOrigin(url));
+    }
+    if (siteOrigin && !normalizedAllowedOrigins.includes(siteOrigin)) {
+      add(errors, 'ALLOWED_ORIGINS must include NEXT_PUBLIC_SITE_URL origin');
+    }
+
+    if (authProvider === 'clerk') {
+      const authorizedParties = splitCsv(values.CLERK_AUTHORIZED_PARTIES);
+      if (authorizedParties.length === 0) {
+        add(errors, 'CLERK_AUTHORIZED_PARTIES must include the public web origin for HTTPS/domain proof');
+      }
+      const normalizedAuthorizedParties = [];
+      for (const [index, origin] of authorizedParties.entries()) {
+        const url = requireHttpsUrl(`CLERK_AUTHORIZED_PARTIES[${index}]`, origin, errors);
+        if (url) normalizedAuthorizedParties.push(normalizeOrigin(url));
+      }
+      if (siteOrigin && !normalizedAuthorizedParties.includes(siteOrigin)) {
+        add(errors, 'CLERK_AUTHORIZED_PARTIES must include NEXT_PUBLIC_SITE_URL origin');
+      }
+    }
   }
 
   return { errors, warnings };

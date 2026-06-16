@@ -1,6 +1,58 @@
 /** @type {import('next').NextConfig} */
 const isDevelopment = process.env.NODE_ENV === 'development'
 
+const unique = (values) => Array.from(new Set(values.filter(Boolean)))
+
+const originFromUrl = (value) => {
+  if (!value) return null
+  try {
+    return new URL(value).origin
+  } catch {
+    return null
+  }
+}
+
+const csvValues = (value) =>
+  String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+const configuredClerkOrigins = unique([
+  ...csvValues(process.env.NEXT_PUBLIC_CLERK_CSP_ORIGINS),
+  'https://*.clerk.accounts.dev',
+])
+
+const configuredAppOrigins = unique([
+  originFromUrl(process.env.NEXT_PUBLIC_SITE_URL),
+  originFromUrl(process.env.NEXTAUTH_URL),
+  originFromUrl(process.env.NEXT_PUBLIC_API_URL),
+  originFromUrl(process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL),
+  originFromUrl(process.env.NEXT_PUBLIC_CLERK_SIGN_UP_URL),
+  originFromUrl(process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL),
+  originFromUrl(process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL),
+])
+
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  ["form-action 'self'", ...configuredAppOrigins].join(' '),
+  "img-src 'self' data: blob: https://img.clerk.com",
+  "font-src 'self' data:",
+  "style-src 'self' 'unsafe-inline'",
+  [
+    `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ''}`,
+    ...configuredClerkOrigins,
+    'https://challenges.cloudflare.com',
+  ].join(' '),
+  "manifest-src 'self'",
+  "worker-src 'self' blob:",
+  "frame-src 'self' https://challenges.cloudflare.com",
+  ["connect-src 'self'", ...configuredAppOrigins, ...configuredClerkOrigins].join(' '),
+].join('; ')
+
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-Frame-Options', value: 'DENY' },
@@ -8,21 +60,7 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' },
   {
     key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      "base-uri 'self'",
-      "object-src 'none'",
-      "frame-ancestors 'none'",
-      "form-action 'self' https://eu-west-2ypo6sl1zm.auth.eu-west-2.amazoncognito.com",
-      "img-src 'self' data: blob: https://img.clerk.com",
-      "font-src 'self' data:",
-      "style-src 'self' 'unsafe-inline'",
-      `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ''} https://*.clerk.accounts.dev https://challenges.cloudflare.com`,
-      "manifest-src 'self'",
-      "worker-src 'self' blob:",
-      "frame-src 'self' https://challenges.cloudflare.com",
-      "connect-src 'self' https://api.oasis-care.co https://app.oasis-care.co https://eu-west-2ypo6sl1zm.auth.eu-west-2.amazoncognito.com https://*.clerk.accounts.dev",
-    ].join('; '),
+    value: contentSecurityPolicy,
   },
 ]
 

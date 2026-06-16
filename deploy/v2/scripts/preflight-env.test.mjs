@@ -51,6 +51,46 @@ test('placeholders and localhost fail', () => {
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY')));
 });
 
+test('production-like public URLs must use HTTPS', () => {
+  const result = validate(validEnv({
+    NEXT_PUBLIC_SITE_URL: 'http://care.example.org',
+    NEXT_PUBLIC_API_URL: 'http://care.example.org/graphql',
+    NEXT_PUBLIC_CLERK_SIGN_IN_URL: 'http://care.example.org/sign-in',
+  }));
+
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_SITE_URL must use https')));
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_API_URL must use https')));
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_SIGN_IN_URL must use https')));
+});
+
+test('production-like app domain, NextAuth URL, and allowed origins must match the web origin', () => {
+  const result = validate(validEnv({
+    APP_DOMAIN: 'other.example.org',
+    NEXTAUTH_URL: 'https://auth.example.org',
+    ALLOWED_ORIGINS: 'https://other.example.org',
+  }));
+
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_SITE_URL host must match APP_DOMAIN')));
+  assert(result.errors.some((error) => error.includes('NEXTAUTH_URL origin must match')));
+  assert(result.errors.some((error) => error.includes('ALLOWED_ORIGINS must include')));
+});
+
+test('Clerk authorized parties and redirect URLs must match the public web origin', () => {
+  const result = validate(validEnv({
+    CLERK_AUTHORIZED_PARTIES: 'https://other.example.org',
+    NEXT_PUBLIC_CLERK_SIGN_IN_URL: 'https://other.example.org/sign-in',
+    NEXT_PUBLIC_CLERK_SIGN_UP_URL: 'https://other.example.org/sign-up',
+    NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: 'https://other.example.org/today',
+    NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: 'https://other.example.org/today',
+  }));
+
+  assert(result.errors.some((error) => error.includes('CLERK_AUTHORIZED_PARTIES must include')));
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_SIGN_IN_URL origin must match')));
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_SIGN_UP_URL origin must match')));
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL origin must match')));
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL origin must match')));
+});
+
 test('local auth and demo mode are forbidden in production-like env', () => {
   const result = validate(validEnv({
     LOCAL_AUTH_ENABLED: 'true',
