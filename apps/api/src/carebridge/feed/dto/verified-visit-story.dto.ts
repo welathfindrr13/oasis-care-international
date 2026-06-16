@@ -1,5 +1,5 @@
 import { Field, ID, ObjectType } from '@nestjs/graphql';
-import { GraphQLJSONObject } from 'graphql-type-json';
+import { GraphQLJSON } from 'graphql-type-json';
 import { CarebridgeContentStatus } from '../../dto/carebridge.enums';
 
 @ObjectType()
@@ -31,7 +31,7 @@ export class VerifiedVisitStoryDTO {
   @Field(() => String, { nullable: true })
   approvedBody?: string | null;
 
-  @Field(() => GraphQLJSONObject)
+  @Field(() => GraphQLJSON)
   sourceRefs!: unknown;
 
   @Field(() => Date, { nullable: true })

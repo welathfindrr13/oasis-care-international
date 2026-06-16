@@ -125,10 +125,11 @@ export class CarebridgeService {
 
   async listCareRooms(viewer: ViewerContext) {
     if (this.isExternalViewer(viewer)) {
-      if (!viewer.email) {
+      const lookup = this.familyAccessLookup(viewer);
+      if (!lookup.authSubject && !lookup.email) {
         return [];
       }
-      const rooms = await this.repository.listRoomsForFamilyEmail(viewer.email.trim().toLowerCase());
+      const rooms = await this.repository.listRoomsForFamilyAccess(lookup);
       return rooms.map((room: any) => this.mapCareRoom(room));
     }
 
@@ -142,7 +143,7 @@ export class CarebridgeService {
 
   async getCareRoom(id: string, viewer: ViewerContext) {
     const room = this.isExternalViewer(viewer)
-      ? await this.repository.findRoomByIdForFamilyEmail(id, (viewer.email || '').trim().toLowerCase())
+      ? await this.repository.findRoomByIdForFamilyAccess(id, this.familyAccessLookup(viewer))
       : await this.repository.findRoomByIdForOrganization(id, viewer.organizationId || '');
 
     if (!room) {
@@ -158,9 +159,10 @@ export class CarebridgeService {
 
   async listVerifiedVisitStories(careRoomId: string, viewer: ViewerContext) {
     await this.getCareRoom(careRoomId, viewer);
-    const status = this.isExternalViewer(viewer) ? 'PUBLISHED' : undefined;
+    const familyVisible = this.isExternalViewer(viewer);
+    const status = familyVisible ? 'PUBLISHED' : undefined;
     const stories = await this.repository.listVerifiedVisitStoriesByRoomId(careRoomId, status as any);
-    return stories.map((story: any) => this.mapStory(story));
+    return stories.map((story: any) => this.mapStory(story, { familyVisible }));
   }
 
   async listVerifiedVisitStoryApprovalQueue(viewer: ViewerContext, careRoomId?: string) {
@@ -324,7 +326,7 @@ export class CarebridgeService {
 
   async raiseConcern(input: RaiseConcernInput, viewer: ViewerContext) {
     const room = this.isExternalViewer(viewer)
-      ? await this.repository.findRoomByIdForFamilyEmail(input.careRoomId, (viewer.email || '').trim().toLowerCase())
+      ? await this.repository.findRoomByIdForFamilyAccess(input.careRoomId, this.familyAccessLookup(viewer))
       : await this.repository.findRoomByIdForOrganization(input.careRoomId, viewer.organizationId || '');
 
     if (!room) {
@@ -427,7 +429,8 @@ export class CarebridgeService {
   }
 
   async submitFamilyPulse(input: SubmitFamilyPulseInput, viewer: ViewerContext) {
-    if (!this.isExternalViewer(viewer) || !viewer.email) {
+    const lookup = this.familyAccessLookup(viewer);
+    if (!this.isExternalViewer(viewer) || (!lookup.authSubject && !lookup.email)) {
       throw new BaseHttpException(
         ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
         'Only family-access users can submit confidence checks.',
@@ -435,7 +438,7 @@ export class CarebridgeService {
       );
     }
 
-    const room = await this.repository.findRoomByIdForFamilyEmail(input.careRoomId, viewer.email.trim().toLowerCase());
+    const room = await this.repository.findRoomByIdForFamilyAccess(input.careRoomId, lookup);
     if (!room) {
       throw new BaseHttpException(
         ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
@@ -447,7 +450,10 @@ export class CarebridgeService {
     const membership = room.memberships.find(
       (item: any) =>
         item.status === CareRoomMembershipStatus.ACTIVE &&
-        item.family_contact?.email?.toLowerCase() === viewer.email?.trim().toLowerCase(),
+        (
+          (lookup.authSubject && item.family_contact?.auth_subject === lookup.authSubject) ||
+          (lookup.email && item.family_contact?.email?.toLowerCase() === lookup.email)
+        ),
     );
 
     if (!membership) {
@@ -525,6 +531,12 @@ export class CarebridgeService {
 
   private isExternalViewer(viewer: ViewerContext) {
     return !['admin', 'carer'].includes((viewer.role || '').trim().toLowerCase());
+  }
+
+  private familyAccessLookup(viewer: ViewerContext) {
+    const authSubject = (viewer.authSubject || viewer.userId || '').trim() || undefined;
+    const email = (viewer.email || '').trim().toLowerCase() || undefined;
+    return { authSubject, email };
   }
 
   private mapConcernEventType(status: ConcernStatus) {
@@ -611,7 +623,26 @@ export class CarebridgeService {
     };
   }
 
-  private mapStory(story: any) {
+  private mapStory(story: any, options?: { familyVisible?: boolean }) {
+    if (options?.familyVisible) {
+      const approvedTitle = story.approved_title ?? '';
+      const approvedBody = story.approved_body ?? '';
+
+      return {
+        id: story.id,
+        status: story.status,
+        draftTitle: approvedTitle,
+        draftBody: approvedBody,
+        approvedTitle: story.approved_title ?? null,
+        approvedBody: story.approved_body ?? null,
+        approvedAt: story.approved_at ?? null,
+        rejectionReason: null,
+        rejectedAt: null,
+        sourceRefs: story.source_refs,
+        publishedAt: story.published_at ?? null,
+      };
+    }
+
     return {
       id: story.id,
       status: story.status,

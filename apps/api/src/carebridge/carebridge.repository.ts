@@ -11,6 +11,21 @@ import {
 export class CarebridgeRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  private familyContactWhere(input: { authSubject?: string | null; email?: string | null }) {
+    const authSubject = (input.authSubject || '').trim();
+    const email = (input.email || '').trim().toLowerCase();
+
+    if (authSubject) {
+      return { auth_subject: authSubject };
+    }
+
+    if (email) {
+      return { email };
+    }
+
+    return { id: '__no-family-access__' };
+  }
+
   async ensureClientInOrganization(clientId: string, organizationId: string): Promise<boolean> {
     const client = await this.prisma.client.findFirst({
       where: this.prisma.whereNotDeleted({
@@ -132,14 +147,16 @@ export class CarebridgeRepository {
   }
 
   async listRoomsForFamilyEmail(email: string) {
+    return this.listRoomsForFamilyAccess({ email });
+  }
+
+  async listRoomsForFamilyAccess(input: { authSubject?: string | null; email?: string | null }) {
     return this.prisma.careRoom.findMany({
       where: {
         memberships: {
           some: {
             status: CareRoomMembershipStatus.ACTIVE,
-            family_contact: {
-              email,
-            },
+            family_contact: this.familyContactWhere(input),
           },
         },
       },
@@ -156,15 +173,17 @@ export class CarebridgeRepository {
   }
 
   async findRoomByIdForFamilyEmail(id: string, email: string) {
+    return this.findRoomByIdForFamilyAccess(id, { email });
+  }
+
+  async findRoomByIdForFamilyAccess(id: string, input: { authSubject?: string | null; email?: string | null }) {
     return this.prisma.careRoom.findFirst({
       where: {
         id,
         memberships: {
           some: {
             status: CareRoomMembershipStatus.ACTIVE,
-            family_contact: {
-              email,
-            },
+            family_contact: this.familyContactWhere(input),
           },
         },
       },

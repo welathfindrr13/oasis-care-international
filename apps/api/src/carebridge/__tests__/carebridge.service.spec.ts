@@ -16,8 +16,10 @@ describe('CarebridgeService', () => {
     upsertFamilyContact: jest.fn(),
     createMembershipWithDefaultScopes: jest.fn(),
     listRoomsForOrganization: jest.fn(),
+    listRoomsForFamilyAccess: jest.fn(),
     listRoomsForFamilyEmail: jest.fn(),
     findRoomByIdForOrganization: jest.fn(),
+    findRoomByIdForFamilyAccess: jest.fn(),
     findRoomByIdForFamilyEmail: jest.fn(),
     listVerifiedVisitStoriesByRoomId: jest.fn(),
     listVerifiedVisitStoryApprovalQueue: jest.fn(),
@@ -96,7 +98,7 @@ describe('CarebridgeService', () => {
   });
 
   it('lists care rooms for a family user by email instead of organization scope', async () => {
-    repository.listRoomsForFamilyEmail.mockResolvedValue([
+    repository.listRoomsForFamilyAccess.mockResolvedValue([
       {
         id: 'room-1',
         organization_id: 'org-1',
@@ -116,13 +118,46 @@ describe('CarebridgeService', () => {
       email: 'daughter@example.com',
     });
 
-    expect(repository.listRoomsForFamilyEmail).toHaveBeenCalledWith('daughter@example.com');
+    expect(repository.listRoomsForFamilyAccess).toHaveBeenCalledWith({
+      authSubject: undefined,
+      email: 'daughter@example.com',
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].client?.fullName).toBe('Mary Smith');
+  });
+
+  it('lists care rooms for a family user by verified auth subject when email is absent', async () => {
+    repository.listRoomsForFamilyAccess.mockResolvedValue([
+      {
+        id: 'room-1',
+        organization_id: 'org-1',
+        client_id: 'client-1',
+        status: 'ACTIVE',
+        created_at: new Date('2026-04-21T09:00:00Z'),
+        updated_at: new Date('2026-04-21T09:00:00Z'),
+        client: {
+          id: 'client-1',
+          full_name: 'Mary Smith',
+        },
+      },
+    ] as any);
+
+    const result = await service.listCareRooms({
+      role: 'user',
+      userId: 'clerk-family-subject',
+      authSubject: 'clerk-family-subject',
+    });
+
+    expect(repository.listRoomsForFamilyAccess).toHaveBeenCalledWith({
+      authSubject: 'clerk-family-subject',
+      email: undefined,
+    });
     expect(result).toHaveLength(1);
     expect(result[0].client?.fullName).toBe('Mary Smith');
   });
 
   it('treats client-scoped external viewers as family access rather than staff access', async () => {
-    repository.listRoomsForFamilyEmail.mockResolvedValue([
+    repository.listRoomsForFamilyAccess.mockResolvedValue([
       {
         id: 'room-1',
         organization_id: 'org-1',
@@ -142,7 +177,10 @@ describe('CarebridgeService', () => {
       email: 'daughter@example.com',
     });
 
-    expect(repository.listRoomsForFamilyEmail).toHaveBeenCalledWith('daughter@example.com');
+    expect(repository.listRoomsForFamilyAccess).toHaveBeenCalledWith({
+      authSubject: undefined,
+      email: 'daughter@example.com',
+    });
     expect(result).toHaveLength(1);
   });
 
@@ -287,23 +325,38 @@ describe('CarebridgeService', () => {
   });
 
   it('keeps family users limited to published verified visit stories', async () => {
-    repository.findRoomByIdForFamilyEmail.mockResolvedValue({
+    repository.findRoomByIdForFamilyAccess.mockResolvedValue({
       id: 'room-1',
       organization_id: 'org-1',
       client_id: 'client-1',
     } as any);
-    repository.listVerifiedVisitStoriesByRoomId.mockResolvedValue([] as any);
+    repository.listVerifiedVisitStoriesByRoomId.mockResolvedValue([
+      {
+        id: 'story-1',
+        status: 'PUBLISHED',
+        draft_title: 'Internal draft title',
+        draft_body: 'Internal draft contains staff-only notes.',
+        approved_title: 'Wellbeing visit completed',
+        approved_body: 'Mary had a calm visit and completed her usual routine.',
+        source_refs: [{ type: 'Visit', id: 'visit-1' }],
+        published_at: new Date('2026-04-22T09:00:00Z'),
+      },
+    ] as any);
 
-    await service.listVerifiedVisitStories('room-1', {
+    const result = await service.listVerifiedVisitStories('room-1', {
       role: 'user',
       email: 'daughter@example.com',
     });
 
     expect(repository.listVerifiedVisitStoriesByRoomId).toHaveBeenCalledWith('room-1', 'PUBLISHED');
+    expect(result).toHaveLength(1);
+    expect(result[0].draftTitle).toBe('Wellbeing visit completed');
+    expect(result[0].draftBody).toBe('Mary had a calm visit and completed her usual routine.');
+    expect(result[0].draftBody).not.toContain('staff-only');
   });
 
   it('raises a concern with SLA timestamps and an initial event', async () => {
-    repository.findRoomByIdForFamilyEmail.mockResolvedValue({
+    repository.findRoomByIdForFamilyAccess.mockResolvedValue({
       id: 'room-1',
       organization_id: 'org-1',
       client_id: 'client-1',

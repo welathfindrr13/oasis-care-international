@@ -1,5 +1,5 @@
 import { Field, ID, InputType, ObjectType, registerEnumType } from '@nestjs/graphql';
-import { GraphQLJSONObject } from 'graphql-type-json';
+import { GraphQLJSON, GraphQLJSONObject } from 'graphql-type-json';
 import {
   AccessGrantScope,
   CareRoomMembershipStatus,
@@ -173,8 +173,8 @@ export class VerifiedVisitStoryDTO {
   @Field(() => Date, { nullable: true })
   rejectedAt?: Date | null;
 
-  @Field(() => GraphQLJSONObject)
-  sourceRefs!: Record<string, unknown>;
+  @Field(() => GraphQLJSON)
+  sourceRefs!: unknown;
 
   @Field(() => Date, { nullable: true })
   publishedAt?: Date | null;
