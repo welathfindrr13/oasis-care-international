@@ -330,14 +330,29 @@ describe('CarebridgeService', () => {
       organization_id: 'org-1',
       client_id: 'client-1',
     } as any);
-    repository.listVerifiedVisitStoriesByRoomId.mockResolvedValue([] as any);
+    repository.listVerifiedVisitStoriesByRoomId.mockResolvedValue([
+      {
+        id: 'story-1',
+        status: 'PUBLISHED',
+        draft_title: 'Internal draft title',
+        draft_body: 'Internal draft contains staff-only notes.',
+        approved_title: 'Wellbeing visit completed',
+        approved_body: 'Mary had a calm visit and completed her usual routine.',
+        source_refs: [{ type: 'Visit', id: 'visit-1' }],
+        published_at: new Date('2026-04-22T09:00:00Z'),
+      },
+    ] as any);
 
-    await service.listVerifiedVisitStories('room-1', {
+    const result = await service.listVerifiedVisitStories('room-1', {
       role: 'user',
       email: 'daughter@example.com',
     });
 
     expect(repository.listVerifiedVisitStoriesByRoomId).toHaveBeenCalledWith('room-1', 'PUBLISHED');
+    expect(result).toHaveLength(1);
+    expect(result[0].draftTitle).toBe('Wellbeing visit completed');
+    expect(result[0].draftBody).toBe('Mary had a calm visit and completed her usual routine.');
+    expect(result[0].draftBody).not.toContain('staff-only');
   });
 
   it('raises a concern with SLA timestamps and an initial event', async () => {

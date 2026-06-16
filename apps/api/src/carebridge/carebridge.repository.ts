@@ -14,12 +14,16 @@ export class CarebridgeRepository {
   private familyContactWhere(input: { authSubject?: string | null; email?: string | null }) {
     const authSubject = (input.authSubject || '').trim();
     const email = (input.email || '').trim().toLowerCase();
-    const OR = [
-      ...(authSubject ? [{ auth_subject: authSubject }] : []),
-      ...(email ? [{ email }] : []),
-    ];
 
-    return OR.length > 0 ? { OR } : { id: '__no-family-access__' };
+    if (authSubject) {
+      return { auth_subject: authSubject };
+    }
+
+    if (email) {
+      return { email };
+    }
+
+    return { id: '__no-family-access__' };
   }
 
   async ensureClientInOrganization(clientId: string, organizationId: string): Promise<boolean> {

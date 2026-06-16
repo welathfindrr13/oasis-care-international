@@ -159,9 +159,10 @@ export class CarebridgeService {
 
   async listVerifiedVisitStories(careRoomId: string, viewer: ViewerContext) {
     await this.getCareRoom(careRoomId, viewer);
-    const status = this.isExternalViewer(viewer) ? 'PUBLISHED' : undefined;
+    const familyVisible = this.isExternalViewer(viewer);
+    const status = familyVisible ? 'PUBLISHED' : undefined;
     const stories = await this.repository.listVerifiedVisitStoriesByRoomId(careRoomId, status as any);
-    return stories.map((story: any) => this.mapStory(story));
+    return stories.map((story: any) => this.mapStory(story, { familyVisible }));
   }
 
   async listVerifiedVisitStoryApprovalQueue(viewer: ViewerContext, careRoomId?: string) {
@@ -622,7 +623,26 @@ export class CarebridgeService {
     };
   }
 
-  private mapStory(story: any) {
+  private mapStory(story: any, options?: { familyVisible?: boolean }) {
+    if (options?.familyVisible) {
+      const approvedTitle = story.approved_title ?? '';
+      const approvedBody = story.approved_body ?? '';
+
+      return {
+        id: story.id,
+        status: story.status,
+        draftTitle: approvedTitle,
+        draftBody: approvedBody,
+        approvedTitle: story.approved_title ?? null,
+        approvedBody: story.approved_body ?? null,
+        approvedAt: story.approved_at ?? null,
+        rejectionReason: null,
+        rejectedAt: null,
+        sourceRefs: story.source_refs,
+        publishedAt: story.published_at ?? null,
+      };
+    }
+
     return {
       id: story.id,
       status: story.status,
