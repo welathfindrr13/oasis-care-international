@@ -13,8 +13,22 @@ test('extractClerkRolesFromClaims maps Clerk organization admin to Oasis admin',
   assert(roles.includes('admin'));
 });
 
+test('extractClerkRolesFromClaims maps current Clerk compact organization admin claim', () => {
+  const roles = extractClerkRolesFromClaims({ o: { id: 'org_123', rol: 'admin' } });
+
+  assert(roles.includes('admin'));
+});
+
 test('extractClerkRolesFromClaims does not treat default org member as staff', () => {
   const roles = extractClerkRolesFromClaims({ org_role: 'org:member' });
+
+  assert.equal(roles[0], 'user');
+  assert(!roles.includes('carer'));
+  assert(!roles.includes('admin'));
+});
+
+test('extractClerkRolesFromClaims does not treat compact Clerk member as staff', () => {
+  const roles = extractClerkRolesFromClaims({ o: { id: 'org_123', rol: 'member' } });
 
   assert.equal(roles[0], 'user');
   assert(!roles.includes('carer'));
@@ -38,6 +52,7 @@ test('extractClerkRolesFromClaims ignores unsafe metadata roles', () => {
 test('getClerkOrganizationIdFromClaims resolves active organization claim variants', () => {
   assert.equal(getClerkOrganizationIdFromClaims({ org_id: 'org_123' }), 'org_123');
   assert.equal(getClerkOrganizationIdFromClaims({ organizationId: 'org_456' }), 'org_456');
+  assert.equal(getClerkOrganizationIdFromClaims({ o: { id: 'org_789', rol: 'admin' } }), 'org_789');
 });
 
 test('getClerkBearerTokenFromCookieHeader extracts Clerk session token without logging it', () => {

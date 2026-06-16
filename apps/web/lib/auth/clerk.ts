@@ -45,6 +45,7 @@ function collectClaimRoles(claims: ClaimRecord): string[] {
     claims.orgRole,
     claims.organization_role,
     claims.organizationRole,
+    claims.o?.rol,
     claims.role,
     claims.roles,
     claims.realm_access?.roles,
@@ -67,7 +68,7 @@ export function extractClerkRolesFromClaims(claims: ClaimRecord | null | undefin
 
 export function getClerkOrganizationIdFromClaims(claims: ClaimRecord | null | undefined): string | null {
   if (!claims) return null;
-  const orgId = claims.org_id ?? claims.orgId ?? claims.organization_id ?? claims.organizationId;
+  const orgId = claims.org_id ?? claims.orgId ?? claims.organization_id ?? claims.organizationId ?? claims.o?.id;
   return typeof orgId === 'string' && orgId.trim() ? orgId.trim() : null;
 }
 
