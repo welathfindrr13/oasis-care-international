@@ -75,8 +75,6 @@ export const config = {
      * Match all request paths except:
      * - api/auth (NextAuth routes)
      * - api/health (health check)
-     * - api/graphql (GraphQL proxy - auth handled by backend)
-     * - api/evidence-packs (export API - auth handled by route/backend)
      * - login (login page)
      * - _next/static (static files)
      * - _next/image (image optimization)
@@ -84,6 +82,6 @@ export const config = {
      * - PWA files (manifest and service worker)
      * - public assets
      */
-    "/((?!$|api/auth|api/health|api/graphql|api/evidence-packs|login|offline|manifest\\.webmanifest|sw\\.js|_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.svg$).*)",
+    "/((?!$|api/auth|api/health|login|offline|manifest\\.webmanifest|sw\\.js|_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.svg$).*)",
   ],
 }

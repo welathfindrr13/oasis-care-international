@@ -20,6 +20,11 @@ export interface JwtPayload {
   org_id?: string;
   org_role?: string;
   org_slug?: string;
+  o?: {
+    id?: string;
+    rol?: string;
+    slg?: string;
+  };
   tenant_id?: string;
   role?: string;
   roles?: string[];
@@ -330,7 +335,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   private static extractOrganizationClaim(payload: JwtPayload, provider: string): string | null {
     const candidates =
       provider === 'clerk'
-        ? [payload.org_id, payload.organization_id, payload['custom:organization_id'], payload.tenant_id]
+        ? [payload.org_id, payload.o?.id, payload.organization_id, payload['custom:organization_id'], payload.tenant_id]
         : [payload['custom:organization_id'], payload.organization_id, payload.org_id, payload.tenant_id];
 
     return candidates
@@ -343,6 +348,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       const metadataRole = JwtStrategy.valueFromMetadata(payload.public_metadata, 'role');
       return [
         payload.org_role,
+        payload.o?.rol,
         payload.organization_role,
         payload.role,
         metadataRole,
@@ -380,7 +386,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (hasAny(['carer', 'care_manager', 'staff', 'office', 'org:staff', 'org:carer'])) {
       return 'carer';
     }
-    if (hasAny(['family', 'user', 'viewer', 'org:member', 'org:family', 'org:user', 'org:viewer'])) {
+    if (hasAny(['family', 'user', 'viewer', 'member', 'org:member', 'org:family', 'org:user', 'org:viewer'])) {
       return 'user';
     }
 

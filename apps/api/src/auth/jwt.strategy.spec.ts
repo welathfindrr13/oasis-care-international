@@ -102,6 +102,32 @@ describe('JwtStrategy local auth gating', () => {
     });
   });
 
+  it.each([
+    ['admin', 'admin'],
+    ['member', 'user'],
+  ])('maps current Clerk compact tenant role %s to canonical API role %s', async (compactRole, expectedRole) => {
+    process.env.NODE_ENV = 'test';
+    process.env.AUTH_IDENTITY_PROVIDER = 'clerk';
+    process.env.CLERK_ISSUER = 'https://clerk.example.org';
+
+    const strategy = new JwtStrategy();
+
+    await expect(
+      strategy.validate({
+        sub: 'user_compact_123',
+        iss: 'https://clerk.example.org',
+        o: { id: 'org_compact_123', rol: compactRole },
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        iat: Math.floor(Date.now() / 1000),
+      }),
+    ).resolves.toMatchObject({
+      id: 'user_compact_123',
+      organizationId: 'org_compact_123',
+      role: expectedRole,
+      authMode: 'clerk',
+    });
+  });
+
   it.each(['admin', 'carer'])('ignores unsafe_metadata.role=%s for Clerk authorization', async (unsafeRole) => {
     process.env.NODE_ENV = 'test';
     process.env.AUTH_IDENTITY_PROVIDER = 'clerk';
