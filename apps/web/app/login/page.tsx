@@ -1,6 +1,6 @@
 'use client';
 
-import { SignInButton, SignUpButton } from '@clerk/nextjs';
+import { SignIn } from '@clerk/nextjs';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
@@ -91,7 +91,7 @@ function LoginContent() {
               </div>
             )}
 
-            {/* Sign In Button */}
+            {/* Sign In */}
             {localAuthEnabled ? (
               <div className="space-y-4">
                 <label className="block">
@@ -118,20 +118,19 @@ function LoginContent() {
                 </button>
               </div>
             ) : authMode === 'clerk' ? (
-              <div className="space-y-3">
-                <SignInButton mode="modal">
-                  <button className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                    </svg>
-                    Continue with Clerk
-                  </button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="w-full text-sm font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline">
-                    Request access with your care organisation
-                  </button>
-                </SignUpButton>
+              <div className="flex justify-center">
+                <SignIn
+                  routing="path"
+                  path="/login"
+                  signUpUrl="/login"
+                  fallbackRedirectUrl={callbackUrl}
+                  appearance={{
+                    elements: {
+                      rootBox: 'w-full',
+                      card: 'w-full border-0 shadow-none p-0',
+                    },
+                  }}
+                />
               </div>
             ) : (
               <button
