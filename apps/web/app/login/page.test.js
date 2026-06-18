@@ -6,6 +6,8 @@ test('Clerk mode renders a dedicated sign-in surface instead of a modal launcher
   const source = fs.readFileSync(__dirname + '/page.tsx', 'utf8')
 
   assert.match(source, /<SignIn\b/)
+  assert.match(source, /routing="hash"/)
   assert.doesNotMatch(source, /<SignInButton/)
   assert.doesNotMatch(source, /<SignUpButton/)
+  assert.doesNotMatch(source, /routing="path"/)
 })

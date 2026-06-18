@@ -120,8 +120,7 @@ function LoginContent() {
             ) : authMode === 'clerk' ? (
               <div className="flex justify-center">
                 <SignIn
-                  routing="path"
-                  path="/login"
+                  routing="hash"
                   signUpUrl="/login"
                   fallbackRedirectUrl={callbackUrl}
                   appearance={{
