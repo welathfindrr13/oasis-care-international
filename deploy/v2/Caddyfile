@@ -24,6 +24,10 @@
 		reverse_proxy api:4000
 	}
 
+	handle /stats/* {
+		reverse_proxy api:4000
+	}
+
 	handle /api/graphql {
 		uri strip_prefix /api
 		reverse_proxy api:4000

@@ -3,11 +3,17 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useSession, signOut } from 'next-auth/react'
+import { useAuth, useClerk, useUser } from '@clerk/nextjs'
+import { useSession, signOut as nextAuthSignOut } from 'next-auth/react'
 import { cn } from '../../lib/utils'
 import { InstallAppPrompt } from '../pwa/InstallAppPrompt'
-import { hasRole, normalizeAppRoles } from '../../lib/auth/roles'
-import { getAccessContext } from '../../lib/auth/access'
+import { resolveAuthMode } from '../../lib/auth/mode'
+import {
+  createClerkHeaderViewer,
+  createNextAuthHeaderViewer,
+  getHeaderAccessLabel,
+  type HeaderViewer,
+} from './headerIdentity'
 
 const staffNavItems = [
   { href: '/today', label: 'Today', icon: '📊', aliases: ['/dashboard'] },
@@ -34,72 +40,112 @@ function isNavItemActive(pathname: string, item: { href: string; aliases?: reado
   return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`))
 }
 
-function formatRoleLabel(role: string): string {
-  const normalized = role.trim().toLowerCase()
-  if (!normalized) return ''
-
-  switch (normalized) {
-    case 'admin':
-      return 'ADMIN'
-    case 'carer':
-      return 'CARER'
-    case 'care_manager':
-      return 'CARE MANAGER'
-    case 'manager':
-      return 'MANAGER'
-    case 'office':
-      return 'OFFICE'
-    case 'client':
-      return 'CLIENT'
-    default:
-      return normalized.replace(/_/g, ' ').toUpperCase()
-  }
-}
-
 export interface HeaderProps {
   className?: string
   notificationCount?: number
 }
 
-export function Header({ 
-  className, 
-  notificationCount = 0 
-}: HeaderProps) {
+interface HeaderContentProps extends HeaderProps {
+  pathname: string
+  viewer: HeaderViewer
+  onSignOut: () => Promise<void>
+}
+
+function getBrowserAuthMode() {
+  return resolveAuthMode({
+    NODE_ENV: process.env.NODE_ENV,
+    NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: process.env.NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER,
+    NEXT_PUBLIC_LOCAL_AUTH_ENABLED: process.env.NEXT_PUBLIC_LOCAL_AUTH_ENABLED,
+  } as NodeJS.ProcessEnv)
+}
+
+export function Header(props: HeaderProps) {
+  if (getBrowserAuthMode() === 'clerk') {
+    return <ClerkHeader {...props} />
+  }
+
+  return <NextAuthHeader {...props} />
+}
+
+function ClerkHeader({ className, notificationCount = 0 }: HeaderProps) {
+  const pathname = usePathname()
+  const { isLoaded, isSignedIn, orgRole } = useAuth()
+  const { user } = useUser()
+  const { signOut } = useClerk()
+  const viewer = createClerkHeaderViewer({
+    pathname,
+    isLoaded,
+    isSignedIn,
+    userName: user?.fullName,
+    userEmail: user?.primaryEmailAddress?.emailAddress,
+    sessionClaims: {
+      org_role: orgRole,
+      public_metadata: user?.publicMetadata,
+    },
+  })
+
+  async function handleSignOut() {
+    await signOut({ redirectUrl: '/login' })
+  }
+
+  return (
+    <HeaderContent
+      className={className}
+      notificationCount={notificationCount}
+      pathname={pathname}
+      viewer={viewer}
+      onSignOut={handleSignOut}
+    />
+  )
+}
+
+function NextAuthHeader({ className, notificationCount = 0 }: HeaderProps) {
   const pathname = usePathname()
   const { data: session, status } = useSession()
+  const viewer = createNextAuthHeaderViewer({
+    pathname,
+    status,
+    roles: (session as any)?.roles ?? [],
+    userName: session?.user?.name,
+    userEmail: session?.user?.email,
+  })
+
+  async function handleSignOut() {
+    try {
+      await nextAuthSignOut({ redirect: false });
+    } finally {
+      window.location.assign('/api/auth/cognito-logout');
+    }
+  }
+
+  return (
+    <HeaderContent
+      className={className}
+      notificationCount={notificationCount}
+      pathname={pathname}
+      viewer={viewer}
+      onSignOut={handleSignOut}
+    />
+  )
+}
+
+function HeaderContent({
+  className,
+  notificationCount = 0,
+  pathname,
+  viewer,
+  onSignOut,
+}: HeaderContentProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-
-  const sessionRoles = normalizeAppRoles((session as any)?.roles ?? [])
-  const loadingFallbackRoles =
-    status === 'loading' && sessionRoles.length === 0
-      ? pathname.startsWith('/family')
-        ? ['user']
-        : ['admin']
-      : sessionRoles
-  const accessContext = getAccessContext(loadingFallbackRoles)
-  const primaryRole = loadingFallbackRoles[0]
-  const userRole = primaryRole ? formatRoleLabel(primaryRole) : ''
   const [notificationsOpen, setNotificationsOpen] = useState(false)
-
-  // Get user info from session.
-  const userName = session?.user?.name || session?.user?.email?.split('@')[0] || (status === 'loading' ? '' : 'User')
-  const userEmail = session?.user?.email || ''
-  const userInitial = (session?.user?.name || session?.user?.email || 'U').charAt(0).toUpperCase()
-  const isAdmin = hasRole(loadingFallbackRoles, 'admin')
+  const { accessContext, userName, userEmail, userInitial, isAdmin } = viewer
+  const userRole = getHeaderAccessLabel(viewer)
   const navItems = accessContext.isExternal
     ? familyNavItems
     : isAdmin
     ? [...staffNavItems, ...managementNavItems] as const
     : staffNavItems
-
-  async function handleSignOut() {
-    try {
-      await signOut({ redirect: false });
-    } finally {
-      window.location.assign('/api/auth/cognito-logout');
-    }
-  }
 
   return (
     <header className={cn('bg-white border-b border-slate-200 sticky top-0 z-50', className)}>
@@ -201,7 +247,7 @@ export function Header({
                 <div className="hidden sm:block text-left">
                   <p className="text-sm font-medium text-slate-900">{userName || ' '}</p>
                   <p className="text-xs text-slate-500">
-                    {accessContext.isExternal ? 'FAMILY ACCESS' : userRole || (status === 'loading' ? '' : 'MEMBER')}
+                    {userRole}
                   </p>
                 </div>
                 <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -265,7 +311,7 @@ export function Header({
                   )}
                   <div className="border-t border-slate-100 mt-2 pt-2">
                     <button 
-                      onClick={handleSignOut}
+                      onClick={onSignOut}
                       className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
