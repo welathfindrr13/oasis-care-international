@@ -54,7 +54,7 @@ jobs:
           git fetch origin main
           git checkout main
           git pull --ff-only origin main
-          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml up -d --build
+          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml up -d --build --wait --wait-timeout 180
           docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml ps
           REMOTE
 
@@ -62,6 +62,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsS "$OASIS_APP_URL/health" >/dev/null
-          curl -fsS "$OASIS_APP_URL/ready" >/dev/null
-          curl -fsS -I "$OASIS_APP_URL/sw.js" >/dev/null
+
+          probe_public_endpoint() {
+            local label="$1"
+            local curl_args="$2"
+            local url="$3"
+
+            for attempt in {1..30}; do
+              if curl -fsS $curl_args "$url" >/dev/null; then
+                printf 'PASS: %s\n' "$label"
+                return 0
+              fi
+
+              printf 'WAIT: %s attempt %s/30\n' "$label" "$attempt"
+              sleep 5
+            done
+
+            printf 'FAIL: %s did not become ready\n' "$label" >&2
+            return 1
+          }
+
+          probe_public_endpoint "health" "" "$OASIS_APP_URL/health"
+          probe_public_endpoint "ready" "" "$OASIS_APP_URL/ready"
+          probe_public_endpoint "service worker" "-I" "$OASIS_APP_URL/sw.js"

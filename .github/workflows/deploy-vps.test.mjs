@@ -16,3 +16,13 @@ test('VPS deploy workflow deploys with the Deployment V2 env file without printi
   assert.doesNotMatch(workflow, /cat deploy\/v2\/\.env/);
   assert.doesNotMatch(workflow, /printenv/);
 });
+
+test('VPS deploy workflow waits for compose health before public probes', () => {
+  assert.match(workflow, /up -d --build --wait --wait-timeout \d+/);
+});
+
+test('VPS deploy workflow retries public HTTPS probes during startup', () => {
+  assert.match(workflow, /probe_public_endpoint\(\)/);
+  assert.match(workflow, /for attempt in \{1\.\.30\}/);
+  assert.match(workflow, /sleep 5/);
+});
