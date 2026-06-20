@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
 const test = require('node:test')
 
 function loadNextConfig(env = {}) {
@@ -43,4 +44,8 @@ test('content security policy is driven by Deployment V2 app and Clerk domains',
   assert.match(csp, /connect-src[^;]*https:\/\/bright-gull-23\.clerk\.accounts\.dev/)
   assert.doesNotMatch(csp, /amazoncognito\.com/)
   assert.doesNotMatch(csp, /oasis-care\.co/)
+})
+
+test('service worker registration points at an existing public sw.js asset', () => {
+  assert.equal(fs.existsSync(__dirname + '/public/sw.js'), true)
 })
