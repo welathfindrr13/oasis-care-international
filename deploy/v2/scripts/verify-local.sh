@@ -52,7 +52,7 @@ pnpm --filter @oasis/api build
 pnpm --filter @oasis/web build
 docker build -f apps/api/Dockerfile -t oasis-api:v2 .
 docker build -f apps/web/Dockerfile -t oasis-web:v2 .
-docker compose -f deploy/v2/docker-compose.yml config
+docker compose --env-file "$TEMP_ENV" -f deploy/v2/docker-compose.yml config
 docker run --rm -v "$PWD/deploy/v2/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile
 bash -n deploy/v2/scripts/smoke-test.sh
 bash -n deploy/v2/scripts/backup-postgres.sh
