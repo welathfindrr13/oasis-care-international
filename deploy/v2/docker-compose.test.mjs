@@ -31,3 +31,10 @@ test('web service receives Clerk runtime environment for protected routes', () =
   assert.match(webBlock, /NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL:\s*\$\{NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL/);
   assert.match(webBlock, /NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL:\s*\$\{NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL/);
 });
+
+test('api service does not inject a default Clerk audience', () => {
+  const apiBlock = serviceBlock('api');
+
+  assert.match(apiBlock, /CLERK_AUDIENCE:\s*\$\{CLERK_AUDIENCE:-\}/);
+  assert.doesNotMatch(apiBlock, /CLERK_AUDIENCE:[^\n]*oasis-api/);
+});
