@@ -14,13 +14,13 @@ export class CarebridgeRepository {
   private familyContactWhere(input: { authSubject?: string | null; email?: string | null }) {
     const authSubject = (input.authSubject || '').trim();
     const email = (input.email || '').trim().toLowerCase();
+    const candidates = [
+      ...(authSubject ? [{ auth_subject: authSubject }] : []),
+      ...(email ? [{ email }] : []),
+    ];
 
-    if (authSubject) {
-      return { auth_subject: authSubject };
-    }
-
-    if (email) {
-      return { email };
+    if (candidates.length > 0) {
+      return { OR: candidates };
     }
 
     return { id: '__no-family-access__' };
