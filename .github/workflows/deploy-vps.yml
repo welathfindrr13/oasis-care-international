@@ -1,0 +1,67 @@
+name: Deploy VPS
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Deployment V2 VPS
+    runs-on: ubuntu-latest
+    env:
+      OASIS_APP_URL: https://app.oasiscare.care
+    steps:
+      - name: Validate deploy secrets
+        shell: bash
+        env:
+          OASIS_VPS_HOST: ${{ secrets.OASIS_VPS_HOST }}
+          OASIS_VPS_USER: ${{ secrets.OASIS_VPS_USER }}
+          OASIS_VPS_SSH_KEY: ${{ secrets.OASIS_VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$OASIS_VPS_HOST"
+          test -n "$OASIS_VPS_USER"
+          test -n "$OASIS_VPS_SSH_KEY"
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          OASIS_VPS_HOST: ${{ secrets.OASIS_VPS_HOST }}
+          OASIS_VPS_SSH_KEY: ${{ secrets.OASIS_VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$OASIS_VPS_SSH_KEY" > ~/.ssh/oasis_vps
+          chmod 600 ~/.ssh/oasis_vps
+          ssh-keyscan -H "$OASIS_VPS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy main to VPS
+        shell: bash
+        env:
+          OASIS_VPS_HOST: ${{ secrets.OASIS_VPS_HOST }}
+          OASIS_VPS_USER: ${{ secrets.OASIS_VPS_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'bash -se' <<'REMOTE'
+          set -euo pipefail
+          cd /opt/oasis-care
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
+          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml up -d --build
+          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml ps
+          REMOTE
+
+      - name: Verify public HTTPS endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS "$OASIS_APP_URL/health" >/dev/null
+          curl -fsS "$OASIS_APP_URL/ready" >/dev/null
+          curl -fsS -I "$OASIS_APP_URL/sw.js" >/dev/null
