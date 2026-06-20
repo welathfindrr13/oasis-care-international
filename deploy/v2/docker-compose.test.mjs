@@ -23,7 +23,8 @@ test('Caddy receives public domain environment used by the Caddyfile', () => {
 test('web service receives Clerk runtime environment for protected routes', () => {
   const webBlock = serviceBlock('web');
 
-  assert.match(webBlock, /CLERK_SECRET_KEY:\s*\$\{CLERK_SECRET_KEY/);
+  assert.match(webBlock, /CLERK_SECRET_KEY:\s*\$\{CLERK_SECRET_KEY:\?/);
+  assert.doesNotMatch(webBlock, /CLERK_SECRET_KEY:[^\n]*sk_test_synthetic_clerk_secret/);
   assert.match(webBlock, /NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:\s*\$\{NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY/);
   assert.match(webBlock, /NEXT_PUBLIC_CLERK_SIGN_IN_URL:\s*\$\{NEXT_PUBLIC_CLERK_SIGN_IN_URL/);
   assert.match(webBlock, /NEXT_PUBLIC_CLERK_SIGN_UP_URL:\s*\$\{NEXT_PUBLIC_CLERK_SIGN_UP_URL/);
