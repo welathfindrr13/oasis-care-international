@@ -166,6 +166,8 @@ jobs:
         AI_SUMMARY_ENABLED=false
         ENV
         node --test apps/web/next.config.test.js
+        node --test .github/workflows/deploy-vps.test.mjs
+        node --test deploy/v2/docker-compose.test.mjs
         node --test deploy/v2/scripts/preflight-env.test.mjs
         node --test deploy/v2/scripts/smoke-test.test.mjs
         node deploy/v2/scripts/preflight-env.mjs "$TEMP_ENV"
