@@ -91,6 +91,21 @@ test('migration runner supports a parameterised dry run without Terraform or AWS
   assert.doesNotMatch(result.stdout + result.stderr, /terraform output/);
 });
 
+test('migration dry run remains safe when expected AWS account is unset', () => {
+  const result = run('bash', ['infrastructure/scripts/run-migration.sh'], {
+    env: {
+      MIGRATION_DRY_RUN: 'true',
+      EXPECTED_AWS_ACCOUNT_ID: '',
+      AWS_ACCOUNT_ID: '',
+      SUBNET_ID: 'subnet-prod-1',
+      SECURITY_GROUP_ID: 'sg-prod-1',
+    },
+  });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /expected account: <not enforced>/);
+});
+
 test('smoke script supports parameterised API, web, and GraphQL dry-run checks', () => {
   const result = run('bash', ['infrastructure/scripts/smoke-test.sh'], {
     env: {
@@ -105,7 +120,50 @@ test('smoke script supports parameterised API, web, and GraphQL dry-run checks',
   assert.match(result.stdout, /GET https:\/\/api\.example\.test\/health/);
   assert.match(result.stdout, /GET https:\/\/app\.example\.test\/api\/health/);
   assert.match(result.stdout, /POST https:\/\/api\.example\.test\/graphql/);
-  assert.doesNotMatch(result.stdout, /staging-api\.oasis-care\.com/);
+  assert.doesNotMatch(result.stdout, /oasis-care\.(co|com)/);
+});
+
+test('smoke script fails safely without explicit targets', () => {
+  const result = run('bash', ['infrastructure/scripts/smoke-test.sh'], {
+    env: {
+      SMOKE_DRY_RUN: 'true',
+      API_BASE_URL: '',
+      WEB_BASE_URL: '',
+      GRAPHQL_ENDPOINT: '',
+    },
+  });
+
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.match(result.stderr, /GRAPHQL_ENDPOINT or API_BASE_URL is required/);
+  assert.doesNotMatch(result.stdout + result.stderr, /oasis-care\.(co|com)/);
+});
+
+test('smoke script requires explicit live opt-in before network calls', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'oasis-smoke-'));
+  const curlLog = path.join(tempDir, 'curl.log');
+
+  writeExecutable(
+    path.join(tempDir, 'curl'),
+    `#!/usr/bin/env bash
+echo "$*" >> "$SMOKE_CURL_LOG"
+exit 2
+`,
+  );
+
+  const result = run('bash', ['infrastructure/scripts/smoke-test.sh'], {
+    env: {
+      SMOKE_DRY_RUN: 'false',
+      API_BASE_URL: 'https://api.example.test',
+      WEB_BASE_URL: 'https://app.example.test',
+      GRAPHQL_ENDPOINT: 'https://api.example.test/graphql',
+      SMOKE_CURL_LOG: curlLog,
+      PATH: `${tempDir}:${process.env.PATH}`,
+    },
+  });
+
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.match(result.stderr, /SMOKE_OPT_IN_REQUIRED/);
+  assert.throws(() => readFileSync(curlLog, 'utf8'));
 });
 
 test('migration runner checks the named migration container exit code', () => {
@@ -115,6 +173,10 @@ test('migration runner checks the named migration container exit code', () => {
     path.join(tempDir, 'aws'),
     `#!/usr/bin/env bash
 set -euo pipefail
+if [[ "$1" == "sts" && "$2" == "get-caller-identity" ]]; then
+  echo "123456789012"
+  exit 0
+fi
 if [[ "$1" == "ecs" && "$2" == "run-task" ]]; then
   echo "arn:aws:ecs:eu-west-2:123456789012:task/oasis/migration-task"
   exit 0
@@ -148,6 +210,7 @@ exit 2
   const result = run('bash', ['infrastructure/scripts/run-migration.sh'], {
     env: {
       AWS_REGION: 'eu-west-2',
+      EXPECTED_AWS_ACCOUNT_ID: '123456789012',
       CLUSTER: 'oasis-care-production-cluster',
       TASK_DEF: 'oasis-care-production-api',
       CONTAINER_NAME: 'api',
@@ -159,6 +222,38 @@ exit 2
 
   assert.equal(result.status, 1, result.stdout);
   assert.match(result.stderr, /Migration failed with exit code: 1/);
+});
+
+test('migration runner fails closed when non-dry-run expected account is unset', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'oasis-migration-'));
+  const awsLog = path.join(tempDir, 'aws.log');
+
+  writeExecutable(
+    path.join(tempDir, 'aws'),
+    `#!/usr/bin/env bash
+echo "$*" >> "$AWS_CALL_LOG"
+exit 2
+`,
+  );
+
+  const result = run('bash', ['infrastructure/scripts/run-migration.sh'], {
+    env: {
+      AWS_REGION: 'eu-west-2',
+      EXPECTED_AWS_ACCOUNT_ID: '',
+      AWS_ACCOUNT_ID: '',
+      CLUSTER: 'oasis-care-production-cluster',
+      TASK_DEF: 'oasis-care-production-api',
+      CONTAINER_NAME: 'api',
+      SUBNET_ID: 'subnet-prod-1',
+      SECURITY_GROUP_ID: 'sg-prod-1',
+      AWS_CALL_LOG: awsLog,
+      PATH: `${tempDir}:${process.env.PATH}`,
+    },
+  });
+
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.match(result.stderr, /EXPECTED_AWS_ACCOUNT_ID is required/);
+  assert.throws(() => readFileSync(awsLog, 'utf8'));
 });
 
 test('staging diagnostic continuation script has valid bash syntax', () => {

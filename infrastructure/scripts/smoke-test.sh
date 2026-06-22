@@ -2,15 +2,27 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TERRAFORM_DIR="${TERRAFORM_DIR:-${SCRIPT_DIR}/../staging}"
 
 SMOKE_DRY_RUN="${SMOKE_DRY_RUN:-false}"
 SMOKE_TIMEOUT_SECONDS="${SMOKE_TIMEOUT_SECONDS:-15}"
 GRAPHQL_SCHEMA_INTROSPECTION="${GRAPHQL_SCHEMA_INTROSPECTION:-false}"
+SMOKE_LIVE_OPT_IN="${SMOKE_LIVE_OPT_IN:-${ALLOW_LIVE_RELEASE_PROBES:-false}}"
 
 trim_trailing_slash() {
   local value="$1"
   printf '%s\n' "${value%/}"
+}
+
+require_env() {
+  local name="$1"
+  local value="${!name:-}"
+
+  if [[ -z "$value" ]]; then
+    echo "$name is required for smoke tests; no live defaults are provided." >&2
+    exit 2
+  fi
+
+  printf '%s\n' "$value"
 }
 
 resolve_graphql_endpoint() {
@@ -24,16 +36,19 @@ resolve_graphql_endpoint() {
     return
   fi
 
-  if [[ -d "$TERRAFORM_DIR" ]]; then
-    terraform -chdir="$TERRAFORM_DIR" output -raw graphql_endpoint 2>/dev/null && return
-  fi
-
-  printf '%s\n' "https://api.oasis-care.co/graphql"
+  echo "GRAPHQL_ENDPOINT or API_BASE_URL is required for smoke tests; no live defaults are provided." >&2
+  exit 2
 }
 
 GRAPHQL_ENDPOINT="$(resolve_graphql_endpoint)"
-API_BASE_URL="${API_BASE_URL:-${GRAPHQL_ENDPOINT%/graphql}}"
-WEB_BASE_URL="${WEB_BASE_URL:-https://app.oasis-care.co}"
+if [[ -z "${API_BASE_URL:-}" ]]; then
+  if [[ "$GRAPHQL_ENDPOINT" == */graphql ]]; then
+    API_BASE_URL="${GRAPHQL_ENDPOINT%/graphql}"
+  else
+    API_BASE_URL="$(require_env API_BASE_URL)"
+  fi
+fi
+WEB_BASE_URL="$(require_env WEB_BASE_URL)"
 
 API_BASE_URL="$(trim_trailing_slash "$API_BASE_URL")"
 WEB_BASE_URL="$(trim_trailing_slash "$WEB_BASE_URL")"
@@ -56,6 +71,11 @@ print_plan() {
 if [[ "$SMOKE_DRY_RUN" == "true" ]]; then
   print_plan
   exit 0
+fi
+
+if [[ "$SMOKE_LIVE_OPT_IN" != "true" ]]; then
+  echo "SMOKE_OPT_IN_REQUIRED: set ALLOW_LIVE_RELEASE_PROBES=true or SMOKE_LIVE_OPT_IN=true to run smoke tests against explicit endpoints." >&2
+  exit 2
 fi
 
 echo "Running smoke tests..."

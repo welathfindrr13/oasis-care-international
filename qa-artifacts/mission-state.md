@@ -1,10 +1,10 @@
 # Mission State
 
-Last updated: 2026-06-22 20:26:49 BST
+Last updated: 2026-06-22 21:21:01 BST
 
 ## Active Task
 
-Manual reconciliation of Deployment V2 hardening conflicts onto current `origin/main`.
+PR #34 external review changes for Deployment V2 hardening.
 
 ## Current Branch
 
@@ -15,29 +15,37 @@ Manual reconciliation of Deployment V2 hardening conflicts onto current `origin/
 
 ## Scope
 
-No deploy, no VPS access, no push, no commit, no migrations, and no live probes were run.
+No deploy, no VPS access, no migrations, and no live probes were run.
 
 ## Result
 
-Deployment V2 hardening was reconciled onto current Clerk-based main. Required env interpolation now fails fast for production/staging config where unsafe placeholder/default values were previously present.
+Deployment V2 hardening was reconciled onto current Clerk-based main. External review blocking issues were addressed locally: preflight coverage now matches Compose required env, VPS deploy preflight runs before compose up, Clerk public redirect values are passed at build time, smoke tests require explicit targets/opt-in, migration account guard fails closed for non-dry-run, and env preflight validates file values without ambient masking.
+
+## Pull Request
+
+- Draft PR: #34
+- URL: https://github.com/welathfindrr13/oasis-care-international/pull/34
+- Base: `main`
+- Head: `release/staging-hardening-reconciled`
+- Status before review fixes: open draft, CI passed on `a4288ce`
 
 ## Verification
 
-Safe local verification passed after one scoped fix to `deploy/v2/scripts/verify-local.sh`.
+Safe local verification passed after external review fixes.
 
 Evidence logs:
 
 - `qa-artifacts/logs/reconcile/`
+- `qa-artifacts/logs/pr34-review-fixes/`
 
 ## Open Blockers
 
-- Commit requires human approval.
-- Push/PR requires human approval.
+- Review-fix commit/push pending.
 - Deploy remains explicitly not approved.
-- External review required unless waived.
+- External review re-check required unless waived after push/CI.
 
 ## Next Recommended Action
 
-Review the reconciled diff, then approve commit and PR creation if the file set is acceptable.
+Commit and push the verified review fixes, then wait for PR #34 CI and review re-check. Staging deploy still requires separate approval after review.
 
 Can continue autonomously: NO - commit/push/deploy boundaries require explicit approval.

@@ -10,7 +10,7 @@ TASK_DEF="${TASK_DEF:-oasis-care-staging-api}"
 CONTAINER_NAME="${CONTAINER_NAME:-api}"
 EXPECTED_AWS_ACCOUNT_ID="${EXPECTED_AWS_ACCOUNT_ID:-${AWS_ACCOUNT_ID:-}}"
 MIGRATION_DRY_RUN="${MIGRATION_DRY_RUN:-false}"
-MIGRATION_COMMAND_LABEL="${MIGRATION_COMMAND_LABEL:-npx prisma migrate deploy}"
+MIGRATION_COMMAND=(npx prisma migrate deploy)
 
 resolve_subnet_id() {
   if [[ -n "${SUBNET_ID:-}" ]]; then
@@ -42,7 +42,7 @@ print_plan() {
   echo "container: $CONTAINER_NAME"
   echo "subnet: $subnet_label"
   echo "security group: $security_group_label"
-  echo "command: $MIGRATION_COMMAND_LABEL"
+  echo "command: ${MIGRATION_COMMAND[*]}"
 }
 
 if [[ "$MIGRATION_DRY_RUN" == "true" ]]; then
@@ -53,12 +53,15 @@ fi
 echo "Running database migrations..."
 print_plan
 
-if [[ -n "$EXPECTED_AWS_ACCOUNT_ID" ]]; then
-  account="$(aws sts get-caller-identity --region "$AWS_REGION" --query Account --output text)"
-  if [[ "$account" != "$EXPECTED_AWS_ACCOUNT_ID" ]]; then
-    echo "Unexpected AWS account: $account (expected $EXPECTED_AWS_ACCOUNT_ID)" >&2
-    exit 1
-  fi
+if [[ -z "$EXPECTED_AWS_ACCOUNT_ID" ]]; then
+  echo "EXPECTED_AWS_ACCOUNT_ID is required for non-dry-run migrations." >&2
+  exit 2
+fi
+
+account="$(aws sts get-caller-identity --region "$AWS_REGION" --query Account --output text)"
+if [[ "$account" != "$EXPECTED_AWS_ACCOUNT_ID" ]]; then
+  echo "Unexpected AWS account: $account (expected $EXPECTED_AWS_ACCOUNT_ID)" >&2
+  exit 1
 fi
 
 SUBNET1="$(resolve_subnet_id)"

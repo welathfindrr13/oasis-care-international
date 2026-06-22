@@ -1,6 +1,6 @@
 # Reconciliation Plan
 
-Last updated: 2026-06-22 20:26:49 BST
+Last updated: 2026-06-22 21:21:01 BST
 
 ## Summary
 
@@ -117,11 +117,15 @@ Logs:
 
 ## Candidate Status
 
-Branch is a verified local release-hardening candidate, but not clean because changes are intentionally uncommitted.
+Branch was committed locally and pushed to GitHub.
 
-Commit recommended: YES, after human review of the dirty file list.
+Commit: `2084de3`
 
-Push/PR recommended: YES, after commit approval.
+Draft PR: #34 - https://github.com/welathfindrr13/oasis-care-international/pull/34
+
+PR status before external review fixes: open draft, CI passed on `a4288ce`.
+
+External review response: blocking deployment review issues were fixed locally and verified. Follow-up commit/push pending.
 
 Deploy recommended: NO. Deployment still requires a separate explicit controlled deploy approval after commit/PR review.
 
@@ -129,7 +133,8 @@ External review required: YES unless explicitly waived.
 
 ## Remaining Blockers
 
-- Human review required before commit.
-- No PR exists yet.
+- Review-fix commit/push pending.
+- PR #34 CI must rerun after push.
+- External review re-check is pending.
 - No deploy approval has been given.
 - Staging browser proof remains pending until after a controlled deploy.

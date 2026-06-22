@@ -1,8 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const compose = fs.readFileSync(new URL('./docker-compose.yml', import.meta.url), 'utf8');
+const webDockerfile = fs.readFileSync(new URL('../../apps/web/Dockerfile', import.meta.url), 'utf8');
+const deployDir = path.dirname(fileURLToPath(import.meta.url));
 
 function serviceBlock(name) {
   const start = compose.search(new RegExp(`^  ${name}:`, 'm'));
@@ -32,6 +39,31 @@ test('web service receives Clerk runtime environment for protected routes', () =
   assert.match(webBlock, /NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL:\s*\$\{NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL/);
 });
 
+test('web build receives every Clerk public redirect URL used by Next.js config', () => {
+  const webBlock = serviceBlock('web');
+
+  for (const name of [
+    'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
+    'NEXT_PUBLIC_CLERK_SIGN_UP_URL',
+    'NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL',
+    'NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL',
+  ]) {
+    assert.match(webBlock, new RegExp(`args:[\\s\\S]*${name}:\\s*\\$\\{${name}:\\?`), `${name} should be a build arg`);
+  }
+});
+
+test('web Dockerfile promotes every Clerk public redirect build arg into build env', () => {
+  for (const name of [
+    'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
+    'NEXT_PUBLIC_CLERK_SIGN_UP_URL',
+    'NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL',
+    'NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL',
+  ]) {
+    assert.match(webDockerfile, new RegExp(`ARG ${name}=`));
+    assert.match(webDockerfile, new RegExp(`ENV ${name}=\\$${name}`));
+  }
+});
+
 test('api service does not inject a default Clerk audience', () => {
   const apiBlock = serviceBlock('api');
 
@@ -48,6 +80,9 @@ test('production deployment config fails fast for required env instead of using 
     'NEXTAUTH_SECRET',
     'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
     'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
+    'NEXT_PUBLIC_CLERK_SIGN_UP_URL',
+    'NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL',
+    'NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL',
     'CLERK_ISSUER',
     'CLERK_JWKS_URL',
     'CLERK_AUTHORIZED_PARTIES',
@@ -56,4 +91,29 @@ test('production deployment config fails fast for required env instead of using 
   ]) {
     assert.match(compose, new RegExp(`\\$\\{${name}:\\?`), `${name} should use required interpolation`);
   }
+});
+
+test('docker compose config fails when a required variable is missing', () => {
+  const fixture = fs.readFileSync(new URL('./.env.synthetic', import.meta.url), 'utf8');
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'oasis-compose-'));
+  const envFile = path.join(tempDir, 'deploy.env');
+  writeFileSync(
+    envFile,
+    fixture
+      .split(/\r?\n/)
+      .filter((line) => !line.startsWith('NEXT_PUBLIC_CLERK_SIGN_UP_URL='))
+      .join('\n'),
+  );
+
+  const result = spawnSync('docker', ['compose', '--env-file', envFile, '-f', path.join(deployDir, 'docker-compose.yml'), 'config'], {
+    cwd: path.resolve(deployDir, '../..'),
+    encoding: 'utf8',
+    env: {
+      HOME: process.env.HOME,
+      PATH: process.env.PATH,
+    },
+  });
+
+  assert.notEqual(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stderr, /NEXT_PUBLIC_CLERK_SIGN_UP_URL is required/);
 });
