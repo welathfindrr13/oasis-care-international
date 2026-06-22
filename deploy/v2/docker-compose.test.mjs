@@ -38,3 +38,22 @@ test('api service does not inject a default Clerk audience', () => {
   assert.match(apiBlock, /CLERK_AUDIENCE:\s*\$\{CLERK_AUDIENCE:-\}/);
   assert.doesNotMatch(apiBlock, /CLERK_AUDIENCE:[^\n]*oasis-api/);
 });
+
+test('production deployment config fails fast for required env instead of using placeholders', () => {
+  assert.doesNotMatch(compose, /\$\{[A-Z0-9_]+:-[^}]*?(replace-me|example\.com|clerk\.example\.com|app\.example\.com|localhost)/);
+
+  for (const name of [
+    'APP_DOMAIN',
+    'ACME_EMAIL',
+    'NEXTAUTH_SECRET',
+    'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
+    'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
+    'CLERK_ISSUER',
+    'CLERK_JWKS_URL',
+    'CLERK_AUTHORIZED_PARTIES',
+    'POSTGRES_PASSWORD',
+    'JWT_SECRET',
+  ]) {
+    assert.match(compose, new RegExp(`\\$\\{${name}:\\?`), `${name} should use required interpolation`);
+  }
+});

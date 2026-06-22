@@ -34,6 +34,9 @@ CLERK_SECRET_KEY=0123456789abcdef0123456789abcdefclerk
 NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_Y2FyZS5leGFtcGxlLm9yZyQ=
 NEXT_PUBLIC_CLERK_SIGN_IN_URL=https://care.example.org/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=https://care.example.org/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=https://care.example.org/today
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=https://care.example.org/today
 LOCAL_AUTH_ENABLED=false
 NEXT_PUBLIC_LOCAL_AUTH_ENABLED=false
 DEMO_MODE=false
@@ -53,7 +56,7 @@ pnpm --filter @oasis/web build
 docker build -f apps/api/Dockerfile -t oasis-api:v2 .
 docker build -f apps/web/Dockerfile -t oasis-web:v2 .
 docker compose --env-file "$TEMP_ENV" -f deploy/v2/docker-compose.yml config
-docker run --rm -v "$PWD/deploy/v2/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile
+docker run --rm --env-file "$TEMP_ENV" -v "$PWD/deploy/v2/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile
 bash -n deploy/v2/scripts/smoke-test.sh
 bash -n deploy/v2/scripts/backup-postgres.sh
 bash -n deploy/v2/scripts/restore-postgres.sh

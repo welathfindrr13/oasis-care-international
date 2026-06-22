@@ -44,7 +44,7 @@ for NAME in "${LIKELY[@]}"; do
   aws secretsmanager list-secrets --region "$AWS_REGION" --filters Key=name,Values="oasis/staging/$NAME" > "_generated/diag/secret_${NAME}.json" 2>&1 || echo '{"SecretList":[]}' > "_generated/diag/secret_${NAME}.json"
 done
 
-for TD_FILE in _generated/diag/ecs_td_*json 2>/dev/null; do
+for TD_FILE in _generated/diag/ecs_td_*json; do
   [ ! -f "$TD_FILE" ] && continue
   ROLE=$(jq -r '..|.executionRoleArn? // empty' "$TD_FILE" 2>/dev/null | head -n1)
   [ -z "$ROLE" ] && continue

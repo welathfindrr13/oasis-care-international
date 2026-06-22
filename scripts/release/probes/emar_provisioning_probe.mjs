@@ -1,17 +1,15 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { chromium } from 'playwright';
+import { getLiveProbeAccount, getLiveProbeBaseUrl } from './live-probe-env.mjs';
 
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://app.oasis-care.co';
+const BASE_URL = getLiveProbeBaseUrl();
 const OUT_DIR = 'output/playwright/e2e-live';
 const TS = Date.now();
 const RESULT_PREFIX = 'PROBE_RESULT_JSON:';
 const REQUIRED_CHECKS = ['clientLookup', 'createMedication', 'createPrescription', 'readBack'];
 
-const ACCOUNT = {
-  email: process.env.PLAYWRIGHT_ADMIN_EMAIL || 'boss@yourdomain.com',
-  password: process.env.PLAYWRIGHT_ADMIN_PASSWORD || 'SecurePassword123!1',
-};
+const ACCOUNT = getLiveProbeAccount('admin');
 
 function nowIso() {
   return new Date().toISOString();

@@ -1,8 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { validate } from './preflight-env.mjs';
 
 const strongSecret = '0123456789abcdef0123456789abcdef';
+const deployDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function validEnv(overrides = {}) {
   return {
@@ -137,4 +141,12 @@ test('Clerk production env requires issuer, JWKS, public key, sign-in URL, and a
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_SIGN_IN_URL')));
   assert(result.errors.some((error) => error.includes('CLERK_AUDIENCE or CLERK_AUTHORIZED_PARTIES')));
+});
+
+test('runtime deployment config does not provide production placeholder fallbacks', () => {
+  const compose = readFileSync(path.join(deployDir, 'docker-compose.yml'), 'utf8');
+  const caddyfile = readFileSync(path.join(deployDir, 'Caddyfile'), 'utf8');
+
+  assert.doesNotMatch(compose, /\$\{[A-Z0-9_]+:-[^}]*?(replace-me|example\.com|clerk\.example\.com|app\.example\.com)/);
+  assert.doesNotMatch(caddyfile, /\{\$[A-Z0-9_]+:(localhost|admin@example\.com)\}/);
 });
