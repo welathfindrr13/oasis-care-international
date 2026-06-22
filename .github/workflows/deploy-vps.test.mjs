@@ -17,6 +17,15 @@ test('VPS deploy workflow deploys with the Deployment V2 env file without printi
   assert.doesNotMatch(workflow, /printenv/);
 });
 
+test('VPS deploy workflow runs env preflight against the real env file before compose up', () => {
+  const preflightIndex = workflow.indexOf('node deploy/v2/scripts/preflight-env.mjs deploy/v2/.env');
+  const composeUpIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml up');
+
+  assert.notEqual(preflightIndex, -1);
+  assert.notEqual(composeUpIndex, -1);
+  assert(preflightIndex < composeUpIndex, 'preflight must run before compose up');
+});
+
 test('VPS deploy workflow waits for compose health before public probes', () => {
   assert.match(workflow, /up -d --build --wait --wait-timeout \d+/);
 });

@@ -1,8 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { chromium } from 'playwright';
+import { getLiveProbeAccount, getLiveProbeBaseUrl } from './live-probe-env.mjs';
 
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://app.oasis-care.co';
+const BASE_URL = getLiveProbeBaseUrl();
 const OUT_DIR = 'output/playwright/e2e-live';
 const TS = Date.now();
 const RESULT_PREFIX = 'PROBE_RESULT_JSON:';
@@ -10,14 +11,8 @@ const REQUIRED_ADMIN_CHECKS = ['noFatal', 'currentWeekBefore', 'currentWeekAfter
 const REQUIRED_CARER_CHECKS = ['noFatal', 'currentWeekBefore', 'currentWeekAfter', 'approveForbiddenForCarer'];
 
 const ACCOUNTS = {
-  admin: {
-    email: process.env.PLAYWRIGHT_ADMIN_EMAIL || 'boss@yourdomain.com',
-    password: process.env.PLAYWRIGHT_ADMIN_PASSWORD || 'SecurePassword123!1',
-  },
-  carer: {
-    email: process.env.PLAYWRIGHT_CARER_EMAIL || 'carer-demo@yourdomain.com',
-    password: process.env.PLAYWRIGHT_CARER_PASSWORD || 'SecurePassword123!2',
-  },
+  admin: getLiveProbeAccount('admin'),
+  carer: getLiveProbeAccount('carer'),
 };
 
 function boundsThisWeek() {

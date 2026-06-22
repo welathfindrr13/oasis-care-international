@@ -1,8 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validate } from './preflight-env.mjs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { CLERK_REQUIRED, REQUIRED, validate } from './preflight-env.mjs';
 
 const strongSecret = '0123456789abcdef0123456789abcdef';
+const deployDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const scriptPath = path.join(deployDir, 'scripts/preflight-env.mjs');
 
 function validEnv(overrides = {}) {
   return {
@@ -28,6 +35,9 @@ function validEnv(overrides = {}) {
     NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: 'clerk',
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_Y2FyZS5leGFtcGxlLm9yZyQ=',
     NEXT_PUBLIC_CLERK_SIGN_IN_URL: 'https://care.example.org/sign-in',
+    NEXT_PUBLIC_CLERK_SIGN_UP_URL: 'https://care.example.org/sign-up',
+    NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: 'https://care.example.org/today',
+    NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: 'https://care.example.org/today',
     LOCAL_AUTH_ENABLED: 'false',
     NEXT_PUBLIC_LOCAL_AUTH_ENABLED: 'false',
     DEMO_MODE: 'false',
@@ -129,6 +139,9 @@ test('Clerk production env requires issuer, JWKS, public key, sign-in URL, and a
     CLERK_AUTHORIZED_PARTIES: '',
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: '',
     NEXT_PUBLIC_CLERK_SIGN_IN_URL: '',
+    NEXT_PUBLIC_CLERK_SIGN_UP_URL: '',
+    NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: '',
+    NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: '',
   }));
 
   assert(result.errors.some((error) => error.includes('CLERK_ISSUER')));
@@ -136,5 +149,67 @@ test('Clerk production env requires issuer, JWKS, public key, sign-in URL, and a
   assert(result.errors.some((error) => error.includes('CLERK_SECRET_KEY')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_SIGN_IN_URL')));
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_SIGN_UP_URL')));
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL')));
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL')));
   assert(result.errors.some((error) => error.includes('CLERK_AUDIENCE or CLERK_AUTHORIZED_PARTIES')));
+});
+
+test('preflight required env coverage stays ahead of compose required interpolation', () => {
+  const compose = readFileSync(path.join(deployDir, 'docker-compose.yml'), 'utf8');
+  const composeRequired = new Set(
+    Array.from(compose.matchAll(/\$\{([A-Z0-9_]+):\?/g), (match) => match[1]),
+  );
+  const preflightRequired = new Set([...REQUIRED, ...CLERK_REQUIRED]);
+
+  for (const name of composeRequired) {
+    assert(preflightRequired.has(name), `${name} is required by compose but missing from preflight`);
+  }
+});
+
+test('preflight validates file values instead of ambient process env overrides', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'oasis-preflight-'));
+  const envFile = path.join(tempDir, 'deploy.env');
+  const fileEnv = Object.entries(validEnv({ NEXTAUTH_URL: '' }))
+    .map(([name, value]) => `${name}=${value}`)
+    .join('\n');
+  writeFileSync(envFile, `${fileEnv}\n`);
+
+  const result = spawnSync(process.execPath, [scriptPath, envFile], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      NEXTAUTH_URL: 'https://care.example.org',
+    },
+  });
+
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stderr, /NEXTAUTH_URL is required/);
+});
+
+test('ambient unrelated env cannot cause placeholder failures for a valid env file', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'oasis-preflight-'));
+  const envFile = path.join(tempDir, 'deploy.env');
+  const fileEnv = Object.entries(validEnv())
+    .map(([name, value]) => `${name}=${value}`)
+    .join('\n');
+  writeFileSync(envFile, `${fileEnv}\n`);
+
+  const result = spawnSync(process.execPath, [scriptPath, envFile], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      UNRELATED_VENDOR_PLACEHOLDER: 'https://example.com/replace-me',
+    },
+  });
+
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+test('runtime deployment config does not provide production placeholder fallbacks', () => {
+  const compose = readFileSync(path.join(deployDir, 'docker-compose.yml'), 'utf8');
+  const caddyfile = readFileSync(path.join(deployDir, 'Caddyfile'), 'utf8');
+
+  assert.doesNotMatch(compose, /\$\{[A-Z0-9_]+:-[^}]*?(replace-me|example\.com|clerk\.example\.com|app\.example\.com)/);
+  assert.doesNotMatch(caddyfile, /\{\$[A-Z0-9_]+:(localhost|admin@example\.com)\}/);
 });

@@ -21,6 +21,7 @@ const REQUIRED = [
   'NEXT_PUBLIC_SITE_URL',
   'ALLOWED_ORIGINS',
   'AUTH_IDENTITY_PROVIDER',
+  'NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER',
   'LOCAL_AUTH_ENABLED',
   'NEXT_PUBLIC_LOCAL_AUTH_ENABLED',
   'RUN_MIGRATIONS',
@@ -30,8 +31,12 @@ const CLERK_REQUIRED = [
   'CLERK_ISSUER',
   'CLERK_JWKS_URL',
   'CLERK_SECRET_KEY',
+  'CLERK_AUTHORIZED_PARTIES',
   'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
   'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
+  'NEXT_PUBLIC_CLERK_SIGN_UP_URL',
+  'NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL',
+  'NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL',
 ];
 
 const SECRET_NAMES = new Set([
@@ -53,6 +58,34 @@ const URL_NAMES = new Set([
   'CLERK_ISSUER',
   'CLERK_JWKS_URL',
   'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
+  'NEXT_PUBLIC_CLERK_SIGN_UP_URL',
+  'NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL',
+  'NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL',
+  'CLERK_AUTHORIZED_PARTIES',
+]);
+
+const AUDITED_OPTIONAL_NAMES = new Set([
+  'NODE_ENV',
+  'DEMO_MODE',
+  'GDPR_ENABLED',
+  'METRICS_ENABLED',
+  'AI_SUMMARY_ENABLED',
+  'AWS_REGION',
+  'BEDROCK_MODEL',
+  'COGNITO_ISSUER',
+  'COGNITO_CLIENT_ID',
+  'COGNITO_CLIENT_SECRET',
+  'LOCAL_AUTH_ISSUER',
+  'LOCAL_AUTH_JWT_SECRET',
+  'CLERK_AUDIENCE',
+]);
+
+const AUDITED_NAMES = new Set([
+  ...REQUIRED,
+  ...CLERK_REQUIRED,
+  ...SECRET_NAMES,
+  ...URL_NAMES,
+  ...AUDITED_OPTIONAL_NAMES,
 ]);
 
 function parseEnvFile(filePath) {
@@ -146,6 +179,8 @@ function validate(values) {
   }
 
   for (const [name, rawValue] of Object.entries(values)) {
+    if (!AUDITED_NAMES.has(name)) continue;
+
     const value = String(rawValue || '').trim();
     if (!value) continue;
 
@@ -277,7 +312,7 @@ function main() {
   }
 
   const fileValues = parseEnvFile(fullPath);
-  const values = { ...fileValues, ...process.env };
+  const values = fileValues;
   const { errors, warnings } = validate(values);
 
   for (const warning of warnings) {
@@ -299,4 +334,4 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   main();
 }
 
-export { parseEnvFile, validate };
+export { CLERK_REQUIRED, REQUIRED, parseEnvFile, validate };
