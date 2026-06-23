@@ -1,6 +1,6 @@
 # Test Matrix
 
-Last updated: 2026-06-23 18:33:56 BST
+Last updated: 2026-06-23 19:33:58 BST
 
 | Area | Command | Status | Evidence |
 | --- | --- | --- | --- |
@@ -52,9 +52,9 @@ Last updated: 2026-06-23 18:33:56 BST
 | Issue #11 staff browser proof | synthetic staff login and staff routes | PARTIAL PASS | Routes rendered and session persisted, but GraphQL console errors observed; `/activity` stats returned 403 under admin-only policy |
 | Issue #11 family browser proof | synthetic family login and family boundary routes | FAIL | Clerk rejected supplied synthetic family login |
 | Issue #11 cookie/session proof | authenticated cookie attributes and session behavior | PARTIAL / BLOCKED | Staff reload persisted and URL did not expose tokens; cookie attributes not inspected |
-| Issue #11 read-only auth diagnosis | code/config inspection, Chrome console, sanitized VPS logs | COMPLETE | Family failure is Clerk-account/setup blocked; `/activity` 403 is current role policy; audit-log FK failures likely explain authenticated console/log noise |
+| Issue #11 read-only auth diagnosis | code/config inspection, Chrome console, sanitized VPS logs | COMPLETE | Family failure is Clerk-account/setup blocked; `/activity` 403 is current role policy; audit-log FK failures are confirmed audit defects but not proven as browser GraphQL console cause |
 | Issue #11 audit-log FK regression RED | `pnpm --filter @oasis/api test -- src/common/interceptors/__tests__/audit-log.interceptor.spec.ts --runInBand` before source fix | EXPECTED FAIL | Stale org FK test failed because current interceptor attempted one write only |
-| Issue #11 audit-log FK regression GREEN | `pnpm --filter @oasis/api test -- src/common/interceptors/__tests__/audit-log.interceptor.spec.ts --runInBand` | PASS | Valid org write and stale-org retry with nullable `organization_id` covered |
+| Issue #11 audit-log FK regression GREEN | `pnpm --filter @oasis/api test -- src/common/interceptors/__tests__/audit-log.interceptor.spec.ts --runInBand` | PASS | 9 tests cover valid org writes, supported Prisma FK meta shapes, negative scoping, nullable org input, retry failure logging, and response-path isolation |
 | Issue #11 auth guard regression | `pnpm --filter @oasis/api test -- src/auth/api-roles.guard.spec.ts --runInBand` | PASS | Clerk membership and tenant-role enforcement unchanged |
 | Issue #11 JWT regression | `pnpm --filter @oasis/api test -- src/auth/jwt.strategy.spec.ts --runInBand` | PASS | Clerk issuer/org/role validation unchanged |
 | Issue #11 affected API suite | `pnpm --filter @oasis/api test -- --runInBand` | PASS | 31 suites / 216 tests passed |

@@ -1,6 +1,6 @@
 # Defect Log
 
-Last updated: 2026-06-23 18:33:56 BST
+Last updated: 2026-06-23 19:33:58 BST
 
 ## ISSUE11-AUTH-001: Synthetic family Clerk login rejected
 
@@ -29,7 +29,7 @@ Verify the fake family Clerk account exists, password is current, staging org/pu
 ## ISSUE11-AUTH-002: GraphQL console errors on authenticated staff/admin surfaces
 
 - Severity: Medium
-- Status: Local fix pending review/deploy
+- Status: Open / diagnosis pending
 - Area: Authenticated browser proof / GraphQL UI requests
 - Environment: `https://app.oasiscare.care`
 - Deployed commit: `3ec66ec`
@@ -46,11 +46,11 @@ Authenticated UI proof remains incomplete until the underlying GraphQL error sou
 
 - `qa-artifacts/authenticated-browser-proof.md`
 - Screenshots under `qa-artifacts/screenshots/issue-11-auth-proof/`
-- Sanitized read-only VPS log tail showed repeated Prisma `P2003` audit-log writes against `audit_log_organization_id_fkey` during authenticated traffic.
+- Sanitized read-only VPS log tail showed repeated Prisma `P2003` audit-log writes against `audit_log_organization_id_fkey` during authenticated traffic. Those audit failures are confirmed, but they are not proven to be the browser GraphQL console error cause because audit writes are caught and should not affect the client response path.
 
 ### Next Step
 
-Review/deploy the local audit-log FK fix, then rerun authenticated admin/staff browser proof and confirm console is clean or remaining errors are expected and non-blocking.
+Review/deploy the audit resilience fix, then rerun authenticated admin/staff browser proof. If browser GraphQL console errors remain, continue root-cause diagnosis in organization mapping, tenant scoping, and route data access rather than treating audit logging as resolved proof.
 
 ## ISSUE11-AUTH-003: Staff `/activity` stats request returns 403
 
@@ -87,7 +87,7 @@ Decide expected staff behavior for `/activity`. If staff should access it, updat
 ## ISSUE11-AUTH-004: Authenticated audit log writes fail organization FK
 
 - Severity: Medium
-- Status: Local fix pending review/deploy
+- Status: Draft PR #35 pending re-review/deploy
 - Area: API audit logging / tenant membership parity
 - Environment: `https://app.oasiscare.care`
 - Deployed commit: `3ec66ec`
@@ -98,7 +98,7 @@ Redacted VPS API logs showed repeated Prisma `P2003` failures while writing `aud
 
 ### Impact
 
-The UI can still render because `AuditLogInterceptor.logToDatabase` catches and logs failures, but authenticated proof is not clean: audit evidence is failing in staging, and console/log noise remains.
+The UI can still render because `AuditLogInterceptor.logToDatabase` catches and logs failures, but audit completeness is degraded: audit rows tied to stale/external organization ids are missing unless the write falls back to nullable `organization_id`.
 
 ### Evidence
 
@@ -108,14 +108,15 @@ The UI can still render because `AuditLogInterceptor.logToDatabase` catches and 
 
 ### Next Step
 
-Review the local fix in `apps/api/src/common/interceptors/audit-log.interceptor.ts` and `apps/api/src/common/interceptors/__tests__/audit-log.interceptor.spec.ts`. If approved, commit/PR/deploy through the controlled lane, then rerun authenticated proof. Longer-term, investigate why staging resolved a non-existent organization id so audit rows can retain internal organization linkage where possible.
+Review PR #35. If approved, merge/deploy through the controlled lane, then rerun authenticated proof. This PR does not prove the browser GraphQL console symptom is fixed; it preserves audit events while the organization mapping defect is investigated separately.
 
 ### Local Fix
 
-Implemented but not committed/deployed:
+Implemented in draft PR #35 but not deployed:
 
 - Valid internal organization ids still write normally.
-- Audit-log-only `P2003` failures for `audit_log.organization_id` retry once with `organization_id: null`.
+- Audit-log-only `P2003` failures for `audit_log.organization_id` retry once with `organization_id: null` when Prisma metadata identifies the audit-log organization FK.
+- Negative/scoping tests cover generic errors, wrong models, irrelevant FK metadata, nullable org id input, retry failure handling, and response-path isolation.
 - No organizations are auto-created from auth claims.
 - No auth/role policy was changed.
 
@@ -129,3 +130,29 @@ Verification:
 - `pnpm lint`: PASS
 - `pnpm --filter @oasis/api build`: PASS
 - `pnpm build`: PASS
+
+## ISSUE11-AUTH-005: External Clerk org id can reach internal organization FK surfaces
+
+- Severity: High
+- Status: Open / follow-up blocker
+- Area: Tenant organization mapping / production readiness
+- Environment: `https://app.oasiscare.care`
+- Deployed commit: `3ec66ec`
+
+### Observation
+
+Sanitized staging logs showed `audit_log.organization_id` FK failures during authenticated Clerk traffic. `apps/api/src/auth/api-roles.guard.ts` has an `enrichOrganizationContext` path that can map Clerk external organization ids through `organization_membership.external_organization_id`, but staging still allowed a stale or external value to reach the audit log write path.
+
+### Impact
+
+Audit fallback with `organization_id: null` preserves the audit event, but it does not fix the underlying tenant mapping/parity problem. Production readiness needs robust external Clerk organization id to internal `organization.id` resolution so tenant-scoped records retain internal organization linkage.
+
+### Evidence
+
+- `qa-artifacts/authenticated-browser-proof.md`
+- `apps/api/src/auth/api-roles.guard.ts`
+- `libs/db/prisma/schema.prisma`
+
+### Next Step
+
+Investigate staging membership/identity-map parity and route-specific auth contexts. Confirm every Clerk authenticated request gets an internal `organization.id` before code writes tenant-scoped records. Do not broaden PR #35 into this full mapping fix without separate approval.

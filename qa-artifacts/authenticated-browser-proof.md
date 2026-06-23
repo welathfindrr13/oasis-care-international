@@ -67,7 +67,7 @@ Chrome browser proof showed public routes still render/respond:
 - Re-read Chrome console after sign-out showed Clerk warnings only on `/login`; prior authenticated admin/staff screenshots remain the browser evidence for the GraphQL console symptom.
 - Redacted VPS `api`/`web` logs showed authenticated API/GraphQL traffic returned HTTP 200 for several requests, while the API repeatedly logged Prisma `P2003` audit-log writes against `audit_log_organization_id_fkey`.
 - Redacted VPS `web` logs showed `Failed to fetch today stats: 403` for `/api/activity/today`.
-- The visible admin/staff routes still rendered without 500/502 text, but the authenticated console/log evidence is an actual defect to fix before Issue #11 closure.
+- The visible admin/staff routes still rendered without 500/502 text. The authenticated console symptom remains unproven; the audit-log FK failures are a confirmed audit resilience/completeness defect observed alongside it, not proven as the client-facing GraphQL error cause.
 
 ## Safe API/CORS Checks
 
@@ -171,7 +171,7 @@ Findings:
 
 - Family auth failure classification: Clerk-account/setup blocked before app authorization.
 - `/activity` classification: staff receives an expected code-level 403 from the current admin-only stats route, but the UI proof language should not call this clean for staff until the intended behavior is decided.
-- GraphQL console error classification: likely API resolver/audit side-effect defect. Authenticated GraphQL/API requests can render data, but global audit logging attempts to insert an `audit_log.organization_id` that fails the organization foreign key. This should be fixed or explicitly waived before Issue #11 closure.
+- GraphQL console error classification: unresolved. Authenticated GraphQL/API requests can render data, while global audit logging attempts to insert an `audit_log.organization_id` that fails the organization foreign key. Because audit writes are caught and not expected to propagate into the response path, the audit FK fix should be treated as audit resilience/completeness work, not proof that the browser GraphQL console symptom is resolved.
 - Cookie/session attribute classification: Codex cannot inspect browser cookie stores under Chrome safety policy. Behavioral session proof is partial only; exact Secure/SameSite/HttpOnly/domain attribute proof requires owner/manual DevTools confirmation without sharing values.
 
 ## Local Fix Addendum
@@ -199,6 +199,13 @@ Fix behavior:
 - Other audit write failures remain caught and logged with a compact sanitized summary.
 - Authorization and staff `/activity` role policy were not changed.
 
+Corrected impact claim:
+
+- This PR is not proven to resolve the Issue #11 browser `GraphQL errors: Array(1)` symptom.
+- `AuditLogInterceptor.logToDatabase` already catches audit write failures, and the RxJS audit side effect is not expected to change the client response path.
+- The local fix improves audit completeness by preserving audit rows when staging presents a stale or external organization id.
+- If GraphQL console errors remain after merge/deploy/rerun, the next root cause likely lives in external-to-internal organization mapping, tenant scoping, or route data access rather than audit logging.
+
 Verification:
 
 - RED first: targeted audit interceptor spec failed before the fix because only one write was attempted.
@@ -214,6 +221,7 @@ Verification:
 Remaining proof blockers:
 
 - Fix is local only and has not been deployed.
+- Robust external Clerk organization id to internal `organization.id` mapping needs follow-up investigation; staging should not leave stale/external org ids reaching audit logging.
 - Fake family Clerk account/setup is still blocked.
 - Staff `/activity` authorization behavior still needs product/security decision or explicit acceptance.
 - Cookie attribute proof still needs manual DevTools confirmation if exact attribute evidence is required.
@@ -222,6 +230,6 @@ Remaining proof blockers:
 
 AUTH PROOF FAILED / BLOCKED.
 
-Signed-out route protection and public route behavior passed. Synthetic admin/staff authenticated route proof partially passed, but authenticated proof cannot pass Issue #11 because the synthetic family login failed, staff `/activity` currently resolves to a stats 403, and the local audit-log FK fix still needs review/deploy/rerun before authenticated console proof can be considered clean.
+Signed-out route protection and public route behavior passed. Synthetic admin/staff authenticated route proof partially passed, but authenticated proof cannot pass Issue #11 because the synthetic family login failed, staff `/activity` currently resolves to a stats 403, and authenticated browser console proof still needs rerun after any merged/deployed fixes. The audit-log FK fix is not by itself Issue #11 closure evidence.
 
 Production verdict remains DO NOT SHIP.

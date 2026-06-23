@@ -189,18 +189,22 @@ export class AuditLogInterceptor implements NestInterceptor {
 
     const meta = (error as { meta?: Record<string, unknown> })?.meta || {};
     const modelName = String(meta.modelName || '');
-    const fieldName = String(meta.field_name || meta.fieldName || '');
+    if (modelName && modelName !== 'AuditLog') {
+      return false;
+    }
 
-    return (
-      modelName === 'AuditLog' &&
-      (fieldName.includes('audit_log_organization_id_fkey') ||
-        fieldName.includes('organization_id'))
-    );
+    const fieldHints = this.extractPrismaMetaFieldHints(meta);
+    if (fieldHints.length === 0) {
+      return false;
+    }
+
+    return fieldHints.some((hint) => this.isAuditOrganizationFieldHint(hint));
   }
 
   private safePrismaErrorSummary(error: unknown): Record<string, unknown> {
     const err = error as { code?: unknown; meta?: Record<string, unknown>; name?: string };
     const meta = err?.meta || {};
+    const fieldHints = this.extractPrismaMetaFieldHints(meta);
 
     return {
       name: err?.name || 'Error',
@@ -211,8 +215,48 @@ export class AuditLogInterceptor implements NestInterceptor {
           ? meta.field_name
           : typeof meta.fieldName === 'string'
             ? meta.fieldName
-            : undefined,
+            : fieldHints[0],
     };
+  }
+
+  private extractPrismaMetaFieldHints(meta: Record<string, unknown>): string[] {
+    const fieldKeys = [
+      'field_name',
+      'fieldName',
+      'fields',
+      'fieldNames',
+      'target',
+      'constraint',
+      'constraintName',
+      'constraint_name',
+      'index',
+      'indexName',
+    ];
+
+    return fieldKeys.flatMap((key) => this.flattenPrismaMetaValue(meta[key]));
+  }
+
+  private flattenPrismaMetaValue(value: unknown): string[] {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed ? [trimmed] : [];
+    }
+
+    if (Array.isArray(value)) {
+      return value.flatMap((item) => this.flattenPrismaMetaValue(item));
+    }
+
+    return [];
+  }
+
+  private isAuditOrganizationFieldHint(value: string): boolean {
+    const hint = value.toLowerCase();
+    return (
+      hint.includes('audit_log_organization_id_fkey') ||
+      hint === 'organization_id' ||
+      hint.includes('organization_id') ||
+      hint === 'organization'
+    );
   }
 
   private extractResourceType(url: string): string {

@@ -1,38 +1,38 @@
 # Mission State
 
-Last updated: 2026-06-23 18:33:56 BST
+Last updated: 2026-06-23 19:33:58 BST
 
 ## Active Task
 
-Focused local fix for Issue #11 authenticated audit-log FK failure.
+PR #35 review changes for audit-log FK fallback truthfulness and scoping tests.
 
 ## Current Branch
 
-- Branch: `release/staging-hardening-reconciled`
-- Base commit: `f43fa47`
+- Branch: `audit-log-fk-fix`
+- Base commit: `3ec66ec`
 - Worktree: `/Users/tyreeseedwards/.codex/worktrees/staging-hardening-reconciled/oasis-care`
 - Original dirty branch preserved: `feat/staging-live-setup`
 
 ## Scope
 
-Controlled staging deploy was already completed earlier. This run performed a local-only source fix and verification for the audit-log FK defect. No deploy, VPS access, restart, migration, env edit, production-data action, real client/caregiver/family data use, or live payment/email/SMS/fulfilment/order API call was performed.
+Controlled staging deploy was already completed earlier. This run revised draft PR #35 locally to address review feedback on the audit-log FK fallback. No deploy, VPS access, restart, migration, env edit, production-data action, real client/caregiver/family data use, or live payment/email/SMS/fulfilment/order API call was performed.
 
 ## Result
 
-Local audit-log FK fix implemented but not committed/deployed. The API now retries audit-log-only organization FK failures with nullable `organization_id`, preserving audit events without auto-creating or faking organizations. Auth/role policy and staff `/activity` authorization were not changed.
+Draft PR #35 now treats the change as audit resilience/completeness work, not proven client-facing Issue #11 resolution. The API retries narrowly scoped audit-log organization FK failures with nullable `organization_id`, preserving audit events without auto-creating or faking organizations. Auth/role policy and staff `/activity` authorization were not changed.
 
 ## Pull Request
 
-- Draft PR: #34
-- URL: https://github.com/welathfindrr13/oasis-care-international/pull/34
+- Draft PR: #35
+- URL: https://github.com/welathfindrr13/oasis-care-international/pull/35
 - Base: `main`
-- Head: `release/staging-hardening-reconciled`
-- Status: merged
-- Merge commit: `3ec66ec0d5b11b5919f0167db018bfbcd77a49c7`
+- Head: `audit-log-fk-fix`
+- Status: draft / review changes in progress
+- Latest pre-review-fix commit: `dcc869e`
 
 ## Verification
 
-Issue #11 browser proof status: AUTH PROOF FAILED / BLOCKED. Local audit-log source fix verification passed; deploy/rerun still pending separate approval.
+Issue #11 browser proof status: AUTH PROOF FAILED / BLOCKED. The audit-log source fix improves audit completeness only; deploy/rerun still pending separate approval and GraphQL console proof remains unresolved until rerun evidence exists.
 
 Evidence logs:
 
@@ -45,7 +45,7 @@ Evidence logs:
 
 Local fix verification:
 
-- `pnpm --filter @oasis/api test -- src/common/interceptors/__tests__/audit-log.interceptor.spec.ts --runInBand`: PASS
+- `pnpm --filter @oasis/api test -- src/common/interceptors/__tests__/audit-log.interceptor.spec.ts --runInBand`: PASS (9 tests after review changes)
 - `pnpm --filter @oasis/api test -- src/auth/api-roles.guard.spec.ts --runInBand`: PASS
 - `pnpm --filter @oasis/api test -- src/auth/jwt.strategy.spec.ts --runInBand`: PASS
 - `pnpm --filter @oasis/api test -- --runInBand`: PASS
@@ -57,7 +57,8 @@ Local fix verification:
 ## Open Blockers
 
 - Working synthetic family Clerk credentials/session are needed.
-- Audit-log FK fix needs review, commit/PR, deploy, and authenticated browser rerun before closure evidence.
+- PR #35 needs re-review, CI after push, merge approval, deploy approval, and authenticated browser rerun before closure evidence.
+- Robust external Clerk org id to internal `organization.id` mapping remains a follow-up blocker; PR #35 only preserves audit events when mapping is stale/missing.
 - Staff `/activity` expected behavior needs decision: safe forbidden state vs staff-authorized stats.
 - Cookie attributes still need manual DevTools attribute confirmation if exact Secure/SameSite/HttpOnly/domain proof is required.
 - Production readiness is not claimed.
@@ -65,6 +66,6 @@ Local fix verification:
 
 ## Next Recommended Action
 
-Review/commit the local audit-log FK fix if approved, deploy through a separately approved controlled staging lane, fix/verify the fake Clerk family account, decide staff `/activity` expected behavior, then rerun Issue #11 browser proof. Do not proceed to production.
+Finish PR #35 review-fix verification, commit/push if clean, wait for CI/re-review, then only after merge and a separately approved controlled staging deploy rerun Issue #11 browser proof. Do not proceed to production.
 
 Can continue autonomously: NO - commit/push/deploy boundaries require explicit approval.
