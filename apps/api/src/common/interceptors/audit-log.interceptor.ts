@@ -26,6 +26,19 @@ interface AuditLogEntry {
   userAgent?: string;
 }
 
+type AuditLogCreateData = {
+  user_id: string;
+  organization_id: string | null;
+  action: string;
+  resource_type: string;
+  resource_id?: string;
+  old_values: Record<string, any>;
+  new_values: Record<string, any>;
+  ip_address?: string;
+  user_agent?: string;
+  timestamp: Date;
+};
+
 const AUDIT_FIELD_LIMITS = {
   action: 50,
   resourceType: 50,
@@ -121,31 +134,85 @@ export class AuditLogInterceptor implements NestInterceptor {
     }
 
     try {
-      const ipAddress = this.extractFirstIp(entry.ipAddress);
-      const userAgent = this.truncate(entry.userAgent, AUDIT_FIELD_LIMITS.userAgent);
-      const action =
-        this.truncate(entry.action, AUDIT_FIELD_LIMITS.action) || 'UNKNOWN_ACTION';
-      const resourceType =
-        this.truncate(entry.resourceType, AUDIT_FIELD_LIMITS.resourceType) || 'UNKNOWN_RESOURCE';
-      const resourceId = this.truncate(entry.resourceId, AUDIT_FIELD_LIMITS.resourceId);
+      const data = this.createAuditLogData(entry);
 
-      await this.prisma.auditLog.create({
-        data: {
-          user_id: entry.userId,
-          organization_id: entry.organizationId ?? null,
-          action,
-          resource_type: resourceType,
-          resource_id: resourceId,
-          old_values: entry.oldValues || {},
-          new_values: entry.newValues || {},
-          ip_address: ipAddress,
-          user_agent: userAgent,
-          timestamp: new Date(),
-        },
-      });
+      try {
+        await this.prisma.auditLog.create({ data });
+      } catch (error) {
+        if (this.isAuditOrganizationForeignKeyError(error) && data.organization_id) {
+          console.warn(
+            'Audit log organization FK failed; retrying without organization_id',
+            this.safePrismaErrorSummary(error),
+          );
+          await this.prisma.auditLog.create({
+            data: {
+              ...data,
+              organization_id: null,
+            },
+          });
+          return;
+        }
+
+        throw error;
+      }
     } catch (error) {
-      console.error('Failed to write audit log:', error);
+      console.error('Failed to write audit log:', this.safePrismaErrorSummary(error));
     }
+  }
+
+  private createAuditLogData(entry: AuditLogEntry): AuditLogCreateData {
+    const ipAddress = this.extractFirstIp(entry.ipAddress);
+    const userAgent = this.truncate(entry.userAgent, AUDIT_FIELD_LIMITS.userAgent);
+    const action =
+      this.truncate(entry.action, AUDIT_FIELD_LIMITS.action) || 'UNKNOWN_ACTION';
+    const resourceType =
+      this.truncate(entry.resourceType, AUDIT_FIELD_LIMITS.resourceType) || 'UNKNOWN_RESOURCE';
+    const resourceId = this.truncate(entry.resourceId, AUDIT_FIELD_LIMITS.resourceId);
+
+    return {
+      user_id: entry.userId,
+      organization_id: entry.organizationId ?? null,
+      action,
+      resource_type: resourceType,
+      resource_id: resourceId,
+      old_values: entry.oldValues || {},
+      new_values: entry.newValues || {},
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      timestamp: new Date(),
+    };
+  }
+
+  private isAuditOrganizationForeignKeyError(error: unknown): boolean {
+    const code = (error as { code?: unknown })?.code;
+    if (code !== 'P2003') return false;
+
+    const meta = (error as { meta?: Record<string, unknown> })?.meta || {};
+    const modelName = String(meta.modelName || '');
+    const fieldName = String(meta.field_name || meta.fieldName || '');
+
+    return (
+      modelName === 'AuditLog' &&
+      (fieldName.includes('audit_log_organization_id_fkey') ||
+        fieldName.includes('organization_id'))
+    );
+  }
+
+  private safePrismaErrorSummary(error: unknown): Record<string, unknown> {
+    const err = error as { code?: unknown; meta?: Record<string, unknown>; name?: string };
+    const meta = err?.meta || {};
+
+    return {
+      name: err?.name || 'Error',
+      code: typeof err?.code === 'string' ? err.code : undefined,
+      modelName: typeof meta.modelName === 'string' ? meta.modelName : undefined,
+      fieldName:
+        typeof meta.field_name === 'string'
+          ? meta.field_name
+          : typeof meta.fieldName === 'string'
+            ? meta.fieldName
+            : undefined,
+    };
   }
 
   private extractResourceType(url: string): string {

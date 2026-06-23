@@ -1,0 +1,227 @@
+# Issue #11 Authenticated Browser Proof
+
+Date: 2026-06-23 18:33:56 BST
+
+## Scope
+
+- Domain: `https://app.oasiscare.care`
+- Deployed staging commit: `3ec66ec`
+- Data policy: fake/synthetic data only
+- No deploy performed in this proof run
+- No VPS write, restart, migration, env edit, or production-data action performed
+- No secrets, cookie values, session tokens, passwords, OTPs, or env values printed
+
+## Local/Deploy Context
+
+- PR #34 is merged.
+- Staging deploy report records VPS fast-forward from `f43fa47` to `3ec66ec`.
+- Containers were healthy after deploy.
+- Public deploy checks already passed for `/`, `/health`, `/ready`, `/sw.js`, and `/api/health`.
+
+## Auth Method Discovery
+
+- Code/docs show staging uses Clerk for production-like auth.
+- `docs/deployment-v2/clerk-auth-gate.md` requires Clerk `sub` to map to `OrganizationMembership.auth_subject`, Clerk org context to map to an Oasis organization, and backend membership role/status to be authoritative.
+- `apps/web/lib/auth/clerk.ts` maps explicit Clerk family/client metadata or org role to Oasis family-facing `client` presentation state, while default `org:member` is not treated as staff.
+- `libs/auth/src/jwt.strategy.ts` requires Clerk tokens to include a valid subject, configured issuer, organization claim, and resolvable role.
+- `apps/api/src/auth/api-roles.guard.ts` requires an active `organization_membership` row in Clerk mode before tenant-scoped API access.
+- Live probe scripts require explicit `PLAYWRIGHT_*` credentials and `ALLOW_LIVE_RELEASE_PROBES=true`.
+- Local environment did not have documented Playwright/Clerk fake user credential variables set.
+- Chrome profile was not already signed in for `app.oasiscare.care`.
+- User supplied synthetic staging Clerk credentials during the proof run. Passwords were used only in the browser login form and were not recorded in this artifact.
+
+Result: synthetic admin/staff auth proof could proceed; synthetic family auth remained blocked because Clerk rejected the supplied family login.
+
+Still needed, without values:
+
+- Working fake Clerk family test user credentials or an already-authenticated fake family browser session.
+- Correct staging Clerk org/role/public metadata plus matching backend `organization_membership` and CareBridge family contact/membership/grants for fake data.
+
+## Signed-Out Browser Proof
+
+Chrome browser proof showed protected routes redirect to the Oasis login page while signed out:
+
+| Route | Result | Screenshot |
+| --- | --- | --- |
+| `/family` | redirected to `/login?redirect_url=.../family` | `qa-artifacts/screenshots/issue-11-auth-proof/signed-out-_family.png` |
+| `/activity` | redirected to `/login?redirect_url=.../activity` | `qa-artifacts/screenshots/issue-11-auth-proof/signed-out-_activity.png` |
+| `/today` | redirected to `/login?redirect_url=.../today` | `qa-artifacts/screenshots/issue-11-auth-proof/signed-out-_today.png` |
+| `/carebridge` | redirected to `/login?redirect_url=.../carebridge` | `qa-artifacts/screenshots/issue-11-auth-proof/signed-out-_carebridge.png` |
+| `/family-updates/concerns` | redirected to `/login?redirect_url=.../family-updates/concerns` | `qa-artifacts/screenshots/issue-11-auth-proof/signed-out-_family_updates_concerns.png` |
+
+No protected data was visible in the signed-out browser proof.
+
+## Public Browser Proof
+
+Chrome browser proof showed public routes still render/respond:
+
+- `/`: public landing page rendered.
+- `/health`: returned status JSON in browser.
+- `/ready`: returned readiness JSON in browser.
+- `/sw.js`: returned service worker JavaScript in browser.
+
+## Console Evidence
+
+- Login page console errors observed through Chrome tooling: 0.
+- Admin/staff authenticated surfaces showed repeated browser console messages: `GraphQL errors: Array(1)`.
+- Re-read Chrome console after sign-out showed Clerk warnings only on `/login`; prior authenticated admin/staff screenshots remain the browser evidence for the GraphQL console symptom.
+- Redacted VPS `api`/`web` logs showed authenticated API/GraphQL traffic returned HTTP 200 for several requests, while the API repeatedly logged Prisma `P2003` audit-log writes against `audit_log_organization_id_fkey`.
+- Redacted VPS `web` logs showed `Failed to fetch today stats: 403` for `/api/activity/today`.
+- The visible admin/staff routes still rendered without 500/502 text, but the authenticated console/log evidence is an actual defect to fix before Issue #11 closure.
+
+## Safe API/CORS Checks
+
+- `https://app.oasiscare.care/api/graphql` safe `__typename` query returned 200 in deploy smoke.
+- Unapproved origin CORS check did not allow `https://evil.example` on `/api/health`.
+- Unapproved origin CORS preflight did not allow `https://evil.example` on `/api/graphql`.
+
+## Authenticated Proof
+
+Status: PARTIAL / BLOCKED.
+
+### Admin Proof
+
+Synthetic admin login succeeded.
+
+Observed:
+
+- `/today`: rendered without login redirect, 500, or 502; header showed admin role, not `FAMILY ACCESS`.
+- `/activity`: rendered without login redirect, 500, or 502.
+- `/carebridge`: rendered without login redirect, 500, or 502.
+- `/carebridge/approvals`: rendered without login redirect, 500, or 502.
+- `/carebridge/concerns`: rendered without login redirect, 500, or 502.
+- `/family-updates/concerns`: rendered without login redirect, 500, or 502.
+- Sign-out returned to `/login`.
+
+Screenshots:
+
+- `qa-artifacts/screenshots/issue-11-auth-proof/admin-_today.png`
+- `qa-artifacts/screenshots/issue-11-auth-proof/admin-_activity.png`
+- `qa-artifacts/screenshots/issue-11-auth-proof/admin-_carebridge.png`
+- `qa-artifacts/screenshots/issue-11-auth-proof/admin-_carebridge_approvals.png`
+- `qa-artifacts/screenshots/issue-11-auth-proof/admin-_carebridge_concerns.png`
+- `qa-artifacts/screenshots/issue-11-auth-proof/admin-_family_updates_concerns.png`
+
+### Staff Proof
+
+Synthetic staff login succeeded.
+
+Observed:
+
+- `/today`: rendered without login redirect, 500, or 502; header showed carer/staff role, not `FAMILY ACCESS`.
+- `/activity`: rendered without login redirect, 500, or 502, but redacted web logs showed the stats request returned 403. Code confirms `/api/activity/today` and `GET /stats/today` are currently admin-only.
+- `/family-updates`: rendered without login redirect, 500, or 502.
+- `/carebridge`: rendered without login redirect, 500, or 502.
+- Session persisted across reload on `/today`.
+- Reload URL did not expose token/session material.
+- Sign-out returned to `/login`.
+
+Screenshots:
+
+- `qa-artifacts/screenshots/issue-11-auth-proof/staff-_today.png`
+- `qa-artifacts/screenshots/issue-11-auth-proof/staff-_activity.png`
+- `qa-artifacts/screenshots/issue-11-auth-proof/staff-_family_updates.png`
+- `qa-artifacts/screenshots/issue-11-auth-proof/staff-_carebridge.png`
+
+### Family Proof
+
+Synthetic family login did not succeed. Clerk displayed a credential/authentication error for the supplied synthetic family account.
+
+Diagnosis:
+
+- Rejection happened on the Clerk login surface before the app received a signed-in family session.
+- This points to Clerk test-account setup/credentials first, not a family route guard failure.
+- After Clerk accepts the fake family user, the account still needs the required staging org/role/public metadata and backend fake CareBridge membership/grants before family boundary proof can pass.
+
+Not proven:
+
+- Fake family authenticated CareBridge view.
+- Family-only boundary on staff/internal surfaces.
+- Family inability to see raw care logs, raw visits, medication administration rows, evidence exports, approval queue, or staff concerns.
+- Family session persistence and sign-out.
+
+### Cookie / Session Sanity
+
+Confirmed without inspecting cookie values/session stores:
+
+- Admin/staff login reached protected routes.
+- Staff session persisted across reload.
+- Reload URL did not expose token/session material.
+- Sign-out returned to `/login`.
+
+Not inspected by Codex due browser safety constraints:
+
+- Cookie values.
+- Browser cookie store/session storage/local storage.
+- Secure/HttpOnly/SameSite cookie attributes.
+
+Manual browser DevTools confirmation is still needed for cookie attributes if Issue #11 closure requires that exact evidence.
+
+## Read-Only Diagnosis Addendum
+
+Timestamp: 2026-06-23 18:23:48 BST.
+
+Performed:
+
+- Local code/config inspection only.
+- Read-only Chrome console inspection.
+- Read-only sanitized VPS log tail for `api` and `web`; no env files, tokens, cookies, passwords, or bearer values printed to artifacts.
+
+Findings:
+
+- Family auth failure classification: Clerk-account/setup blocked before app authorization.
+- `/activity` classification: staff receives an expected code-level 403 from the current admin-only stats route, but the UI proof language should not call this clean for staff until the intended behavior is decided.
+- GraphQL console error classification: likely API resolver/audit side-effect defect. Authenticated GraphQL/API requests can render data, but global audit logging attempts to insert an `audit_log.organization_id` that fails the organization foreign key. This should be fixed or explicitly waived before Issue #11 closure.
+- Cookie/session attribute classification: Codex cannot inspect browser cookie stores under Chrome safety policy. Behavioral session proof is partial only; exact Secure/SameSite/HttpOnly/domain attribute proof requires owner/manual DevTools confirmation without sharing values.
+
+## Local Fix Addendum
+
+Timestamp: 2026-06-23 18:33:56 BST.
+
+No deploy was performed.
+
+Focused local source fix:
+
+- `apps/api/src/common/interceptors/audit-log.interceptor.ts`
+- `apps/api/src/common/interceptors/__tests__/audit-log.interceptor.spec.ts`
+
+Root cause:
+
+- The audit interceptor writes `req.user.organizationId` to `audit_log.organization_id`.
+- `audit_log.organization_id` is nullable but, when present, references internal `organization.id`.
+- If authenticated staging traffic resolves a stale or external organization id, Prisma raises `P2003` on `audit_log_organization_id_fkey`.
+
+Fix behavior:
+
+- Valid internal organization ids still write normally.
+- Audit-log-only `P2003` failures for `AuditLog.organization_id` retry once with `organization_id: null`.
+- The retry preserves the audit event without inventing or auto-creating organizations from untrusted auth claims.
+- Other audit write failures remain caught and logged with a compact sanitized summary.
+- Authorization and staff `/activity` role policy were not changed.
+
+Verification:
+
+- RED first: targeted audit interceptor spec failed before the fix because only one write was attempted.
+- PASS: `pnpm --filter @oasis/api test -- src/common/interceptors/__tests__/audit-log.interceptor.spec.ts --runInBand`
+- PASS: `pnpm --filter @oasis/api test -- src/auth/api-roles.guard.spec.ts --runInBand`
+- PASS: `pnpm --filter @oasis/api test -- src/auth/jwt.strategy.spec.ts --runInBand`
+- PASS: `pnpm --filter @oasis/api test -- --runInBand`
+- PASS: `git diff --check`
+- PASS: `pnpm lint`
+- PASS: `pnpm --filter @oasis/api build`
+- PASS: `pnpm build`
+
+Remaining proof blockers:
+
+- Fix is local only and has not been deployed.
+- Fake family Clerk account/setup is still blocked.
+- Staff `/activity` authorization behavior still needs product/security decision or explicit acceptance.
+- Cookie attribute proof still needs manual DevTools confirmation if exact attribute evidence is required.
+
+## Verdict
+
+AUTH PROOF FAILED / BLOCKED.
+
+Signed-out route protection and public route behavior passed. Synthetic admin/staff authenticated route proof partially passed, but authenticated proof cannot pass Issue #11 because the synthetic family login failed, staff `/activity` currently resolves to a stats 403, and the local audit-log FK fix still needs review/deploy/rerun before authenticated console proof can be considered clean.
+
+Production verdict remains DO NOT SHIP.

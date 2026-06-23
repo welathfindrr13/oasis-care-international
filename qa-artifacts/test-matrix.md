@@ -1,6 +1,6 @@
 # Test Matrix
 
-Last updated: 2026-06-22 21:21:01 BST
+Last updated: 2026-06-23 18:33:56 BST
 
 | Area | Command | Status | Evidence |
 | --- | --- | --- | --- |
@@ -39,5 +39,28 @@ Last updated: 2026-06-22 21:21:01 BST
 | PR #34 synthetic Compose | `docker compose --env-file deploy/v2/.env.synthetic -f deploy/v2/docker-compose.yml config` | PASS | `qa-artifacts/logs/pr34-review-fixes/synthetic-compose.log` |
 | PR #34 Compose required env | missing required env Compose config | EXPECTED FAIL | `qa-artifacts/logs/pr34-review-fixes/required-env-compose-fail-fast.log` |
 | PR #34 shell syntax sweep | `find deploy infrastructure scripts -name "*.sh" ... bash -n` | PASS | `qa-artifacts/logs/pr34-review-fixes/shell-syntax-sweep.log` |
+| Staging VPS readonly baseline | `ssh oasis-staging "sudo -n /usr/local/bin/oasis-readonly"` | PASS | `qa-artifacts/staging-deploy-report.md` |
+| Staging deploy env preflight | `node deploy/v2/scripts/preflight-env.mjs deploy/v2/.env` | PASS | `qa-artifacts/staging-deploy-report.md` |
+| Staging deploy Compose config | `docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml config` | PASS | `qa-artifacts/staging-deploy-report.md` |
+| Staging controlled Compose deploy | `docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml up -d --build --wait --wait-timeout 180` | PASS | `qa-artifacts/staging-deploy-report.md` |
+| Staging public health | `/`, `/health`, `/ready`, `/sw.js`, `/api/health` | PASS | `qa-artifacts/staging-deploy-report.md` |
+| Staging safe smoke | `/activity`, `/api/activity/today`, `/api/graphql` safe typename | PASS | `qa-artifacts/staging-deploy-report.md` |
+| Issue #11 signed-out browser proof | `/family`, `/activity`, `/today`, `/carebridge`, `/family-updates/concerns` redirect to login | PASS | `qa-artifacts/authenticated-browser-proof.md` |
+| Issue #11 public browser proof | `/`, `/health`, `/ready`, `/sw.js` | PASS | `qa-artifacts/authenticated-browser-proof.md` |
+| Issue #11 unapproved CORS check | unapproved origin not allowed for `/api/health` and `/api/graphql` preflight | PASS | `qa-artifacts/authenticated-browser-proof.md` |
+| Issue #11 admin browser proof | synthetic admin login and staff/admin routes | PARTIAL PASS | Routes rendered, but GraphQL console errors and audit-log FK failures observed |
+| Issue #11 staff browser proof | synthetic staff login and staff routes | PARTIAL PASS | Routes rendered and session persisted, but GraphQL console errors observed; `/activity` stats returned 403 under admin-only policy |
+| Issue #11 family browser proof | synthetic family login and family boundary routes | FAIL | Clerk rejected supplied synthetic family login |
+| Issue #11 cookie/session proof | authenticated cookie attributes and session behavior | PARTIAL / BLOCKED | Staff reload persisted and URL did not expose tokens; cookie attributes not inspected |
+| Issue #11 read-only auth diagnosis | code/config inspection, Chrome console, sanitized VPS logs | COMPLETE | Family failure is Clerk-account/setup blocked; `/activity` 403 is current role policy; audit-log FK failures likely explain authenticated console/log noise |
+| Issue #11 audit-log FK regression RED | `pnpm --filter @oasis/api test -- src/common/interceptors/__tests__/audit-log.interceptor.spec.ts --runInBand` before source fix | EXPECTED FAIL | Stale org FK test failed because current interceptor attempted one write only |
+| Issue #11 audit-log FK regression GREEN | `pnpm --filter @oasis/api test -- src/common/interceptors/__tests__/audit-log.interceptor.spec.ts --runInBand` | PASS | Valid org write and stale-org retry with nullable `organization_id` covered |
+| Issue #11 auth guard regression | `pnpm --filter @oasis/api test -- src/auth/api-roles.guard.spec.ts --runInBand` | PASS | Clerk membership and tenant-role enforcement unchanged |
+| Issue #11 JWT regression | `pnpm --filter @oasis/api test -- src/auth/jwt.strategy.spec.ts --runInBand` | PASS | Clerk issuer/org/role validation unchanged |
+| Issue #11 affected API suite | `pnpm --filter @oasis/api test -- --runInBand` | PASS | 31 suites / 216 tests passed |
+| Issue #11 local fix diff check | `git diff --check` | PASS | Whitespace check clean |
+| Issue #11 local fix lint | `pnpm lint` | PASS | Repo configured lint task passed |
+| Issue #11 local fix API build | `pnpm --filter @oasis/api build` | PASS | API compiled |
+| Issue #11 local fix root build | `pnpm build` | PASS | 4 build tasks successful |
 
-No live probes, deployments, SSH commands, migrations, or production-data actions were run.
+No migrations, production-data actions, live payment/email/SMS/fulfilment/order API calls, or production deploys were run.
