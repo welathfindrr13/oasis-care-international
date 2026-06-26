@@ -1,6 +1,6 @@
 # Defect Log
 
-Last updated: 2026-06-25 19:17 BST
+Last updated: 2026-06-26 23:12 BST
 
 ## ISSUE11-AUTH-001: Synthetic family Clerk login rejected
 
@@ -59,24 +59,24 @@ Authenticated UI proof remains incomplete until the underlying GraphQL error sou
 
 ### Diagnosis
 
-Likely client-side Clerk token propagation/auth context issue on CareBridge client components, not an unresolved audit-log FK crash and not a CareBridge resolver/database 500.
+Likely client-side GraphQL proxy auth context issue, not an unresolved audit-log FK crash and not a CareBridge resolver/database 500. Review showed the correct fix layer is the shared `/api/graphql` proxy because `clientQuery(...)` is the intended authenticated browser GraphQL abstraction and many protected client components use it.
 
 ### Next Step
 
-Review, commit, merge, deploy, and rerun admin/staff browser proof for the CareBridge approval/concern pages. PR #35 should not be treated as Issue #11 closure evidence.
+Review, commit, merge, deploy, and rerun admin/staff browser proof for the CareBridge approval/concern pages. PR #35 and un-deployed PR #36 changes should not be treated as Issue #11 closure evidence.
 
 ### Local Fix
 
-Implemented locally, not deployed:
+First PR #36 local fix was revised after external review. Current local strategy is central proxy auth, not per-page Clerk hook migration.
 
-- `/carebridge/approvals` and `/carebridge/concerns` now use dynamic route wrappers with Clerk-aware client components.
-- The affected client GraphQL calls now use `useClerkClientQuery()` instead of plain `clientQuery(...)`.
-- `/family-updates/approvals` and `/family-updates/concerns` remain aliases and are marked dynamic to avoid build-time Clerk hook prerender failures.
-- `useClerkClientQuery()` returns a stable callback for clean hook dependencies.
+- `/api/graphql` now resolves auth centrally through explicit bearer, Clerk session cookie, server Clerk auth, or NextAuth token material depending on mode.
+- CareBridge approval/concern components use the shared `clientQuery(...)` path.
+- `/family-updates/approvals` and `/family-updates/concerns` remain aliases.
 
 Verification:
 
 - `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`: PASS
+- `pnpm exec tsx --test apps/web/lib/graphql/proxy-auth.test.ts`: PASS
 - `git diff --check`: PASS
 - `pnpm lint`: PASS
 - `pnpm --filter @oasis/web build`: PASS

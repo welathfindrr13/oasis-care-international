@@ -234,6 +234,47 @@ Signed-out route protection and public route behavior passed. Synthetic admin/st
 
 Production verdict remains DO NOT SHIP.
 
+## PR #36 Review Change Addendum
+
+Timestamp: 2026-06-26 23:12 BST
+
+No deploy, VPS access, restart, migration, staging env edit, production-data action, real client/caregiver/family data, or live payment/email/SMS/fulfilment/order API call was performed.
+
+External review found the first PR #36 implementation too narrow because only CareBridge approval/concern pages were migrated to a Clerk-aware client helper while many other protected client pages still used plain `clientQuery(...)`.
+
+Architecture inspection:
+
+- `clientQuery(...)` calls same-origin `/api/graphql`.
+- `clientQuery(...)` sends `credentials: 'include'`, so browser cookies are available to the proxy.
+- `/api/graphql` already attempts server-side auth through `getServerAuthContext()`.
+- `getServerAuthContext()` calls Clerk `auth().getToken()` in Clerk mode.
+- Middleware includes `/api/graphql` as public but still runs Clerk middleware for matched requests.
+- Many protected client components use plain `clientQuery(...)`, so a per-page CareBridge migration would leave a half-migrated convention.
+
+Chosen strategy:
+
+- Strategy A, central shared auth fix.
+
+Corrected local fix:
+
+- `/api/graphql` now resolves auth centrally through `resolveGraphQLProxyAccessToken(...)`.
+- Explicit bearer headers still win.
+- In Clerk mode, same-origin browser requests can authenticate through the Clerk session cookie token before falling back to server-derived Clerk auth.
+- Non-Clerk/NextAuth token order is preserved.
+- CareBridge approval/concern components use the shared `clientQuery(...)` path again.
+- The route/client split and family aliases remain intact.
+
+Corrected impact claim:
+
+- This is still not Issue #11 closure evidence.
+- The fix is local and un-deployed until PR #36 is reviewed, merged, and separately deployed.
+- Browser proof must be rerun after deploy before claiming the CareBridge GraphQL symptom is fixed.
+
+Focused verification started:
+
+- PASS: `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`
+- PASS: `pnpm exec tsx --test apps/web/lib/graphql/proxy-auth.test.ts`
+
 # 2026-06-25 Admin CareBridge GraphQL Error Diagnosis
 
 Timestamp: 2026-06-25 19:04 BST

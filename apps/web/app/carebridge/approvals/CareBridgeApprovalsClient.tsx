@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Header } from '../../../components/oasis/Header'
 import { Button } from '../../../components/ui/Button'
-import { useClerkClientQuery } from '../../../lib/graphql/useClerkClientQuery'
+import { clientQuery } from '../../../lib/graphql/client-side'
 import {
   CAREBRIDGE_ROOMS_QUERY,
   PUBLISH_VERIFIED_VISIT_STORY_MUTATION,
@@ -23,15 +23,14 @@ export function CareBridgeApprovalsClient() {
   const [loading, setLoading] = useState(true)
   const [busyStoryId, setBusyStoryId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const queryWithClerkToken = useClerkClientQuery()
 
   const loadApprovalQueue = useCallback(async (careRoomId?: string) => {
     const [queueData, roomsData] = await Promise.all([
-      queryWithClerkToken<VerifiedVisitStoryApprovalQueueQueryResponse>(
+      clientQuery<VerifiedVisitStoryApprovalQueueQueryResponse>(
         VERIFIED_VISIT_STORY_APPROVAL_QUEUE_QUERY,
         careRoomId ? { careRoomId } : {},
       ),
-      queryWithClerkToken<CareRoomsQueryResponse>(CAREBRIDGE_ROOMS_QUERY),
+      clientQuery<CareRoomsQueryResponse>(CAREBRIDGE_ROOMS_QUERY),
     ])
 
     setStories(queueData.verifiedVisitStoryApprovalQueue)
@@ -41,7 +40,7 @@ export function CareBridgeApprovalsClient() {
         label: room.client.fullName,
       })),
     )
-  }, [queryWithClerkToken])
+  }, [])
 
   useEffect(() => {
     async function bootstrap() {
@@ -63,7 +62,7 @@ export function CareBridgeApprovalsClient() {
     try {
       setBusyStoryId(storyId)
       setError(null)
-      await queryWithClerkToken(PUBLISH_VERIFIED_VISIT_STORY_MUTATION, { storyId })
+      await clientQuery(PUBLISH_VERIFIED_VISIT_STORY_MUTATION, { storyId })
       setStories((current) => current.filter((story) => story.id !== storyId))
     } catch (err: any) {
       setError(err?.message || 'Unable to approve this verified visit story.')
@@ -76,7 +75,7 @@ export function CareBridgeApprovalsClient() {
     try {
       setBusyStoryId(storyId)
       setError(null)
-      await queryWithClerkToken(REJECT_VERIFIED_VISIT_STORY_MUTATION, {
+      await clientQuery(REJECT_VERIFIED_VISIT_STORY_MUTATION, {
         input: {
           storyId,
           rejectionReason,

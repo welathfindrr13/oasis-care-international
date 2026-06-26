@@ -1,34 +1,34 @@
 # Mission State
 
-Last updated: 2026-06-25 19:17 BST
+Last updated: 2026-06-26 23:12 BST
 
 ## Active Task
 
-Implement focused local fix for CareBridge admin GraphQL Clerk token propagation.
+Address PR #36 review changes for CareBridge browser GraphQL auth architecture.
 
 ## Current Branch
 
-- Branch: `audit-log-fk-fix`
+- Branch: `carebridge-clerk-graphql-token-fix`
 - Deployed staging commit: `687ee1e`
 - Worktree: `/Users/tyreeseedwards/.codex/worktrees/staging-hardening-reconciled/oasis-care`
 - Original dirty branch preserved: `feat/staging-live-setup`
 
 ## Scope
 
-This run implemented a focused local code fix for CareBridge approval/concern client-side GraphQL Clerk token propagation. No deploy, SSH/VPS access, restart, migration, staging env edit, record creation/modification, production data, real client/caregiver/family data, or live payment/email/SMS/fulfilment/order API call was performed.
+This run addresses external review feedback on PR #36 by moving from a per-page CareBridge Clerk hook migration to a central `/api/graphql` auth proxy fix. No deploy, SSH/VPS access, restart, migration, staging env edit, record creation/modification, production data, real client/caregiver/family data, or live payment/email/SMS/fulfilment/order API call was performed.
 
 ## Result
 
-Staging remains deployed at `687ee1e`. Public health/smoke checks previously passed. A local fix now routes the affected CareBridge approval/concern browser GraphQL calls through the existing Clerk-aware query helper. Issue #11 remains failed/blocked until the fix is reviewed, deployed, and authenticated browser proof is rerun.
+Staging remains deployed at `687ee1e`. Public health/smoke checks previously passed. Local PR #36 review changes now make browser GraphQL auth consistent through the shared `/api/graphql` proxy. Issue #11 remains failed/blocked until the fix is reviewed, deployed, and authenticated browser proof is rerun.
 
 ## Pull Request
 
-- PR: #35
-- URL: https://github.com/welathfindrr13/oasis-care-international/pull/35
+- PR: #36
+- URL: https://github.com/welathfindrr13/oasis-care-international/pull/36
 - Base: `main`
-- Head: `audit-log-fk-fix`
-- Status: merged
-- Merge commit: `687ee1e6ba9cfd1e8a42f5c0d3fd2fa8f4b98b60`
+- Head: `carebridge-clerk-graphql-token-fix`
+- Status: draft / review changes in progress
+- Base deployed staging commit: `687ee1e6ba9cfd1e8a42f5c0d3fd2fa8f4b98b60`
 
 ## Verification
 
@@ -56,7 +56,8 @@ Local fix verification:
 
 CareBridge token propagation local verification:
 
-- `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`: PASS (4 tests)
+- `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`: PASS (6 tests)
+- `pnpm exec tsx --test apps/web/lib/graphql/proxy-auth.test.ts`: PASS (6 tests)
 - `git diff --check`: PASS
 - `pnpm lint`: PASS
 - `pnpm --filter @oasis/web build`: PASS
@@ -66,7 +67,7 @@ CareBridge token propagation local verification:
 
 - Working synthetic family Clerk credentials/session are needed.
 - PR #35 is merged and deployed to staging.
-- Admin CareBridge approval/concern surfaces showed `GraphQL errors: Array(1)` plus visible `Unauthorized` on deployed `687ee1e`; local token propagation fix is not deployed yet.
+- Admin CareBridge approval/concern surfaces showed `GraphQL errors: Array(1)` plus visible `Unauthorized` on deployed `687ee1e`; local central proxy auth fix is not deployed yet.
 - Robust external Clerk org id to internal `organization.id` mapping remains a follow-up blocker; PR #35 only preserves audit events when mapping is stale/missing.
 - Staff `/activity` expected behavior needs decision: safe forbidden state vs staff-authorized stats.
 - Cookie attributes still need manual DevTools attribute confirmation if exact Secure/SameSite/HttpOnly/domain proof is required.
@@ -75,6 +76,6 @@ CareBridge token propagation local verification:
 
 ## Next Recommended Action
 
-Perform final diff review and local commit for the focused CareBridge token propagation fix, then open a small PR after explicit approval. Keep Issue #11 open. Do not proceed to production.
+Finish PR #36 review-change verification, commit/push if clean, then wait for CI and external re-review. Keep Issue #11 open. Do not proceed to production.
 
 Can continue autonomously: NO - commit/push/deploy boundaries require explicit approval.

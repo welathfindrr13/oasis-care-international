@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Header } from '../../../components/oasis/Header'
 import { Button } from '../../../components/ui/Button'
-import { useClerkClientQuery } from '../../../lib/graphql/useClerkClientQuery'
+import { clientQuery } from '../../../lib/graphql/client-side'
 import {
   CAREBRIDGE_CONCERN_INBOX_QUERY,
   UPDATE_CAREBRIDGE_CONCERN_MUTATION,
@@ -19,15 +19,14 @@ export function CareBridgeConcernsClient() {
   const [loading, setLoading] = useState(true)
   const [busyConcernId, setBusyConcernId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const queryWithClerkToken = useClerkClientQuery()
 
   const loadConcerns = useCallback(async (status?: string) => {
-    const data = await queryWithClerkToken<CarebridgeConcernInboxQueryResponse>(
+    const data = await clientQuery<CarebridgeConcernInboxQueryResponse>(
       CAREBRIDGE_CONCERN_INBOX_QUERY,
       status ? { status } : {},
     )
     setConcerns(data.carebridgeConcernInbox)
-  }, [queryWithClerkToken])
+  }, [])
 
   useEffect(() => {
     async function bootstrap() {
@@ -49,7 +48,7 @@ export function CareBridgeConcernsClient() {
     try {
       setBusyConcernId(concernId)
       setError(null)
-      await queryWithClerkToken(UPDATE_CAREBRIDGE_CONCERN_MUTATION, {
+      await clientQuery(UPDATE_CAREBRIDGE_CONCERN_MUTATION, {
         input: {
           concernId,
           status: 'ACKNOWLEDGED',
@@ -67,7 +66,7 @@ export function CareBridgeConcernsClient() {
     try {
       setBusyConcernId(concernId)
       setError(null)
-      await queryWithClerkToken(UPDATE_CAREBRIDGE_CONCERN_MUTATION, {
+      await clientQuery(UPDATE_CAREBRIDGE_CONCERN_MUTATION, {
         input: {
           concernId,
           status: 'RESOLVED',

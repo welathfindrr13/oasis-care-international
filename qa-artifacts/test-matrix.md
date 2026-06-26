@@ -1,6 +1,6 @@
 # Test Matrix
 
-Last updated: 2026-06-25 19:17 BST
+Last updated: 2026-06-26 23:12 BST
 
 | Area | Command | Status | Evidence |
 | --- | --- | --- | --- |
@@ -79,5 +79,11 @@ Last updated: 2026-06-25 19:17 BST
 | CareBridge token propagation lint | `pnpm lint` | PASS | No ESLint warnings or errors after stable callback/hook dependency cleanup |
 | CareBridge token propagation web build | `pnpm --filter @oasis/web build` | PASS | Direct CareBridge routes and family alias routes build as dynamic without Clerk prerender errors |
 | CareBridge token propagation root build | `pnpm build` | PASS | 4 build tasks successful |
+| PR #36 review-change CareBridge proxy static guard | `node --test apps/web/app/carebridge/carebridge-client-auth.test.js` | PASS | 6 tests verify CareBridge uses shared `clientQuery`, `clientQuery` sends cookies, `/api/graphql` resolves auth centrally, and aliases remain intact |
+| PR #36 review-change proxy token resolver | `pnpm exec tsx --test apps/web/lib/graphql/proxy-auth.test.ts` | PASS | 6 tests cover direct bearer priority, Clerk cookie token path, Clerk server-auth fallback, NextAuth token order, and missing auth |
+| PR #36 review-change diff check | `git diff --check` | PASS | Whitespace check clean |
+| PR #36 review-change lint | `pnpm lint` | PASS | No ESLint warnings or errors |
+| PR #36 review-change web build | `pnpm --filter @oasis/web build` | PASS | Next web build completed; `/api/graphql` and CareBridge routes built |
+| PR #36 review-change root build | `pnpm build` | PASS | 4 build tasks successful |
 
 No migrations, production-data actions, live payment/email/SMS/fulfilment/order API calls, or production deploys were run.

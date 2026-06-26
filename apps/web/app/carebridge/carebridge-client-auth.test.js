@@ -10,30 +10,44 @@ function readAppFile(...segments) {
   return fs.readFileSync(path.join(webAppDir, ...segments), 'utf8');
 }
 
-test('CareBridge approvals page uses Clerk-aware client GraphQL querying', () => {
+test('CareBridge approvals page uses the shared authenticated GraphQL proxy', () => {
   const pageSource = readAppFile('carebridge', 'approvals', 'page.tsx');
   const source = readAppFile('carebridge', 'approvals', 'CareBridgeApprovalsClient.tsx');
 
   assert.match(pageSource, /export const dynamic = ['"]force-dynamic['"]/);
   assert.match(pageSource, /<CareBridgeApprovalsClient \/>/);
-  assert.match(source, /useClerkClientQuery/);
-  assert.match(source, /const\s+queryWithClerkToken\s*=\s*useClerkClientQuery\(\)/);
-  assert.doesNotMatch(source, /from ['"]\.\.\/\.\.\/\.\.\/lib\/graphql\/client-side['"]/);
-  assert.doesNotMatch(source, /\bclientQuery</);
-  assert.doesNotMatch(source, /\bclientQuery\(/);
+  assert.match(source, /from ['"]\.\.\/\.\.\/\.\.\/lib\/graphql\/client-side['"]/);
+  assert.match(source, /\bclientQuery</);
+  assert.match(source, /\bclientQuery\(/);
+  assert.doesNotMatch(source, /useClerkClientQuery/);
 });
 
-test('CareBridge concerns page uses Clerk-aware client GraphQL querying', () => {
+test('CareBridge concerns page uses the shared authenticated GraphQL proxy', () => {
   const pageSource = readAppFile('carebridge', 'concerns', 'page.tsx');
   const source = readAppFile('carebridge', 'concerns', 'CareBridgeConcernsClient.tsx');
 
   assert.match(pageSource, /export const dynamic = ['"]force-dynamic['"]/);
   assert.match(pageSource, /<CareBridgeConcernsClient \/>/);
-  assert.match(source, /useClerkClientQuery/);
-  assert.match(source, /const\s+queryWithClerkToken\s*=\s*useClerkClientQuery\(\)/);
-  assert.doesNotMatch(source, /from ['"]\.\.\/\.\.\/\.\.\/lib\/graphql\/client-side['"]/);
-  assert.doesNotMatch(source, /\bclientQuery</);
-  assert.doesNotMatch(source, /\bclientQuery\(/);
+  assert.match(source, /from ['"]\.\.\/\.\.\/\.\.\/lib\/graphql\/client-side['"]/);
+  assert.match(source, /\bclientQuery</);
+  assert.match(source, /\bclientQuery\(/);
+  assert.doesNotMatch(source, /useClerkClientQuery/);
+});
+
+test('Shared client GraphQL helper sends cookies through the app proxy', () => {
+  const source = readAppFile('..', 'lib', 'graphql', 'client-side.ts');
+
+  assert.match(source, /fetch\(['"]\/api\/graphql['"]/);
+  assert.match(source, /credentials:\s*['"]include['"]/);
+});
+
+test('GraphQL proxy resolves auth centrally from Clerk cookies and server auth', () => {
+  const routeSource = readAppFile('api', 'graphql', 'route.ts');
+
+  assert.match(routeSource, /resolveGraphQLProxyAccessToken/);
+  assert.match(routeSource, /hasDirectBearer/);
+  assert.match(routeSource, /cookieHeader:\s*request\.headers\.get\(['"]cookie['"]\)/);
+  assert.match(routeSource, /serverAuthAccessToken:\s*serverAuth\?\.accessToken/);
 });
 
 test('Family Updates concerns route remains an alias of the CareBridge concerns page', () => {
