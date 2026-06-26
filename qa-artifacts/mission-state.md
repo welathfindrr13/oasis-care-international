@@ -1,38 +1,38 @@
 # Mission State
 
-Last updated: 2026-06-23 19:33:58 BST
+Last updated: 2026-06-25 19:17 BST
 
 ## Active Task
 
-PR #35 review changes for audit-log FK fallback truthfulness and scoping tests.
+Implement focused local fix for CareBridge admin GraphQL Clerk token propagation.
 
 ## Current Branch
 
 - Branch: `audit-log-fk-fix`
-- Base commit: `3ec66ec`
+- Deployed staging commit: `687ee1e`
 - Worktree: `/Users/tyreeseedwards/.codex/worktrees/staging-hardening-reconciled/oasis-care`
 - Original dirty branch preserved: `feat/staging-live-setup`
 
 ## Scope
 
-Controlled staging deploy was already completed earlier. This run revised draft PR #35 locally to address review feedback on the audit-log FK fallback. No deploy, VPS access, restart, migration, env edit, production-data action, real client/caregiver/family data use, or live payment/email/SMS/fulfilment/order API call was performed.
+This run implemented a focused local code fix for CareBridge approval/concern client-side GraphQL Clerk token propagation. No deploy, SSH/VPS access, restart, migration, staging env edit, record creation/modification, production data, real client/caregiver/family data, or live payment/email/SMS/fulfilment/order API call was performed.
 
 ## Result
 
-Draft PR #35 now treats the change as audit resilience/completeness work, not proven client-facing Issue #11 resolution. The API retries narrowly scoped audit-log organization FK failures with nullable `organization_id`, preserving audit events without auto-creating or faking organizations. Auth/role policy and staff `/activity` authorization were not changed.
+Staging remains deployed at `687ee1e`. Public health/smoke checks previously passed. A local fix now routes the affected CareBridge approval/concern browser GraphQL calls through the existing Clerk-aware query helper. Issue #11 remains failed/blocked until the fix is reviewed, deployed, and authenticated browser proof is rerun.
 
 ## Pull Request
 
-- Draft PR: #35
+- PR: #35
 - URL: https://github.com/welathfindrr13/oasis-care-international/pull/35
 - Base: `main`
 - Head: `audit-log-fk-fix`
-- Status: draft / review changes in progress
-- Latest pre-review-fix commit: `dcc869e`
+- Status: merged
+- Merge commit: `687ee1e6ba9cfd1e8a42f5c0d3fd2fa8f4b98b60`
 
 ## Verification
 
-Issue #11 browser proof status: AUTH PROOF FAILED / BLOCKED. The audit-log source fix improves audit completeness only; deploy/rerun still pending separate approval and GraphQL console proof remains unresolved until rerun evidence exists.
+Issue #11 browser proof status: AUTH PROOF STILL FAILED / BLOCKED. PR #35 improves audit completeness only; post-deploy admin proof still has GraphQL console errors now mapped to `VerifiedVisitStoryApprovalQueue`, `CareRooms`, and `CarebridgeConcernInbox` on client-rendered CareBridge queue pages.
 
 Evidence logs:
 
@@ -54,10 +54,19 @@ Local fix verification:
 - `pnpm --filter @oasis/api build`: PASS
 - `pnpm build`: PASS
 
+CareBridge token propagation local verification:
+
+- `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`: PASS (4 tests)
+- `git diff --check`: PASS
+- `pnpm lint`: PASS
+- `pnpm --filter @oasis/web build`: PASS
+- `pnpm build`: PASS
+
 ## Open Blockers
 
 - Working synthetic family Clerk credentials/session are needed.
-- PR #35 needs re-review, CI after push, merge approval, deploy approval, and authenticated browser rerun before closure evidence.
+- PR #35 is merged and deployed to staging.
+- Admin CareBridge approval/concern surfaces showed `GraphQL errors: Array(1)` plus visible `Unauthorized` on deployed `687ee1e`; local token propagation fix is not deployed yet.
 - Robust external Clerk org id to internal `organization.id` mapping remains a follow-up blocker; PR #35 only preserves audit events when mapping is stale/missing.
 - Staff `/activity` expected behavior needs decision: safe forbidden state vs staff-authorized stats.
 - Cookie attributes still need manual DevTools attribute confirmation if exact Secure/SameSite/HttpOnly/domain proof is required.
@@ -66,6 +75,6 @@ Local fix verification:
 
 ## Next Recommended Action
 
-Finish PR #35 review-fix verification, commit/push if clean, wait for CI/re-review, then only after merge and a separately approved controlled staging deploy rerun Issue #11 browser proof. Do not proceed to production.
+Perform final diff review and local commit for the focused CareBridge token propagation fix, then open a small PR after explicit approval. Keep Issue #11 open. Do not proceed to production.
 
 Can continue autonomously: NO - commit/push/deploy boundaries require explicit approval.

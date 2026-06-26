@@ -1,6 +1,6 @@
 # Test Matrix
 
-Last updated: 2026-06-23 19:33:58 BST
+Last updated: 2026-06-25 19:17 BST
 
 | Area | Command | Status | Evidence |
 | --- | --- | --- | --- |
@@ -62,5 +62,22 @@ Last updated: 2026-06-23 19:33:58 BST
 | Issue #11 local fix lint | `pnpm lint` | PASS | Repo configured lint task passed |
 | Issue #11 local fix API build | `pnpm --filter @oasis/api build` | PASS | API compiled |
 | Issue #11 local fix root build | `pnpm build` | PASS | 4 build tasks successful |
+| PR #35 merge CI | GitHub Actions `test`, `Deployment V2 verification` | PASS | PR #35 latest commit `96ffda1` passed before merge |
+| PR #35 staging fast-forward | VPS `/opt/oasis-care` `git pull --ff-only origin main` | PASS | VPS moved `3ec66ec` -> `687ee1e` |
+| PR #35 staging preflight | `node deploy/v2/scripts/preflight-env.mjs deploy/v2/.env` | PASS | No env values printed |
+| PR #35 staging Compose config | `docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml config` | PASS | `compose-config-ok` |
+| PR #35 staging controlled deploy | `docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml up -d --build --wait --wait-timeout 180` | PASS | web/api rebuilt and all containers healthy |
+| PR #35 post-deploy health | `/`, `/health`, `/ready`, `/sw.js`, `/api/health`, safe GraphQL typename | PASS | All returned expected 200 responses |
+| PR #35 signed-out protection | `/activity`, `/api/activity/today` | PASS | Both returned 307 login redirects |
+| PR #35 admin proof rerun | admin `/today`, `/activity`, CareBridge routes | FAIL / BLOCKED | Routes rendered without 500/502 and header showed admin, but GraphQL console errors remain on CareBridge approval/concern surfaces |
+| Admin CareBridge GraphQL diagnosis | fresh synthetic admin tabs for `/carebridge/approvals`, `/carebridge/concerns`, `/family-updates/concerns`, `/carebridge`; code/log inspection | COMPLETE | Approval/concern client pages show visible `Unauthorized` and fresh `GraphQL errors: Array(1)`; operations mapped to `VerifiedVisitStoryApprovalQueue`, `CareRooms`, and `CarebridgeConcernInbox`; likely client-side Clerk token propagation issue using plain `clientQuery(...)` instead of Clerk-aware helper |
+| PR #35 staff proof rerun | staff `/today`, `/activity`, `/family-updates`, `/carebridge` | PARTIAL PASS | Staff routes rendered; `/activity` showed safe forbidden state; no GraphQL errors captured in fresh staff tab; final sign-out had session-state anomaly |
+| PR #35 audit fallback post-deploy logs | sanitized API log sample | PARTIAL PASS | `P2003` still occurs, fallback logs `retrying without organization_id`; no sampled `Failed to write audit log` |
+| CareBridge token propagation focused RED | `node --test apps/web/app/carebridge/carebridge-client-auth.test.js` before wrapper/client implementation | EXPECTED FAIL | Test expected Clerk-aware client component files before they existed |
+| CareBridge token propagation focused GREEN | `node --test apps/web/app/carebridge/carebridge-client-auth.test.js` | PASS | 4 tests verify CareBridge approval/concern client components use Clerk-aware GraphQL helper and family aliases stay dynamic |
+| CareBridge token propagation diff check | `git diff --check` | PASS | Whitespace check clean |
+| CareBridge token propagation lint | `pnpm lint` | PASS | No ESLint warnings or errors after stable callback/hook dependency cleanup |
+| CareBridge token propagation web build | `pnpm --filter @oasis/web build` | PASS | Direct CareBridge routes and family alias routes build as dynamic without Clerk prerender errors |
+| CareBridge token propagation root build | `pnpm build` | PASS | 4 build tasks successful |
 
 No migrations, production-data actions, live payment/email/SMS/fulfilment/order API calls, or production deploys were run.

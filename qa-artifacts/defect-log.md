@@ -1,6 +1,6 @@
 # Defect Log
 
-Last updated: 2026-06-23 19:33:58 BST
+Last updated: 2026-06-25 19:17 BST
 
 ## ISSUE11-AUTH-001: Synthetic family Clerk login rejected
 
@@ -29,10 +29,10 @@ Verify the fake family Clerk account exists, password is current, staging org/pu
 ## ISSUE11-AUTH-002: GraphQL console errors on authenticated staff/admin surfaces
 
 - Severity: Medium
-- Status: Open / diagnosis pending
+- Status: Local fix implemented; not deployed
 - Area: Authenticated browser proof / GraphQL UI requests
 - Environment: `https://app.oasiscare.care`
-- Deployed commit: `3ec66ec`
+- Deployed commit: `687ee1e`
 
 ### Observation
 
@@ -47,10 +47,40 @@ Authenticated UI proof remains incomplete until the underlying GraphQL error sou
 - `qa-artifacts/authenticated-browser-proof.md`
 - Screenshots under `qa-artifacts/screenshots/issue-11-auth-proof/`
 - Sanitized read-only VPS log tail showed repeated Prisma `P2003` audit-log writes against `audit_log_organization_id_fkey` during authenticated traffic. Those audit failures are confirmed, but they are not proven to be the browser GraphQL console error cause because audit writes are caught and should not affect the client response path.
+- Post-PR35 deploy rerun on `687ee1e` still showed `GraphQL errors: Array(1)` on admin CareBridge approval/concern surfaces.
+- 2026-06-25 focused admin diagnosis:
+  - `/carebridge/approvals` rendered as admin but showed inline `Unauthorized` and two fresh `GraphQL errors: Array(1)` console events.
+  - `/carebridge/concerns` rendered as admin but showed inline `Unauthorized` and one fresh `GraphQL errors: Array(1)` console event.
+  - `/family-updates/concerns` aliases the same concern page and showed the same visible symptom.
+  - `/carebridge` rendered cleanly and listed fake active CareBridge rooms.
+  - API logs for the same window showed HTTP 200 GraphQL responses with small JSON bodies, not 500/502 crashes.
+  - Code maps the failing operations to `VerifiedVisitStoryApprovalQueue`, `CareRooms`, and `CarebridgeConcernInbox`.
+  - The failing pages call the plain `clientQuery(...)` helper directly, while the repo already has `useClerkClientQuery()` for adding Clerk bearer tokens to client-side GraphQL calls.
+
+### Diagnosis
+
+Likely client-side Clerk token propagation/auth context issue on CareBridge client components, not an unresolved audit-log FK crash and not a CareBridge resolver/database 500.
 
 ### Next Step
 
-Review/deploy the audit resilience fix, then rerun authenticated admin/staff browser proof. If browser GraphQL console errors remain, continue root-cause diagnosis in organization mapping, tenant scoping, and route data access rather than treating audit logging as resolved proof.
+Review, commit, merge, deploy, and rerun admin/staff browser proof for the CareBridge approval/concern pages. PR #35 should not be treated as Issue #11 closure evidence.
+
+### Local Fix
+
+Implemented locally, not deployed:
+
+- `/carebridge/approvals` and `/carebridge/concerns` now use dynamic route wrappers with Clerk-aware client components.
+- The affected client GraphQL calls now use `useClerkClientQuery()` instead of plain `clientQuery(...)`.
+- `/family-updates/approvals` and `/family-updates/concerns` remain aliases and are marked dynamic to avoid build-time Clerk hook prerender failures.
+- `useClerkClientQuery()` returns a stable callback for clean hook dependencies.
+
+Verification:
+
+- `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`: PASS
+- `git diff --check`: PASS
+- `pnpm lint`: PASS
+- `pnpm --filter @oasis/web build`: PASS
+- `pnpm build`: PASS
 
 ## ISSUE11-AUTH-003: Staff `/activity` stats request returns 403
 
@@ -87,10 +117,10 @@ Decide expected staff behavior for `/activity`. If staff should access it, updat
 ## ISSUE11-AUTH-004: Authenticated audit log writes fail organization FK
 
 - Severity: Medium
-- Status: Draft PR #35 pending re-review/deploy
+- Status: PR #35 deployed to staging; fallback active
 - Area: API audit logging / tenant membership parity
 - Environment: `https://app.oasiscare.care`
-- Deployed commit: `3ec66ec`
+- Deployed commit: `687ee1e`
 
 ### Observation
 
@@ -108,17 +138,23 @@ The UI can still render because `AuditLogInterceptor.logToDatabase` catches and 
 
 ### Next Step
 
-Review PR #35. If approved, merge/deploy through the controlled lane, then rerun authenticated proof. This PR does not prove the browser GraphQL console symptom is fixed; it preserves audit events while the organization mapping defect is investigated separately.
+PR #35 is merged and deployed. The fallback is active in logs, but this PR does not prove the browser GraphQL console symptom is fixed; it preserves audit events while the organization mapping defect is investigated separately.
 
 ### Local Fix
 
-Implemented in draft PR #35 but not deployed:
+Implemented in PR #35 and deployed to staging:
 
 - Valid internal organization ids still write normally.
 - Audit-log-only `P2003` failures for `audit_log.organization_id` retry once with `organization_id: null` when Prisma metadata identifies the audit-log organization FK.
 - Negative/scoping tests cover generic errors, wrong models, irrelevant FK metadata, nullable org id input, retry failure handling, and response-path isolation.
 - No organizations are auto-created from auth claims.
 - No auth/role policy was changed.
+
+Post-deploy evidence:
+
+- API logs still show Prisma `P2003` on `audit_log_organization_id_fkey`.
+- API logs now show `Audit log organization FK failed; retrying without organization_id`.
+- Filtered sampled logs did not show `Failed to write audit log`.
 
 Verification:
 
@@ -137,7 +173,7 @@ Verification:
 - Status: Open / follow-up blocker
 - Area: Tenant organization mapping / production readiness
 - Environment: `https://app.oasiscare.care`
-- Deployed commit: `3ec66ec`
+- Deployed commit: `687ee1e`
 
 ### Observation
 
