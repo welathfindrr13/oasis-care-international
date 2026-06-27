@@ -1,10 +1,10 @@
 # Mission State
 
-Last updated: 2026-06-26 23:12 BST
+Last updated: 2026-06-27 10:19 BST
 
 ## Active Task
 
-Address PR #36 review changes for CareBridge browser GraphQL auth architecture.
+Address PR #36 external review changes for central GraphQL proxy auth boundary hardening.
 
 ## Current Branch
 
@@ -15,11 +15,11 @@ Address PR #36 review changes for CareBridge browser GraphQL auth architecture.
 
 ## Scope
 
-This run addresses external review feedback on PR #36 by moving from a per-page CareBridge Clerk hook migration to a central `/api/graphql` auth proxy fix. No deploy, SSH/VPS access, restart, migration, staging env edit, record creation/modification, production data, real client/caregiver/family data, or live payment/email/SMS/fulfilment/order API call was performed.
+This run addresses the second external review feedback on PR #36 by adding direct Clerk session cookie extractor coverage, making token source priority explicit, removing the dead per-page Clerk query hook, and strengthening static/unit auth boundary tests around the central `/api/graphql` proxy. No deploy, SSH/VPS access, restart, migration, staging env edit, record creation/modification, production data, real client/caregiver/family data, or live payment/email/SMS/fulfilment/order API call was performed.
 
 ## Result
 
-Staging remains deployed at `687ee1e`. Public health/smoke checks previously passed. Local PR #36 review changes now make browser GraphQL auth consistent through the shared `/api/graphql` proxy. Issue #11 remains failed/blocked until the fix is reviewed, deployed, and authenticated browser proof is rerun.
+Staging remains deployed at `687ee1e`. Public health/smoke checks previously passed. Local PR #36 review changes keep browser GraphQL auth centralized through the shared `/api/graphql` proxy and harden its token boundary. Issue #11 remains failed/blocked until the fix is reviewed, deployed, and authenticated browser proof is rerun.
 
 ## Pull Request
 
@@ -27,7 +27,7 @@ Staging remains deployed at `687ee1e`. Public health/smoke checks previously pas
 - URL: https://github.com/welathfindrr13/oasis-care-international/pull/36
 - Base: `main`
 - Head: `carebridge-clerk-graphql-token-fix`
-- Status: draft / review changes in progress
+- Status: draft / review changes implemented locally
 - Base deployed staging commit: `687ee1e6ba9cfd1e8a42f5c0d3fd2fa8f4b98b60`
 
 ## Verification
@@ -63,6 +63,16 @@ CareBridge token propagation local verification:
 - `pnpm --filter @oasis/web build`: PASS
 - `pnpm build`: PASS
 
+PR #36 auth-boundary review-change verification:
+
+- `pnpm exec tsx --test apps/web/lib/auth/clerk.test.ts`: PASS (14 tests)
+- `pnpm exec tsx --test apps/web/lib/graphql/proxy-auth.test.ts`: PASS (6 tests)
+- `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`: PASS (6 tests)
+- `git diff --check`: PASS
+- `pnpm lint`: PASS
+- `pnpm --filter @oasis/web build`: PASS
+- `pnpm build`: PASS
+
 ## Open Blockers
 
 - Working synthetic family Clerk credentials/session are needed.
@@ -76,6 +86,6 @@ CareBridge token propagation local verification:
 
 ## Next Recommended Action
 
-Finish PR #36 review-change verification, commit/push if clean, then wait for CI and external re-review. Keep Issue #11 open. Do not proceed to production.
+Finish PR #36 auth-boundary review-change verification, commit/push if clean, then wait for CI and external re-review. Keep Issue #11 open. Do not proceed to production.
 
 Can continue autonomously: NO - commit/push/deploy boundaries require explicit approval.

@@ -36,9 +36,13 @@ export function resolveGraphQLProxyAccessToken({
   }
 
   if (clerkMode) {
+    // Prefer a server-resolved Clerk token when available because it is minted
+    // for the current request. Cookie fallback keeps browser proxy requests
+    // working when server token resolution is unavailable; the API still
+    // validates the forwarded JWT via its Clerk/JWKS auth boundary.
     return (
-      getClerkBearerTokenFromCookieHeader(cookieHeader) ||
-      normalizedToken(serverAuthAccessToken)
+      normalizedToken(serverAuthAccessToken) ||
+      getClerkBearerTokenFromCookieHeader(cookieHeader)
     );
   }
 

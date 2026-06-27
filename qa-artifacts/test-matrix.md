@@ -1,6 +1,6 @@
 # Test Matrix
 
-Last updated: 2026-06-26 23:12 BST
+Last updated: 2026-06-27 10:19 BST
 
 | Area | Command | Status | Evidence |
 | --- | --- | --- | --- |
@@ -85,5 +85,12 @@ Last updated: 2026-06-26 23:12 BST
 | PR #36 review-change lint | `pnpm lint` | PASS | No ESLint warnings or errors |
 | PR #36 review-change web build | `pnpm --filter @oasis/web build` | PASS | Next web build completed; `/api/graphql` and CareBridge routes built |
 | PR #36 review-change root build | `pnpm build` | PASS | 4 build tasks successful |
+| PR #36 auth-boundary Clerk extractor tests | `pnpm exec tsx --test apps/web/lib/auth/clerk.test.ts` | PASS | 14 tests cover role/org claims plus exact/suffixed Clerk session cookies, deterministic precedence, malformed/empty/unrelated cookies, URL decoding, and invalid escapes |
+| PR #36 auth-boundary proxy resolver tests | `pnpm exec tsx --test apps/web/lib/graphql/proxy-auth.test.ts` | PASS | 6 tests cover direct bearer priority, server Clerk token before cookie fallback, cookie fallback, non-Clerk token order, and missing auth |
+| PR #36 auth-boundary CareBridge proxy static guard | `node --test apps/web/app/carebridge/carebridge-client-auth.test.js` | PASS | 6 tests verify CareBridge uses shared `clientQuery`, `/api/graphql` central auth inputs, unauthorized path, token forwarding, no token/header logging, and aliases |
+| PR #36 auth-boundary diff check | `git diff --check` | PASS | Whitespace check clean |
+| PR #36 auth-boundary lint | `pnpm lint` | PASS | No ESLint warnings or errors |
+| PR #36 auth-boundary web build | `pnpm --filter @oasis/web build` | PASS | Next web build completed |
+| PR #36 auth-boundary root build | `pnpm build` | PASS | 4 build tasks successful |
 
 No migrations, production-data actions, live payment/email/SMS/fulfilment/order API calls, or production deploys were run.

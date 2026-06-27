@@ -24,24 +24,23 @@ test('resolveGraphQLProxyAccessToken gives explicit bearer priority', () => {
   assert.equal(token, 'direct.jwt.value');
 });
 
-test('resolveGraphQLProxyAccessToken uses Clerk session cookie for client proxy requests', () => {
+test('resolveGraphQLProxyAccessToken prefers server Clerk token over cookie fallback', () => {
   const token = resolveGraphQLProxyAccessToken({
     clerkMode: true,
     serverAuthAccessToken: 'server.jwt.value',
     cookieHeader: `theme=dark; __session=${encodeURIComponent('cookie.jwt.value')}`,
   });
 
-  assert.equal(token, 'cookie.jwt.value');
+  assert.equal(token, 'server.jwt.value');
 });
 
-test('resolveGraphQLProxyAccessToken falls back to server Clerk token when cookie token is unavailable', () => {
+test('resolveGraphQLProxyAccessToken falls back to Clerk session cookie when server token is unavailable', () => {
   const token = resolveGraphQLProxyAccessToken({
     clerkMode: true,
-    serverAuthAccessToken: 'server.jwt.value',
-    cookieHeader: 'theme=dark',
+    cookieHeader: `theme=dark; __session=${encodeURIComponent('cookie.jwt.value')}`,
   });
 
-  assert.equal(token, 'server.jwt.value');
+  assert.equal(token, 'cookie.jwt.value');
 });
 
 test('resolveGraphQLProxyAccessToken preserves NextAuth token order outside Clerk mode', () => {

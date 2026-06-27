@@ -19,7 +19,6 @@ test('CareBridge approvals page uses the shared authenticated GraphQL proxy', ()
   assert.match(source, /from ['"]\.\.\/\.\.\/\.\.\/lib\/graphql\/client-side['"]/);
   assert.match(source, /\bclientQuery</);
   assert.match(source, /\bclientQuery\(/);
-  assert.doesNotMatch(source, /useClerkClientQuery/);
 });
 
 test('CareBridge concerns page uses the shared authenticated GraphQL proxy', () => {
@@ -31,7 +30,6 @@ test('CareBridge concerns page uses the shared authenticated GraphQL proxy', () 
   assert.match(source, /from ['"]\.\.\/\.\.\/\.\.\/lib\/graphql\/client-side['"]/);
   assert.match(source, /\bclientQuery</);
   assert.match(source, /\bclientQuery\(/);
-  assert.doesNotMatch(source, /useClerkClientQuery/);
 });
 
 test('Shared client GraphQL helper sends cookies through the app proxy', () => {
@@ -48,6 +46,12 @@ test('GraphQL proxy resolves auth centrally from Clerk cookies and server auth',
   assert.match(routeSource, /hasDirectBearer/);
   assert.match(routeSource, /cookieHeader:\s*request\.headers\.get\(['"]cookie['"]\)/);
   assert.match(routeSource, /serverAuthAccessToken:\s*serverAuth\?\.accessToken/);
+  assert.match(routeSource, /if \(!accessToken\)/);
+  assert.match(routeSource, /headers\[['"]Authorization['"]\]\s*=\s*`Bearer \$\{accessToken\}`/);
+  assert.doesNotMatch(
+    routeSource,
+    /console\.[a-z]+\([^)]*(accessToken|cookieHeader|directAuthorization|Authorization)/s,
+  );
 });
 
 test('Family Updates concerns route remains an alias of the CareBridge concerns page', () => {

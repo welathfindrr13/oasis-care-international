@@ -1,6 +1,6 @@
 # Defect Log
 
-Last updated: 2026-06-26 23:12 BST
+Last updated: 2026-06-27 10:19 BST
 
 ## ISSUE11-AUTH-001: Synthetic family Clerk login rejected
 
@@ -59,7 +59,7 @@ Authenticated UI proof remains incomplete until the underlying GraphQL error sou
 
 ### Diagnosis
 
-Likely client-side GraphQL proxy auth context issue, not an unresolved audit-log FK crash and not a CareBridge resolver/database 500. Review showed the correct fix layer is the shared `/api/graphql` proxy because `clientQuery(...)` is the intended authenticated browser GraphQL abstraction and many protected client components use it.
+Likely client-side GraphQL proxy auth context issue, not an unresolved audit-log FK crash and not a CareBridge resolver/database 500. Review showed the correct fix layer is the shared `/api/graphql` proxy because `clientQuery(...)` is the intended authenticated browser GraphQL abstraction and many protected client components use it. A follow-up review accepted the central proxy architecture but required auth-boundary hardening before approval.
 
 ### Next Step
 
@@ -70,6 +70,9 @@ Review, commit, merge, deploy, and rerun admin/staff browser proof for the CareB
 First PR #36 local fix was revised after external review. Current local strategy is central proxy auth, not per-page Clerk hook migration.
 
 - `/api/graphql` now resolves auth centrally through explicit bearer, Clerk session cookie, server Clerk auth, or NextAuth token material depending on mode.
+- Token priority is explicit bearer first, server Clerk token second, Clerk session cookie fallback third in Clerk mode; backend JWT validation remains the trust anchor.
+- `getClerkBearerTokenFromCookieHeader` now has direct coverage for exact and suffixed Clerk session cookies, deterministic precedence, malformed chunks, URL decoding, unrelated cookies, and empty values.
+- The unused `useClerkClientQuery` hook was removed so future client GraphQL work stays on the shared proxy path.
 - CareBridge approval/concern components use the shared `clientQuery(...)` path.
 - `/family-updates/approvals` and `/family-updates/concerns` remain aliases.
 
@@ -77,6 +80,7 @@ Verification:
 
 - `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`: PASS
 - `pnpm exec tsx --test apps/web/lib/graphql/proxy-auth.test.ts`: PASS
+- `pnpm exec tsx --test apps/web/lib/auth/clerk.test.ts`: PASS
 - `git diff --check`: PASS
 - `pnpm lint`: PASS
 - `pnpm --filter @oasis/web build`: PASS

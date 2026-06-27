@@ -218,6 +218,45 @@ Verification:
 - PASS: `pnpm --filter @oasis/api build`
 - PASS: `pnpm build`
 
+## PR #36 Local Auth Proxy Addendum
+
+Timestamp: 2026-06-27 10:19 BST.
+
+No deploy was performed.
+
+Focused local source fix:
+
+- `apps/web/app/api/graphql/route.ts`
+- `apps/web/lib/auth/clerk.ts`
+- `apps/web/lib/auth/clerk.test.ts`
+- `apps/web/lib/graphql/proxy-auth.ts`
+- `apps/web/lib/graphql/proxy-auth.test.ts`
+- `apps/web/lib/graphql/useClerkClientQuery.ts` (removed)
+- `apps/web/app/carebridge/carebridge-client-auth.test.js`
+
+Corrected impact claim:
+
+- This PR is expected to fix the CareBridge client GraphQL `Unauthorized` class by keeping authenticated browser GraphQL calls on the central `/api/graphql` proxy path.
+- This PR is not Issue #11 closure proof. Issue #11 still needs staging deploy plus authenticated admin/staff/family browser proof rerun.
+- Family Clerk account/setup, staff `/activity` policy, cookie attribute proof, and external Clerk org id to internal `organization.id` mapping remain separate blockers/follow-ups.
+
+Fix behavior:
+
+- `clientQuery(...)` remains the shared browser GraphQL path and sends same-origin cookies to `/api/graphql`.
+- `/api/graphql` token priority is explicit bearer first, server Clerk token second, Clerk session cookie fallback third in Clerk mode.
+- Backend API JWT validation remains the auth trust anchor; token values are not logged.
+- The unused `useClerkClientQuery` helper was removed to avoid a second client GraphQL auth convention.
+
+Verification:
+
+- `pnpm exec tsx --test apps/web/lib/auth/clerk.test.ts`: PASS (14 tests)
+- `pnpm exec tsx --test apps/web/lib/graphql/proxy-auth.test.ts`: PASS (6 tests)
+- `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`: PASS (6 tests)
+- `git diff --check`: PASS
+- `pnpm lint`: PASS
+- `pnpm --filter @oasis/web build`: PASS
+- `pnpm build`: PASS
+
 Remaining proof blockers:
 
 - Fix is local only and has not been deployed.
