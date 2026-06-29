@@ -19,6 +19,40 @@ const REQUEST_TIMEOUT_MS = 10_000;
 
 export interface ClientQueryOptions {
   getBearerToken?: () => Promise<string | null | undefined>;
+  headers?: Record<string, string>;
+}
+
+type BrowserClerk = {
+  load?: () => Promise<unknown>;
+  session?: {
+    getToken?: () => Promise<string | null | undefined>;
+  } | null;
+};
+
+function getBrowserClerk(): BrowserClerk | null {
+  if (typeof window === 'undefined') return null;
+  return ((window as any).Clerk as BrowserClerk | undefined) || null;
+}
+
+function hasAuthorizationHeader(headers: Record<string, string>): boolean {
+  return Object.entries(headers).some(
+    ([key, value]) => key.toLowerCase() === 'authorization' && value.trim().length > 0,
+  );
+}
+
+async function getBrowserClerkBearerToken(): Promise<string> {
+  const clerk = getBrowserClerk();
+  if (!clerk) return '';
+
+  try {
+    if (typeof clerk.load === 'function') {
+      await clerk.load();
+    }
+    const token = await clerk.session?.getToken?.();
+    return typeof token === 'string' ? token.trim() : '';
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -32,9 +66,14 @@ export async function clientQuery<T = any>(
 ): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  const bearerToken = await options?.getBearerToken?.();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (bearerToken) {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options?.headers || {}),
+  };
+  const bearerToken = hasAuthorizationHeader(headers)
+    ? ''
+    : (await options?.getBearerToken?.()) || (await getBrowserClerkBearerToken());
+  if (bearerToken.trim()) {
     headers.Authorization = `Bearer ${bearerToken}`;
   }
 

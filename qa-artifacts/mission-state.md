@@ -4,24 +4,24 @@ Last updated: 2026-06-29 16:54 BST
 
 ## Active Task
 
-Focused local fix for `/api/graphql` Clerk browser-session token derivation after sanitized signed-in DevTools evidence showed a fake/synthetic admin request with Clerk/session cookies present, no Authorization header, and GraphQL `UNAUTHENTICATED` response on `/carebridge/approvals`.
+Amended PR #37 after browser split proof showed cookie-only `/api/graphql` failed but explicit `window.Clerk.session.getToken()` bearer succeeded for the fake/synthetic admin `VerifiedVisitStoryApprovalQueue` request.
 
 ## Current Branch
 
-- Branch: `carebridge-clerk-graphql-token-fix`
+- Branch: `graphql-proxy-clerk-db-jwt-fix`
 - Deployed staging commit: `97678af`
 - Worktree: `/Users/tyreeseedwards/.codex/worktrees/staging-hardening-reconciled/oasis-care`
 - Original dirty branch preserved: `feat/staging-live-setup`
 
 ## Scope
 
-This run made a local-only source/test fix for the web `/api/graphql` Clerk cookie fallback. No deploy, SSH, service restart, production-data action, destructive database command, migration, staging env edit, commit, push, merge, live payment/email/SMS/fulfilment/order API call, family Clerk setup, staff `/activity` policy change, org-mapping change, or `AWSCLIV2.pkg` cleanup was performed. No browser credentials, cookies, tokens, auth headers, JWTs, session values, or env values were inspected or printed.
+This run amended the local PR #37 source/test fix for the shared browser GraphQL client. No deploy, SSH, service restart, production-data action, destructive database command, migration, staging env edit, merge, live payment/email/SMS/fulfilment/order API call, family Clerk setup, staff `/activity` policy change, org-mapping change, or `AWSCLIV2.pkg` cleanup was performed. No browser credentials, cookies, tokens, auth headers, JWTs, session values, or env values were inspected or printed.
 
 ## Result
 
-Staging remains deployed at `97678af`. Issue #11 remains failed/blocked until this local fix is committed, reviewed, merged, deployed, and admin CareBridge queue browser proof is rerun.
+Staging remains deployed at `97678af`. Issue #11 remains failed/blocked until the amended PR #37 fix is reviewed, merged, deployed, and admin CareBridge queue browser proof is rerun.
 
-Local fix result: `apps/web/lib/auth/clerk.ts` now recognizes exact/suffixed `__clerk_db_jwt` cookies and prefers them before exact/suffixed `__session` fallback. The proxy still preserves explicit bearer priority, server Clerk token priority, session-cookie fallback, and non-Clerk/NextAuth behavior. Staff `/activity`, family Clerk account behavior, and external-to-internal org mapping were not changed.
+Local fix result: `apps/web/lib/graphql/client-side.ts` now attaches an explicit browser Clerk bearer from `window.Clerk.session.getToken()` to same-origin `/api/graphql` calls when available. Caller-provided Authorization remains highest priority, and no-Clerk/no-token cookie-only behavior remains as fallback. Staff `/activity`, family Clerk account behavior, backend resolver guards, and external-to-internal org mapping were not changed. The prior DB JWT cookie preference hypothesis was removed because browser split proof showed explicit Clerk bearer, not DB-cookie selection, is the proven path.
 
 ## Pull Request
 
@@ -92,22 +92,19 @@ PR #36 staging deploy and admin/staff proof:
 - Staff `/today`, `/family-updates`, `/carebridge`, `/activity`: PASS
 - Staff reload/sign-out/session URL behavior: PASS / behavioral only
 
-Local Clerk DB JWT cookie fallback fix:
+Local browser Clerk bearer fix:
 
-- RED first: direct TSX tests failed before the source change because the extractor/proxy selected `__session` ahead of `__clerk_db_jwt`.
+- RED first: direct TSX tests failed before the source change because `clientQuery(...)` did not attach a Clerk bearer in the browser.
 - `git diff --check`: PASS
-- `./node_modules/.bin/tsx --test apps/web/lib/auth/clerk.test.ts`: PASS (16 tests)
-- `./node_modules/.bin/tsx --test apps/web/lib/graphql/proxy-auth.test.ts`: PASS (7 tests)
+- `./node_modules/.bin/tsx --test apps/web/lib/graphql/client-side.test.ts`: PASS (4 tests)
+- `./node_modules/.bin/tsx --test apps/web/lib/auth/clerk.test.ts`: PASS (14 tests)
+- `./node_modules/.bin/tsx --test apps/web/lib/graphql/proxy-auth.test.ts`: PASS (6 tests)
 - `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`: PASS (6 tests)
-- `./node_modules/.bin/next lint` from `apps/web`: PASS
-- `./node_modules/.bin/next build` from `apps/web`: PASS
-- `corepack pnpm --filter @oasis/web build`: PASS
-- `pnpm lint`, `pnpm --filter @oasis/web build`, and `pnpm build` through the Codex runtime pnpm wrapper: BLOCKED before affected scripts ran by `ERR_PNPM_IGNORED_BUILDS`; generated `pnpm-workspace.yaml` approval stub was removed as tool noise.
 
 ## Open Blockers
 
 - Working synthetic family Clerk credentials/session are needed.
-- Local Clerk DB JWT cookie fallback fix is not committed, pushed, reviewed, merged, or deployed.
+- Amended browser Clerk bearer fix is not reviewed, merged, or deployed.
 - Admin CareBridge approval/concern surfaces still show `GraphQL errors: Array(1)` plus visible `Unauthorized` on deployed `97678af`; this local fix has not yet been browser-proven on staging.
 - ApiRolesGuard order fix is not currently supported by source/test evidence.
 - Exact signed-in GraphQL response body capture is blocked by current Chrome/log tooling; only route DOM/console symptoms and a no-cookie unauthenticated control envelope were captured.
@@ -119,6 +116,6 @@ Local Clerk DB JWT cookie fallback fix:
 
 ## Next Recommended Action
 
-Next safest action is final diff review and local commit for the Clerk DB JWT cookie fallback fix, then a separate PR/CI/review/merge/deploy lane. After deployment, rerun admin CareBridge queue browser proof. Keep Issue #11 open. Do not proceed to production.
+Next safest action is complete verification, commit and push the amended PR #37 fix, wait for CI, then request external re-review. After merge and controlled staging deploy, rerun admin CareBridge queue browser proof. Keep Issue #11 open. Do not proceed to production.
 
 Can continue autonomously: NO - further diagnosis/fix/deploy boundaries require explicit approval.

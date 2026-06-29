@@ -273,7 +273,7 @@ Signed-out route protection and public route behavior passed. Synthetic admin/st
 
 Production verdict remains DO NOT SHIP.
 
-## Local Clerk DB JWT Cookie Fix Addendum
+## Browser Clerk Bearer Fix Addendum
 
 Timestamp: 2026-06-29 16:54 BST.
 
@@ -296,24 +296,34 @@ Sanitized signed-in evidence supplied from Chrome DevTools:
 - Browser request had no Authorization header.
 - UI-visible error text: `Unauthorized`
 
-Local root-cause classification for this focused fix:
+Browser split evidence captured after hostile review:
+
+- Cookie-only request to `/api/graphql`: HTTP 200 GraphQL envelope with `UNAUTHENTICATED` and `data = null`.
+- Explicit bearer request to `/api/graphql` using `window.Clerk.session.getToken()`: HTTP 200 with no GraphQL errors and object data for `VerifiedVisitStoryApprovalQueue`.
+- This proves the signed-in browser session exists and the backend accepts the explicit Clerk bearer for this operation.
+- This refutes backend resolver, role, and org mapping as the cause for this specific operation.
+- It also means the previous DB JWT cookie preference hypothesis was unproven and should not be treated as the fix.
+
+Revised root-cause classification for this focused fix:
 
 - The browser had auth material via cookies but no explicit bearer header.
 - `/api/graphql` already reads `request.headers.get('cookie')`, passes that into `resolveGraphQLProxyAccessToken`, and forwards `Authorization: Bearer <token>` when token resolution succeeds.
-- The deployed extractor only recognized exact/suffixed `__session` cookies. If a backend-usable Clerk DB JWT cookie is present alongside a regular session cookie, the proxy could select the session token first and forward a bearer the backend rejects with GraphQL `UNAUTHENTICATED`.
-- The local fix keeps explicit bearer and server Clerk token priority unchanged, then prefers exact/suffixed Clerk DB JWT cookies before exact/suffixed `__session` fallback.
+- The cookie-only browser path failed, while the explicit Clerk bearer path succeeded.
+- The shared browser GraphQL client therefore needs to attach `window.Clerk.session.getToken()` as an explicit bearer when available.
 
 Focused local source fix:
 
-- `apps/web/lib/auth/clerk.ts`
+- `apps/web/lib/graphql/client-side.ts`
+- `apps/web/lib/graphql/client-side.test.ts`
 - `apps/web/lib/auth/clerk.test.ts`
 - `apps/web/lib/graphql/proxy-auth.test.ts`
 
 Verification:
 
-- RED first: direct TSX tests failed because the extractor/proxy chose the session cookie instead of the Clerk DB JWT cookie.
+- RED first: direct TSX client-side tests failed because `clientQuery(...)` did not attach the browser Clerk session token.
 - PASS: `git diff --check`
 - PASS: `./node_modules/.bin/tsx --test apps/web/lib/auth/clerk.test.ts`
+- PASS: `./node_modules/.bin/tsx --test apps/web/lib/graphql/client-side.test.ts`
 - PASS: `./node_modules/.bin/tsx --test apps/web/lib/graphql/proxy-auth.test.ts`
 - PASS: `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`
 - PASS: `./node_modules/.bin/next lint` from `apps/web`

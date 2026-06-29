@@ -330,12 +330,12 @@ Required next step:
 
 - Manual DevTools Network capture from the signed-in admin tab, copying only sanitized Response JSON `errors` fields and `data` null/partial state for failed `/api/graphql` requests.
 
-## ISSUE11-AUTH-007: GraphQL proxy Clerk cookie fallback can choose non-backend-usable session token
+## ISSUE11-AUTH-007: Browser GraphQL client does not attach explicit Clerk bearer
 
 - Severity: High
-- Status: Local fix implemented / not committed / not deployed
-- Area: Web `/api/graphql` auth proxy / Clerk browser session token derivation
-- Environment: Local fix against `carebridge-clerk-graphql-token-fix`; staging still at deployed `97678af`
+- Status: Local fix amended on PR #37 / not deployed
+- Area: Web browser GraphQL client / Clerk bearer propagation
+- Environment: PR #37 branch `graphql-proxy-clerk-db-jwt-fix`; staging still at deployed `97678af`
 
 ### Observation
 
@@ -349,24 +349,30 @@ Manual sanitized DevTools evidence from a signed-in fake/synthetic admin request
 - Browser request had no Authorization header.
 - Response JSON: `errors[0].message = Unauthorized`, `errors[0].extensions.code = UNAUTHENTICATED`, `data = null`.
 
+Follow-up browser split probe showed:
+
+- Cookie-only `/api/graphql` request: HTTP 200 GraphQL `UNAUTHENTICATED`, `data = null`.
+- Explicit bearer `/api/graphql` request using `window.Clerk.session.getToken()`: HTTP 200, no GraphQL errors, object data.
+
 ### Diagnosis
 
-The proxy route already reads cookies, passes the cookie header into `resolveGraphQLProxyAccessToken`, and forwards a backend Authorization bearer when token resolution succeeds. The remaining gap was token selection: `getClerkBearerTokenFromCookieHeader` only recognized exact/suffixed `__session` cookies. When Clerk provides a backend-usable DB JWT cookie alongside a regular session cookie, the proxy could select the session token first and forward a bearer the backend rejects.
+The backend accepts the explicit Clerk bearer for `VerifiedVisitStoryApprovalQueue`, so backend resolver, role, and org mapping are not the cause for this operation. The cookie-only browser path fails because the shared browser GraphQL helper does not attach the active Clerk session token as an explicit bearer. The earlier DB JWT cookie preference hypothesis is unproven and was removed.
 
 ### Local Fix
 
-- `apps/web/lib/auth/clerk.ts` now recognizes exact/suffixed `__clerk_db_jwt` cookies and prefers them before exact/suffixed `__session` fallback.
-- Explicit Authorization bearer priority is unchanged.
-- Server Clerk token priority is unchanged.
-- Non-Clerk/NextAuth paths are unchanged.
+- `apps/web/lib/graphql/client-side.ts` now loads browser Clerk when available, calls `window.Clerk.session.getToken()`, and sends `Authorization: Bearer <token>` to same-origin `/api/graphql`.
+- Caller-provided Authorization remains highest priority.
+- Existing no-Clerk/no-token cookie-only behavior remains as fallback.
+- Server-side behavior and the `/api/graphql` proxy explicit bearer path are unchanged.
 - No auth/role checks, staff `/activity` policy, family account behavior, or org mapping logic were changed.
 - No token, cookie, JWT, password, auth header, or secret values were logged or stored.
 
 ### Verification
 
-- RED first: extractor/proxy tests failed before the fix because `__session` was selected ahead of `__clerk_db_jwt`.
+- RED first: client-side GraphQL tests failed before the fix because no Authorization header was sent from `clientQuery(...)`.
 - PASS: `git diff --check`
 - PASS: `./node_modules/.bin/tsx --test apps/web/lib/auth/clerk.test.ts`
+- PASS: `./node_modules/.bin/tsx --test apps/web/lib/graphql/client-side.test.ts`
 - PASS: `./node_modules/.bin/tsx --test apps/web/lib/graphql/proxy-auth.test.ts`
 - PASS: `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`
 - PASS: `./node_modules/.bin/next lint` from `apps/web`
@@ -376,4 +382,4 @@ The proxy route already reads cookies, passes the cookie header into `resolveGra
 
 ### Next Step
 
-Final review and local commit only, then PR/CI/review/merge/deploy under separate approval. After deployment, rerun admin CareBridge queue browser proof. Do not claim Issue #11 is fixed until browser proof is clean.
+PR #37 needs CI and external re-review after the amended commit. After merge and controlled staging deploy, rerun admin CareBridge queue browser proof. Do not claim Issue #11 is fixed until browser proof is clean.

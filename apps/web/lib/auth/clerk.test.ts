@@ -62,28 +62,6 @@ test('getClerkBearerTokenFromCookieHeader extracts exact Clerk session token', (
   assert.equal(getClerkBearerTokenFromCookieHeader(cookie), token);
 });
 
-test('getClerkBearerTokenFromCookieHeader prefers Clerk DB JWT cookie over session cookie', () => {
-  const dbJwtToken = 'db.header.payload';
-  const sessionToken = 'session.header.payload';
-  const cookie = [
-    `__session=${encodeURIComponent(sessionToken)}`,
-    `__clerk_db_jwt=${encodeURIComponent(dbJwtToken)}`,
-  ].join('; ');
-
-  assert.equal(getClerkBearerTokenFromCookieHeader(cookie), dbJwtToken);
-});
-
-test('getClerkBearerTokenFromCookieHeader supports suffixed Clerk DB JWT cookies', () => {
-  const dbJwtToken = 'tenant.db.header.payload';
-  const sessionToken = 'session.header.payload';
-  const cookie = [
-    `__session_oasis=${encodeURIComponent(sessionToken)}`,
-    `__clerk_db_jwt_oasis=${encodeURIComponent(dbJwtToken)}`,
-  ].join('; ');
-
-  assert.equal(getClerkBearerTokenFromCookieHeader(cookie), dbJwtToken);
-});
-
 test('getClerkBearerTokenFromCookieHeader supports suffixed Clerk session cookies as fallback', () => {
   const token = 'tenant.header.payload';
   const cookie = `__session_oasis=${encodeURIComponent(token)}`;
