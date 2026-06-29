@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { resolveAuthMode } from '../../../lib/auth/mode';
 import { getServerAuthContext } from '../../../lib/auth/server-auth';
+import {
+  getDirectBearerToken,
+  resolveGraphQLProxyAccessToken,
+} from '../../../lib/graphql/proxy-auth';
 
 // Next.js build: mark as dynamic so /api/graphql isn't prerendered
 export const dynamic = 'force-dynamic';
@@ -12,20 +16,24 @@ export async function POST(request: NextRequest) {
     const body = await request.text();
     
     const directAuthorization = request.headers.get('authorization') || '';
-    const directBearer = directAuthorization.toLowerCase().startsWith('bearer ')
-      ? directAuthorization.slice('bearer '.length).trim()
-      : '';
+    const hasDirectBearer = Boolean(getDirectBearerToken(directAuthorization));
     const clerkMode = resolveAuthMode(process.env) === 'clerk';
-    const token = directBearer || clerkMode
-      ? null
-      : await getToken({
-          req: request as any,
-          secret: process.env.NEXTAUTH_SECRET,
-        });
-    const serverAuth = directBearer ? null : await getServerAuthContext();
-    const tokenAccessToken = (token as any)?.accessToken;
-    const tokenIdToken = (token as any)?.idToken;
-    const accessToken = directBearer || serverAuth?.accessToken || tokenAccessToken || tokenIdToken;
+    const token =
+      hasDirectBearer || clerkMode
+        ? null
+        : await getToken({
+            req: request as any,
+            secret: process.env.NEXTAUTH_SECRET,
+          });
+    const serverAuth = hasDirectBearer ? null : await getServerAuthContext();
+    const accessToken = resolveGraphQLProxyAccessToken({
+      authorizationHeader: directAuthorization,
+      clerkMode,
+      serverAuthAccessToken: serverAuth?.accessToken,
+      nextAuthAccessToken: (token as any)?.accessToken,
+      nextAuthIdToken: (token as any)?.idToken,
+      cookieHeader: request.headers.get('cookie'),
+    });
 
     if (!accessToken) {
       return new NextResponse('Unauthorized', { status: 401 });

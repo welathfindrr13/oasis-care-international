@@ -218,6 +218,45 @@ Verification:
 - PASS: `pnpm --filter @oasis/api build`
 - PASS: `pnpm build`
 
+## PR #36 Local Auth Proxy Addendum
+
+Timestamp: 2026-06-27 10:19 BST.
+
+No deploy was performed.
+
+Focused local source fix:
+
+- `apps/web/app/api/graphql/route.ts`
+- `apps/web/lib/auth/clerk.ts`
+- `apps/web/lib/auth/clerk.test.ts`
+- `apps/web/lib/graphql/proxy-auth.ts`
+- `apps/web/lib/graphql/proxy-auth.test.ts`
+- `apps/web/lib/graphql/useClerkClientQuery.ts` (removed)
+- `apps/web/app/carebridge/carebridge-client-auth.test.js`
+
+Corrected impact claim:
+
+- This PR is expected to fix the CareBridge client GraphQL `Unauthorized` class by keeping authenticated browser GraphQL calls on the central `/api/graphql` proxy path.
+- This PR is not Issue #11 closure proof. Issue #11 still needs staging deploy plus authenticated admin/staff/family browser proof rerun.
+- Family Clerk account/setup, staff `/activity` policy, cookie attribute proof, and external Clerk org id to internal `organization.id` mapping remain separate blockers/follow-ups.
+
+Fix behavior:
+
+- `clientQuery(...)` remains the shared browser GraphQL path and sends same-origin cookies to `/api/graphql`.
+- `/api/graphql` token priority is explicit bearer first, server Clerk token second, Clerk session cookie fallback third in Clerk mode.
+- Backend API JWT validation remains the auth trust anchor; token values are not logged.
+- The unused `useClerkClientQuery` helper was removed to avoid a second client GraphQL auth convention.
+
+Verification:
+
+- `pnpm exec tsx --test apps/web/lib/auth/clerk.test.ts`: PASS (14 tests)
+- `pnpm exec tsx --test apps/web/lib/graphql/proxy-auth.test.ts`: PASS (6 tests)
+- `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`: PASS (6 tests)
+- `git diff --check`: PASS
+- `pnpm lint`: PASS
+- `pnpm --filter @oasis/web build`: PASS
+- `pnpm build`: PASS
+
 Remaining proof blockers:
 
 - Fix is local only and has not been deployed.
@@ -231,5 +270,255 @@ Remaining proof blockers:
 AUTH PROOF FAILED / BLOCKED.
 
 Signed-out route protection and public route behavior passed. Synthetic admin/staff authenticated route proof partially passed, but authenticated proof cannot pass Issue #11 because the synthetic family login failed, staff `/activity` currently resolves to a stats 403, and authenticated browser console proof still needs rerun after any merged/deployed fixes. The audit-log FK fix is not by itself Issue #11 closure evidence.
+
+Production verdict remains DO NOT SHIP.
+
+## PR #36 Review Change Addendum
+
+Timestamp: 2026-06-26 23:12 BST
+
+No deploy, VPS access, restart, migration, staging env edit, production-data action, real client/caregiver/family data, or live payment/email/SMS/fulfilment/order API call was performed.
+
+External review found the first PR #36 implementation too narrow because only CareBridge approval/concern pages were migrated to a Clerk-aware client helper while many other protected client pages still used plain `clientQuery(...)`.
+
+Architecture inspection:
+
+- `clientQuery(...)` calls same-origin `/api/graphql`.
+- `clientQuery(...)` sends `credentials: 'include'`, so browser cookies are available to the proxy.
+- `/api/graphql` already attempts server-side auth through `getServerAuthContext()`.
+- `getServerAuthContext()` calls Clerk `auth().getToken()` in Clerk mode.
+- Middleware includes `/api/graphql` as public but still runs Clerk middleware for matched requests.
+- Many protected client components use plain `clientQuery(...)`, so a per-page CareBridge migration would leave a half-migrated convention.
+
+Chosen strategy:
+
+- Strategy A, central shared auth fix.
+
+Corrected local fix:
+
+- `/api/graphql` now resolves auth centrally through `resolveGraphQLProxyAccessToken(...)`.
+- Explicit bearer headers still win.
+- In Clerk mode, same-origin browser requests can authenticate through the Clerk session cookie token before falling back to server-derived Clerk auth.
+- Non-Clerk/NextAuth token order is preserved.
+- CareBridge approval/concern components use the shared `clientQuery(...)` path again.
+- The route/client split and family aliases remain intact.
+
+Corrected impact claim:
+
+- This is still not Issue #11 closure evidence.
+- The fix is local and un-deployed until PR #36 is reviewed, merged, and separately deployed.
+- Browser proof must be rerun after deploy before claiming the CareBridge GraphQL symptom is fixed.
+
+Focused verification started:
+
+- PASS: `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`
+- PASS: `pnpm exec tsx --test apps/web/lib/graphql/proxy-auth.test.ts`
+
+# 2026-06-25 Admin CareBridge GraphQL Error Diagnosis
+
+Timestamp: 2026-06-25 19:04 BST
+
+## Local CareBridge Token Propagation Fix Addendum
+
+Timestamp: 2026-06-25 19:17 BST
+
+No deploy, VPS access, restart, migration, staging env edit, production-data action, real client/caregiver/family data, or live payment/email/SMS/fulfilment/order API call was performed.
+
+Root cause:
+
+- Admin CareBridge approval/concern pages were client-rendered but called the plain browser `clientQuery(...)` helper.
+- Plain `clientQuery(...)` does not attach the active Clerk bearer token.
+- The affected GraphQL operations therefore reached the API without the expected authenticated Clerk context and returned GraphQL 200 responses containing authorization errors.
+
+Focused local source fix:
+
+- `/carebridge/approvals` now renders a dynamic server route wrapper around a Clerk-aware client component.
+- `/carebridge/concerns` now renders a dynamic server route wrapper around a Clerk-aware client component.
+- Both client components call `useClerkClientQuery()` so browser GraphQL requests propagate the Clerk token through the existing helper.
+- `/family-updates/approvals` and `/family-updates/concerns` remain aliases of the CareBridge screens and are marked dynamic so build-time prerendering does not execute Clerk client auth hooks outside `ClerkProvider`.
+- `useClerkClientQuery()` now returns a stable callback so React hook dependencies remain clean.
+
+Files changed:
+
+- `apps/web/app/carebridge/approvals/page.tsx`
+- `apps/web/app/carebridge/approvals/CareBridgeApprovalsClient.tsx`
+- `apps/web/app/carebridge/concerns/page.tsx`
+- `apps/web/app/carebridge/concerns/CareBridgeConcernsClient.tsx`
+- `apps/web/app/family-updates/approvals/page.tsx`
+- `apps/web/app/family-updates/concerns/page.tsx`
+- `apps/web/app/carebridge/carebridge-client-auth.test.js`
+- `apps/web/lib/graphql/useClerkClientQuery.ts`
+
+Verification:
+
+- RED first: focused test failed before the wrapper/client split because the expected Clerk-aware client component files did not exist.
+- PASS: `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`
+- PASS: `git diff --check`
+- PASS: `pnpm lint`
+- PASS: `pnpm --filter @oasis/web build`
+- PASS: `pnpm build`
+
+Build failure encountered and fixed:
+
+- Initial direct use of `useClerkClientQuery()` inside the client page modules caused Next build prerender failures because Clerk `useAuth` ran outside `ClerkProvider`.
+- Moving the client logic behind dynamic route wrappers and marking the family alias routes dynamic fixed the prerender failure.
+
+Remaining proof blockers:
+
+- The fix is local only and has not been committed, reviewed, merged, or deployed.
+- Admin/staff CareBridge browser proof must be rerun after a reviewed deploy.
+- Fake family Clerk account/setup remains blocked.
+- Staff `/activity` expected authorization behavior still needs a product/security decision or explicit acceptance.
+- Cookie attributes still need manual DevTools attribute confirmation if exact attribute evidence is required.
+
+Production verdict remains DO NOT SHIP.
+
+## Scope
+
+- Deployed staging commit: `687ee1e`
+- Domain: `https://app.oasiscare.care`
+- Fake/synthetic admin account only.
+- No code changes, deploy, restart, migration, staging env edit, record creation/modification, or production-data action performed.
+- No cookies, session storage, local storage, bearer tokens, auth headers, passwords, OTPs, env values, or secrets were inspected or printed.
+
+## Browser Evidence
+
+Fresh synthetic admin Chrome tabs were opened for each failing surface after login.
+
+- `/carebridge/approvals`
+  - Header showed `ADMIN`, not `FAMILY ACCESS`.
+  - Page rendered without login redirect, 500, or 502.
+  - Visible inline error: `Unauthorized`.
+  - Console: two fresh `GraphQL errors: Array(1)` events.
+  - Operations mapped from code: `VerifiedVisitStoryApprovalQueue` and `CareRooms`.
+- `/carebridge/concerns`
+  - Header showed `ADMIN`, not `FAMILY ACCESS`.
+  - Page rendered without login redirect, 500, or 502.
+  - Visible inline error: `Unauthorized`.
+  - Console: one fresh `GraphQL errors: Array(1)` event.
+  - Operation mapped from code: `CarebridgeConcernInbox`.
+- `/family-updates/concerns`
+  - Alias of `/carebridge/concerns`.
+  - Same visible `Unauthorized` symptom.
+- `/carebridge`
+  - Rendered cleanly and listed active fake CareBridge rooms.
+  - No visible `Unauthorized` state.
+
+The failing pages are client components that call `clientQuery(...)` directly. The repo already has `useClerkClientQuery()`, which wraps `clientQuery(...)` with Clerk `getToken()` for client-side requests, but the CareBridge approval and concern pages do not use it.
+
+## Server Log Evidence
+
+Sanitized read-only VPS logs for the same window showed:
+
+- API requests completed with HTTP 200 and small JSON response bodies during the browser failures.
+- No 500/502 route crash was observed for these CareBridge requests.
+- Existing audit-log Prisma `P2003` retries still appeared, with PR #35 fallback active.
+
+This separates the remaining admin browser failure from the earlier audit-log FK resilience fix. PR #35 is active, but the visible browser symptom remains.
+
+## Classification
+
+Likely category: client-side authenticated GraphQL token propagation / auth context.
+
+The strongest current root cause is that the client-rendered CareBridge approval and concern pages use the plain GraphQL helper without passing a Clerk bearer token. The browser receives GraphQL `UNAUTHORIZED` errors and renders `Unauthorized`, while server-rendered CareBridge surfaces that use the server GraphQL helper continue to load.
+
+Likely files:
+
+- `apps/web/app/carebridge/approvals/page.tsx`
+- `apps/web/app/carebridge/concerns/page.tsx`
+- `apps/web/app/family-updates/concerns/page.tsx`
+- `apps/web/lib/graphql/client-side.ts`
+- `apps/web/lib/graphql/useClerkClientQuery.ts`
+- `apps/web/app/api/graphql/route.ts`
+
+Safe next fix plan:
+
+- Convert the CareBridge approval and concern client pages to use `useClerkClientQuery()` for read and mutation calls.
+- Add focused regression coverage or code-level checks proving these Clerk-mode client surfaces pass a bearer token path.
+- Do not change staff `/activity` policy in this fix.
+- Do not claim Issue #11 fixed until the updated code is merged, deployed, and admin/staff/family authenticated browser proof is rerun.
+
+---
+
+# Post-PR35 Deploy Admin/Staff Proof Addendum
+
+Timestamp: 2026-06-25 18:42:44 BST
+
+## Scope
+
+- Deployed staging commit: `687ee1e`
+- Domain: `https://app.oasiscare.care`
+- Fake/synthetic accounts only.
+- Admin/staff proof rerun only.
+- Family login was not retried; fake family account setup remains a separate blocker.
+- No cookie values, session tokens, passwords, OTPs, or env values were inspected or printed.
+- Browser cookie/local/session storage was not inspected.
+
+## Post-Deploy Public / Signed-Out Checks
+
+- `/`: 200
+- `/health`: 200
+- `/ready`: 200
+- `/sw.js`: 200
+- `/api/health`: 200
+- `/api/graphql` safe `__typename`: 200
+- Signed-out `/activity`: 307 redirect to login
+- Signed-out `/api/activity/today`: 307 redirect to login
+
+## Admin Proof
+
+Synthetic admin session was already active in Chrome at the start of the browser proof.
+
+Observed:
+
+- Header showed `ADMIN`, not `FAMILY ACCESS`.
+- `/today`: rendered without login redirect, 500, or 502.
+- `/activity`: rendered without login redirect, 500, or 502.
+- `/carebridge`: rendered without login redirect, 500, or 502.
+- `/carebridge/approvals`: rendered without login redirect, 500, or 502.
+- `/carebridge/concerns`: rendered without login redirect, 500, or 502.
+- `/family-updates/concerns`: rendered without login redirect, 500, or 502.
+- Admin sign-out reached `/login`.
+
+Console result:
+
+- `GraphQL errors: Array(1)` still appeared on CareBridge approval/concern surfaces.
+- Therefore PR #35 did not make authenticated admin browser console proof clean.
+
+## Staff Proof
+
+Synthetic staff login succeeded after admin sign-out.
+
+Observed:
+
+- Header showed `CARER`, not `FAMILY ACCESS`.
+- `/today`: rendered without login redirect, 500, or 502.
+- `/family-updates`: rendered without login redirect, 500, or 502.
+- `/carebridge`: rendered without login redirect, 500, or 502.
+- `/activity`: rendered a safe forbidden state: `You do not have access to this activity view. Sign in again to continue.`
+- Staff `/today` reload persisted session state and the URL did not expose token/session material.
+
+Console result:
+
+- No `GraphQL errors: Array(1)` were captured in the fresh staff proof tab for `/today`, `/activity`, `/family-updates`, or `/carebridge`.
+
+Session note:
+
+- During final sign-out handling, the tab unexpectedly showed a family-facing header (`FAMILY ACCESS`) instead of the staff header. The visible session was signed out and returned to `/login` without token material in the URL. Treat staff sign-out evidence as partial because of that session-state anomaly.
+
+## Server Log Classification
+
+Recent sanitized post-deploy logs showed:
+
+- API still hits Prisma `P2003` on `audit_log_organization_id_fkey`.
+- PR #35 fallback is active: `Audit log organization FK failed; retrying without organization_id`.
+- Filtered sampled logs did not show `Failed to write audit log`.
+- Web still logs `Failed to fetch today stats: 403`, matching current staff `/activity` authorization policy.
+
+## Verdict
+
+AUTH PROOF STILL FAILED / BLOCKED.
+
+PR #35 improved audit resilience/completeness after deploy, but it did not prove Issue #11 fixed. Admin browser console still showed GraphQL errors on CareBridge approval/concern surfaces. Family proof remains blocked by fake Clerk account setup, staff `/activity` remains a policy decision, and cookie attribute proof remains manual/partial.
 
 Production verdict remains DO NOT SHIP.

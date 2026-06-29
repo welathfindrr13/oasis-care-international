@@ -75,22 +75,36 @@ export function getClerkOrganizationIdFromClaims(claims: ClaimRecord | null | un
 export function getClerkBearerTokenFromCookieHeader(cookieHeader: string | null | undefined): string {
   if (!cookieHeader) return '';
 
+  let suffixedSessionToken = '';
+
   for (const part of cookieHeader.split(';')) {
-    const [rawName, ...rawValueParts] = part.trim().split('=');
-    const name = rawName?.trim();
+    const trimmedPart = part.trim();
+    const separatorIndex = trimmedPart.indexOf('=');
+    if (separatorIndex <= 0) continue;
+
+    const name = trimmedPart.slice(0, separatorIndex).trim();
     if (!name || (name !== CLERK_SESSION_COOKIE_PREFIX && !name.startsWith(`${CLERK_SESSION_COOKIE_PREFIX}_`))) {
       continue;
     }
 
-    const rawValue = rawValueParts.join('=').trim();
+    const rawValue = trimmedPart.slice(separatorIndex + 1).trim();
     if (!rawValue) continue;
 
-    try {
-      return decodeURIComponent(rawValue);
-    } catch {
-      return rawValue;
+    const token = decodeClerkCookieValue(rawValue);
+    if (name === CLERK_SESSION_COOKIE_PREFIX) {
+      return token;
     }
+
+    suffixedSessionToken ||= token;
   }
 
-  return '';
+  return suffixedSessionToken;
+}
+
+function decodeClerkCookieValue(rawValue: string): string {
+  try {
+    return decodeURIComponent(rawValue);
+  } catch {
+    return rawValue;
+  }
 }
