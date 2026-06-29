@@ -273,6 +273,467 @@ Signed-out route protection and public route behavior passed. Synthetic admin/st
 
 Production verdict remains DO NOT SHIP.
 
+## Browser Clerk Bearer Fix Addendum
+
+Timestamp: 2026-06-29 16:54 BST.
+
+No deploy, SSH, service restart, migration, commit, push, merge, staging env edit, or production-data action was performed.
+
+Sanitized signed-in evidence supplied from Chrome DevTools:
+
+- Route: `/carebridge/approvals`
+- Operation: `VerifiedVisitStoryApprovalQueue`
+- Request URL path: `/api/graphql`
+- HTTP status: `200 OK`
+- Request method: `POST`
+- Variable keys: none
+- Response JSON keys: `errors`, `data`
+- `error.message`: `Unauthorized`
+- `error.extensions.code`: `UNAUTHENTICATED`
+- `error.path`: not present
+- `data`: `null`
+- Browser request had Clerk/session cookies present, values redacted.
+- Browser request had no Authorization header.
+- UI-visible error text: `Unauthorized`
+
+Browser split evidence captured after hostile review:
+
+- Cookie-only request to `/api/graphql`: HTTP 200 GraphQL envelope with `UNAUTHENTICATED` and `data = null`.
+- Explicit bearer request to `/api/graphql` using `window.Clerk.session.getToken()`: HTTP 200 with no GraphQL errors and object data for `VerifiedVisitStoryApprovalQueue`.
+- This proves the signed-in browser session exists and the backend accepts the explicit Clerk bearer for this operation.
+- This refutes backend resolver, role, and org mapping as the cause for this specific operation.
+- It also means the previous DB JWT cookie preference hypothesis was unproven and should not be treated as the fix.
+
+Revised root-cause classification for this focused fix:
+
+- The browser had auth material via cookies but no explicit bearer header.
+- `/api/graphql` already reads `request.headers.get('cookie')`, passes that into `resolveGraphQLProxyAccessToken`, and forwards `Authorization: Bearer <token>` when token resolution succeeds.
+- The cookie-only browser path failed, while the explicit Clerk bearer path succeeded.
+- The shared browser GraphQL client therefore needs to attach `window.Clerk.session.getToken()` as an explicit bearer when available.
+
+Focused local source fix:
+
+- `apps/web/lib/graphql/client-side.ts`
+- `apps/web/lib/graphql/client-side.test.ts`
+- `apps/web/lib/auth/clerk.test.ts`
+- `apps/web/lib/graphql/proxy-auth.test.ts`
+
+Verification:
+
+- RED first: direct TSX client-side tests failed because `clientQuery(...)` did not attach the browser Clerk session token.
+- PASS: `git diff --check`
+- PASS: `./node_modules/.bin/tsx --test apps/web/lib/auth/clerk.test.ts`
+- PASS: `./node_modules/.bin/tsx --test apps/web/lib/graphql/client-side.test.ts`
+- PASS: `./node_modules/.bin/tsx --test apps/web/lib/graphql/proxy-auth.test.ts`
+- PASS: `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`
+- PASS: `./node_modules/.bin/next lint` from `apps/web`
+- PASS: `./node_modules/.bin/next build` from `apps/web`
+- PASS: `corepack pnpm --filter @oasis/web build`
+- BLOCKED before script execution: `pnpm lint`, `pnpm --filter @oasis/web build`, and `pnpm build` through the Codex runtime pnpm wrapper hit `ERR_PNPM_IGNORED_BUILDS` / dependency approval gate before running the affected web scripts. The generated `pnpm-workspace.yaml` approval stub was removed as tool noise.
+
+Remaining proof blockers:
+
+- Commit, PR, CI, review, merge, and controlled staging deploy are still required before rerunning browser proof.
+- Admin CareBridge queue proof must be rerun after deploy.
+- Fake family Clerk setup remains separate.
+- Staff `/activity` policy decision remains separate.
+- Cookie attribute proof remains manual/partial if required.
+- External Clerk org ID to internal `organization.id` mapping remains a follow-up blocker.
+
+---
+
+# Post-PR36 Admin CareBridge Queue Diagnosis Addendum
+
+Timestamp: 2026-06-29 12:26 BST
+
+## Scope
+
+- Deployed staging commit under diagnosis: `97678af`
+- Domain: `https://app.oasiscare.care`
+- Diagnosis only.
+- No deploy, source change, commit, push, migration, service restart, staging env edit, or production-data action was performed.
+- No tokens, cookies, auth headers, passwords, JWTs, session values, or env values were inspected or printed.
+- Browser credential entry was not repeated. Chrome no longer had an Oasis session and redirected `/carebridge/approvals` to `/login`, so diagnosis used the prior sanitized admin browser failure plus code and read-only log correlation.
+
+## Prior Browser Symptom Being Diagnosed
+
+After PR #36 was merged and deployed, synthetic admin proof showed:
+
+- `/carebridge`: PASS; header showed `ADMIN`, fake CareBridge rooms visible, no visible `Unauthorized`.
+- `/carebridge/approvals`: FAIL; visible `Unauthorized` and fresh `GraphQL errors: Array(1)`.
+- `/carebridge/concerns`: FAIL; visible `Unauthorized` and fresh `GraphQL errors: Array(1)`.
+- `/family-updates/concerns`: FAIL; same alias failure.
+
+The central `/api/graphql` proxy fix therefore did not resolve the admin queue failure.
+
+## Operation and Resolver Mapping
+
+- `CareRooms`
+  - Frontend: `apps/web/lib/graphql/queries.ts`
+  - `/carebridge` server route: `apps/web/app/carebridge/page.tsx`
+  - Queue page bundled call: `apps/web/app/carebridge/approvals/CareBridgeApprovalsClient.tsx`
+  - Backend: `apps/api/src/carebridge/carebridge.resolver.ts#careRooms`
+  - Resolver roles: `admin`, `carer`, `user`
+  - Service: `CarebridgeService.listCareRooms`
+  - Behavior difference: staff/admin/family role is accepted at guard level; missing org returns an empty list rather than a staff-only failure.
+
+- `VerifiedVisitStoryApprovalQueue`
+  - Frontend: `apps/web/app/carebridge/approvals/CareBridgeApprovalsClient.tsx`
+  - Backend: `apps/api/src/carebridge/carebridge.resolver.ts#verifiedVisitStoryApprovalQueue`
+  - Resolver roles: `admin`, `carer`
+  - Service: `CarebridgeService.listVerifiedVisitStoryApprovalQueue`
+  - Tenant logic: requires staff role and internal organization id before querying `VerifiedVisitStory`.
+
+- `CarebridgeConcernInbox`
+  - Frontend: `apps/web/app/carebridge/concerns/CareBridgeConcernsClient.tsx`
+  - Alias: `apps/web/app/family-updates/concerns/page.tsx`
+  - Backend: `apps/api/src/carebridge/carebridge.resolver.ts#carebridgeConcernInbox`
+  - Resolver roles: `admin`, `carer`
+  - Service: `CarebridgeService.listConcernInbox`
+  - Tenant logic: requires staff role and internal organization id before querying `Concern`.
+
+## Root Cause Classification
+
+Primary cause: D. API guard expects a different role stage than the frontend displays.
+
+More specifically, `ApiRolesGuard.canActivate()` calls `super.canActivate(context)` before `enrichOrganizationContext(request.user)`. The inherited `RolesGuard.handleRequest()` asserts resolver roles during that first pass. For Clerk staging traffic, the trusted internal tenant role is only applied later by `enrichOrganizationContext()` from `OrganizationMembership`.
+
+This creates a split:
+
+- `/carebridge` can pass because `careRooms` allows `user` as well as staff roles.
+- Queue resolvers fail before enrichment because they require `admin` or `carer`.
+- The frontend header can still show `ADMIN` because it uses Clerk session/header role logic, while the API guard's first role assertion is using the pre-enriched JWT role set.
+
+This is not primarily a GraphQL proxy/token propagation issue after PR #36. It is also not missing CareBridge seed data and not a Prisma/audit-log crash.
+
+## Evidence
+
+- `libs/auth/src/roles.guard.ts` authenticates and asserts required roles in `handleRequest()` before returning the user.
+- `apps/api/src/auth/api-roles.guard.ts` then enriches organization context only after `super.canActivate(context)` returns.
+- `apps/api/src/auth/api-roles.guard.ts` comments state tenant-scoped authorization should run after verified `OrganizationMembership` replaces untrusted token roles, but the first inherited role assertion currently happens before that replacement.
+- `apps/api/src/auth/api-roles.guard.spec.ts` proves membership enrichment can turn a Clerk user role into `admin`, but it does not cover the full `canActivate()` order for restrictive resolver roles.
+- `apps/api/src/carebridge/carebridge.resolver.ts` allows `CareRooms` to `admin/carer/user`, while approval and concern queues allow only `admin/carer`.
+- `apps/api/src/carebridge/carebridge.service.ts` additionally enforces staff role and organization id for queue methods, but the observed `Unauthorized`/GraphQL failure is consistent with the guard denying before resolver/service success.
+- Read-only redacted VPS log tails did not show a matching crash, Prisma queue failure, or 500/502 during diagnosis.
+
+## Proposed No-Code Fix Plan
+
+Do not implement without separate approval.
+
+1. Add a failing regression test for `ApiRolesGuard.canActivate()` showing a Clerk-authenticated user with raw `user` role and active `organizationMembership.role = admin` can access a handler requiring `admin`.
+2. Adjust guard flow so authentication occurs first, tenant membership enrichment runs next, and required role assertion happens only after enrichment.
+3. Preserve current behavior for missing/ambiguous membership: still deny tenant-scoped access.
+4. Preserve `GqlRolesGuard` request extraction and legacy operational access checks.
+5. Verify negative cases: no token, unsupported membership role, no active membership in Clerk mode, and non-admin/non-carer access to queue resolvers.
+6. Deploy only after review/merge approval, then rerun admin CareBridge queue browser proof.
+
+## Verdict
+
+Issue #11 remains failed/blocked. Production verdict remains DO NOT SHIP.
+
+## Guard-Order Fix Attempt Addendum
+
+Timestamp: 2026-06-29 12:58 BST
+
+No deploy, VPS access, source code change, commit, push, merge, migration, staging env edit, production-data action, or browser credential entry was performed.
+
+The approved ApiRolesGuard enrichment-order fix was halted before source edits because current `origin/main` at `97678af` already implements the intended order:
+
+1. `ApiRolesGuard.handleRequest()` authenticates only.
+2. `ApiRolesGuard.canActivate()` enriches trusted organization membership.
+3. `ApiRolesGuard.canActivate()` then runs `assertRequiredRoles()`.
+
+Direct local verification:
+
+- `CI=true ./apps/api/node_modules/jest/bin/jest.js --config apps/api/jest.config.js src/auth/api-roles.guard.spec.ts --runInBand`: PASS, 13 tests.
+- `CI=true ./apps/api/node_modules/jest/bin/jest.js --config apps/api/jest.config.js src/auth/jwt.strategy.spec.ts --runInBand`: PASS, 17 tests.
+
+Conclusion: do not create a no-op guard-order PR. The remaining admin queue `Unauthorized` still needs exact sanitized GraphQL error-body capture from a synthetic admin session before selecting the next focused fix.
+
+## Exact GraphQL Error Capture Attempt Addendum
+
+Timestamp: 2026-06-29 13:02 BST
+
+Scope:
+
+- Diagnosis/evidence capture only.
+- No deploy, source change, commit, push, merge, migration, service restart, staging env edit, production-data action, cookie/session-store inspection, or browser credential entry was performed.
+- No tokens, cookies, auth headers, JWTs, passwords, session values, or env values were printed.
+
+Result:
+
+- Chrome had no active Oasis admin session.
+- Opening `https://app.oasiscare.care/carebridge/approvals` redirected to `/login`.
+- Because the browser was signed out, no authenticated `/api/graphql` queue request was made and no GraphQL response body could be captured.
+- The tab was left at the Oasis login page for user handoff.
+
+Operation map retained for the next capture:
+
+- `/carebridge/approvals` calls `VerifiedVisitStoryApprovalQueue` and `CareRooms` through `clientQuery(...)`.
+- `/carebridge/concerns` calls `CarebridgeConcernInbox` through `clientQuery(...)`.
+- `/family-updates/concerns` aliases the CareBridge concerns page.
+- Queue resolvers are in `apps/api/src/carebridge/carebridge.resolver.ts`.
+- Queue services require staff role plus organization context in `apps/api/src/carebridge/carebridge.service.ts`.
+
+Server evidence:
+
+- Approved read-only VPS status wrapper showed staging at `97678af` and web/API/caddy/postgres containers healthy.
+- Direct compose log pull as `oasis-staging` was blocked by read permissions on `/opt/oasis-care/deploy/v2/.env`.
+- No matching redacted GraphQL/CareBridge log entries were available from the current unauthenticated browser attempt.
+
+Next required step:
+
+- Sign in to Chrome as the fake/synthetic admin account without sharing credentials.
+- Rerun the capture immediately on `/carebridge/approvals`, `/carebridge/concerns`, and `/family-updates/concerns`.
+
+## Admin CareBridge Queue Error Capture Addendum
+
+Timestamp: 2026-06-29 15:28 BST
+
+Scope:
+
+- Diagnosis/evidence capture only.
+- Existing Chrome session was already signed in as the fake/synthetic admin.
+- No deploy, SSH write, source change, commit, push, merge, migration, service restart, staging env edit, production-data action, cookie/session-store inspection, family login attempt, staff `/activity` policy change, or org-mapping change was performed.
+- No tokens, cookies, auth headers, JWTs, passwords, session values, or env values were printed.
+
+Staging context:
+
+- VPS read-only wrapper showed deployed staging commit `97678af`.
+- Containers were healthy: web, API, Caddy, Postgres.
+- Local branch `carebridge-clerk-graphql-token-fix` has later central GraphQL proxy/auth hardening at `8542ee9`.
+- Deployed `97678af` contains the earlier/narrow CareBridge token commit, not the later central `/api/graphql` auth proxy hardening from `b3bed45`/`8542ee9`.
+
+Admin session check:
+
+- Visible app session was authenticated.
+- Current page `/today` showed admin context and header role `ADMIN`.
+- No browser cookies, local storage, session storage, tokens, auth headers, or session values were inspected.
+
+Route captures:
+
+| Route | UI-visible result | Fresh console symptom | Operation mapping | Batching |
+| --- | --- | --- | --- | --- |
+| `/carebridge/approvals` | Visible `Unauthorized`; page still rendered the approval queue shell and empty-state text | Two `GraphQL errors: Array(1)` entries | `VerifiedVisitStoryApprovalQueue` plus `CareRooms` | App helper issues separate `/api/graphql` requests via `Promise.all`; no batching in `clientQuery(...)` |
+| `/carebridge/concerns` | Visible `Unauthorized`; page still rendered the concern inbox shell and empty-state text | One fresh `GraphQL errors: Array(1)` entry | `CarebridgeConcernInbox` | Single `/api/graphql` request; no batching |
+| `/family-updates/concerns` | Visible `Unauthorized`; alias rendered the same concern inbox shell and empty-state text | One fresh `GraphQL errors: Array(1)` entry | `CarebridgeConcernInbox` through the family-updates alias | Single `/api/graphql` request; no batching |
+
+Signed-in browser response-body limitation:
+
+- The available Chrome extension API exposed route DOM and console logs but not network response bodies.
+- The read-only page evaluation sandbox did not expose `fetch` or constructible `XMLHttpRequest`, so a same-session direct GraphQL probe could not be run from page context.
+- Local Chrome did not expose a DevTools debugging socket on `127.0.0.1:9222`.
+- Therefore the exact signed-in browser `/api/graphql` response JSON body could not be captured in this run.
+
+No-cookie unauthenticated control response:
+
+- A no-cookie control request to the same `/api/graphql` path returned the same user-visible error class for each operation.
+- This control is not the signed-in browser response body; it is evidence for the exact GraphQL envelope produced when the proxy/API receives no usable auth.
+
+Sanitized control envelope for `CareRooms`, `VerifiedVisitStoryApprovalQueue`, and `CarebridgeConcernInbox`:
+
+```json
+{
+  "requestUrlPath": "/api/graphql",
+  "httpStatus": 200,
+  "responseJsonKeys": ["errors", "data"],
+  "errors": [
+    {
+      "message": "Unauthorized",
+      "extensionsCode": "UNAUTHENTICATED",
+      "path": null,
+      "keys": ["message", "extensions"],
+      "extensionsKeys": ["code"]
+    }
+  ],
+  "dataState": "null",
+  "multipleOperationsBatched": false,
+  "variableKeys": []
+}
+```
+
+CareRooms independence:
+
+- `/carebridge` had previously passed on deployed `97678af` with fake CareBridge room data visible.
+- On `/carebridge/approvals`, `CareRooms` is called alongside `VerifiedVisitStoryApprovalQueue`; two console GraphQL error entries were observed, so the page-level failure does not isolate `CareRooms` as independently failing.
+- The available browser tooling could not capture the two individual signed-in response bodies to prove which of the paired approval requests failed first.
+
+Server log evidence:
+
+- Approved VPS read-only wrapper succeeded and confirmed `97678af` plus healthy containers.
+- Direct compose log read as `deploy` was blocked by `/opt/oasis-care/deploy/v2/.env` permissions.
+- `sudo -n docker logs` was denied because sudo requires a password.
+- No permissions were changed and no root shell/log workaround was attempted.
+
+Classification:
+
+- The captured UI/console symptom is consistent with the browser GraphQL path reaching `/api/graphql` without usable auth and receiving the standard GraphQL `Unauthorized` / `UNAUTHENTICATED` envelope.
+- The strongest deploy-parity finding is that staging is on `97678af`, while the current branch contains later central proxy/auth hardening at `8542ee9`.
+- Issue #11 remains failed/blocked. This run does not prove family auth, cookie attributes, or clean admin queue behavior.
+
+## PR #36 Deploy Correction and Signed-In Capture Addendum
+
+Timestamp: 2026-06-29 15:52 BST
+
+Correction:
+
+- Do not treat `8542ee9` vs `97678af` as a deploy-parity gap.
+- PR #36 was squash-merged as `97678afd8f55b7440c42660b93d53e09a3fdec2e`.
+- Staging deployed HEAD is `97678af`.
+- Read-only VPS inspection confirmed deployed `97678af` contains the PR #36 central GraphQL auth proxy files:
+  - `apps/web/app/api/graphql/route.ts`
+  - `apps/web/lib/graphql/proxy-auth.ts`
+  - `apps/web/lib/auth/clerk.ts`
+  - `apps/web/lib/graphql/proxy-auth.test.ts`
+  - `apps/web/lib/auth/clerk.test.ts`
+- Read-only VPS inspection confirmed `apps/web/lib/graphql/useClerkClientQuery.ts` is missing in deployed code, matching the final PR #36 architecture.
+
+Browser capture:
+
+- In-app browser was open but signed out at `/login`, so it could not provide signed-in admin response evidence.
+- Existing Chrome tab was signed in as fake/synthetic admin and showed `ADMIN`.
+- No cookies, session storage, local storage, bearer tokens, auth headers, JWTs, passwords, session values, or env values were inspected or printed.
+
+Signed-in route symptoms reproduced on deployed `97678af`:
+
+| Route | UI-visible result | Fresh console symptom | Operation mapping | Batching |
+| --- | --- | --- | --- | --- |
+| `/carebridge/approvals` | `ADMIN` visible; inline `Unauthorized`; approval queue shell and empty state rendered | Two `GraphQL errors: Array(1)` entries | `VerifiedVisitStoryApprovalQueue` plus `CareRooms` | App helper issues separate `/api/graphql` requests through `Promise.all`; not a single batched request |
+| `/carebridge/concerns` | `ADMIN` visible; inline `Unauthorized`; concern inbox shell and empty state rendered | One fresh `GraphQL errors: Array(1)` entry | `CarebridgeConcernInbox` | Single `/api/graphql` request |
+| `/family-updates/concerns` | `ADMIN` visible; inline `Unauthorized`; alias rendered same concern inbox shell and empty state | One fresh `GraphQL errors: Array(1)` entry | `CarebridgeConcernInbox` through alias | Single `/api/graphql` request |
+
+Signed-in response-body capture status:
+
+- Signed-in response body was not captured.
+- The in-app browser and Chrome browser APIs expose DOM and console logs but not network response bodies.
+- Read-only page evaluation reports `fetch` and `XMLHttpRequest` as unavailable in the browser automation sandbox.
+- Therefore the previous no-cookie control response must not be treated as the signed-in admin GraphQL body.
+
+Manual DevTools capture now required:
+
+1. Open DevTools in the signed-in admin Chrome tab.
+2. Go to Network.
+3. Enable Preserve log.
+4. Filter by `/api/graphql`.
+5. Refresh `/carebridge/approvals`.
+6. Click the failed `/api/graphql` request.
+7. Copy only the sanitized Response JSON `errors` section and response `data` null/partial state.
+8. Do not copy request headers, cookies, Authorization, tokens, JWTs, payload values, passwords, or session values.
+
+Server log limitation:
+
+- Direct compose logs as `deploy` remain blocked by `/opt/oasis-care/deploy/v2/.env` permissions.
+- `sudo -n docker logs` is denied because sudo requires a password.
+- No permissions were changed and no root/DigitalOcean write action was attempted.
+
+Current classification:
+
+- H. Unknown / insufficient evidence until the real signed-in `/api/graphql` response body is captured.
+- PR #36 central proxy/auth code is deployed, so category A is ruled out.
+- The visible symptom is still consistent with auth failure, but without the signed-in response body we cannot distinguish B/C/D/E safely.
+- Record only route, operation name, HTTP status, response JSON shape, `error.message`, `error.extensions.code`, and `error.path`; redact variables and auth material.
+
+---
+
+# PR #36 Post-Deploy Admin/Staff Proof Addendum
+
+Timestamp: 2026-06-29 11:59 BST
+
+## Scope
+
+- Deployed staging commit: `97678af`
+- PR #36 merge commit: `97678afd8f55b7440c42660b93d53e09a3fdec2e`
+- Domain: `https://app.oasiscare.care`
+- Fake/synthetic accounts only.
+- Admin/staff proof rerun only.
+- Family login was not retried; fake family account setup remains a separate blocker.
+- No cookie values, session tokens, passwords, OTPs, auth headers, JWTs, or env values were recorded.
+- Browser cookie/local/session storage was not inspected.
+
+## Post-Deploy Public / Signed-Out Checks
+
+- `/`: 200
+- `/health`: 200
+- `/ready`: 200
+- `/sw.js`: 200
+- `/api/health`: 200
+- `/api/graphql` safe `__typename`: 200
+- Signed-out `/activity`: 307 redirect to login
+- Signed-out `/api/activity/today`: 307 redirect to login
+
+## Admin Proof
+
+Synthetic admin session was active in Chrome at the start of the browser proof.
+
+Observed:
+
+- Header showed `ADMIN`, not `FAMILY ACCESS`.
+- `/carebridge`: rendered without login redirect, 500, 502, or visible `Unauthorized`; active fake CareBridge rooms were visible.
+- `/carebridge/approvals`: rendered without login redirect, 500, or 502, but showed visible `Unauthorized`.
+- `/carebridge/concerns`: rendered without login redirect, 500, or 502, but showed visible `Unauthorized`.
+- `/family-updates/concerns`: rendered without login redirect, 500, or 502, but showed visible `Unauthorized`.
+
+Console result:
+
+- Fresh admin tab captured `GraphQL errors: Array(1)` on `/carebridge/approvals`, `/carebridge/concerns`, and `/family-updates/concerns`.
+- No console errors were captured on `/carebridge`.
+
+Classification:
+
+- PR #36 did not make admin CareBridge queue proof clean.
+- Server logs showed HTTP 200 GraphQL responses with small error bodies, not 500/502 crashes.
+- Operation names remain mapped from source/routes to `VerifiedVisitStoryApprovalQueue`, `CareRooms`, and `CarebridgeConcernInbox`; browser tooling did not expose the underlying GraphQL error body.
+
+## Staff Proof
+
+Synthetic staff login succeeded after admin sign-out.
+
+Observed:
+
+- Header showed `CARER`, not `FAMILY ACCESS`.
+- `/today`: rendered without login redirect, 500, 502, or visible `Unauthorized`.
+- `/family-updates`: rendered without login redirect, 500, 502, or visible `Unauthorized`.
+- `/carebridge`: rendered without login redirect, 500, 502, or visible `Unauthorized`.
+- `/activity`: rendered without login redirect, 500, 502, or visible `Unauthorized`.
+- Reload preserved staff session state.
+- Sign-out returned to `/login`.
+- URLs did not expose token/session material.
+
+Console result:
+
+- No `GraphQL errors: Array(1)` were captured in the fresh staff proof tab for `/today`, `/activity`, `/family-updates`, or `/carebridge`.
+
+## Cookie / Session Sanity
+
+Confirmed without inspecting cookie values/session stores:
+
+- Admin/staff sessions reached protected routes.
+- Staff reload persisted session.
+- Staff sign-out returned to `/login`.
+- URLs did not expose token/session material.
+
+Not inspected:
+
+- Cookie values.
+- Browser cookie store/session storage/local storage.
+- Secure/HttpOnly/SameSite/domain attributes.
+
+Manual browser DevTools confirmation is still needed for exact cookie attributes if Issue #11 closure requires that evidence.
+
+## Screenshots
+
+Stored locally under:
+
+- `qa-artifacts/screenshots/issue-11-pr36-postdeploy/`
+
+## Verdict
+
+AUTH PROOF STILL FAILED / BLOCKED.
+
+PR #36 deployed cleanly and staff proof passed for the requested staff routes, but admin CareBridge approval/concern queue proof still shows visible `Unauthorized` and `GraphQL errors: Array(1)`. Issue #11 remains open and cannot be closed from this evidence.
+
+Production verdict remains DO NOT SHIP.
+
 ## PR #36 Review Change Addendum
 
 Timestamp: 2026-06-26 23:12 BST

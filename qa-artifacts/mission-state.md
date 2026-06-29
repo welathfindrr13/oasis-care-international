@@ -1,25 +1,27 @@
 # Mission State
 
-Last updated: 2026-06-27 10:19 BST
+Last updated: 2026-06-29 16:54 BST
 
 ## Active Task
 
-Address PR #36 external review changes for central GraphQL proxy auth boundary hardening.
+Amended PR #37 after browser split proof showed cookie-only `/api/graphql` failed but explicit `window.Clerk.session.getToken()` bearer succeeded for the fake/synthetic admin `VerifiedVisitStoryApprovalQueue` request.
 
 ## Current Branch
 
-- Branch: `carebridge-clerk-graphql-token-fix`
-- Deployed staging commit: `687ee1e`
+- Branch: `graphql-proxy-clerk-db-jwt-fix`
+- Deployed staging commit: `97678af`
 - Worktree: `/Users/tyreeseedwards/.codex/worktrees/staging-hardening-reconciled/oasis-care`
 - Original dirty branch preserved: `feat/staging-live-setup`
 
 ## Scope
 
-This run addresses the second external review feedback on PR #36 by adding direct Clerk session cookie extractor coverage, making token source priority explicit, removing the dead per-page Clerk query hook, and strengthening static/unit auth boundary tests around the central `/api/graphql` proxy. No deploy, SSH/VPS access, restart, migration, staging env edit, record creation/modification, production data, real client/caregiver/family data, or live payment/email/SMS/fulfilment/order API call was performed.
+This run amended the local PR #37 source/test fix for the shared browser GraphQL client. No deploy, SSH, service restart, production-data action, destructive database command, migration, staging env edit, merge, live payment/email/SMS/fulfilment/order API call, family Clerk setup, staff `/activity` policy change, org-mapping change, or `AWSCLIV2.pkg` cleanup was performed. No browser credentials, cookies, tokens, auth headers, JWTs, session values, or env values were inspected or printed.
 
 ## Result
 
-Staging remains deployed at `687ee1e`. Public health/smoke checks previously passed. Local PR #36 review changes keep browser GraphQL auth centralized through the shared `/api/graphql` proxy and harden its token boundary. Issue #11 remains failed/blocked until the fix is reviewed, deployed, and authenticated browser proof is rerun.
+Staging remains deployed at `97678af`. Issue #11 remains failed/blocked until the amended PR #37 fix is reviewed, merged, deployed, and admin CareBridge queue browser proof is rerun.
+
+Local fix result: `apps/web/lib/graphql/client-side.ts` now attaches an explicit browser Clerk bearer from `window.Clerk.session.getToken()` to same-origin `/api/graphql` calls when available. Caller-provided Authorization remains highest priority, and no-Clerk/no-token cookie-only behavior remains as fallback. Staff `/activity`, family Clerk account behavior, backend resolver guards, and external-to-internal org mapping were not changed. The prior DB JWT cookie preference hypothesis was removed because browser split proof showed explicit Clerk bearer, not DB-cookie selection, is the proven path.
 
 ## Pull Request
 
@@ -27,12 +29,12 @@ Staging remains deployed at `687ee1e`. Public health/smoke checks previously pas
 - URL: https://github.com/welathfindrr13/oasis-care-international/pull/36
 - Base: `main`
 - Head: `carebridge-clerk-graphql-token-fix`
-- Status: draft / review changes implemented locally
-- Base deployed staging commit: `687ee1e6ba9cfd1e8a42f5c0d3fd2fa8f4b98b60`
+- Status: merged / deployed to staging
+- Base deployed staging commit: `97678afd8f55b7440c42660b93d53e09a3fdec2e`
 
 ## Verification
 
-Issue #11 browser proof status: AUTH PROOF STILL FAILED / BLOCKED. PR #35 improves audit completeness only; post-deploy admin proof still has GraphQL console errors now mapped to `VerifiedVisitStoryApprovalQueue`, `CareRooms`, and `CarebridgeConcernInbox` on client-rendered CareBridge queue pages.
+Issue #11 browser proof status: AUTH PROOF STILL FAILED / BLOCKED. PR #36 deployed successfully, but post-deploy admin proof still has visible `Unauthorized` and GraphQL console errors on `VerifiedVisitStoryApprovalQueue`, `CareRooms`, and `CarebridgeConcernInbox` paths for client-rendered CareBridge queue pages.
 
 Evidence logs:
 
@@ -73,11 +75,39 @@ PR #36 auth-boundary review-change verification:
 - `pnpm --filter @oasis/web build`: PASS
 - `pnpm build`: PASS
 
+PR #36 staging deploy and admin/staff proof:
+
+- VPS fast-forward `687ee1e` -> `97678af`: PASS
+- Deployment V2 real env preflight: PASS
+- Compose config validation: PASS
+- Controlled Compose deploy with `--wait`: PASS
+- Post-deploy containers: web/api/caddy/postgres healthy
+- Public checks `/`, `/health`, `/ready`, `/sw.js`, `/api/health`: PASS
+- Safe `/api/graphql` `__typename`: PASS
+- Signed-out `/activity` and `/api/activity/today`: PASS, 307 login redirects
+- Admin `/carebridge`: PASS
+- Admin `/carebridge/approvals`, `/carebridge/concerns`, `/family-updates/concerns`: FAIL, visible `Unauthorized` and `GraphQL errors: Array(1)`
+- PR #36 deployed-content verification: PASS, deployed `97678af` contains central proxy/auth files and removed `useClerkClientQuery.ts`
+- Admin queue error capture: PARTIAL / BLOCKED, active admin session reproduced failures but exact signed-in response body could not be intercepted; manual DevTools Network response capture is required
+- Staff `/today`, `/family-updates`, `/carebridge`, `/activity`: PASS
+- Staff reload/sign-out/session URL behavior: PASS / behavioral only
+
+Local browser Clerk bearer fix:
+
+- RED first: direct TSX tests failed before the source change because `clientQuery(...)` did not attach a Clerk bearer in the browser.
+- `git diff --check`: PASS
+- `./node_modules/.bin/tsx --test apps/web/lib/graphql/client-side.test.ts`: PASS (4 tests)
+- `./node_modules/.bin/tsx --test apps/web/lib/auth/clerk.test.ts`: PASS (14 tests)
+- `./node_modules/.bin/tsx --test apps/web/lib/graphql/proxy-auth.test.ts`: PASS (6 tests)
+- `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`: PASS (6 tests)
+
 ## Open Blockers
 
 - Working synthetic family Clerk credentials/session are needed.
-- PR #35 is merged and deployed to staging.
-- Admin CareBridge approval/concern surfaces showed `GraphQL errors: Array(1)` plus visible `Unauthorized` on deployed `687ee1e`; local central proxy auth fix is not deployed yet.
+- Amended browser Clerk bearer fix is not reviewed, merged, or deployed.
+- Admin CareBridge approval/concern surfaces still show `GraphQL errors: Array(1)` plus visible `Unauthorized` on deployed `97678af`; this local fix has not yet been browser-proven on staging.
+- ApiRolesGuard order fix is not currently supported by source/test evidence.
+- Exact signed-in GraphQL response body capture is blocked by current Chrome/log tooling; only route DOM/console symptoms and a no-cookie unauthenticated control envelope were captured.
 - Robust external Clerk org id to internal `organization.id` mapping remains a follow-up blocker; PR #35 only preserves audit events when mapping is stale/missing.
 - Staff `/activity` expected behavior needs decision: safe forbidden state vs staff-authorized stats.
 - Cookie attributes still need manual DevTools attribute confirmation if exact Secure/SameSite/HttpOnly/domain proof is required.
@@ -86,6 +116,6 @@ PR #36 auth-boundary review-change verification:
 
 ## Next Recommended Action
 
-Finish PR #36 auth-boundary review-change verification, commit/push if clean, then wait for CI and external re-review. Keep Issue #11 open. Do not proceed to production.
+Next safest action is complete verification, commit and push the amended PR #37 fix, wait for CI, then request external re-review. After merge and controlled staging deploy, rerun admin CareBridge queue browser proof. Keep Issue #11 open. Do not proceed to production.
 
-Can continue autonomously: NO - commit/push/deploy boundaries require explicit approval.
+Can continue autonomously: NO - further diagnosis/fix/deploy boundaries require explicit approval.
