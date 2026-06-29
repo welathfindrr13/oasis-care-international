@@ -43,6 +43,18 @@ test('resolveGraphQLProxyAccessToken falls back to Clerk session cookie when ser
   assert.equal(token, 'cookie.jwt.value');
 });
 
+test('resolveGraphQLProxyAccessToken prefers backend-usable Clerk DB JWT cookie fallback', () => {
+  const token = resolveGraphQLProxyAccessToken({
+    clerkMode: true,
+    cookieHeader: [
+      `__session=${encodeURIComponent('session.jwt.value')}`,
+      `__clerk_db_jwt=${encodeURIComponent('db.jwt.value')}`,
+    ].join('; '),
+  });
+
+  assert.equal(token, 'db.jwt.value');
+});
+
 test('resolveGraphQLProxyAccessToken preserves NextAuth token order outside Clerk mode', () => {
   assert.equal(
     resolveGraphQLProxyAccessToken({

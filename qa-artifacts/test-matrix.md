@@ -1,6 +1,6 @@
 # Test Matrix
 
-Last updated: 2026-06-27 10:19 BST
+Last updated: 2026-06-29 16:54 BST
 
 | Area | Command | Status | Evidence |
 | --- | --- | --- | --- |
@@ -92,5 +92,30 @@ Last updated: 2026-06-27 10:19 BST
 | PR #36 auth-boundary lint | `pnpm lint` | PASS | No ESLint warnings or errors |
 | PR #36 auth-boundary web build | `pnpm --filter @oasis/web build` | PASS | Next web build completed |
 | PR #36 auth-boundary root build | `pnpm build` | PASS | 4 build tasks successful |
+| PR #36 staging fast-forward | VPS `/opt/oasis-care` `git pull --ff-only origin main` | PASS | VPS moved `687ee1e` -> `97678af`; known untracked deploy-local files preserved |
+| PR #36 staging preflight | `node deploy/v2/scripts/preflight-env.mjs deploy/v2/.env` | PASS | No env values printed |
+| PR #36 staging Compose config | `docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml config` | PASS | `compose-config-ok` |
+| PR #36 staging controlled deploy | `docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml up -d --build --wait --wait-timeout 180` | PASS | web/api rebuilt and all containers healthy |
+| PR #36 post-deploy public health | `/`, `/health`, `/ready`, `/sw.js`, `/api/health` | PASS | All returned 200 |
+| PR #36 post-deploy safe GraphQL | `/api/graphql` safe `__typename` | PASS | Returned `{"data":{"__typename":"Query"}}` |
+| PR #36 signed-out protection | `/activity`, `/api/activity/today` | PASS | Both returned 307 login redirects |
+| PR #36 admin `/carebridge` proof | Chrome synthetic admin session | PASS | `ADMIN` header, fake active CareBridge rooms visible, no visible `Unauthorized`, no console errors |
+| PR #36 admin CareBridge queue proof | Chrome synthetic admin session for `/carebridge/approvals`, `/carebridge/concerns`, `/family-updates/concerns` | FAIL | Visible `Unauthorized` and fresh `GraphQL errors: Array(1)` remain |
+| PR #36 deployed content verification | Read-only SSH `git show` and file existence checks on staging `97678af` | PASS | Deployed squash commit includes central `/api/graphql` proxy/auth files, `proxy-auth` and Clerk extractor tests, and removed `useClerkClientQuery.ts`; missing-deploy hypothesis ruled out |
+| PR #36 staff proof | Chrome synthetic staff session for `/today`, `/family-updates`, `/carebridge`, `/activity` | PASS | `CARER` header, routes rendered, no visible `Unauthorized`, no fresh GraphQL console errors, reload persisted session, sign-out returned to login |
+| Admin CareBridge queue auth root-cause diagnosis | Code inspection, Chrome session check, read-only redacted VPS log tail | COMPLETE | Primary cause classified as API guard role assertion before Clerk tenant membership enrichment; no code changes or deploy performed |
+| ApiRolesGuard order fix preflight | Direct Jest: `CI=true ./apps/api/node_modules/jest/bin/jest.js --config apps/api/jest.config.js src/auth/api-roles.guard.spec.ts --runInBand` | PASS | 13 tests passed; current source already covers membership-derived admin/carer access after raw Clerk member role |
+| JWT strategy adjacent guard check | Direct Jest: `CI=true ./apps/api/node_modules/jest/bin/jest.js --config apps/api/jest.config.js src/auth/jwt.strategy.spec.ts --runInBand` | PASS | 17 tests passed; Clerk role mapping unchanged |
+| ApiRolesGuard order fix decision | Source/test inspection | HALTED | Approved guard-order hypothesis did not reproduce in current `origin/main`; no source fix made |
+| Admin queue exact GraphQL error capture | Chrome `/carebridge/approvals`, `/carebridge/concerns`, `/family-updates/concerns`; browser capability check; read-only VPS content check | PARTIAL / BLOCKED | Active admin session reproduced visible `Unauthorized` and fresh `GraphQL errors: Array(1)` on all three target routes. Exact signed-in response body could not be intercepted with available in-app/Chrome tooling. Previous no-cookie control is not signed-in evidence. Manual DevTools Network response capture is required |
+| Signed-in admin GraphQL error body | Manual sanitized Chrome DevTools capture for `/carebridge/approvals` | COMPLETE | `/api/graphql` returned HTTP 200 GraphQL envelope with `errors[0].message = Unauthorized`, `extensions.code = UNAUTHENTICATED`, `data = null`; cookies present but values redacted; no Authorization header |
+| Clerk DB JWT cookie fallback RED | `./node_modules/.bin/tsx --test apps/web/lib/auth/clerk.test.ts` and `./node_modules/.bin/tsx --test apps/web/lib/graphql/proxy-auth.test.ts` before source fix | EXPECTED FAIL | Extractor/proxy selected `__session` instead of `__clerk_db_jwt` |
+| Clerk DB JWT cookie fallback GREEN | `./node_modules/.bin/tsx --test apps/web/lib/auth/clerk.test.ts` | PASS | 16 tests cover role/org claims, exact/suffixed Clerk DB JWT cookies, exact/suffixed session fallback, deterministic precedence, malformed/empty/unrelated cookies, URL decoding, and invalid escapes |
+| Clerk DB JWT proxy fallback GREEN | `./node_modules/.bin/tsx --test apps/web/lib/graphql/proxy-auth.test.ts` | PASS | 7 tests cover direct bearer priority, server Clerk token before cookie fallback, backend-usable Clerk DB JWT cookie fallback, session cookie fallback, non-Clerk token order, and missing auth |
+| CareBridge shared proxy static guard | `node --test apps/web/app/carebridge/carebridge-client-auth.test.js` | PASS | 6 tests verify CareBridge remains on shared `clientQuery`, `/api/graphql` central auth inputs, unauthorized path, token forwarding, no token/header logging, and aliases |
+| Clerk DB JWT local diff check | `git diff --check` | PASS | Whitespace check clean |
+| Clerk DB JWT local web lint | `./node_modules/.bin/next lint` from `apps/web` | PASS | No ESLint warnings or errors |
+| Clerk DB JWT local web build | `./node_modules/.bin/next build` from `apps/web`; `corepack pnpm --filter @oasis/web build` | PASS | Next web build completed and `/api/graphql` route built |
+| Clerk DB JWT root pnpm scripts | `pnpm lint`, `pnpm --filter @oasis/web build`, `pnpm build` via Codex runtime pnpm wrapper | BLOCKED BEFORE SCRIPT | `ERR_PNPM_IGNORED_BUILDS` dependency approval gate fired before affected scripts ran; generated `pnpm-workspace.yaml` approval stub was removed as tool noise |
 
 No migrations, production-data actions, live payment/email/SMS/fulfilment/order API calls, or production deploys were run.

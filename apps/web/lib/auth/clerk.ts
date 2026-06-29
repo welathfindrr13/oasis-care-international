@@ -3,6 +3,7 @@ import { normalizeAppRoles } from './roles';
 type ClaimRecord = Record<string, any>;
 
 const CLERK_SESSION_COOKIE_PREFIX = '__session';
+const CLERK_DB_JWT_COOKIE_PREFIX = '__clerk_db_jwt';
 
 function asArray(value: unknown): unknown[] {
   if (Array.isArray(value)) return value;
@@ -75,6 +76,9 @@ export function getClerkOrganizationIdFromClaims(claims: ClaimRecord | null | un
 export function getClerkBearerTokenFromCookieHeader(cookieHeader: string | null | undefined): string {
   if (!cookieHeader) return '';
 
+  let exactDbJwtToken = '';
+  let suffixedDbJwtToken = '';
+  let exactSessionToken = '';
   let suffixedSessionToken = '';
 
   for (const part of cookieHeader.split(';')) {
@@ -83,7 +87,7 @@ export function getClerkBearerTokenFromCookieHeader(cookieHeader: string | null 
     if (separatorIndex <= 0) continue;
 
     const name = trimmedPart.slice(0, separatorIndex).trim();
-    if (!name || (name !== CLERK_SESSION_COOKIE_PREFIX && !name.startsWith(`${CLERK_SESSION_COOKIE_PREFIX}_`))) {
+    if (!name || !isSupportedClerkBearerCookieName(name)) {
       continue;
     }
 
@@ -91,14 +95,34 @@ export function getClerkBearerTokenFromCookieHeader(cookieHeader: string | null 
     if (!rawValue) continue;
 
     const token = decodeClerkCookieValue(rawValue);
+    if (name === CLERK_DB_JWT_COOKIE_PREFIX) {
+      exactDbJwtToken ||= token;
+      continue;
+    }
+
+    if (name.startsWith(`${CLERK_DB_JWT_COOKIE_PREFIX}_`)) {
+      suffixedDbJwtToken ||= token;
+      continue;
+    }
+
     if (name === CLERK_SESSION_COOKIE_PREFIX) {
-      return token;
+      exactSessionToken ||= token;
+      continue;
     }
 
     suffixedSessionToken ||= token;
   }
 
-  return suffixedSessionToken;
+  return exactDbJwtToken || suffixedDbJwtToken || exactSessionToken || suffixedSessionToken;
+}
+
+function isSupportedClerkBearerCookieName(name: string): boolean {
+  return (
+    name === CLERK_DB_JWT_COOKIE_PREFIX ||
+    name.startsWith(`${CLERK_DB_JWT_COOKIE_PREFIX}_`) ||
+    name === CLERK_SESSION_COOKIE_PREFIX ||
+    name.startsWith(`${CLERK_SESSION_COOKIE_PREFIX}_`)
+  );
 }
 
 function decodeClerkCookieValue(rawValue: string): string {
