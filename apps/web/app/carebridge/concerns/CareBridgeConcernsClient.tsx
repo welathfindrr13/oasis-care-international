@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useAuth } from '@clerk/nextjs'
 import { Header } from '../../../components/oasis/Header'
 import { Button } from '../../../components/ui/Button'
+import { resolveAuthMode } from '../../../lib/auth/mode'
 import { clientQuery } from '../../../lib/graphql/client-side'
 import {
   CAREBRIDGE_CONCERN_INBOX_QUERY,
@@ -13,7 +15,49 @@ import {
 } from '../../../lib/graphql/queries'
 import { ConcernInboxList } from '../../../components/carebridge/ConcernInboxList'
 
+type GetBearerToken = () => Promise<string | null | undefined>
+
+interface CareBridgeConcernsQueueClientProps {
+  authReady: boolean
+  isSignedIn: boolean
+  getBearerToken?: GetBearerToken
+}
+
+function isClerkAuthMode() {
+  return resolveAuthMode({
+    NODE_ENV: process.env.NODE_ENV,
+    NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: process.env.NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER,
+    NEXT_PUBLIC_LOCAL_AUTH_ENABLED: process.env.NEXT_PUBLIC_LOCAL_AUTH_ENABLED,
+  } as NodeJS.ProcessEnv) === 'clerk'
+}
+
 export function CareBridgeConcernsClient() {
+  if (isClerkAuthMode()) {
+    return <CareBridgeConcernsClerkClient />
+  }
+
+  return <CareBridgeConcernsQueueClient authReady isSignedIn />
+}
+
+function CareBridgeConcernsClerkClient() {
+  const { isLoaded, isSignedIn, getToken } = useAuth()
+
+  const getBearerToken = useCallback(() => getToken(), [getToken])
+
+  return (
+    <CareBridgeConcernsQueueClient
+      authReady={isLoaded}
+      isSignedIn={Boolean(isSignedIn)}
+      getBearerToken={getBearerToken}
+    />
+  )
+}
+
+function CareBridgeConcernsQueueClient({
+  authReady,
+  isSignedIn,
+  getBearerToken,
+}: CareBridgeConcernsQueueClientProps) {
   const [concerns, setConcerns] = useState<CarebridgeConcern[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -24,11 +68,22 @@ export function CareBridgeConcernsClient() {
     const data = await clientQuery<CarebridgeConcernInboxQueryResponse>(
       CAREBRIDGE_CONCERN_INBOX_QUERY,
       status ? { status } : {},
+      getBearerToken ? { getBearerToken } : undefined,
     )
     setConcerns(data.carebridgeConcernInbox)
-  }, [])
+  }, [getBearerToken])
 
   useEffect(() => {
+    if (!authReady) {
+      return
+    }
+
+    if (!isSignedIn) {
+      setLoading(false)
+      setError('Unauthorized')
+      return
+    }
+
     async function bootstrap() {
       try {
         setLoading(true)
@@ -42,7 +97,7 @@ export function CareBridgeConcernsClient() {
     }
 
     bootstrap()
-  }, [loadConcerns, statusFilter])
+  }, [authReady, isSignedIn, loadConcerns, statusFilter])
 
   async function acknowledgeConcern(concernId: string) {
     try {
@@ -53,7 +108,7 @@ export function CareBridgeConcernsClient() {
           concernId,
           status: 'ACKNOWLEDGED',
         },
-      })
+      }, getBearerToken ? { getBearerToken } : undefined)
       await loadConcerns(statusFilter || undefined)
     } catch (err: any) {
       setError(err?.message || 'Unable to acknowledge this concern.')
@@ -73,7 +128,7 @@ export function CareBridgeConcernsClient() {
           outcome: 'RESOLVED',
           message: resolutionNote,
         },
-      })
+      }, getBearerToken ? { getBearerToken } : undefined)
       await loadConcerns(statusFilter || undefined)
     } catch (err: any) {
       setError(err?.message || 'Unable to resolve this concern.')
