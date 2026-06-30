@@ -150,6 +150,21 @@ function normalizeOrigin(url) {
   return url ? url.origin.replace(/\/$/, '') : '';
 }
 
+function normalizeProvider(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function authModeProof(values) {
+  const authProvider = normalizeProvider(values.AUTH_IDENTITY_PROVIDER);
+  const publicAuthProvider = normalizeProvider(values.NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER);
+
+  return {
+    authProviderIsClerk: authProvider === 'clerk',
+    publicAuthProviderIsClerk: publicAuthProvider === 'clerk',
+    authProvidersMatch: Boolean(authProvider) && authProvider === publicAuthProvider,
+  };
+}
+
 function validate(values) {
   const errors = [];
   const warnings = [];
@@ -162,9 +177,13 @@ function validate(values) {
     }
   }
 
-  const authProvider = String(values.AUTH_IDENTITY_PROVIDER || '').trim().toLowerCase();
-  if (isProductionLike && authProvider !== 'clerk') {
+  const proof = authModeProof(values);
+  const authProvider = normalizeProvider(values.AUTH_IDENTITY_PROVIDER);
+  if (isProductionLike && !proof.authProviderIsClerk) {
     add(errors, 'AUTH_IDENTITY_PROVIDER=clerk is required for production Deployment V2 auth');
+  }
+  if (isProductionLike && !proof.publicAuthProviderIsClerk) {
+    add(errors, 'NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk is required for production Deployment V2 public auth');
   }
 
   if (authProvider === 'clerk') {
@@ -327,6 +346,10 @@ function main() {
     process.exit(1);
   }
 
+  const proof = authModeProof(values);
+  console.log(`AUTH_IDENTITY_PROVIDER is clerk: ${proof.authProviderIsClerk ? 'YES' : 'NO'}`);
+  console.log(`NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER is clerk: ${proof.publicAuthProviderIsClerk ? 'YES' : 'NO'}`);
+  console.log(`Auth provider envs match: ${proof.authProvidersMatch ? 'YES' : 'NO'}`);
   console.log('Deployment V2 env preflight passed.');
 }
 
@@ -334,4 +357,4 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   main();
 }
 
-export { CLERK_REQUIRED, REQUIRED, parseEnvFile, validate };
+export { CLERK_REQUIRED, REQUIRED, authModeProof, parseEnvFile, validate };

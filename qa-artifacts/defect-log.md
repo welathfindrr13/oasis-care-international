@@ -406,3 +406,83 @@ External review blocker addressed locally:
 - Regression coverage now verifies Clerk-only children call `useAuth()`, pass `authReady={isLoaded}`, and provide the stable bearer callback to the shared queue client.
 
 Verification passed locally, including the CareBridge readiness/non-Clerk guard test, client-side GraphQL tests, Clerk/proxy auth tests, web lint, and web builds. Do not claim Issue #11 is fixed until this local fix is committed, reviewed, merged, deployed, and browser proof is clean.
+
+## ISSUE11-DEPLOY-008: Auth env preflight used deploy alias without env visibility
+
+- Severity: Medium
+- Status: Diagnosed / owner deploy-lane correction needed
+- Area: Deployment V2 staging proof preflight
+- Environment: staging deploy gate before PR #38 deploy
+
+### Observation
+
+The controlled staging deploy for PR #38 was stopped before deploy after a sanitized auth provider check returned `NO` for both `AUTH_IDENTITY_PROVIDER` and `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER`.
+
+### Sanitized Diagnosis
+
+- The check ran through the `oasis-staging` alias as SSH user `deploy`.
+- `/opt/oasis-care/deploy/v2/.env` exists but is not readable by that SSH user.
+- Docker is not readable by that SSH user.
+- General passwordless sudo is not available to that SSH user.
+- The approved read-only wrapper is available and reports current deployed HEAD `c8dab77`.
+- The GitHub Deploy VPS workflow runs `preflight-env.mjs deploy/v2/.env` before compose up and uses `docker compose --env-file deploy/v2/.env`.
+- The workflow does not print the env file.
+- Compose passes `AUTH_IDENTITY_PROVIDER` into web/API runtime and passes `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER` into web build args and runtime.
+
+### Classification
+
+Root cause category: preflight checked the wrong access context/source. The `NO` result came from an unreadable root-owned env file in the deploy alias context, not from proven non-Clerk staging runtime configuration.
+
+### Required Correction
+
+Use the approved GitHub Deploy VPS workflow or another approved root-equivalent deploy lane for the next deploy attempt. For future proof gates, add/use a sanctioned sanitized auth-env check in the same context as deploy, printing only booleans. Do not source the root-owned `.env` through the plain `oasis-staging` deploy alias.
+
+No deploy, SSH write, env edit, migration, production-data action, secret print, or GitHub variable/secret change was performed during this diagnosis.
+
+## ISSUE11-DEPLOY-009: Deploy workflow lacks sanctioned NEXT_PUBLIC auth-mode equality proof
+
+- Severity: Medium
+- Status: Blocking PR #38 staging deploy rerun under current approval criteria
+- Area: Deployment V2 staging deploy gate
+- Environment: source preflight before GitHub Deploy VPS workflow rerun
+
+### Observation
+
+The approved rerun plan required sanctioned deploy-context proof that both auth provider envs equal `clerk` before triggering the staging deploy.
+
+### Sanitized Source Evidence
+
+- `origin/main` target is `059bde8`.
+- PR #38 is merged.
+- `.github/workflows/deploy-vps.yml` runs `node deploy/v2/scripts/preflight-env.mjs deploy/v2/.env` before compose up.
+- `.github/workflows/deploy-vps.yml` uses `docker compose --env-file deploy/v2/.env`.
+- `deploy/v2/docker-compose.yml` passes `AUTH_IDENTITY_PROVIDER` into web/API runtime.
+- `deploy/v2/docker-compose.yml` passes `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER` into web build args and runtime.
+- `deploy/v2/scripts/preflight-env.mjs` enforces `AUTH_IDENTITY_PROVIDER=clerk` for production-like Deployment V2.
+- `deploy/v2/scripts/preflight-env.mjs` requires `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER` to be present.
+- `deploy/v2/scripts/preflight-env.mjs` does not enforce `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk`.
+- The existing workflow does not print sanitized equality booleans for both provider envs.
+
+### Classification
+
+Root cause category: missing sanctioned equality proof in the approved deploy lane. This is not a live-env failure and does not prove staging is misconfigured. It means the current workflow/source evidence cannot satisfy the explicit proof gate without a small preflight/workflow hardening change or another approved root-equivalent sanitized check.
+
+### Required Correction
+
+Add or approve a sanctioned check that proves, without printing secrets or raw env values, that both Deployment V2 auth provider envs equal `clerk`. Preferred small code fix: update `preflight-env.mjs` to require `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk` for production-like Deployment V2, with tests, then rerun the controlled staging deploy.
+
+No deploy, SSH write, env edit, migration, production-data action, service restart, commit, push, merge, or secret print occurred.
+
+### Local Fix
+
+Timestamp: 2026-06-30 15:41 BST
+
+Status: Fixed locally / not pushed / not deployed.
+
+- `deploy/v2/scripts/preflight-env.mjs` now requires `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk` in production-like Deployment V2 preflight.
+- The script prints sanitized auth-mode proof on success using YES/NO only.
+- Regression tests cover non-Clerk public auth mode, missing public auth mode, sanitized success proof, and failure output that does not expose secret values.
+- `git diff --check`, focused preflight tests, and CI-equivalent Deployment V2 static gates passed.
+- Full `pnpm deploy:v2:verify` is locally blocked by dependency build-script approval gating before the verification script can complete.
+
+No deploy, SSH write, env edit, migration, production-data action, service restart, push, merge, or secret print occurred.
