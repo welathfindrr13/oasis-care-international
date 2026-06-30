@@ -132,8 +132,9 @@ Local Clerk readiness race fix:
 ## Open Blockers
 
 - Working synthetic family Clerk credentials/session are needed.
-- PR #38 review-change amendment is not committed, pushed, reviewed, merged, or deployed.
-- Admin CareBridge approval/concern surfaces still show visible `Unauthorized` on deployed `c8dab77` until the local fix is deployed and proven.
+- PR #38 is merged to `main` as `059bde8`, but it is not deployed.
+- PR #38 staging deploy rerun is blocked by the current approval gate: source/workflow proves `AUTH_IDENTITY_PROVIDER=clerk` enforcement, but only presence for `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER`; no sanctioned deploy-context equality boolean exists for both auth provider envs.
+- Admin CareBridge approval/concern surfaces still show visible `Unauthorized` on deployed `c8dab77` until the merged PR #38 fix is deployed and proven.
 - ApiRolesGuard order fix is not currently supported by source/test evidence.
 - Exact post-PR37 signed-in GraphQL response body capture is blocked by current built-in browser tooling; only route DOM/console symptoms were captured after PR #37.
 - Robust external Clerk org id to internal `organization.id` mapping remains a follow-up blocker; PR #35 only preserves audit events when mapping is stale/missing.
@@ -144,6 +145,14 @@ Local Clerk readiness race fix:
 
 ## Next Recommended Action
 
-Next safest action is commit and push the PR #38 non-Clerk safety amendment after verification, then rerun PR #38 CI/re-review. Keep Issue #11 open. Do not proceed to production.
+PR #38 was approved, marked ready, and squash-merged to `main` as `059bde8`. The first controlled staging deploy attempt stopped before deploy because a sanitized auth env preflight returned `NO` for both expected auth provider checks.
+
+Read-only diagnosis showed the failed env preflight used the `oasis-staging` deploy alias as user `deploy`, which cannot read the root-owned `/opt/oasis-care/deploy/v2/.env` and cannot inspect Docker directly. The `NO` result therefore came from the wrong access context/source, not from proven non-Clerk runtime configuration. The GitHub Deploy VPS workflow remains the correct deploy lane: it runs `preflight-env.mjs deploy/v2/.env` before compose up, uses `docker compose --env-file deploy/v2/.env`, and does not print the env file. Compose passes `AUTH_IDENTITY_PROVIDER` to web/API runtime and `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER` to web build args/runtime.
+
+The approved workflow deploy rerun was stopped before triggering the workflow because source inspection found the existing preflight enforces `AUTH_IDENTITY_PROVIDER=clerk` but only requires `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER` to be present. Existing workflow logs do not produce sanitized equality booleans for both auth provider envs. Under the current approval criteria, the deploy gate is not satisfied.
+
+Focused local preflight hardening is now implemented but not pushed/deployed. It requires `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk` in `deploy/v2/scripts/preflight-env.mjs`, emits sanitized YES/NO auth-mode proof, and adds regression coverage. Verification passed for `git diff --check`, focused preflight tests, CI-equivalent Deployment V2 static gates, and workflow discovery. Full `pnpm deploy:v2:verify` remains locally blocked by dependency build-script approval gating.
+
+Next safest action is review the local commit, push a focused draft PR, wait for CI/review, merge, then rerun the controlled staging deploy through the approved GitHub Deploy VPS workflow. Keep Issue #11 open. Do not proceed to production.
 
 Can continue autonomously: NO - further diagnosis/fix/deploy boundaries require explicit approval.

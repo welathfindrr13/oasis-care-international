@@ -130,6 +130,62 @@ test('production-like env rejects Cognito as the Deployment V2 auth provider', (
   assert(result.errors.some((error) => error.includes('AUTH_IDENTITY_PROVIDER=clerk')));
 });
 
+test('production-like env rejects non-Clerk public auth provider', () => {
+  const result = validate(validEnv({
+    NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: 'cognito',
+  }));
+
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk')));
+});
+
+test('production-like env requires public auth provider to be present', () => {
+  const result = validate(validEnv({
+    NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: '',
+  }));
+
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER is required')));
+});
+
+test('successful preflight prints sanitized Clerk auth-mode proof', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'oasis-preflight-'));
+  const envFile = path.join(tempDir, 'deploy.env');
+  const fileEnv = Object.entries(validEnv())
+    .map(([name, value]) => `${name}=${value}`)
+    .join('\n');
+  writeFileSync(envFile, `${fileEnv}\n`);
+
+  const result = spawnSync(process.execPath, [scriptPath, envFile], {
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /AUTH_IDENTITY_PROVIDER is clerk: YES/);
+  assert.match(result.stdout, /NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER is clerk: YES/);
+  assert.match(result.stdout, /Auth provider envs match: YES/);
+});
+
+test('failed preflight does not print secret values', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'oasis-preflight-'));
+  const envFile = path.join(tempDir, 'deploy.env');
+  const leakedSecret = 'do-not-print-this-secret-value-1234567890';
+  const fileEnv = Object.entries(validEnv({
+    JWT_SECRET: leakedSecret,
+    NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: 'cognito',
+  }))
+    .map(([name, value]) => `${name}=${value}`)
+    .join('\n');
+  writeFileSync(envFile, `${fileEnv}\n`);
+
+  const result = spawnSync(process.execPath, [scriptPath, envFile], {
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.doesNotMatch(result.stdout, new RegExp(leakedSecret));
+  assert.doesNotMatch(result.stderr, new RegExp(leakedSecret));
+  assert.match(result.stderr, /NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk/);
+});
+
 test('Clerk production env requires issuer, JWKS, public key, sign-in URL, and audience or azp', () => {
   const result = validate(validEnv({
     CLERK_ISSUER: '',

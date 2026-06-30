@@ -293,6 +293,92 @@ No deploy was performed. Issue #11 remains open and unproven until review, merge
 
 ---
 
+# PR #38 Deploy Gate Auth Env Diagnosis
+
+Timestamp: 2026-06-30 15:17 BST
+
+The first controlled deploy attempt for PR #38 stopped before deploy because a sanitized auth env preflight printed `NO` for both expected auth provider checks. Read-only diagnosis found that the check was run through the `oasis-staging` deploy SSH alias, whose user cannot read `/opt/oasis-care/deploy/v2/.env` and cannot inspect Docker directly.
+
+Sanitized evidence:
+
+- SSH user: `deploy`
+- VPS `.env` path exists: YES
+- VPS `.env` readable by SSH user: NO
+- Docker socket readable by SSH user: NO
+- Passwordless sudo generally available: NO
+- Approved read-only wrapper available: YES
+- Current deployed commit from approved read-only wrapper: `c8dab77`
+- Expected deploy-local untracked files present: YES
+- GitHub Deploy VPS workflow runs `node deploy/v2/scripts/preflight-env.mjs deploy/v2/.env` before compose up: YES
+- GitHub Deploy VPS workflow uses `docker compose --env-file deploy/v2/.env`: YES
+- GitHub Deploy VPS workflow prints env file: NO
+- Latest successful Deploy VPS workflow before this diagnosis deployed `c8dab77`: YES
+- Compose file passes `AUTH_IDENTITY_PROVIDER` to web/API runtime and `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER` to web build/runtime: YES
+
+Classification: the failed preflight checked the wrong access context/source. It did not prove the live staging runtime is non-Clerk. No env values, secrets, Clerk keys, cookies, tokens, JWTs, auth headers, or session values were printed.
+
+Required correction before rerunning deploy: use the approved GitHub Deploy VPS workflow or another approved root-equivalent deploy lane for Deployment V2, and add/use a sanctioned sanitized preflight that checks the root-owned env file from the same context as deploy. Do not use the plain `oasis-staging` deploy alias to source `.env`.
+
+---
+
+# PR #38 Workflow Deploy Rerun Gate
+
+Timestamp: 2026-06-30 15:27 BST
+
+Target deploy commit: `059bde8`.
+Previous deployed commit: `c8dab77`.
+
+Local/source preflight:
+
+- `origin/main` is `059bde8`: YES
+- PR #38 is merged: YES
+- Dirty source/config files: NO
+- Dirty local files are QA/review artifacts only: YES
+- GitHub Deploy VPS workflow runs `node deploy/v2/scripts/preflight-env.mjs deploy/v2/.env`: YES
+- GitHub Deploy VPS workflow uses `docker compose --env-file deploy/v2/.env`: YES
+- Compose passes `AUTH_IDENTITY_PROVIDER` into web/API runtime: YES
+- Compose passes `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER` into web build args/runtime: YES
+- `preflight-env.mjs` enforces `AUTH_IDENTITY_PROVIDER=clerk` for production-like env: YES
+- `preflight-env.mjs` requires `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER` to be present: YES
+- `preflight-env.mjs` enforces `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk`: NO
+- Existing workflow logs produce sanitized equality booleans for both auth provider envs: NO
+
+Decision: deploy was not triggered. The approved plan requires sanctioned deploy-context proof that both auth provider envs equal `clerk`, or workflow/source enforcement equivalent to that proof. Source currently proves equality for `AUTH_IDENTITY_PROVIDER` only; it proves presence, not equality, for `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER`.
+
+No deploy, SSH write, env edit, migration, service restart, production-data action, commit, push, merge, or secret print occurred. Issue #11 admin browser proof was not rerun because the deploy gate did not pass.
+
+Required next step: add or approve a sanctioned sanitized deploy-context check, preferably by hardening `preflight-env.mjs` to require `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk` in production-like Deployment V2, then rerun the controlled staging deploy.
+
+---
+
+# Local Deploy Preflight Hardening
+
+Timestamp: 2026-06-30 15:41 BST
+
+Focused local fix only. No deploy was performed.
+
+Change:
+
+- Deployment V2 preflight now requires `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk` in production-like envs alongside the existing `AUTH_IDENTITY_PROVIDER=clerk` gate.
+- Successful preflight emits sanitized proof only:
+  - `AUTH_IDENTITY_PROVIDER is clerk: YES`
+  - `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER is clerk: YES`
+  - `Auth provider envs match: YES`
+- Failure messages remain sanitized validation messages and do not print secret values.
+
+Verification:
+
+- RED first: targeted preflight tests failed before the source change for non-Clerk public auth mode and missing sanitized success proof.
+- PASS: `node --test deploy/v2/scripts/preflight-env.test.mjs`
+- PASS: Deployment V2 static gates equivalent to CI, including workflow tests, Compose tests, Caddy validation, smoke shell syntax checks, and synthetic preflight proof.
+- PASS: `git diff --check`
+- BLOCKED: `pnpm deploy:v2:verify` and `corepack pnpm deploy:v2:verify` were blocked locally by dependency build-script approval gating before the verification script could complete.
+- PASS: `gh workflow list || true` showed `CI` and `Deploy VPS` active.
+
+Issue #11 remains unproven until this preflight hardening is committed, reviewed, merged, staging is deployed from updated `main`, and authenticated browser proof is rerun.
+
+---
+
 # Post-PR37 Deploy Auth Proof Attempt
 
 Timestamp: 2026-06-29 19:34 BST.
