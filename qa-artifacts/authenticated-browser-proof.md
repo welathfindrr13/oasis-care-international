@@ -275,6 +275,24 @@ Production verdict remains DO NOT SHIP.
 
 ---
 
+# PR #38 Non-Clerk Safety Amendment
+
+Timestamp: 2026-06-30 12:45 BST
+
+External hostile review requested changes on PR #38 after identifying a non-Clerk crash risk in the local readiness-race fix. The app only mounts `ClerkProvider` in Clerk auth mode, so calling Clerk React `useAuth()` from exported queue clients could crash local/Cognito/non-Clerk modes.
+
+Amended local behavior:
+
+- Clerk mode still waits for Clerk readiness and signed-in state before protected queue bootstrap.
+- Clerk mode still passes a stable `getBearerToken` callback backed by Clerk `getToken()` into protected `clientQuery(...)` calls.
+- Non-Clerk mode does not call `useAuth()`.
+- Non-Clerk mode preserves the prior cookie/session `clientQuery(...)` path.
+- `/family-updates/concerns` remains covered transitively through the CareBridge concerns alias.
+
+No deploy was performed. Issue #11 remains open and unproven until review, merge, controlled staging deploy, and authenticated browser proof rerun.
+
+---
+
 # Post-PR37 Deploy Auth Proof Attempt
 
 Timestamp: 2026-06-29 19:34 BST.

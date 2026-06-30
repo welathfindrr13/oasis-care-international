@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useAuth } from '@clerk/nextjs'
 import { Header } from '../../../components/oasis/Header'
 import { Button } from '../../../components/ui/Button'
+import { resolveAuthMode } from '../../../lib/auth/mode'
 import { clientQuery } from '../../../lib/graphql/client-side'
 import {
   CAREBRIDGE_ROOMS_QUERY,
@@ -17,8 +18,49 @@ import {
 } from '../../../lib/graphql/queries'
 import { ApprovalQueueItem } from '../../../components/carebridge/ApprovalQueueItem'
 
+type GetBearerToken = () => Promise<string | null | undefined>
+
+interface CareBridgeApprovalsQueueClientProps {
+  authReady: boolean
+  isSignedIn: boolean
+  getBearerToken?: GetBearerToken
+}
+
+function isClerkAuthMode() {
+  return resolveAuthMode({
+    NODE_ENV: process.env.NODE_ENV,
+    NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: process.env.NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER,
+    NEXT_PUBLIC_LOCAL_AUTH_ENABLED: process.env.NEXT_PUBLIC_LOCAL_AUTH_ENABLED,
+  } as NodeJS.ProcessEnv) === 'clerk'
+}
+
 export function CareBridgeApprovalsClient() {
+  if (isClerkAuthMode()) {
+    return <CareBridgeApprovalsClerkClient />
+  }
+
+  return <CareBridgeApprovalsQueueClient authReady isSignedIn />
+}
+
+function CareBridgeApprovalsClerkClient() {
   const { isLoaded, isSignedIn, getToken } = useAuth()
+
+  const getBearerToken = useCallback(() => getToken(), [getToken])
+
+  return (
+    <CareBridgeApprovalsQueueClient
+      authReady={isLoaded}
+      isSignedIn={Boolean(isSignedIn)}
+      getBearerToken={getBearerToken}
+    />
+  )
+}
+
+function CareBridgeApprovalsQueueClient({
+  authReady,
+  isSignedIn,
+  getBearerToken,
+}: CareBridgeApprovalsQueueClientProps) {
   const [stories, setStories] = useState<VerifiedVisitStory[]>([])
   const [roomOptions, setRoomOptions] = useState<Array<{ id: string; label: string }>>([])
   const [selectedRoomId, setSelectedRoomId] = useState<string>('')
@@ -27,15 +69,14 @@ export function CareBridgeApprovalsClient() {
   const [error, setError] = useState<string | null>(null)
 
   const loadApprovalQueue = useCallback(async (careRoomId?: string) => {
+    const queryOptions = getBearerToken ? { getBearerToken } : undefined
     const [queueData, roomsData] = await Promise.all([
       clientQuery<VerifiedVisitStoryApprovalQueueQueryResponse>(
         VERIFIED_VISIT_STORY_APPROVAL_QUEUE_QUERY,
         careRoomId ? { careRoomId } : {},
-        { getBearerToken: () => getToken() },
+        queryOptions,
       ),
-      clientQuery<CareRoomsQueryResponse>(CAREBRIDGE_ROOMS_QUERY, undefined, {
-        getBearerToken: () => getToken(),
-      }),
+      clientQuery<CareRoomsQueryResponse>(CAREBRIDGE_ROOMS_QUERY, undefined, queryOptions),
     ])
 
     setStories(queueData.verifiedVisitStoryApprovalQueue)
@@ -45,10 +86,10 @@ export function CareBridgeApprovalsClient() {
         label: room.client.fullName,
       })),
     )
-  }, [getToken])
+  }, [getBearerToken])
 
   useEffect(() => {
-    if (!isLoaded) {
+    if (!authReady) {
       return
     }
 
@@ -71,15 +112,17 @@ export function CareBridgeApprovalsClient() {
     }
 
     bootstrap()
-  }, [isLoaded, isSignedIn, loadApprovalQueue, selectedRoomId])
+  }, [authReady, isSignedIn, loadApprovalQueue, selectedRoomId])
 
   async function approveStory(storyId: string) {
     try {
       setBusyStoryId(storyId)
       setError(null)
-      await clientQuery(PUBLISH_VERIFIED_VISIT_STORY_MUTATION, { storyId }, {
-        getBearerToken: () => getToken(),
-      })
+      await clientQuery(
+        PUBLISH_VERIFIED_VISIT_STORY_MUTATION,
+        { storyId },
+        getBearerToken ? { getBearerToken } : undefined,
+      )
       setStories((current) => current.filter((story) => story.id !== storyId))
     } catch (err: any) {
       setError(err?.message || 'Unable to approve this verified visit story.')
@@ -97,9 +140,7 @@ export function CareBridgeApprovalsClient() {
           storyId,
           rejectionReason,
         },
-      }, {
-        getBearerToken: () => getToken(),
-      })
+      }, getBearerToken ? { getBearerToken } : undefined)
       setStories((current) => current.filter((story) => story.id !== storyId))
     } catch (err: any) {
       setError(err?.message || 'Unable to return this verified visit story for changes.')

@@ -119,11 +119,12 @@ PR #37 staging deploy:
 Local Clerk readiness race fix:
 
 - RED first: `node --test apps/web/app/carebridge/carebridge-client-auth.test.js` failed because queue clients did not import `useAuth()`, gate on Clerk readiness, or pass `getBearerToken`.
+- PR #38 review-change RED: focused tests failed against `ced0afb` because exported queue clients called `useAuth()` unconditionally and had no non-Clerk wrapper path.
 - `git diff --check`: PASS
 - `./node_modules/.bin/tsx --test apps/web/lib/graphql/client-side.test.ts`: PASS (4 tests)
 - `./node_modules/.bin/tsx --test apps/web/lib/auth/clerk.test.ts`: PASS (14 tests)
 - `./node_modules/.bin/tsx --test apps/web/lib/graphql/proxy-auth.test.ts`: PASS (6 tests)
-- `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`: PASS (8 tests)
+- `node --test apps/web/app/carebridge/carebridge-client-auth.test.js`: PASS (10 tests)
 - `./node_modules/.bin/next lint` from `apps/web`: PASS
 - `./node_modules/.bin/next build` from `apps/web`: PASS
 - `corepack pnpm --filter @oasis/web build`: PASS
@@ -131,7 +132,7 @@ Local Clerk readiness race fix:
 ## Open Blockers
 
 - Working synthetic family Clerk credentials/session are needed.
-- Local Clerk readiness race fix is not committed, pushed, reviewed, merged, or deployed.
+- PR #38 review-change amendment is not committed, pushed, reviewed, merged, or deployed.
 - Admin CareBridge approval/concern surfaces still show visible `Unauthorized` on deployed `c8dab77` until the local fix is deployed and proven.
 - ApiRolesGuard order fix is not currently supported by source/test evidence.
 - Exact post-PR37 signed-in GraphQL response body capture is blocked by current built-in browser tooling; only route DOM/console symptoms were captured after PR #37.
@@ -143,6 +144,6 @@ Local Clerk readiness race fix:
 
 ## Next Recommended Action
 
-Next safest action is final diff review and local commit for the Clerk readiness race fix, then PR/CI/review/merge/deploy under separate approval. Keep Issue #11 open. Do not proceed to production.
+Next safest action is commit and push the PR #38 non-Clerk safety amendment after verification, then rerun PR #38 CI/re-review. Keep Issue #11 open. Do not proceed to production.
 
 Can continue autonomously: NO - further diagnosis/fix/deploy boundaries require explicit approval.

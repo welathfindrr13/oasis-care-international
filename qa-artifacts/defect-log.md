@@ -390,11 +390,19 @@ Manual DevTools evidence later showed the real failing queue requests had no Aut
 
 Local follow-up fix, not deployed:
 
-- `CareBridgeApprovalsClient` and `CareBridgeConcernsClient` now use `useAuth()`.
-- Protected queue bootstrap waits for `isLoaded`.
+- `CareBridgeApprovalsClient` and `CareBridgeConcernsClient` now branch on auth mode before using Clerk React auth.
+- Clerk-mode child components use `useAuth()` only when `ClerkProvider` is mounted.
+- Protected queue bootstrap waits for Clerk `isLoaded` via a shared `authReady` prop.
 - Loaded but signed-out state does not silently fire unauthenticated protected queries.
-- Signed-in requests pass `getBearerToken: () => getToken()` into `clientQuery(...)`.
+- Signed-in Clerk requests pass a stable `getBearerToken` callback backed by `getToken()` into `clientQuery(...)`.
+- Non-Clerk/local/Cognito mode never calls `useAuth()` and preserves the prior cookie/session `clientQuery(...)` path.
 - Mutations on those queue pages also pass the same token callback.
 - `/family-updates/concerns` remains transitively covered by the existing alias.
 
-Verification passed locally, including the CareBridge readiness guard test, client-side GraphQL tests, Clerk/proxy auth tests, web lint, and web builds. Do not claim Issue #11 is fixed until this local fix is committed, reviewed, merged, deployed, and browser proof is clean.
+External review blocker addressed locally:
+
+- Hostile review requested changes because the first PR #38 readiness fix called `useAuth()` unconditionally from exported queue clients.
+- Regression coverage now verifies the exported approval/concern clients do not call `useAuth()` in the non-Clerk wrapper path.
+- Regression coverage now verifies Clerk-only children call `useAuth()`, pass `authReady={isLoaded}`, and provide the stable bearer callback to the shared queue client.
+
+Verification passed locally, including the CareBridge readiness/non-Clerk guard test, client-side GraphQL tests, Clerk/proxy auth tests, web lint, and web builds. Do not claim Issue #11 is fixed until this local fix is committed, reviewed, merged, deployed, and browser proof is clean.
