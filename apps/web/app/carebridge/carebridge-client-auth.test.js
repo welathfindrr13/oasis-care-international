@@ -21,6 +21,16 @@ test('CareBridge approvals page uses the shared authenticated GraphQL proxy', ()
   assert.match(source, /\bclientQuery\(/);
 });
 
+test('CareBridge approvals waits for Clerk readiness before protected queue queries', () => {
+  const source = readAppFile('carebridge', 'approvals', 'CareBridgeApprovalsClient.tsx');
+
+  assert.match(source, /import \{ useAuth \} from ['"]@clerk\/nextjs['"]/);
+  assert.match(source, /const \{ isLoaded, isSignedIn, getToken \} = useAuth\(\)/);
+  assert.match(source, /if \(!isLoaded\) \{\s*return\s*\}/s);
+  assert.match(source, /if \(!isSignedIn\) \{/);
+  assert.match(source, /getBearerToken:\s*\(\)\s*=>\s*getToken\(\)/);
+});
+
 test('CareBridge concerns page uses the shared authenticated GraphQL proxy', () => {
   const pageSource = readAppFile('carebridge', 'concerns', 'page.tsx');
   const source = readAppFile('carebridge', 'concerns', 'CareBridgeConcernsClient.tsx');
@@ -30,6 +40,16 @@ test('CareBridge concerns page uses the shared authenticated GraphQL proxy', () 
   assert.match(source, /from ['"]\.\.\/\.\.\/\.\.\/lib\/graphql\/client-side['"]/);
   assert.match(source, /\bclientQuery</);
   assert.match(source, /\bclientQuery\(/);
+});
+
+test('CareBridge concerns waits for Clerk readiness before protected inbox queries', () => {
+  const source = readAppFile('carebridge', 'concerns', 'CareBridgeConcernsClient.tsx');
+
+  assert.match(source, /import \{ useAuth \} from ['"]@clerk\/nextjs['"]/);
+  assert.match(source, /const \{ isLoaded, isSignedIn, getToken \} = useAuth\(\)/);
+  assert.match(source, /if \(!isLoaded\) \{\s*return\s*\}/s);
+  assert.match(source, /if \(!isSignedIn\) \{/);
+  assert.match(source, /getBearerToken:\s*\(\)\s*=>\s*getToken\(\)/);
 });
 
 test('Shared client GraphQL helper sends cookies through the app proxy', () => {

@@ -333,9 +333,9 @@ Required next step:
 ## ISSUE11-AUTH-007: Browser GraphQL client does not attach explicit Clerk bearer
 
 - Severity: High
-- Status: Local fix amended on PR #37 / not deployed
+- Status: PR #37 deployed to staging / admin proof rerun still fails with visible Unauthorized on queue routes
 - Area: Web browser GraphQL client / Clerk bearer propagation
-- Environment: PR #37 branch `graphql-proxy-clerk-db-jwt-fix`; staging still at deployed `97678af`
+- Environment: staging `c8dab77`
 
 ### Observation
 
@@ -382,4 +382,19 @@ The backend accepts the explicit Clerk bearer for `VerifiedVisitStoryApprovalQue
 
 ### Next Step
 
-PR #37 needs CI and external re-review after the amended commit. After merge and controlled staging deploy, rerun admin CareBridge queue browser proof. Do not claim Issue #11 is fixed until browser proof is clean.
+Post-PR37 staging deploy passed and VPS HEAD is `c8dab77`. Public smoke passed. Signed-in fake/synthetic admin proof rerun showed `/today` and `/carebridge` render with `ADMIN` and no visible `Unauthorized`, but `/carebridge/approvals`, `/carebridge/concerns`, and `/family-updates/concerns` still render visible `Unauthorized`. No fresh `GraphQL errors: Array(1)` console entries were captured in this proof pass.
+
+Automated sanitized response capture was attempted from the built-in browser, but the tooling cannot expose DevTools Network response bodies, and the read-only page evaluation scope does not expose `fetch`, `XMLHttpRequest`, or the page's Clerk globals. No `/api/graphql` response body was captured. Code inspection shows `clientQuery(...)` can render `Unauthorized` without logging `GraphQL errors:` when `/api/graphql` returns HTTP 401, so HTTP 401 is a plausible but unproven next hypothesis.
+
+Manual DevTools evidence later showed the real failing queue requests had no Authorization header and returned GraphQL `UNAUTHENTICATED`, matching a Clerk readiness race: the queue client requests fire on mount before Clerk session readiness is guaranteed, so no explicit bearer is attached.
+
+Local follow-up fix, not deployed:
+
+- `CareBridgeApprovalsClient` and `CareBridgeConcernsClient` now use `useAuth()`.
+- Protected queue bootstrap waits for `isLoaded`.
+- Loaded but signed-out state does not silently fire unauthenticated protected queries.
+- Signed-in requests pass `getBearerToken: () => getToken()` into `clientQuery(...)`.
+- Mutations on those queue pages also pass the same token callback.
+- `/family-updates/concerns` remains transitively covered by the existing alias.
+
+Verification passed locally, including the CareBridge readiness guard test, client-side GraphQL tests, Clerk/proxy auth tests, web lint, and web builds. Do not claim Issue #11 is fixed until this local fix is committed, reviewed, merged, deployed, and browser proof is clean.

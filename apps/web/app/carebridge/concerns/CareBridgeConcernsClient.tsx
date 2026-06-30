@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useAuth } from '@clerk/nextjs'
 import { Header } from '../../../components/oasis/Header'
 import { Button } from '../../../components/ui/Button'
 import { clientQuery } from '../../../lib/graphql/client-side'
@@ -14,6 +15,7 @@ import {
 import { ConcernInboxList } from '../../../components/carebridge/ConcernInboxList'
 
 export function CareBridgeConcernsClient() {
+  const { isLoaded, isSignedIn, getToken } = useAuth()
   const [concerns, setConcerns] = useState<CarebridgeConcern[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -24,11 +26,22 @@ export function CareBridgeConcernsClient() {
     const data = await clientQuery<CarebridgeConcernInboxQueryResponse>(
       CAREBRIDGE_CONCERN_INBOX_QUERY,
       status ? { status } : {},
+      { getBearerToken: () => getToken() },
     )
     setConcerns(data.carebridgeConcernInbox)
-  }, [])
+  }, [getToken])
 
   useEffect(() => {
+    if (!isLoaded) {
+      return
+    }
+
+    if (!isSignedIn) {
+      setLoading(false)
+      setError('Unauthorized')
+      return
+    }
+
     async function bootstrap() {
       try {
         setLoading(true)
@@ -42,7 +55,7 @@ export function CareBridgeConcernsClient() {
     }
 
     bootstrap()
-  }, [loadConcerns, statusFilter])
+  }, [isLoaded, isSignedIn, loadConcerns, statusFilter])
 
   async function acknowledgeConcern(concernId: string) {
     try {
@@ -53,6 +66,8 @@ export function CareBridgeConcernsClient() {
           concernId,
           status: 'ACKNOWLEDGED',
         },
+      }, {
+        getBearerToken: () => getToken(),
       })
       await loadConcerns(statusFilter || undefined)
     } catch (err: any) {
@@ -73,6 +88,8 @@ export function CareBridgeConcernsClient() {
           outcome: 'RESOLVED',
           message: resolutionNote,
         },
+      }, {
+        getBearerToken: () => getToken(),
       })
       await loadConcerns(statusFilter || undefined)
     } catch (err: any) {

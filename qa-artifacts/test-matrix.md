@@ -118,5 +118,18 @@ Last updated: 2026-06-29 16:54 BST
 | Browser Clerk bearer local diff check | `git diff --check` | PASS | Whitespace check clean |
 | Browser Clerk bearer local web lint | `./node_modules/.bin/next lint` from `apps/web` | PASS | No ESLint warnings or errors |
 | Browser Clerk bearer local web build | `./node_modules/.bin/next build` from `apps/web`; `corepack pnpm --filter @oasis/web build` | PASS | Next web build completed and `/api/graphql` route built |
+| PR #37 merge CI | GitHub Actions `test`, `Deployment V2 verification` | PASS | PR #37 latest commit `e853b13` passed before squash merge |
+| PR #37 staging deploy | GitHub Actions `Deploy VPS` workflow run `28394084090` | PASS | Workflow deployed `c8dab77` to staging; no migrations run |
+| PR #37 VPS read-only post-deploy state | `ssh oasis-staging "sudo -n /usr/local/bin/oasis-readonly"` | PASS | VPS HEAD `c8dab77`; web/api/caddy/postgres healthy; only expected untracked deploy-local files present |
+| PR #37 public smoke | `/health`, `/ready`, `/sw.js`, signed-out `/today` | PASS | Public endpoints returned 200; signed-out `/today` returned 307 login redirect |
+| PR #37 admin shell proof rerun | In-app browser `/today`, `/carebridge` after manual fake-admin sign-in | PASS | Both routes rendered with `ADMIN`, no login redirect, no visible `Unauthorized`, and no fresh sanitized GraphQL console errors |
+| PR #37 admin CareBridge queue proof rerun | In-app browser `/carebridge/approvals`, `/carebridge/concerns`, `/family-updates/concerns` after manual fake-admin sign-in | FAIL | Routes rendered with `ADMIN` and no login redirect, but all three showed visible `Unauthorized`; no fresh sanitized GraphQL console errors captured |
+| PR #37 sanitized GraphQL response capture | Built-in browser response capture attempt for `/api/graphql` on failing queue routes | BLOCKED | Browser plugin does not expose DevTools Network response bodies; read-only page evaluation exposes neither `fetch` nor `XMLHttpRequest`; manual DevTools Network capture still required |
+| Clerk readiness race CareBridge guard RED | `node --test apps/web/app/carebridge/carebridge-client-auth.test.js` before source fix | EXPECTED FAIL | Queue clients lacked `useAuth()`, `isLoaded`/`isSignedIn` gating, and explicit `getBearerToken` handoff |
+| Clerk readiness race CareBridge guard GREEN | `node --test apps/web/app/carebridge/carebridge-client-auth.test.js` | PASS | 8 tests verify approvals/concerns use readiness-gated Clerk token path and family aliases remain transitive |
+| Clerk readiness race client GraphQL regression | `./node_modules/.bin/tsx --test apps/web/lib/graphql/client-side.test.ts` | PASS | 4 tests still prove Clerk bearer attachment, caller Authorization priority, no-token fallback, and no token logging |
+| Clerk readiness race Clerk extractor regression | `./node_modules/.bin/tsx --test apps/web/lib/auth/clerk.test.ts` | PASS | 14 tests passed |
+| Clerk readiness race proxy resolver regression | `./node_modules/.bin/tsx --test apps/web/lib/graphql/proxy-auth.test.ts` | PASS | 6 tests passed |
+| Clerk readiness race local diff/lint/build | `git diff --check`; `./node_modules/.bin/next lint`; `./node_modules/.bin/next build`; `corepack pnpm --filter @oasis/web build` | PASS | Local fix builds; not committed or deployed |
 
 No migrations, production-data actions, live payment/email/SMS/fulfilment/order API calls, or production deploys were run.

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useAuth } from '@clerk/nextjs'
 import { Header } from '../../../components/oasis/Header'
 import { Button } from '../../../components/ui/Button'
 import { clientQuery } from '../../../lib/graphql/client-side'
@@ -17,6 +18,7 @@ import {
 import { ApprovalQueueItem } from '../../../components/carebridge/ApprovalQueueItem'
 
 export function CareBridgeApprovalsClient() {
+  const { isLoaded, isSignedIn, getToken } = useAuth()
   const [stories, setStories] = useState<VerifiedVisitStory[]>([])
   const [roomOptions, setRoomOptions] = useState<Array<{ id: string; label: string }>>([])
   const [selectedRoomId, setSelectedRoomId] = useState<string>('')
@@ -29,8 +31,11 @@ export function CareBridgeApprovalsClient() {
       clientQuery<VerifiedVisitStoryApprovalQueueQueryResponse>(
         VERIFIED_VISIT_STORY_APPROVAL_QUEUE_QUERY,
         careRoomId ? { careRoomId } : {},
+        { getBearerToken: () => getToken() },
       ),
-      clientQuery<CareRoomsQueryResponse>(CAREBRIDGE_ROOMS_QUERY),
+      clientQuery<CareRoomsQueryResponse>(CAREBRIDGE_ROOMS_QUERY, undefined, {
+        getBearerToken: () => getToken(),
+      }),
     ])
 
     setStories(queueData.verifiedVisitStoryApprovalQueue)
@@ -40,9 +45,19 @@ export function CareBridgeApprovalsClient() {
         label: room.client.fullName,
       })),
     )
-  }, [])
+  }, [getToken])
 
   useEffect(() => {
+    if (!isLoaded) {
+      return
+    }
+
+    if (!isSignedIn) {
+      setLoading(false)
+      setError('Unauthorized')
+      return
+    }
+
     async function bootstrap() {
       try {
         setLoading(true)
@@ -56,13 +71,15 @@ export function CareBridgeApprovalsClient() {
     }
 
     bootstrap()
-  }, [loadApprovalQueue, selectedRoomId])
+  }, [isLoaded, isSignedIn, loadApprovalQueue, selectedRoomId])
 
   async function approveStory(storyId: string) {
     try {
       setBusyStoryId(storyId)
       setError(null)
-      await clientQuery(PUBLISH_VERIFIED_VISIT_STORY_MUTATION, { storyId })
+      await clientQuery(PUBLISH_VERIFIED_VISIT_STORY_MUTATION, { storyId }, {
+        getBearerToken: () => getToken(),
+      })
       setStories((current) => current.filter((story) => story.id !== storyId))
     } catch (err: any) {
       setError(err?.message || 'Unable to approve this verified visit story.')
@@ -80,6 +97,8 @@ export function CareBridgeApprovalsClient() {
           storyId,
           rejectionReason,
         },
+      }, {
+        getBearerToken: () => getToken(),
       })
       setStories((current) => current.filter((story) => story.id !== storyId))
     } catch (err: any) {
