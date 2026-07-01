@@ -16,7 +16,13 @@ export type RouteDecision =
   | { action: 'allow' }
   | { action: 'redirect'; destination: '/today' | '/family' }
 
-const ADMIN_ONLY_PATHS = [/^\/admin(?:\/|$)/, /^\/clients\/new$/, /^\/visits\/new$/, /^\/clients\/[^/]+\/edit$/]
+const ADMIN_ONLY_PATHS = [
+  /^\/admin(?:\/|$)/,
+  /^\/activity(?:\/|$)/,
+  /^\/clients\/new$/,
+  /^\/visits\/new$/,
+  /^\/clients\/[^/]+\/edit$/,
+]
 const FAMILY_PATH = /^\/family(?:\/|$)/
 
 export function getAccessContext(rawRoles: unknown): AccessContext {
