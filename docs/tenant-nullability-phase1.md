@@ -7,7 +7,7 @@ It does not change schema nullability, create a migration, backfill data, or mut
 
 | Model | Table | Nullable `organization_id` | Organization relation | Constraints/indexes | Creation path | Risk category |
 | --- | --- | --- | --- | --- | --- | --- |
-| Carer | `carer` | YES | YES | global `email` unique, `organization_id` index | `CarerRepository.upsertById`, demo/seed | cross-tenant identity, payroll/visit integrity |
+| Carer | `carer` | YES | YES | global `email` unique, `organization_id` index | `CarerRepository.upsertById`, `AiSummaryService.resolveApproverId`, demo/seed | cross-tenant identity, payroll/visit integrity |
 | Client | `client` | YES | YES | no tenant unique, no tenant index in schema | `ClientRepository.create`, demo/seed | cross-tenant visibility, orphaned care record |
 | Visit | `visit` | YES | YES | `organization_id`, carer/client/time indexes | `VisitRepository.create`, demo/seed | visit integrity, cross-tenant visibility |
 | CarerShift | `carer_shift` | YES | YES | `organization_id`, carer/time indexes | `ShiftRepository.createShift` | payroll/visit integrity |
@@ -24,6 +24,7 @@ It does not change schema nullability, create a migration, backfill data, or mut
 
 - Primary API service paths already derive tenant context from authenticated organization membership before calling repositories.
 - Phase 1 adds repository/service boundary guards so missing, empty, or whitespace tenant IDs fail before sensitive Prisma `create` calls.
+- `AiSummaryService.resolveApproverId` performs a direct Carer create when an approver profile is missing; Phase 1 guards that path before Prisma create.
 - Synthetic demo and Prisma seed paths now write `organization_id` on Carer and Visit rows directly instead of creating null rows and patching them later.
 - The audit interceptor remains a documented exception: it can retry audit writes with nullable `organization_id` only after an audit-log organization foreign-key failure, preserving the audit event while the separate org-mapping hardening stays tracked elsewhere.
 
