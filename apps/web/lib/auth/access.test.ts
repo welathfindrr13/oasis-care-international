@@ -85,3 +85,29 @@ test('keeps admin-only pages restricted for non-admin staff', () => {
     destination: '/today',
   })
 })
+
+test('allows admins to open activity reporting', () => {
+  const decision = resolveAuthenticatedRoute('/activity', ['admin'])
+
+  assert.deepEqual(decision, {
+    action: 'allow',
+  })
+})
+
+test('redirects staff away from activity reporting', () => {
+  const decision = resolveAuthenticatedRoute('/activity', ['carer'])
+
+  assert.deepEqual(decision, {
+    action: 'redirect',
+    destination: '/today',
+  })
+})
+
+test('redirects family users away from activity reporting', () => {
+  const decision = resolveAuthenticatedRoute('/activity', ['client'])
+
+  assert.deepEqual(decision, {
+    action: 'redirect',
+    destination: '/family',
+  })
+})
