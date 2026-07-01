@@ -436,6 +436,7 @@ const statusConfig = {
 export default async function DashboardPage() {
   const { roles } = await getServerAuthContext()
   const isAdmin = roles.some((role: unknown) => String(role).toLowerCase() === 'admin')
+  const activityHref = isAdmin ? '/activity' : '/today'
 
   const [stats, activeClientTotal, shiftData, todayVisitsData, familyUpdateReviewCount, openConcernCount, careSpineSignalData, medicationExceptionCount] = await Promise.all([
     getTodayStats(),
@@ -730,7 +731,7 @@ export default async function DashboardPage() {
                     Latest updates from your care team
                   </p>
                 </div>
-                <Link href="/activity" className="text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors">
+                <Link href={activityHref} className="text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors">
                   View All →
                 </Link>
               </div>
@@ -824,11 +825,11 @@ export default async function DashboardPage() {
                   </Button>
                 )}
                 <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
-                  <Link href="/activity">
+                  <Link href={activityHref}>
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    View Reports
+                    {isAdmin ? 'View Reports' : 'Today Overview'}
                   </Link>
                 </Button>
               </div>
