@@ -1,9 +1,19 @@
 # Test Matrix
 
-Last updated: 2026-06-29 16:54 BST
+Last updated: 2026-07-01 19:50 BST
 
 | Area | Command | Status | Evidence |
 | --- | --- | --- | --- |
+| Issue #15 tenant guard RED | `corepack pnpm --filter @oasis/api test -- src/common/tenant/tenant-ownership.spec.ts --runInBand` before implementation | EXPECTED FAIL | Missing `tenant-ownership` module proved the new guard test was active |
+| Issue #15 dry-run RED | `node --test scripts/release/tenant-nullability-dry-run.test.mjs` before implementation | EXPECTED FAIL | Missing dry-run script proved the report test was active |
+| Issue #15 tenant creation guards | `corepack pnpm --filter @oasis/api test -- src/common/tenant/tenant-ownership.spec.ts src/carer/carer.repository.spec.ts src/client/client.repository.spec.ts src/visit/visit.repository.spec.ts src/shift/shift.repository.spec.ts src/care-log/care-log.repository.spec.ts src/care-planning/care-planning.repository.spec.ts src/medication/medication.repository.spec.ts src/gdpr/services/gdpr-tenant-isolation.spec.ts --runInBand` | PASS | 9 suites / 34 tests passed |
+| Issue #15 dry-run report | `node --test scripts/release/tenant-nullability-dry-run.test.mjs` | PASS | 2 tests passed; output limited to model/table/count and no row data |
+| Issue #15 diff check | `git diff --check` | PASS | Whitespace check clean |
+| Issue #15 Prisma validate | `DATABASE_URL=<synthetic> corepack pnpm --dir libs/db exec prisma validate` | PASS | Schema valid; no real database URL used |
+| Issue #15 web lint | `./node_modules/.bin/next lint` from `apps/web` | PASS | No ESLint warnings or errors |
+| Issue #15 web build | `./node_modules/.bin/next build` from `apps/web` | PASS | Build completed; browserslist warning only |
+| Issue #15 filtered web build | `corepack pnpm --filter @oasis/web build` | PASS AFTER SEQUENTIAL RERUN | One parallel run hit known `.next` cache/export race; sequential rerun passed |
+| Issue #15 API build | `corepack pnpm --filter @oasis/api build` | PASS | API compiled |
 | Deploy env tests | `node --test deploy/v2/scripts/preflight-env.test.mjs` | PASS | `qa-artifacts/logs/reconcile/20260622-targeted-preflight-env.log` |
 | Compose tests | `node --test deploy/v2/docker-compose.test.mjs` | PASS | `qa-artifacts/logs/reconcile/20260622-targeted-docker-compose-test.log` |
 | Release script tests | `node --test scripts/release/production-readiness-scripts.test.mjs` | PASS | `qa-artifacts/logs/reconcile/20260622-targeted-release-script-tests.log` |

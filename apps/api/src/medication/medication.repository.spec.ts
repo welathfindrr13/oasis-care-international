@@ -6,6 +6,9 @@ describe('MedicationRepository', () => {
       medicationAdministration: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      medicationAudit: {
+        create: jest.fn(),
+      },
     } as any;
 
     return {
@@ -59,5 +62,21 @@ describe('MedicationRepository', () => {
         }),
       }),
     );
+  });
+
+  it('rejects medication audit creation without tenant ownership', async () => {
+    const { prisma, repository } = createRepository();
+
+    await expect(
+      repository.createMedicationAudit({
+        organizationId: '',
+        action: 'MEDICATION_ADMINISTERED' as any,
+        actorId: 'staff-1',
+        actorRole: 'admin',
+        changes: {},
+      }),
+    ).rejects.toThrow('Organization context is required');
+
+    expect(prisma.medicationAudit.create).not.toHaveBeenCalled();
   });
 });

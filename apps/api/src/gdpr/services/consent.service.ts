@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@oasis/db';
+import { assertTenantIdForSensitiveWrite } from '../../common/tenant/tenant-ownership';
 
 export interface ConsentRecord {
   id: string;
@@ -39,11 +40,12 @@ export class ConsentService {
    */
   async grantConsent(input: GrantConsentInput): Promise<ConsentRecord> {
     const { organizationId, userId, consentType, purpose, legalBasis, metadata } = input;
+    const orgId = assertTenantIdForSensitiveWrite('ConsentRecord', organizationId);
 
     // Check if there's an existing consent record for this type
     const existing = await this.prisma.consentRecord.findFirst({
       where: {
-        organization_id: organizationId,
+        organization_id: orgId,
         user_id: userId,
         consent_type: consentType,
       },
@@ -60,7 +62,7 @@ export class ConsentService {
     // Create new consent record
     const record = await this.prisma.consentRecord.create({
       data: {
-        organization_id: organizationId,
+        organization_id: orgId,
         user_id: userId,
         consent_type: consentType,
         purpose,

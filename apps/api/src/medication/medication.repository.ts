@@ -8,6 +8,7 @@ import {
   MedicationAuditAction,
   Prisma 
 } from '@oasis/db';
+import { assertTenantIdForSensitiveWrite } from '../common/tenant/tenant-ownership';
 
 @Injectable()
 export class MedicationRepository {
@@ -457,9 +458,10 @@ export class MedicationRepository {
     actorRole: string;
     changes: Record<string, any>;
   }) {
+    const organizationId = assertTenantIdForSensitiveWrite('MedicationAudit', data.organizationId);
     return this.prisma.medicationAudit.create({
       data: {
-        organization_id: data.organizationId,
+        organization_id: organizationId,
         prescription_id: data.prescriptionId,
         medication_administration_id: data.medicationAdministrationId,
         action: data.action,

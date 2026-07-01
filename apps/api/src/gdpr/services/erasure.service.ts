@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@oasis/db';
+import { assertTenantIdForSensitiveWrite } from '../../common/tenant/tenant-ownership';
 
 export interface ErasureRequest {
   requestId: string;
@@ -40,10 +41,11 @@ export class ErasureService {
     requestType: string,
     reason?: string,
   ): Promise<ErasureRequest> {
+    const orgId = assertTenantIdForSensitiveWrite('ErasureQueue', organizationId);
     // Check if there's already a pending request
     const existing = await this.prisma.erasureQueue.findFirst({
       where: {
-        organization_id: organizationId,
+        organization_id: orgId,
         user_id: userId,
         request_type: requestType,
         status: 'pending',
@@ -59,7 +61,7 @@ export class ErasureService {
 
     const request = await this.prisma.erasureQueue.create({
       data: {
-        organization_id: organizationId,
+        organization_id: orgId,
         user_id: userId,
         request_type: requestType,
         status: 'pending',

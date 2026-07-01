@@ -1,6 +1,34 @@
 # Defect Log
 
-Last updated: 2026-06-29 16:54 BST
+Last updated: 2026-07-01 19:50 BST
+
+## ISSUE15-TENANT-001: Sensitive records allow nullable tenant ownership
+
+- Severity: Blocker
+- Status: Phase 1 local hardening implemented; Issue #15 remains open
+- Area: Data safety / tenancy
+- Environment: Local only, no deploy
+- Current main: `97d4dfc`
+
+### Observation
+
+The Prisma schema still permits nullable `organization_id` on sensitive tenant-owned records including Carer, Client, Visit, CarerShift, MedicationAudit, Assessment, CarePlan, EvidencePack, CareLog, ConsentRecord, AuditLog, and ErasureQueue.
+
+### Impact
+
+Nullable tenant ownership is a structural SaaS boundary risk because legacy or newly created null-tenant rows can create cross-tenant visibility, orphaned care records, audit/compliance gaps, deletion/export ambiguity, and visit/payroll integrity issues.
+
+### Phase 1 Mitigation
+
+- Added a shared sensitive-write tenant assertion.
+- Added/verified runtime guards on audited API creation boundaries for new sensitive records.
+- Updated synthetic seed/demo creation paths to set tenant ownership directly for Carer and Visit records.
+- Added a read-only dry-run count script that prints only table/model names and null-row counts.
+- Documented inventory and Phase 2 backfill/migration plan in `docs/tenant-nullability-phase1.md`.
+
+### Remaining Work
+
+Run approved staging read-only counts, classify legacy null rows, prepare reviewed backfill/quarantine script, rehearse against disposable non-client data, then prepare a separate NOT NULL migration only after zero/null-quarantine proof.
 
 ## ISSUE11-AUTH-001: Synthetic family Clerk login rejected
 

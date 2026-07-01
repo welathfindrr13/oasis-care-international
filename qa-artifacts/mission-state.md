@@ -1,27 +1,28 @@
 # Mission State
 
-Last updated: 2026-06-30 00:00 BST
+Last updated: 2026-07-01 19:50 BST
 
 ## Active Task
 
-Local Clerk readiness race fix for CareBridge queue clients after post-PR37 browser proof still showed visible `Unauthorized`.
+Issue #15 Phase 1 tenant nullability hardening: inventory nullable tenant-owned sensitive records, add runtime creation guards, add dry-run null-tenant count script, and document Phase 2 backfill/migration plan.
 
 ## Current Branch
 
-- Branch: `graphql-proxy-clerk-db-jwt-fix`
-- Deployed staging commit: `c8dab77`
-- Worktree: `/Users/tyreeseedwards/.codex/worktrees/staging-hardening-reconciled/oasis-care`
+- Branch: `codex/issue-15-null-tenant-phase1`
+- Current main: `97d4dfc`
+- Latest deployed staging commit recorded: `b67485a`
+- Worktree: `/Users/tyreeseedwards/.codex/worktrees/issue-15-null-tenant-phase1/oasis-care`
 - Original dirty branch preserved: `feat/staging-live-setup`
 
 ## Scope
 
-This run deployed PR #37 merge commit `c8dab77` to staging through the existing GitHub `Deploy VPS` workflow after direct SSH write access was blocked by the `oasis-staging` alias permissions. No production-data action, destructive database command, migration, staging env edit, commit, push, merge, live payment/email/SMS/fulfilment/order API call, family Clerk setup, staff `/activity` policy change, org-mapping change, or `AWSCLIV2.pkg` cleanup was performed. No browser credentials, cookies, tokens, auth headers, JWTs, session values, or env values were inspected or printed.
+Phase 1 only. No deploy, SSH, service restart, migration, Prisma migration, staging/production data mutation, env edit, Clerk user/session change, #41 closure, schema NOT NULL change, backfill, destructive database command, live payment/email/SMS/fulfilment/order API call, token/cookie/header/session inspection, or secret output was performed.
 
 ## Result
 
-Staging is deployed at `c8dab77`. Issue #11 remains failed because the verified local Clerk readiness race fix is not committed, reviewed, merged, or deployed.
+Phase 1 implementation is local only. Sensitive nullable tenant models are inventoried in `docs/tenant-nullability-phase1.md`. Runtime creation guards now reject missing/empty tenant ownership before creating new Carer, Client, Visit, CarerShift, MedicationAudit, Assessment, CarePlan, EvidencePack, CareLog, ConsentRecord, and ErasureQueue/SAR queue records through the audited API boundaries. Synthetic demo/seed paths now write Carer and Visit tenant ownership directly instead of creating null rows and patching later. `scripts/release/tenant-nullability-dry-run.mjs` reports sanitized null-tenant counts without row data and changes no data.
 
-Manual DevTools evidence showed the remaining failing queue requests had no Authorization header and returned GraphQL `UNAUTHENTICATED`. Local fix result: the CareBridge approvals and concerns clients now use Clerk React `useAuth()`, wait for `isLoaded`, avoid unauthenticated protected bootstrap when `isSignedIn` is false, and pass `getBearerToken: () => getToken()` into protected `clientQuery(...)` calls. Staff `/activity`, family Clerk account behavior, backend resolver guards, and external-to-internal org mapping were not changed.
+No migration was created. No backfill was performed. Issue #15 remains open for Phase 2 staging read-only counts, backfill/quarantine design, migration review, rehearsal, and approval.
 
 ## Pull Request
 
