@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '@oasis/db';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import { assertTenantIdForSensitiveWrite } from '../common/tenant/tenant-ownership';
 import { CreateAssessmentInput } from './dto/create-assessment.input';
 import { CreateCarePlanInput } from './dto/create-care-plan.input';
 import { CreateEvidencePackInput } from './dto/create-evidence-pack.input';
@@ -53,14 +54,15 @@ export class CarePlanningRepository {
   }
 
   async createAssessment(organizationId: string, input: CreateAssessmentInput): Promise<any> {
-    await this.assertClientInOrganization(organizationId, input.clientId);
+    const orgId = assertTenantIdForSensitiveWrite('Assessment', organizationId);
+    await this.assertClientInOrganization(orgId, input.clientId);
     if (input.visitId) {
-      await this.assertVisitInOrganization(organizationId, input.clientId, input.visitId);
+      await this.assertVisitInOrganization(orgId, input.clientId, input.visitId);
     }
 
     return this.assessmentModel().create({
       data: {
-        organization_id: organizationId,
+        organization_id: orgId,
         client_id: input.clientId,
         visit_id: input.visitId ?? null,
         status: input.status,
@@ -125,14 +127,15 @@ export class CarePlanningRepository {
   }
 
   async createCarePlan(organizationId: string, input: CreateCarePlanInput): Promise<any> {
-    await this.assertClientInOrganization(organizationId, input.clientId);
+    const orgId = assertTenantIdForSensitiveWrite('CarePlan', organizationId);
+    await this.assertClientInOrganization(orgId, input.clientId);
     if (input.assessmentId) {
-      await this.assertAssessmentInOrganization(organizationId, input.clientId, input.assessmentId);
+      await this.assertAssessmentInOrganization(orgId, input.clientId, input.assessmentId);
     }
 
     return this.carePlanModel().create({
       data: {
-        organization_id: organizationId,
+        organization_id: orgId,
         client_id: input.clientId,
         assessment_id: input.assessmentId ?? null,
         status: input.status,
@@ -377,16 +380,17 @@ export class CarePlanningRepository {
   }
 
   async createEvidencePack(organizationId: string, input: CreateEvidencePackInput): Promise<any> {
-    await this.assertClientInOrganization(organizationId, input.clientId);
+    const orgId = assertTenantIdForSensitiveWrite('EvidencePack', organizationId);
+    await this.assertClientInOrganization(orgId, input.clientId);
     if (input.carePlanId) {
-      await this.assertCarePlanInOrganization(organizationId, input.clientId, input.carePlanId);
+      await this.assertCarePlanInOrganization(orgId, input.clientId, input.carePlanId);
     }
-    await this.assertEvidenceSourcesInOrganization(organizationId, input.clientId, input.items ?? []);
+    await this.assertEvidenceSourcesInOrganization(orgId, input.clientId, input.items ?? []);
 
     const items = input.items ?? [];
     return this.evidencePackModel().create({
       data: {
-        organization_id: organizationId,
+        organization_id: orgId,
         client_id: input.clientId,
         care_plan_id: input.carePlanId ?? null,
         status: input.status,

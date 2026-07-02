@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService, ShiftVerificationMethod } from '@oasis/db';
+import { assertTenantIdForSensitiveWrite } from '../common/tenant/tenant-ownership';
 
 @Injectable()
 export class ShiftRepository {
@@ -43,9 +44,10 @@ export class ShiftRepository {
     locationConsentAt?: Date | null;
     notes?: string | null;
   }) {
+    const organizationId = assertTenantIdForSensitiveWrite('CarerShift', input.organizationId);
     return this.prisma.carerShift.create({
       data: {
-        organization: { connect: { id: input.organizationId } },
+        organization: { connect: { id: organizationId } },
         carer: { connect: { id: input.carerId } },
         clock_in_at: new Date(),
         clock_in_method: input.clockInMethod,

@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService, Visit, VisitTask, Prisma, VisitStatus, MedicationStatus } from '@oasis/db';
 import { VISIT_TASK_OUTCOME_PREFIX } from './visit.constants';
+import { assertTenantOwnershipForSensitiveWrite } from '../common/tenant/tenant-ownership';
 
 @Injectable()
 export class VisitRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(data: Prisma.VisitCreateInput): Promise<Visit> {
+    assertTenantOwnershipForSensitiveWrite('Visit', data as any);
     return this.prisma.visit.create({
       data,
       include: {

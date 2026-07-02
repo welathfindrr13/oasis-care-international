@@ -47,6 +47,7 @@ async function main() {
         first_name: 'Sarah',
         last_name: 'Johnson',
         email: 'carer.sarah@demo.local',
+        organization_id: org.id,
         phone: '+44 20 7946 0958',
         hire_date: new Date('2023-01-15'),
       },
@@ -56,6 +57,7 @@ async function main() {
         first_name: 'Mike',
         last_name: 'Thompson',
         email: 'carer.mike@demo.local',
+        organization_id: org.id,
         phone: '+44 20 7946 0959',
         hire_date: new Date('2023-03-22'),
       },
@@ -65,6 +67,7 @@ async function main() {
         first_name: 'Emma',
         last_name: 'Wilson',
         email: 'carer.emma@demo.local',
+        organization_id: org.id,
         phone: '+44 20 7946 0960',
         hire_date: new Date('2023-06-10'),
       },
@@ -74,6 +77,7 @@ async function main() {
         first_name: 'Joe',
         last_name: 'Davies',
         email: 'carer.joe@demo.local',
+        organization_id: org.id,
         phone: '+44 20 7946 0961',
         hire_date: new Date('2023-08-05'),
       },
@@ -182,6 +186,7 @@ async function main() {
       data: {
         carer_id: carers[0].id,
         client_id: clients[0].id,
+        organization_id: org.id,
         scheduled_start: getTodayTime(9, 0),
         scheduled_end: getTodayTime(10, 0),
         actual_start: getTodayTime(9, 5),
@@ -194,6 +199,7 @@ async function main() {
       data: {
         carer_id: carers[1].id,
         client_id: clients[1].id,
+        organization_id: org.id,
         scheduled_start: getTodayTime(11, 0),
         scheduled_end: getTodayTime(12, 0),
         actual_start: getTodayTime(11, 0),
@@ -207,6 +213,7 @@ async function main() {
       data: {
         carer_id: carers[2].id,
         client_id: clients[2].id,
+        organization_id: org.id,
         scheduled_start: getTodayTime(14, 0),
         scheduled_end: getTodayTime(15, 0),
         status: 'SCHEDULED',
@@ -216,6 +223,7 @@ async function main() {
       data: {
         carer_id: carers[0].id,
         client_id: clients[3].id,
+        organization_id: org.id,
         scheduled_start: getTodayTime(15, 30),
         scheduled_end: getTodayTime(16, 30),
         status: 'SCHEDULED',
@@ -225,6 +233,7 @@ async function main() {
       data: {
         carer_id: carers[3].id,
         client_id: clients[4].id,
+        organization_id: org.id,
         scheduled_start: getTodayTime(17, 0),
         scheduled_end: getTodayTime(18, 0),
         status: 'SCHEDULED',
@@ -234,6 +243,7 @@ async function main() {
       data: {
         carer_id: carers[1].id,
         client_id: clients[0].id,
+        organization_id: org.id,
         scheduled_start: getTodayTime(19, 0),
         scheduled_end: getTodayTime(20, 0),
         status: 'SCHEDULED',
@@ -244,6 +254,7 @@ async function main() {
       data: {
         carer_id: carers[0].id,
         client_id: clients[1].id,
+        organization_id: org.id,
         scheduled_start: getTomorrowTime(9, 0),
         scheduled_end: getTomorrowTime(10, 0),
         status: 'SCHEDULED',
@@ -253,6 +264,7 @@ async function main() {
       data: {
         carer_id: carers[1].id,
         client_id: clients[2].id,
+        organization_id: org.id,
         scheduled_start: getTomorrowTime(10, 30),
         scheduled_end: getTomorrowTime(11, 30),
         status: 'SCHEDULED',
@@ -262,6 +274,7 @@ async function main() {
       data: {
         carer_id: carers[2].id,
         client_id: clients[3].id,
+        organization_id: org.id,
         scheduled_start: getTomorrowTime(13, 0),
         scheduled_end: getTomorrowTime(14, 0),
         status: 'SCHEDULED',
@@ -271,6 +284,7 @@ async function main() {
       data: {
         carer_id: carers[3].id,
         client_id: clients[4].id,
+        organization_id: org.id,
         scheduled_start: getTomorrowTime(14, 30),
         scheduled_end: getTomorrowTime(15, 30),
         status: 'SCHEDULED',
@@ -280,6 +294,7 @@ async function main() {
       data: {
         carer_id: carers[0].id,
         client_id: clients[0].id,
+        organization_id: org.id,
         scheduled_start: getTomorrowTime(16, 0),
         scheduled_end: getTomorrowTime(17, 0),
         status: 'SCHEDULED',
@@ -289,6 +304,7 @@ async function main() {
       data: {
         carer_id: carers[1].id,
         client_id: clients[1].id,
+        organization_id: org.id,
         scheduled_start: getTomorrowTime(18, 0),
         scheduled_end: getTomorrowTime(19, 0),
         status: 'SCHEDULED',

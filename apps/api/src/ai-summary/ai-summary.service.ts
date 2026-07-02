@@ -8,6 +8,7 @@ import { HealthSummary, MedicationAuditAction, Prisma, PrismaService } from '@oa
 import { ClsService } from 'nestjs-cls';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import { assertTenantIdForSensitiveWrite } from '../common/tenant/tenant-ownership';
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -395,10 +396,11 @@ export class AiSummaryService {
 
     const firstName = normalizedEmail.split('@')[0] || 'Approver';
     try {
+      const tenantId = assertTenantIdForSensitiveWrite('Carer', organizationId);
       const created = await this.prisma.carer.create({
         data: {
           id: userId,
-          organization_id: organizationId,
+          organization_id: tenantId,
           first_name: firstName,
           last_name: 'Approver',
           email: normalizedEmail,

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@oasis/db';
+import { assertTenantIdForSensitiveWrite } from '../../common/tenant/tenant-ownership';
 
 export interface SarRequest {
   requestId: string;
@@ -34,10 +35,11 @@ export class SarService {
     requestType: string,
     email?: string,
   ): Promise<SarRequest> {
+    const orgId = assertTenantIdForSensitiveWrite('ErasureQueue', organizationId);
     // Create an erasure queue entry for tracking (reusing the model)
     const request = await this.prisma.erasureQueue.create({
       data: {
-        organization_id: organizationId,
+        organization_id: orgId,
         user_id: userId,
         request_type: `sar_${requestType}`,
         status: 'pending',

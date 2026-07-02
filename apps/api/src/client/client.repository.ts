@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService, Client, Prisma } from '@oasis/db';
+import { assertTenantIdForSensitiveWrite } from '../common/tenant/tenant-ownership';
 
 @Injectable()
 export class ClientRepository {
@@ -42,6 +43,7 @@ export class ClientRepository {
     city: string;
     postcode: string;
   }): Promise<Client> {
+    assertTenantIdForSensitiveWrite('Client', data.organization_id);
     return this.prisma.client.create({
       data,
     });

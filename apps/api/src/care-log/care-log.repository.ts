@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { CareLog, Prisma, PrismaService } from '@oasis/db';
+import { assertTenantOwnershipForSensitiveWrite } from '../common/tenant/tenant-ownership';
 
 @Injectable()
 export class CareLogRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(data: Prisma.CareLogCreateInput): Promise<CareLog> {
+    assertTenantOwnershipForSensitiveWrite('CareLog', data as any);
     return this.prisma.careLog.create({ data });
   }
 

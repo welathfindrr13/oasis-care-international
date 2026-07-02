@@ -73,4 +73,19 @@ describe('CarerRepository tenant safety', () => {
     expect(prisma.carer.update).not.toHaveBeenCalled();
     expect(prisma.carer.create).not.toHaveBeenCalled();
   });
+
+  it('rejects creating a carer profile without tenant ownership', async () => {
+    const { prisma, repository } = createRepository();
+    prisma.carer.findUnique.mockResolvedValue(null);
+
+    await expect(
+      repository.upsertById({
+        ...input,
+        organization_id: '   ',
+      }),
+    ).rejects.toThrow('Organization context is required');
+
+    expect(prisma.carer.create).not.toHaveBeenCalled();
+    expect(prisma.carer.update).not.toHaveBeenCalled();
+  });
 });

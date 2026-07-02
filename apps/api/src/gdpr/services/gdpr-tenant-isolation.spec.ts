@@ -75,6 +75,24 @@ describe('GDPR service tenant isolation', () => {
     );
   });
 
+  it('rejects consent writes without tenant ownership', async () => {
+    const prisma = createPrisma();
+    const service = new ConsentService(prisma);
+
+    await expect(
+      service.grantConsent({
+        organizationId: '',
+        userId: 'client-1',
+        consentType: 'family_access',
+        purpose: 'CareBridge',
+        legalBasis: 'consent',
+      }),
+    ).rejects.toThrow('Organization context is required');
+
+    expect(prisma.consentRecord.findFirst).not.toHaveBeenCalled();
+    expect(prisma.consentRecord.create).not.toHaveBeenCalled();
+  });
+
   it('scopes SAR exports by organisation across profile, care records, consent, and audit logs', async () => {
     const prisma = createPrisma();
     const service = new SarService(prisma);
@@ -143,5 +161,17 @@ describe('GDPR service tenant isolation', () => {
         }),
       }),
     );
+  });
+
+  it('rejects erasure queue writes without tenant ownership', async () => {
+    const prisma = createPrisma();
+    const service = new ErasureService(prisma);
+
+    await expect(
+      service.enqueueDataErasure(' ', 'client-1', 'full', 'subject request'),
+    ).rejects.toThrow('Organization context is required');
+
+    expect(prisma.erasureQueue.findFirst).not.toHaveBeenCalled();
+    expect(prisma.erasureQueue.create).not.toHaveBeenCalled();
   });
 });

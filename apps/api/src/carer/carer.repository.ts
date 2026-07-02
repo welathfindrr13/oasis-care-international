@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '@oasis/db';
+import { assertTenantIdForSensitiveWrite } from '../common/tenant/tenant-ownership';
 
 @Injectable()
 export class CarerRepository {
@@ -21,18 +22,19 @@ export class CarerRepository {
     phone?: string | null;
     is_active: boolean;
   }) {
+    const organizationId = assertTenantIdForSensitiveWrite('Carer', input.organization_id);
     // `id` is the Cognito sub.
     const existing = await this.prisma.carer.findUnique({
       where: { id: input.id },
       select: { id: true, organization_id: true },
     });
 
-    if (existing && existing.organization_id !== input.organization_id) {
+    if (existing && existing.organization_id !== organizationId) {
       throw new ForbiddenException('Carer profile already belongs to another organization');
     }
 
     const data = {
-      organization_id: input.organization_id,
+      organization_id: organizationId,
       first_name: input.first_name,
       last_name: input.last_name,
       email: input.email,

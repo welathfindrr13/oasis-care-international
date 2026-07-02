@@ -13,14 +13,14 @@ describe('AiSummaryService Deployment V2 runtime guard', () => {
     process.env = originalEnv;
   });
 
-  function createService() {
+  function createService(prisma: any = {}) {
     return new AiSummaryService(
       {
         checkOrganizationAIEnabled: jest.fn(),
       } as any,
       {} as any,
       { get: jest.fn() } as any,
-      {} as any,
+      prisma,
     );
   }
 
@@ -49,5 +49,22 @@ describe('AiSummaryService Deployment V2 runtime guard', () => {
           message: 'AI summary generation is disabled for this deployment.',
         });
       });
+  });
+
+  it('rejects approver carer creation without tenant ownership', async () => {
+    const prisma = {
+      carer: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 'user-1' }),
+      },
+      whereNotDeleted: jest.fn((where) => where),
+    };
+    const service = createService(prisma) as any;
+
+    await expect(
+      service.resolveApproverId('user-1', 'approver@example.test', '   '),
+    ).rejects.toThrow('Organization context is required');
+
+    expect(prisma.carer.create).not.toHaveBeenCalled();
   });
 });
