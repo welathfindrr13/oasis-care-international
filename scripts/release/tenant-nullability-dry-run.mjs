@@ -54,7 +54,7 @@ export async function runTenantNullabilityDryRun({ prisma, failOnNull = false, l
   let shouldDisconnect = false;
 
   if (!client) {
-    const { PrismaClient } = await import('@prisma/client');
+    const { PrismaClient } = await import('../../libs/db/src/generated/client/index.js');
     client = new PrismaClient();
     shouldDisconnect = true;
   }
