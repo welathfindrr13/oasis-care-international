@@ -36,6 +36,8 @@ Use `scripts/release/tenant-nullability-dry-run.mjs` for read-only counts:
 node scripts/release/tenant-nullability-dry-run.mjs
 ```
 
+The script imports the generated workspace Prisma client from `libs/db/src/generated/client`, so the command is runnable from the repository root without requiring the root package to own `@prisma/client`.
+
 Output is limited to model/table names and counts of rows where `organization_id IS NULL`.
 It does not print row data, names, emails, IDs, connection strings, secrets, tokens, cookies, or headers.
 
