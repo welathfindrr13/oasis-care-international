@@ -38,6 +38,16 @@ docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml run --r
   api /app/scripts/release/tenant-nullability-dry-run.mjs
 ```
 
+After the initial report-only counts are reviewed, run the eligible-table fail gate with `AuditLog` excluded:
+
+```bash
+docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml run --rm --no-deps --entrypoint node \
+  -v "$PWD/scripts/release:/app/scripts/release:ro" \
+  api /app/scripts/release/tenant-nullability-dry-run.mjs --fail-on-null --exclude AuditLog
+```
+
+`AuditLog` is excluded from the first NOT NULL gate because nullable audit rows are an intentional audit-resilience/system-event exception. The command still prints counts only and should include `Excluded models: AuditLog`.
+
 For local/dev checks only, generate the workspace Prisma client before running the script:
 
 ```bash
@@ -46,7 +56,7 @@ pnpm tenant:nullability:dry-run:local
 
 Do not use a raw Debian/Ubuntu root `node scripts/release/tenant-nullability-dry-run.mjs` command as the staging proof path; that path can use a generated client without a matching local query engine unless Prisma generation has just run for the current platform.
 
-Output is limited to model/table names and counts of rows where `organization_id IS NULL`.
+Output is limited to excluded model names, model/table names, and counts of rows where `organization_id IS NULL`.
 It does not print row data, names, emails, IDs, connection strings, secrets, tokens, cookies, or headers. The first staging run must be report-only; do not pass `--fail-on-null` until the initial counts are reviewed.
 
 ## Phase 2 Plan
