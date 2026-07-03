@@ -43,6 +43,13 @@ test('tenant nullability dry-run workflow validates sanitized output shape', () 
   assert.match(workflow, /No data changed\./);
   assert.match(workflow, /PASS: tenant nullability eligible-table gate passed\./);
   assert.match(workflow, /FAIL: tenant nullability eligible-table gate failed\./);
-  assert.match(workflow, /unsafe tenant nullability dry-run output/i);
+  assert.match(workflow, /Tenant nullability dry-run failed with unsafe output suppressed\./);
+  assert.doesNotMatch(workflow, /Unsafe tenant nullability dry-run output; refusing to print report\./);
   assert.match(workflow, /grep -E/);
+});
+
+test('tenant nullability dry-run workflow captures stderr before sanitizing output', () => {
+  assert.match(workflow, /tenant-nullability-dry-run\.mjs --fail-on-null --exclude AuditLog\s+2>&1/);
+  assert.match(workflow, /status=\$\?/);
+  assert.match(workflow, /exit "\$status"/);
 });
