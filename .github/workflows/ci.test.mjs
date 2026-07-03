@@ -17,3 +17,7 @@ test('Deployment V2 CI synthetic env includes required Clerk redirect URLs', () 
   assert.match(workflow, /NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=https:\/\/care\.example\.org\/today/);
   assert.match(workflow, /NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=https:\/\/care\.example\.org\/today/);
 });
+
+test('Deployment V2 CI runs tenant nullability dry-run workflow static guard', () => {
+  assert.match(workflow, /node --test \.github\/workflows\/tenant-nullability-dry-run\.test\.mjs/);
+});

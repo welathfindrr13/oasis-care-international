@@ -171,6 +171,7 @@ jobs:
         node --test .github/workflows/ci.test.mjs
         node --test apps/web/next.config.test.js
         node --test .github/workflows/deploy-vps.test.mjs
+        node --test .github/workflows/tenant-nullability-dry-run.test.mjs
         node --test deploy/v2/docker-compose.test.mjs
         node --test deploy/v2/scripts/verify-local.test.mjs
         node --test deploy/v2/scripts/preflight-env.test.mjs

@@ -467,6 +467,27 @@ Use the approved GitHub Deploy VPS workflow or another approved root-equivalent 
 
 No deploy, SSH write, env edit, migration, production-data action, secret print, or GitHub variable/secret change was performed during this diagnosis.
 
+## ISSUE15-PHASE2-005: Eligible-table gate lane added locally
+
+- Severity: High
+- Status: Local fix committed pending review/push
+- Area: Tenant nullability dry-run execution
+- Environment: local workflow/static tests
+
+### Context
+
+The eligible-table `--fail-on-null --exclude AuditLog` gate could not be run from the plain `oasis-staging` SSH alias because that alias cannot read the root-owned compose env file. Direct root SSH was unavailable.
+
+### Local Fix
+
+A dedicated no-deploy GitHub Actions workflow was added for the fixed staging command only. The workflow reuses the existing VPS secret context, runs the API-container dry-run script with `--fail-on-null --exclude AuditLog`, and sanitizes output before printing.
+
+### Safety Controls
+
+Static tests prove the workflow is manual, has no arbitrary command inputs, does not deploy/rebuild/restart/migrate/backfill, does not dump env, and calls only the tenant nullability dry-run script with `AuditLog` excluded.
+
+No workflow was triggered. No deploy, migration, backfill, or data change occurred.
+
 ## ISSUE11-DEPLOY-009: Deploy workflow lacks sanctioned NEXT_PUBLIC auth-mode equality proof
 
 - Severity: Medium
