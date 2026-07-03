@@ -157,3 +157,31 @@ Focused local preflight hardening is now implemented but not pushed/deployed. It
 Next safest action is review the local commit, push a focused draft PR, wait for CI/review, merge, then rerun the controlled staging deploy through the approved GitHub Deploy VPS workflow. Keep Issue #11 open. Do not proceed to production.
 
 Can continue autonomously: NO - further diagnosis/fix/deploy boundaries require explicit approval.
+
+## Issue #15 No-Deploy Eligible-Table Gate Workflow
+
+Timestamp: 2026-07-03 12:06 BST
+
+- Mode: local workflow/test change only
+- Workflow added: `.github/workflows/tenant-nullability-dry-run.yml`
+- Purpose: provide a sanctioned GitHub Actions lane for the staging eligible-table gate after the plain `oasis-staging` SSH alias failed to read the root-owned compose env file.
+- Trigger: manual `workflow_dispatch`
+- Command type: fixed API-container dry-run command only, using `tenant-nullability-dry-run.mjs --fail-on-null --exclude AuditLog`
+- Safety controls:
+  - no arbitrary workflow inputs
+  - no deploy steps
+  - no `git pull` / checkout of remote staging code
+  - no `docker compose up`, build, restart, or service rebuild
+  - no migration or backfill commands
+  - no env file printing, DB URL printing, row data, names, emails, IDs, tokens, cookies, headers, JWTs, session values, or API keys
+  - sanitized output allowlist for model/table/count lines, `Excluded models: AuditLog`, pass/fail, and `No data changed.`
+- Verification:
+  - `git diff --check`: PASS
+  - `node --test .github/workflows/*.test.mjs`: PASS, 14 tests
+  - `node --test scripts/release/tenant-nullability-dry-run.test.mjs`: PASS, 10 tests
+- Deploy performed: NO
+- Dry-run performed: NO
+- Migration created: NO
+- Backfill performed: NO
+- Data changed: NO
+- Next step: review/push PR, wait for CI, then trigger the workflow only after explicit approval.

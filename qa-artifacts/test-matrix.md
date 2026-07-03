@@ -152,3 +152,7 @@ Last updated: 2026-07-01 19:50 BST
 | Clerk readiness race local diff/lint/build | `git diff --check`; `./node_modules/.bin/next lint`; `./node_modules/.bin/next build`; `corepack pnpm --filter @oasis/web build` | PASS | Local fix builds; not committed or deployed |
 
 No migrations, production-data actions, live payment/email/SMS/fulfilment/order API calls, or production deploys were run.
+
+| Issue #15 no-deploy tenant gate workflow RED | `node --test .github/workflows/tenant-nullability-dry-run.test.mjs` before workflow update | EXPECTED FAIL | Existing draft workflow was report-only and did not include `--fail-on-null --exclude AuditLog` |
+| Issue #15 no-deploy tenant gate workflow static tests | `node --test .github/workflows/*.test.mjs` | PASS | 14 workflow tests passed; new workflow is manual, fixed-command only, no deploy/rebuild/restart/migration/backfill/env dump, and calls `--fail-on-null --exclude AuditLog` |
+| Issue #15 tenant dry-run regression tests | `node --test scripts/release/tenant-nullability-dry-run.test.mjs` | PASS | 10 tests passed; `--exclude AuditLog` behavior and count-only output remain covered |
