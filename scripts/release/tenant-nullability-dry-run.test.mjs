@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   formatTenantNullabilityReport,
   SENSITIVE_TENANT_TABLES,
 } from './tenant-nullability-dry-run.mjs';
 
+const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const scriptSource = fs.readFileSync(
   new URL('./tenant-nullability-dry-run.mjs', import.meta.url),
   'utf8',
@@ -17,9 +20,12 @@ const dryRunDocs = fs.readFileSync(
 const rootPackageJson = JSON.parse(
   fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
 );
-const generatedClientFiles = fs.readdirSync(
-  new URL('../../libs/db/src/generated/client', import.meta.url),
-);
+const trackedFiles = execFileSync('git', ['ls-files'], {
+  cwd: repoRoot,
+  encoding: 'utf8',
+})
+  .split(/\r?\n/)
+  .filter(Boolean);
 
 test('tenant nullability dry-run inventory includes sensitive nullable tenant tables', () => {
   const models = SENSITIVE_TENANT_TABLES.map((table) => table.model);
@@ -74,8 +80,9 @@ test('local tenant nullability script generates Prisma before dry-run', () => {
 });
 
 test('tenant nullability follow-up does not commit Debian query engine binary', () => {
-  assert.equal(
-    generatedClientFiles.includes('libquery_engine-debian-openssl-3.0.x.so.node'),
-    false,
+  const trackedDebianEngines = trackedFiles.filter((file) =>
+    file.endsWith('/libquery_engine-debian-openssl-3.0.x.so.node'),
   );
+
+  assert.deepEqual(trackedDebianEngines, []);
 });
