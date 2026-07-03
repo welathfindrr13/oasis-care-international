@@ -55,17 +55,20 @@ jobs:
           report="$(
             docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml run --rm --no-deps --entrypoint node \
               -v "$PWD/scripts/release:/app/scripts/release:ro" \
-              api /app/scripts/release/tenant-nullability-dry-run.mjs --fail-on-null --exclude AuditLog
+              api /app/scripts/release/tenant-nullability-dry-run.mjs --fail-on-null --exclude AuditLog 2>&1
           )"
           status=$?
           set -e
 
           if printf '%s\n' "$report" | grep -Eiq '://|bearer|secret|token|cookie|jwt|authorization|password|[[:alnum:]_.%+-]+@[[:alnum:].-]+'; then
-            printf 'Unsafe tenant nullability dry-run output; refusing to print report.\n' >&2
-            exit 1
+            printf 'Tenant nullability dry-run failed with unsafe output suppressed.\n' >&2
+            if [ "$status" -eq 0 ]; then
+              exit 1
+            fi
+            exit "$status"
           fi
 
-          printf '%s\n' "$report" | while IFS= read -r line; do
+          while IFS= read -r line; do
             case "$line" in
               "Tenant nullability dry-run"|"Excluded models: AuditLog"|"No data changed.")
                 printf '%s\n' "$line"
@@ -74,16 +77,22 @@ jobs:
                 if printf '%s\n' "$line" | grep -Eq '^[A-Za-z]+ \([a-z_]+\): null organization_id rows = [0-9]+$'; then
                   printf '%s\n' "$line"
                 else
-                  printf 'Unsafe tenant nullability dry-run output; refusing to print report.\n' >&2
-                  exit 1
+                  printf 'Tenant nullability dry-run failed with unsafe output suppressed.\n' >&2
+                  if [ "$status" -eq 0 ]; then
+                    exit 1
+                  fi
+                  exit "$status"
                 fi
                 ;;
               *)
-                printf 'Unsafe tenant nullability dry-run output; refusing to print report.\n' >&2
-                exit 1
+                printf 'Tenant nullability dry-run failed with unsafe output suppressed.\n' >&2
+                if [ "$status" -eq 0 ]; then
+                  exit 1
+                fi
+                exit "$status"
                 ;;
             esac
-          done
+          done <<< "$report"
 
           if [ "$status" -eq 0 ]; then
             printf 'PASS: tenant nullability eligible-table gate passed.\n'
