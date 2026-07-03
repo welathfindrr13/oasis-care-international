@@ -30,16 +30,24 @@ It does not change schema nullability, create a migration, backfill data, or mut
 
 ## Dry-Run Verification
 
-Use `scripts/release/tenant-nullability-dry-run.mjs` for read-only counts:
+Supported staging dry-run path: run the report inside the API container image so the generated Prisma client and matching query engine come from the same environment used by the API. This command starts a transient API container, mounts only the release script read-only, does not start dependencies, and does not deploy or restart services:
 
 ```bash
-node scripts/release/tenant-nullability-dry-run.mjs
+docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml run --rm --no-deps --entrypoint node \
+  -v "$PWD/scripts/release:/app/scripts/release:ro" \
+  api /app/scripts/release/tenant-nullability-dry-run.mjs
 ```
 
-The script imports the generated workspace Prisma client from `libs/db/src/generated/client`, so the command is runnable from the repository root without requiring the root package to own `@prisma/client`.
+For local/dev checks only, generate the workspace Prisma client before running the script:
+
+```bash
+pnpm tenant:nullability:dry-run:local
+```
+
+Do not use a raw Debian/Ubuntu root `node scripts/release/tenant-nullability-dry-run.mjs` command as the staging proof path; that path can use a generated client without a matching local query engine unless Prisma generation has just run for the current platform.
 
 Output is limited to model/table names and counts of rows where `organization_id IS NULL`.
-It does not print row data, names, emails, IDs, connection strings, secrets, tokens, cookies, or headers.
+It does not print row data, names, emails, IDs, connection strings, secrets, tokens, cookies, or headers. The first staging run must be report-only; do not pass `--fail-on-null` until the initial counts are reviewed.
 
 ## Phase 2 Plan
 
