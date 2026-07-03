@@ -15,8 +15,11 @@ export const SENSITIVE_TENANT_TABLES = Object.freeze([
   { model: 'ErasureQueue', table: 'erasure_queue', delegate: 'erasureQueue' },
 ]);
 
-export function formatTenantNullabilityReport(results) {
+export function formatTenantNullabilityReport(results, { excludedModels = [] } = {}) {
   const lines = ['Tenant nullability dry-run'];
+  if (excludedModels.length > 0) {
+    lines.push(`Excluded models: ${excludedModels.join(', ')}`);
+  }
   for (const result of results) {
     lines.push(`${result.model} (${result.table}): null organization_id rows = ${result.count}`);
   }
@@ -24,10 +27,54 @@ export function formatTenantNullabilityReport(results) {
   return lines.join('\n');
 }
 
-export async function collectTenantNullabilityCounts(prisma) {
+export function parseTenantNullabilityArgs(argv) {
+  const excludeModels = [];
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--exclude') {
+      const value = argv[index + 1];
+      if (!value || value.startsWith('--')) {
+        throw new Error('Missing value for --exclude');
+      }
+      excludeModels.push(...parseModelList(value));
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--exclude=')) {
+      excludeModels.push(...parseModelList(arg.slice('--exclude='.length)));
+    }
+  }
+
+  return {
+    failOnNull: argv.includes('--fail-on-null'),
+    excludeModels,
+  };
+}
+
+function parseModelList(value) {
+  return value
+    .split(',')
+    .map((model) => model.trim())
+    .filter(Boolean);
+}
+
+export function selectTenantNullabilityTables({ excludeModels = [] } = {}) {
+  const models = new Set(SENSITIVE_TENANT_TABLES.map((table) => table.model));
+  const unknownModels = [...new Set(excludeModels)].filter((model) => !models.has(model));
+  if (unknownModels.length > 0) {
+    throw new Error(`Unknown model in --exclude: ${unknownModels.join(', ')}`);
+  }
+
+  const excluded = new Set(excludeModels);
+  return SENSITIVE_TENANT_TABLES.filter((table) => !excluded.has(table.model));
+}
+
+export async function collectTenantNullabilityCounts(prisma, { tables = SENSITIVE_TENANT_TABLES } = {}) {
   const results = [];
 
-  for (const table of SENSITIVE_TENANT_TABLES) {
+  for (const table of tables) {
     const delegate = prisma?.[table.delegate];
     if (!delegate || typeof delegate.count !== 'function') {
       throw new Error(`Prisma delegate missing for ${table.model}`);
@@ -49,9 +96,15 @@ export async function collectTenantNullabilityCounts(prisma) {
   return results;
 }
 
-export async function runTenantNullabilityDryRun({ prisma, failOnNull = false, log = console.log } = {}) {
+export async function runTenantNullabilityDryRun({
+  prisma,
+  failOnNull = false,
+  excludeModels = [],
+  log = console.log,
+} = {}) {
   let client = prisma;
   let shouldDisconnect = false;
+  const tables = selectTenantNullabilityTables({ excludeModels });
 
   if (!client) {
     const { PrismaClient } = await import('../../libs/db/src/generated/client/index.js');
@@ -60,8 +113,8 @@ export async function runTenantNullabilityDryRun({ prisma, failOnNull = false, l
   }
 
   try {
-    const results = await collectTenantNullabilityCounts(client);
-    log(formatTenantNullabilityReport(results));
+    const results = await collectTenantNullabilityCounts(client, { tables });
+    log(formatTenantNullabilityReport(results, { excludedModels: excludeModels }));
 
     const nullTenantTables = results.filter((result) => result.count > 0);
     if (failOnNull && nullTenantTables.length > 0) {
@@ -76,14 +129,19 @@ export async function runTenantNullabilityDryRun({ prisma, failOnNull = false, l
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const failOnNull = process.argv.includes('--fail-on-null');
+  try {
+    const { failOnNull, excludeModels } = parseTenantNullabilityArgs(process.argv.slice(2));
 
-  runTenantNullabilityDryRun({ failOnNull })
-    .then((exitCode) => {
-      process.exitCode = exitCode;
-    })
-    .catch((error) => {
-      console.error(`Tenant nullability dry-run failed: ${error?.message || 'unknown error'}`);
-      process.exitCode = 1;
-    });
+    runTenantNullabilityDryRun({ failOnNull, excludeModels })
+      .then((exitCode) => {
+        process.exitCode = exitCode;
+      })
+      .catch((error) => {
+        console.error(`Tenant nullability dry-run failed: ${error?.message || 'unknown error'}`);
+        process.exitCode = 1;
+      });
+  } catch (error) {
+    console.error(`Tenant nullability dry-run failed: ${error?.message || 'unknown error'}`);
+    process.exitCode = 1;
+  }
 }
