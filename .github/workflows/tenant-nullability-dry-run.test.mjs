@@ -46,15 +46,19 @@ test('tenant nullability dry-run workflow validates sanitized output shape', () 
   assert.match(workflow, /PASS: tenant nullability eligible-table gate passed\./);
   assert.match(workflow, /FAIL: tenant nullability eligible-table gate failed\./);
   assert.match(workflow, /Tenant nullability dry-run failed with unsafe output suppressed\./);
+  assert.match(workflow, /Tenant nullability dry-run failed before report generation\./);
   assert.doesNotMatch(workflow, /Unsafe tenant nullability dry-run output; refusing to print report\./);
   assert.match(workflow, /grep -E/);
 });
 
 test('tenant nullability dry-run workflow captures stderr before sanitizing output', () => {
   assert.match(workflow, /tenant-nullability-dry-run\.mjs --fail-on-null --exclude AuditLog\s+2>&1/);
-  assert.match(workflow, /ssh[\s\S]*2>&1 <<'REMOTE'/);
+  assert.match(workflow, /report_file="\$\(mktemp\)"/);
+  assert.match(workflow, /trap 'rm -f "\$report_file"' EXIT/);
+  assert.match(workflow, /ssh[\s\S]*<<'REMOTE'\s*> "\$report_file" 2>&1/);
   assert.match(workflow, /status=\$\?/);
   assert.match(workflow, /exit "\$status"/);
+  assert.doesNotMatch(workflow, /remote_report="\$\(/);
 });
 
 test('tenant nullability dry-run workflow emits report only after validation', () => {
@@ -64,5 +68,7 @@ test('tenant nullability dry-run workflow emits report only after validation', (
   assert.notEqual(unsafeCheckIndex, -1);
   assert.notEqual(delimiterIndex, -1);
   assert(unsafeCheckIndex < delimiterIndex, 'unsafe output check must run before report delimiter is printed');
-  assert.match(workflow, /remote_report="\$\(/);
+  assert.match(workflow, /sanitized_report_lines=/);
+  assert.match(workflow, /\^Tenant nullability dry-run\$/);
+  assert.match(workflow, /\^No data changed\\\.\$/);
 });
