@@ -59,13 +59,18 @@ test('tenant nullability dry-run workflow separates report output from transport
   assert.match(workflow, /ssh[\s\S]*<<'REMOTE'\s*> "\$report_file" 2> "\$diagnostic_file"/);
   assert.match(workflow, /remote_tmp="\$\(mktemp -d\)"/);
   assert.match(workflow, /trap 'rm -rf "\$remote_tmp"' EXIT/);
-  assert.match(workflow, /-v "\$remote_tmp:\/tmp\/tenant-nullability:rw"/);
+  assert.doesNotMatch(workflow, /-v "\$remote_tmp:\/tmp\/tenant-nullability:rw"/);
   assert.match(
     workflow,
-    /node \/app\/scripts\/release\/tenant-nullability-dry-run\.mjs --fail-on-null --exclude AuditLog > \/tmp\/tenant-nullability\/report\.txt/,
+    /container_report_file="\$\(mktemp \/tmp\/tenant-nullability-report\.XXXXXX\)"/,
   );
-  assert.match(workflow, /> "\$remote_tmp\/transport\.out" 2> "\$remote_tmp\/transport\.err"/);
-  assert.match(workflow, /cat "\$remote_tmp\/report\.txt"/);
+  assert.match(
+    workflow,
+    /node \/app\/scripts\/release\/tenant-nullability-dry-run\.mjs --fail-on-null --exclude AuditLog > "\$container_report_file"/,
+  );
+  assert.match(workflow, /cat "\$container_report_file"/);
+  assert.match(workflow, /> "\$remote_tmp\/report\.out" 2> "\$remote_tmp\/transport\.err"/);
+  assert.match(workflow, /cat "\$remote_tmp\/report\.out"/);
   assert.match(workflow, /status=\$\?/);
   assert.match(workflow, /exit "\$status"/);
   assert.doesNotMatch(workflow, /tenant-nullability-dry-run\.mjs --fail-on-null --exclude AuditLog\s+2>&1/);
@@ -73,25 +78,22 @@ test('tenant nullability dry-run workflow separates report output from transport
   assert.doesNotMatch(workflow, /remote_report="\$\(/);
 });
 
-test('tenant nullability dry-run workflow makes mounted report directory writable only by the API container user', () => {
-  const tempDirIndex = workflow.indexOf('remote_tmp="$(mktemp -d)"');
-  const ownershipIndex = workflow.indexOf('chown 1001:1001 "$remote_tmp"');
-  const permissionIndex = workflow.indexOf('chmod 0700 "$remote_tmp"');
+test('tenant nullability dry-run workflow avoids host chown and world-writable report paths', () => {
+  const containerReportIndex = workflow.indexOf('mktemp /tmp/tenant-nullability-report.XXXXXX');
   const composeIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env');
 
   assert.match(apiDockerfile, /addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001 -G nodejs/);
   assert.match(apiDockerfile, /USER nestjs/);
-  assert.notEqual(tempDirIndex, -1);
-  assert.notEqual(ownershipIndex, -1);
-  assert.notEqual(permissionIndex, -1);
+  assert.notEqual(containerReportIndex, -1);
   assert.notEqual(composeIndex, -1);
   assert(
-    tempDirIndex < ownershipIndex && ownershipIndex < permissionIndex && permissionIndex < composeIndex,
-    'remote report directory must be owned by the API user with narrow permissions before bind mount',
+    composeIndex < containerReportIndex,
+    'tenant report must be created inside the API container rather than a host bind mount',
   );
+  assert.doesNotMatch(workflow, /\bchown\b/);
   assert.doesNotMatch(workflow, /chmod 0777 "\$remote_tmp"/);
   assert.doesNotMatch(workflow, /chmod 0?77[0-7] "\$remote_tmp"/);
-  assert.match(workflow, /-v "\$remote_tmp:\/tmp\/tenant-nullability:rw"/);
+  assert.doesNotMatch(workflow, /-v "\$remote_tmp:\/tmp\/tenant-nullability:rw"/);
   assert.match(workflow, /trap 'rm -rf "\$remote_tmp"' EXIT/);
 });
 
