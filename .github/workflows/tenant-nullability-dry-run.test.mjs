@@ -72,6 +72,22 @@ test('tenant nullability dry-run workflow separates report output from transport
   assert.doesNotMatch(workflow, /remote_report="\$\(/);
 });
 
+test('tenant nullability dry-run workflow makes mounted report directory container-writable', () => {
+  const tempDirIndex = workflow.indexOf('remote_tmp="$(mktemp -d)"');
+  const permissionIndex = workflow.indexOf('chmod 0777 "$remote_tmp"');
+  const composeIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env');
+
+  assert.notEqual(tempDirIndex, -1);
+  assert.notEqual(permissionIndex, -1);
+  assert.notEqual(composeIndex, -1);
+  assert(
+    tempDirIndex < permissionIndex && permissionIndex < composeIndex,
+    'remote report directory must be made writable before it is mounted into the API container',
+  );
+  assert.match(workflow, /-v "\$remote_tmp:\/tmp\/tenant-nullability:rw"/);
+  assert.match(workflow, /trap 'rm -rf "\$remote_tmp"' EXIT/);
+});
+
 test('tenant nullability dry-run workflow emits report only after validation', () => {
   const unsafeCheckIndex = workflow.indexOf("grep -Eiq '://|bearer|secret|token|cookie|jwt|authorization|password|");
   const delimiterIndex = workflow.indexOf('TENANT_NULLABILITY_DRY_RUN_REPORT_START');

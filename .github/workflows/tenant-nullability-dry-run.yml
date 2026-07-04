@@ -57,6 +57,7 @@ jobs:
           test -f scripts/release/tenant-nullability-dry-run.mjs
           remote_tmp="$(mktemp -d)"
           trap 'rm -rf "$remote_tmp"' EXIT
+          chmod 0777 "$remote_tmp"
 
           set +e
           docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml run --rm --no-deps --entrypoint sh \
