@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const workflow = fs.readFileSync(new URL('./tenant-nullability-dry-run.yml', import.meta.url), 'utf8');
+const apiDockerfile = fs.readFileSync(new URL('../../apps/api/Dockerfile', import.meta.url), 'utf8');
 
 test('tenant nullability dry-run workflow is manual and uses fixed staging SSH secrets', () => {
   assert.match(workflow, /workflow_dispatch:/);
@@ -72,18 +73,24 @@ test('tenant nullability dry-run workflow separates report output from transport
   assert.doesNotMatch(workflow, /remote_report="\$\(/);
 });
 
-test('tenant nullability dry-run workflow makes mounted report directory container-writable', () => {
+test('tenant nullability dry-run workflow makes mounted report directory writable only by the API container user', () => {
   const tempDirIndex = workflow.indexOf('remote_tmp="$(mktemp -d)"');
-  const permissionIndex = workflow.indexOf('chmod 0777 "$remote_tmp"');
+  const ownershipIndex = workflow.indexOf('chown 1001:1001 "$remote_tmp"');
+  const permissionIndex = workflow.indexOf('chmod 0700 "$remote_tmp"');
   const composeIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env');
 
+  assert.match(apiDockerfile, /addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001 -G nodejs/);
+  assert.match(apiDockerfile, /USER nestjs/);
   assert.notEqual(tempDirIndex, -1);
+  assert.notEqual(ownershipIndex, -1);
   assert.notEqual(permissionIndex, -1);
   assert.notEqual(composeIndex, -1);
   assert(
-    tempDirIndex < permissionIndex && permissionIndex < composeIndex,
-    'remote report directory must be made writable before it is mounted into the API container',
+    tempDirIndex < ownershipIndex && ownershipIndex < permissionIndex && permissionIndex < composeIndex,
+    'remote report directory must be owned by the API user with narrow permissions before bind mount',
   );
+  assert.doesNotMatch(workflow, /chmod 0777 "\$remote_tmp"/);
+  assert.doesNotMatch(workflow, /chmod 0?77[0-7] "\$remote_tmp"/);
   assert.match(workflow, /-v "\$remote_tmp:\/tmp\/tenant-nullability:rw"/);
   assert.match(workflow, /trap 'rm -rf "\$remote_tmp"' EXIT/);
 });
