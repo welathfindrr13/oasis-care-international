@@ -89,3 +89,11 @@ test('tenant nullability dry-run workflow fails on unallowlisted output', () => 
   assert.match(workflow, /Tenant nullability dry-run failed with unsafe output suppressed\./);
   assert.match(workflow, /if \[ "\$status" -eq 0 \]; then\s*exit 1/);
 });
+
+test('tenant nullability dry-run workflow reports only sanitized rejection classes', () => {
+  assert.match(workflow, /Tenant nullability dry-run rejected output class: unsafe pattern\./);
+  assert.match(workflow, /Tenant nullability dry-run rejected output class: malformed count line\./);
+  assert.match(workflow, /Tenant nullability dry-run rejected output class: unallowlisted line\./);
+  assert.doesNotMatch(workflow, /printf '%s\\n' "\$line" >&2/);
+  assert.doesNotMatch(workflow, /cat "\$report_file"/);
+});
