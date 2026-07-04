@@ -47,17 +47,31 @@ jobs:
         run: |
           set -euo pipefail
           report_file="$(mktemp)"
-          trap 'rm -f "$report_file"' EXIT
+          diagnostic_file="$(mktemp)"
+          trap 'rm -f "$report_file" "$diagnostic_file"' EXIT
 
           set +e
-          ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'bash -se' <<'REMOTE' > "$report_file" 2>&1
+          ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'bash -se' <<'REMOTE' > "$report_file" 2> "$diagnostic_file"
           set -euo pipefail
           cd /opt/oasis-care
           test -f scripts/release/tenant-nullability-dry-run.mjs
+          remote_tmp="$(mktemp -d)"
+          trap 'rm -rf "$remote_tmp"' EXIT
 
-          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml run --rm --no-deps --entrypoint node \
+          set +e
+          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml run --rm --no-deps --entrypoint sh \
             -v "$PWD/scripts/release:/app/scripts/release:ro" \
-            api /app/scripts/release/tenant-nullability-dry-run.mjs --fail-on-null --exclude AuditLog 2>&1
+            -v "$remote_tmp:/tmp/tenant-nullability:rw" \
+            api -lc 'node /app/scripts/release/tenant-nullability-dry-run.mjs --fail-on-null --exclude AuditLog > /tmp/tenant-nullability/report.txt' \
+            > "$remote_tmp/transport.out" 2> "$remote_tmp/transport.err"
+          status=$?
+          set -e
+
+          if [ -f "$remote_tmp/report.txt" ]; then
+            cat "$remote_tmp/report.txt"
+          fi
+
+          exit "$status"
           REMOTE
           status=$?
           set -e
