@@ -72,3 +72,20 @@ test('tenant nullability dry-run workflow emits report only after validation', (
   assert.match(workflow, /\^Tenant nullability dry-run\$/);
   assert.match(workflow, /\^No data changed\\\.\$/);
 });
+
+test('tenant nullability dry-run workflow fails on unallowlisted output', () => {
+  const unallowlistedCheckIndex = workflow.indexOf('[ "$unallowlisted_output" -ne 0 ]');
+  const delimiterIndex = workflow.indexOf('TENANT_NULLABILITY_DRY_RUN_REPORT_START');
+
+  assert.match(workflow, /unallowlisted_output=0/);
+  assert.match(workflow, /""\)\s*;;/);
+  assert.match(workflow, /\*\)\s*unallowlisted_output=1\s*;;/);
+  assert.notEqual(unallowlistedCheckIndex, -1);
+  assert.notEqual(delimiterIndex, -1);
+  assert(
+    unallowlistedCheckIndex < delimiterIndex,
+    'unallowlisted output must fail before report delimiters are printed',
+  );
+  assert.match(workflow, /Tenant nullability dry-run failed with unsafe output suppressed\./);
+  assert.match(workflow, /if \[ "\$status" -eq 0 \]; then\s*exit 1/);
+});

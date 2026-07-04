@@ -72,8 +72,11 @@ jobs:
 
           sanitized_report=''
           sanitized_report_lines=0
+          unallowlisted_output=0
           while IFS= read -r line || [ -n "$line" ]; do
             case "$line" in
+              "")
+                ;;
               "Tenant nullability dry-run"|"Excluded models: AuditLog"|"No data changed.")
                 sanitized_report="${sanitized_report}${line}"$'\n'
                 sanitized_report_lines=$((sanitized_report_lines + 1))
@@ -90,8 +93,19 @@ jobs:
                   exit "$status"
                 fi
                 ;;
+              *)
+                unallowlisted_output=1
+                ;;
             esac
           done < "$report_file"
+
+          if [ "$unallowlisted_output" -ne 0 ]; then
+            printf 'Tenant nullability dry-run failed with unsafe output suppressed.\n' >&2
+            if [ "$status" -eq 0 ]; then
+              exit 1
+            fi
+            exit "$status"
+          fi
 
           if [ "$sanitized_report_lines" -eq 0 ] ||
             ! grep -Eq '^Tenant nullability dry-run$' "$report_file" ||
