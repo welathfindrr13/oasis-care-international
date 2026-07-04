@@ -46,9 +46,11 @@ jobs:
           OASIS_VPS_USER: ${{ secrets.OASIS_VPS_USER }}
         run: |
           set -euo pipefail
+          report_file="$(mktemp)"
+          trap 'rm -f "$report_file"' EXIT
+
           set +e
-          remote_report="$(
-            ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'bash -se' 2>&1 <<'REMOTE'
+          ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'bash -se' <<'REMOTE' > "$report_file" 2>&1
           set -euo pipefail
           cd /opt/oasis-care
           test -f scripts/release/tenant-nullability-dry-run.mjs
@@ -57,11 +59,10 @@ jobs:
             -v "$PWD/scripts/release:/app/scripts/release:ro" \
             api /app/scripts/release/tenant-nullability-dry-run.mjs --fail-on-null --exclude AuditLog 2>&1
           REMOTE
-          )"
           status=$?
           set -e
 
-          if printf '%s\n' "$remote_report" | grep -Eiq '://|bearer|secret|token|cookie|jwt|authorization|password|[[:alnum:]_.%+-]+@[[:alnum:].-]+'; then
+          if grep -Eiq '://|bearer|secret|token|cookie|jwt|authorization|password|[[:alnum:]_.%+-]+@[[:alnum:].-]+' "$report_file"; then
             printf 'Tenant nullability dry-run failed with unsafe output suppressed.\n' >&2
             if [ "$status" -eq 0 ]; then
               exit 1
@@ -70,14 +71,17 @@ jobs:
           fi
 
           sanitized_report=''
-          while IFS= read -r line; do
+          sanitized_report_lines=0
+          while IFS= read -r line || [ -n "$line" ]; do
             case "$line" in
               "Tenant nullability dry-run"|"Excluded models: AuditLog"|"No data changed.")
                 sanitized_report="${sanitized_report}${line}"$'\n'
+                sanitized_report_lines=$((sanitized_report_lines + 1))
                 ;;
               *"("*"): null organization_id rows = "*)
                 if printf '%s\n' "$line" | grep -Eq '^[A-Za-z]+ \([a-z_]+\): null organization_id rows = [0-9]+$'; then
                   sanitized_report="${sanitized_report}${line}"$'\n'
+                  sanitized_report_lines=$((sanitized_report_lines + 1))
                 else
                   printf 'Tenant nullability dry-run failed with unsafe output suppressed.\n' >&2
                   if [ "$status" -eq 0 ]; then
@@ -86,15 +90,18 @@ jobs:
                   exit "$status"
                 fi
                 ;;
-              *)
-                printf 'Tenant nullability dry-run failed with unsafe output suppressed.\n' >&2
-                if [ "$status" -eq 0 ]; then
-                  exit 1
-                fi
-                exit "$status"
-                ;;
             esac
-          done <<< "$remote_report"
+          done < "$report_file"
+
+          if [ "$sanitized_report_lines" -eq 0 ] ||
+            ! grep -Eq '^Tenant nullability dry-run$' "$report_file" ||
+            ! grep -Eq '^No data changed\.$' "$report_file"; then
+            printf 'Tenant nullability dry-run failed before report generation.\n' >&2
+            if [ "$status" -eq 0 ]; then
+              exit 1
+            fi
+            exit "$status"
+          fi
 
           printf 'TENANT_NULLABILITY_DRY_RUN_REPORT_START\n'
           printf '%s' "$sanitized_report"
