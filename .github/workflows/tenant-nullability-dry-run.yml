@@ -63,6 +63,7 @@ jobs:
           set -e
 
           if grep -Eiq '://|bearer|secret|token|cookie|jwt|authorization|password|[[:alnum:]_.%+-]+@[[:alnum:].-]+' "$report_file"; then
+            printf 'Tenant nullability dry-run rejected output class: unsafe pattern.\n' >&2
             printf 'Tenant nullability dry-run failed with unsafe output suppressed.\n' >&2
             if [ "$status" -eq 0 ]; then
               exit 1
@@ -86,6 +87,7 @@ jobs:
                   sanitized_report="${sanitized_report}${line}"$'\n'
                   sanitized_report_lines=$((sanitized_report_lines + 1))
                 else
+                  printf 'Tenant nullability dry-run rejected output class: malformed count line.\n' >&2
                   printf 'Tenant nullability dry-run failed with unsafe output suppressed.\n' >&2
                   if [ "$status" -eq 0 ]; then
                     exit 1
@@ -100,6 +102,7 @@ jobs:
           done < "$report_file"
 
           if [ "$unallowlisted_output" -ne 0 ]; then
+            printf 'Tenant nullability dry-run rejected output class: unallowlisted line.\n' >&2
             printf 'Tenant nullability dry-run failed with unsafe output suppressed.\n' >&2
             if [ "$status" -eq 0 ]; then
               exit 1
