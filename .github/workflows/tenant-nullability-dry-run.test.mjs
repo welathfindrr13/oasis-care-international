@@ -23,7 +23,7 @@ test('tenant nullability dry-run workflow cannot deploy rebuild restart migrate 
 
 test('tenant nullability dry-run workflow runs only the fixed eligible-table gate script', () => {
   assert.match(workflow, /scripts\/release\/tenant-nullability-dry-run\.mjs/);
-  assert.match(workflow, /docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml run --rm --no-deps --entrypoint node/);
+  assert.match(workflow, /docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml run --rm --no-deps --entrypoint sh/);
   assert.match(workflow, /--fail-on-null/);
   assert.match(workflow, /--exclude AuditLog/);
   assert.match(workflow, /Excluded models: AuditLog/);
@@ -51,13 +51,24 @@ test('tenant nullability dry-run workflow validates sanitized output shape', () 
   assert.match(workflow, /grep -E/);
 });
 
-test('tenant nullability dry-run workflow captures stderr before sanitizing output', () => {
-  assert.match(workflow, /tenant-nullability-dry-run\.mjs --fail-on-null --exclude AuditLog\s+2>&1/);
+test('tenant nullability dry-run workflow separates report output from transport diagnostics', () => {
   assert.match(workflow, /report_file="\$\(mktemp\)"/);
-  assert.match(workflow, /trap 'rm -f "\$report_file"' EXIT/);
-  assert.match(workflow, /ssh[\s\S]*<<'REMOTE'\s*> "\$report_file" 2>&1/);
+  assert.match(workflow, /diagnostic_file="\$\(mktemp\)"/);
+  assert.match(workflow, /trap 'rm -f "\$report_file" "\$diagnostic_file"' EXIT/);
+  assert.match(workflow, /ssh[\s\S]*<<'REMOTE'\s*> "\$report_file" 2> "\$diagnostic_file"/);
+  assert.match(workflow, /remote_tmp="\$\(mktemp -d\)"/);
+  assert.match(workflow, /trap 'rm -rf "\$remote_tmp"' EXIT/);
+  assert.match(workflow, /-v "\$remote_tmp:\/tmp\/tenant-nullability:rw"/);
+  assert.match(
+    workflow,
+    /node \/app\/scripts\/release\/tenant-nullability-dry-run\.mjs --fail-on-null --exclude AuditLog > \/tmp\/tenant-nullability\/report\.txt/,
+  );
+  assert.match(workflow, /> "\$remote_tmp\/transport\.out" 2> "\$remote_tmp\/transport\.err"/);
+  assert.match(workflow, /cat "\$remote_tmp\/report\.txt"/);
   assert.match(workflow, /status=\$\?/);
   assert.match(workflow, /exit "\$status"/);
+  assert.doesNotMatch(workflow, /tenant-nullability-dry-run\.mjs --fail-on-null --exclude AuditLog\s+2>&1/);
+  assert.doesNotMatch(workflow, /<<'REMOTE'\s*> "\$report_file" 2>&1/);
   assert.doesNotMatch(workflow, /remote_report="\$\(/);
 });
 
@@ -96,4 +107,6 @@ test('tenant nullability dry-run workflow reports only sanitized rejection class
   assert.match(workflow, /Tenant nullability dry-run rejected output class: unallowlisted line\./);
   assert.doesNotMatch(workflow, /printf '%s\\n' "\$line" >&2/);
   assert.doesNotMatch(workflow, /cat "\$report_file"/);
+  assert.doesNotMatch(workflow, /cat "\$diagnostic_file"/);
+  assert.doesNotMatch(workflow, /cat "\$remote_tmp\/transport\.(out|err)"/);
 });
