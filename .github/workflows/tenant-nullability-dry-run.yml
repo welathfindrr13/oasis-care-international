@@ -57,20 +57,21 @@ jobs:
           test -f scripts/release/tenant-nullability-dry-run.mjs
           remote_tmp="$(mktemp -d)"
           trap 'rm -rf "$remote_tmp"' EXIT
-          chown 1001:1001 "$remote_tmp"
-          chmod 0700 "$remote_tmp"
 
           set +e
           docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml run --rm --no-deps --entrypoint sh \
             -v "$PWD/scripts/release:/app/scripts/release:ro" \
-            -v "$remote_tmp:/tmp/tenant-nullability:rw" \
-            api -lc 'node /app/scripts/release/tenant-nullability-dry-run.mjs --fail-on-null --exclude AuditLog > /tmp/tenant-nullability/report.txt' \
-            > "$remote_tmp/transport.out" 2> "$remote_tmp/transport.err"
+            api -lc '
+              set -eu
+              container_report_file="$(mktemp /tmp/tenant-nullability-report.XXXXXX)"
+              node /app/scripts/release/tenant-nullability-dry-run.mjs --fail-on-null --exclude AuditLog > "$container_report_file"
+              cat "$container_report_file"
+            ' > "$remote_tmp/report.out" 2> "$remote_tmp/transport.err"
           status=$?
           set -e
 
-          if [ -f "$remote_tmp/report.txt" ]; then
-            cat "$remote_tmp/report.txt"
+          if [ -f "$remote_tmp/report.out" ]; then
+            cat "$remote_tmp/report.out"
           fi
 
           exit "$status"
