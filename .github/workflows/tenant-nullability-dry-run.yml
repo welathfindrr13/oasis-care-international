@@ -62,10 +62,16 @@ jobs:
           docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml run --rm --no-deps --entrypoint sh \
             -v "$PWD/scripts/release:/app/scripts/release:ro" \
             api -lc '
-              set -eu
+              set -u
               container_report_file="$(mktemp /tmp/tenant-nullability-report.XXXXXX)"
+
+              set +e
               node /app/scripts/release/tenant-nullability-dry-run.mjs --fail-on-null --exclude AuditLog > "$container_report_file"
+              node_status="$?"
+              set -e
+
               cat "$container_report_file"
+              exit "$node_status"
             ' > "$remote_tmp/report.out" 2> "$remote_tmp/transport.err"
           status=$?
           set -e

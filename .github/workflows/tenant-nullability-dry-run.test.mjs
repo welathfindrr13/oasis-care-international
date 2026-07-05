@@ -78,6 +78,39 @@ test('tenant nullability dry-run workflow separates report output from transport
   assert.doesNotMatch(workflow, /remote_report="\$\(/);
 });
 
+test('tenant nullability dry-run workflow preserves report when dry-run exits nonzero', () => {
+  const containerReportNeedle = 'container_report_file="$(mktemp /tmp/tenant-nullability-report.XXXXXX)"';
+  const nodeCommandNeedle =
+    'node /app/scripts/release/tenant-nullability-dry-run.mjs --fail-on-null --exclude AuditLog > "$container_report_file"';
+  const nodeStatusNeedle = 'node_status="$?"';
+  const catReportNeedle = 'cat "$container_report_file"';
+  const exitNodeStatusNeedle = 'exit "$node_status"';
+
+  const containerReportIndex = workflow.indexOf(containerReportNeedle);
+  const nodeCommandIndex = workflow.indexOf(nodeCommandNeedle);
+  const nodeStatusIndex = workflow.indexOf(nodeStatusNeedle);
+  const catReportIndex = workflow.indexOf(catReportNeedle);
+  const exitNodeStatusIndex = workflow.indexOf(exitNodeStatusNeedle);
+  const innerShellStartIndex = workflow.lastIndexOf("api -lc '", containerReportIndex);
+  const innerShellBeforeNode = workflow.slice(innerShellStartIndex, nodeCommandIndex);
+
+  assert.notEqual(containerReportIndex, -1);
+  assert.notEqual(nodeCommandIndex, -1);
+  assert.notEqual(nodeStatusIndex, -1);
+  assert.notEqual(catReportIndex, -1);
+  assert.notEqual(exitNodeStatusIndex, -1);
+  assert.match(innerShellBeforeNode, /\n\s*set -u\n/);
+  assert.doesNotMatch(innerShellBeforeNode, /\n\s*set -eu\b/);
+  assert(containerReportIndex < nodeCommandIndex);
+  assert(nodeCommandIndex < nodeStatusIndex);
+  assert(nodeStatusIndex < catReportIndex);
+  assert(catReportIndex < exitNodeStatusIndex);
+  assert.match(
+    workflow,
+    /set \+e\s*\n\s*node \/app\/scripts\/release\/tenant-nullability-dry-run\.mjs --fail-on-null --exclude AuditLog > "\$container_report_file"\s*\n\s*node_status="\$\?"\s*\n\s*set -e/,
+  );
+});
+
 test('tenant nullability dry-run workflow avoids host chown and world-writable report paths', () => {
   const containerReportIndex = workflow.indexOf('mktemp /tmp/tenant-nullability-report.XXXXXX');
   const composeIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env');
