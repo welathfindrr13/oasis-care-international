@@ -168,3 +168,29 @@ test('tenant nullability dry-run workflow reports only sanitized rejection class
   assert.doesNotMatch(workflow, /cat "\$diagnostic_file"/);
   assert.doesNotMatch(workflow, /cat "\$remote_tmp\/transport\.(out|err)"/);
 });
+
+test('tenant nullability dry-run workflow classifies no-report failures without raw diagnostics', () => {
+  const diagnosticClassIndex = workflow.indexOf('Tenant nullability dry-run diagnostic class:');
+  const missingReportIndex = workflow.indexOf('Tenant nullability dry-run failed before report generation.');
+  const delimiterIndex = workflow.indexOf('TENANT_NULLABILITY_DRY_RUN_REPORT_START');
+
+  assert.match(workflow, /Tenant nullability dry-run diagnostic class: remote command produced no report\./);
+  assert.match(workflow, /Tenant nullability dry-run diagnostic class: empty report output\./);
+  assert.match(workflow, /Tenant nullability dry-run diagnostic class: report missing required header\./);
+  assert.match(workflow, /Tenant nullability dry-run diagnostic class: report missing completion marker\./);
+  assert.match(workflow, /\[ -s "\$diagnostic_file" \]/);
+  assert.notEqual(diagnosticClassIndex, -1);
+  assert.notEqual(missingReportIndex, -1);
+  assert.notEqual(delimiterIndex, -1);
+  assert(
+    diagnosticClassIndex < delimiterIndex,
+    'diagnostic class must be emitted before report delimiters can be printed',
+  );
+  assert(
+    missingReportIndex < delimiterIndex,
+    'missing-report failures must stop before report delimiters are printed',
+  );
+  assert.doesNotMatch(workflow, /printf '%s\\n' "\$diagnostic_file"/);
+  assert.doesNotMatch(workflow, /cat "\$diagnostic_file"/);
+  assert.doesNotMatch(workflow, /cat "\$remote_tmp\/transport\.(out|err)"/);
+});

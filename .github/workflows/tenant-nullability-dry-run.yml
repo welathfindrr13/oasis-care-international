@@ -133,9 +133,30 @@ jobs:
             exit "$status"
           fi
 
-          if [ "$sanitized_report_lines" -eq 0 ] ||
-            ! grep -Eq '^Tenant nullability dry-run$' "$report_file" ||
-            ! grep -Eq '^No data changed\.$' "$report_file"; then
+          if [ "$sanitized_report_lines" -eq 0 ]; then
+            if [ -s "$diagnostic_file" ]; then
+              printf 'Tenant nullability dry-run diagnostic class: remote command produced no report.\n' >&2
+            else
+              printf 'Tenant nullability dry-run diagnostic class: empty report output.\n' >&2
+            fi
+            printf 'Tenant nullability dry-run failed before report generation.\n' >&2
+            if [ "$status" -eq 0 ]; then
+              exit 1
+            fi
+            exit "$status"
+          fi
+
+          if ! grep -Eq '^Tenant nullability dry-run$' "$report_file"; then
+            printf 'Tenant nullability dry-run diagnostic class: report missing required header.\n' >&2
+            printf 'Tenant nullability dry-run failed before report generation.\n' >&2
+            if [ "$status" -eq 0 ]; then
+              exit 1
+            fi
+            exit "$status"
+          fi
+
+          if ! grep -Eq '^No data changed\.$' "$report_file"; then
+            printf 'Tenant nullability dry-run diagnostic class: report missing completion marker.\n' >&2
             printf 'Tenant nullability dry-run failed before report generation.\n' >&2
             if [ "$status" -eq 0 ]; then
               exit 1
