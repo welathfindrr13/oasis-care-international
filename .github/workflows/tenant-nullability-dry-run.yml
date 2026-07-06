@@ -75,6 +75,16 @@ jobs:
           cd /opt/oasis-care
           remote_tmp="$(mktemp -d)"
           trap 'rm -rf "$remote_tmp"' EXIT
+          tenant_override_file="$remote_tmp/tenant-nullability.override.yml"
+          cat > "$tenant_override_file" <<OVERRIDE
+          services:
+            api:
+              volumes:
+                - type: bind
+                  source: ${remote_script_dir}
+                  target: /app/scripts/release
+                  read_only: true
+          OVERRIDE
 
           if ! command -v docker >/dev/null 2>&1; then
             printf 'TENANT_NULLABILITY_DIAGNOSTIC: docker unavailable\n'
@@ -86,15 +96,14 @@ jobs:
             exit 127
           fi
 
-          if ! docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml config --quiet >/dev/null 2>> "$remote_tmp/transport.err"; then
+          if ! docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml -f "$tenant_override_file" config --quiet >/dev/null 2>> "$remote_tmp/transport.err"; then
             printf 'TENANT_NULLABILITY_DIAGNOSTIC: docker compose config failed\n'
             exit 1
           fi
 
           printf 'TENANT_NULLABILITY_DIAGNOSTIC: docker command starting\n'
           set +e
-          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml run --rm --no-deps --entrypoint sh \
-            -v "$remote_script_dir:/app/scripts/release:ro" \
+          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml -f "$tenant_override_file" run --rm --no-deps --entrypoint sh \
             api -lc '
               set -u
               printf "TENANT_NULLABILITY_DIAGNOSTIC: container command started\n"

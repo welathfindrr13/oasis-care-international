@@ -28,7 +28,10 @@ test('tenant nullability dry-run workflow cannot deploy rebuild restart migrate 
 
 test('tenant nullability dry-run workflow runs only the fixed eligible-table gate script', () => {
   assert.match(workflow, /scripts\/release\/tenant-nullability-dry-run\.mjs/);
-  assert.match(workflow, /docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml run --rm --no-deps --entrypoint sh/);
+  assert.match(
+    workflow,
+    /docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml -f "\$tenant_override_file" run --rm --no-deps --entrypoint sh/,
+  );
   assert.match(workflow, /--fail-on-null/);
   assert.match(workflow, /--exclude AuditLog/);
   assert.match(workflow, /Excluded models: AuditLog/);
@@ -69,10 +72,38 @@ test('tenant nullability dry-run workflow copies only the reviewed dry-run scrip
 });
 
 test('tenant nullability dry-run workflow mounts only the remote script directory read-only', () => {
-  assert.match(workflow, /-v "\$remote_script_dir:\/app\/scripts\/release:ro"/);
+  assert.match(workflow, /tenant_override_file="\$remote_tmp\/tenant-nullability\.override\.yml"/);
+  assert.match(workflow, /source: \$\{remote_script_dir\}/);
+  assert.match(workflow, /target: \/app\/scripts\/release/);
+  assert.match(workflow, /read_only: true/);
+  assert.doesNotMatch(workflow, /docker compose[\s\S]*run[^\n]*\s-v\s/);
+  assert.doesNotMatch(workflow, /docker compose[\s\S]*run[^\n]*--volume/);
   assert.doesNotMatch(workflow, /-v "\$PWD\/scripts\/release:\/app\/scripts\/release:ro"/);
   assert.doesNotMatch(workflow, /-v "\$PWD:\/app/);
   assert.doesNotMatch(workflow, /\/opt\/oasis-care\/scripts\/release/);
+});
+
+test('tenant nullability dry-run workflow uses compose override for script mount', () => {
+  const overrideFileIndex = workflow.indexOf('tenant_override_file="$remote_tmp/tenant-nullability.override.yml"');
+  const overrideWriteIndex = workflow.indexOf('cat > "$tenant_override_file" <<OVERRIDE');
+  const configIndex = workflow.indexOf(
+    'docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml -f "$tenant_override_file" config --quiet',
+  );
+  const runIndex = workflow.indexOf(
+    'docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml -f "$tenant_override_file" run --rm --no-deps --entrypoint sh',
+  );
+
+  assert.notEqual(overrideFileIndex, -1);
+  assert.notEqual(overrideWriteIndex, -1);
+  assert.notEqual(configIndex, -1);
+  assert.notEqual(runIndex, -1);
+  assert(overrideFileIndex < overrideWriteIndex);
+  assert(overrideWriteIndex < configIndex);
+  assert(configIndex < runIndex);
+  assert.match(workflow, /services:\n\s+api:\n\s+volumes:/);
+  assert.match(workflow, /source: \$\{remote_script_dir\}/);
+  assert.match(workflow, /target: \/app\/scripts\/release/);
+  assert.match(workflow, /read_only: true/);
 });
 
 test('tenant nullability dry-run workflow does not print env files or secrets', () => {
@@ -278,7 +309,7 @@ test('tenant nullability dry-run workflow classifies docker startup failures sep
   assert.match(workflow, /docker compose version >\/dev\/null 2>&1/);
   assert.match(
     workflow,
-    /docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml config --quiet >\/dev\/null 2>> "\$remote_tmp\/transport\.err"/,
+    /docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml -f "\$tenant_override_file" config --quiet >\/dev\/null 2>> "\$remote_tmp\/transport\.err"/,
   );
   assert.match(workflow, /saw_docker_command_starting=1/);
   assert.match(workflow, /saw_container_command_started=1/);
