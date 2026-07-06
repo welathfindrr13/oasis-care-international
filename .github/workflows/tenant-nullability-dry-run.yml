@@ -75,16 +75,6 @@ jobs:
           cd /opt/oasis-care
           remote_tmp="$(mktemp -d)"
           trap 'rm -rf "$remote_tmp"' EXIT
-          tenant_override_file="$remote_tmp/tenant-nullability.override.yml"
-          cat > "$tenant_override_file" <<OVERRIDE
-          services:
-            api:
-              volumes:
-                - type: bind
-                  source: ${remote_script_dir}
-                  target: /app/scripts/release
-                  read_only: true
-          OVERRIDE
 
           if ! command -v docker >/dev/null 2>&1; then
             printf 'TENANT_NULLABILITY_DIAGNOSTIC: docker unavailable\n'
@@ -96,24 +86,74 @@ jobs:
             exit 127
           fi
 
-          if ! docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml -f "$tenant_override_file" config --quiet >/dev/null 2>> "$remote_tmp/transport.err"; then
+          if ! docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml config --quiet >/dev/null 2>> "$remote_tmp/transport.err"; then
             printf 'TENANT_NULLABILITY_DIAGNOSTIC: docker compose config failed\n'
+            exit 1
+          fi
+
+          api_container_id="$(docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml ps -q api 2>> "$remote_tmp/transport.err" || true)"
+          if [ -z "$api_container_id" ]; then
+            printf 'TENANT_NULLABILITY_DIAGNOSTIC: api container unavailable\n'
+            exit 1
+          fi
+
+          if ! docker inspect -f '{{.State.Running}}' "$api_container_id" >/dev/null 2>> "$remote_tmp/transport.err"; then
+            printf 'TENANT_NULLABILITY_DIAGNOSTIC: api container unavailable\n'
+            exit 1
+          fi
+
+          if ! docker inspect -f '{{.State.Running}}' "$api_container_id" 2>> "$remote_tmp/transport.err" | grep -qx true; then
+            printf 'TENANT_NULLABILITY_DIAGNOSTIC: api container unavailable\n'
             exit 1
           fi
 
           printf 'TENANT_NULLABILITY_DIAGNOSTIC: docker command starting\n'
           set +e
-          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml -f "$tenant_override_file" run --rm --no-deps --entrypoint sh \
-            api -lc '
+          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml exec -T api sh -lc '
               set -u
               printf "TENANT_NULLABILITY_DIAGNOSTIC: container command started\n"
-              container_report_file="$(mktemp /tmp/tenant-nullability-report.XXXXXX)"
+              container_work_dir="$(mktemp -d /tmp/tenant-nullability-work.XXXXXX)" || {
+                printf "TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed\n"
+                exit 1
+              }
+
+              if ! mkdir -p "$container_work_dir/scripts/release"; then
+                printf "TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed\n"
+                rm -rf "$container_work_dir"
+                exit 1
+              fi
+
+              if ! ln -s /app/libs "$container_work_dir/libs"; then
+                printf "TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed\n"
+                rm -rf "$container_work_dir"
+                exit 1
+              fi
+
+              container_script_file="$container_work_dir/scripts/release/tenant-nullability-dry-run.mjs"
+              if ! cat > "$container_script_file"; then
+                printf "TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed\n"
+                rm -rf "$container_work_dir"
+                exit 1
+              fi
+
+              if ! chmod 0444 "$container_script_file"; then
+                printf "TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed\n"
+                rm -rf "$container_work_dir"
+                exit 1
+              fi
+
+              container_report_file="$(mktemp /tmp/tenant-nullability-report.XXXXXX)" || {
+                printf "TENANT_NULLABILITY_DIAGNOSTIC: node command produced empty report\n"
+                rm -rf "$container_work_dir"
+                exit 1
+              }
 
               printf "TENANT_NULLABILITY_DIAGNOSTIC: node command started\n"
               set +e
-              node /app/scripts/release/tenant-nullability-dry-run.mjs --fail-on-null --exclude AuditLog > "$container_report_file"
+              node "$container_script_file" --fail-on-null --exclude AuditLog > "$container_report_file"
               node_status="$?"
               set -e
+              rm -rf "$container_work_dir"
               printf "TENANT_NULLABILITY_DIAGNOSTIC: node command exited status=%s\n" "$node_status"
 
               if [ -s "$container_report_file" ]; then
@@ -123,7 +163,7 @@ jobs:
                 printf "TENANT_NULLABILITY_DIAGNOSTIC: node command produced empty report\n"
               fi
               exit "$node_status"
-            ' > "$remote_tmp/report.out" 2> "$remote_tmp/transport.err"
+            ' < "$remote_script_dir/tenant-nullability-dry-run.mjs" > "$remote_tmp/report.out" 2> "$remote_tmp/transport.err"
           status=$?
           set -e
           printf 'TENANT_NULLABILITY_DIAGNOSTIC: docker command exited status=%s\n' "$status"
@@ -154,8 +194,10 @@ jobs:
           saw_docker_unavailable=0
           saw_docker_compose_unavailable=0
           saw_docker_compose_config_failed=0
+          saw_api_container_unavailable=0
           saw_docker_command_starting=0
           saw_container_command_started=0
+          saw_container_script_staging_failed=0
           saw_node_command_started=0
           saw_node_command_empty_report=0
           saw_container_report_cat_attempted=0
@@ -175,11 +217,17 @@ jobs:
               "TENANT_NULLABILITY_DIAGNOSTIC: docker compose config failed")
                 saw_docker_compose_config_failed=1
                 ;;
+              "TENANT_NULLABILITY_DIAGNOSTIC: api container unavailable")
+                saw_api_container_unavailable=1
+                ;;
               "TENANT_NULLABILITY_DIAGNOSTIC: docker command starting")
                 saw_docker_command_starting=1
                 ;;
               "TENANT_NULLABILITY_DIAGNOSTIC: container command started")
                 saw_container_command_started=1
+                ;;
+              "TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed")
+                saw_container_script_staging_failed=1
                 ;;
               "TENANT_NULLABILITY_DIAGNOSTIC: node command started")
                 saw_node_command_started=1
@@ -237,10 +285,14 @@ jobs:
               printf 'Tenant nullability dry-run diagnostic class: docker compose unavailable.\n' >&2
             elif [ "$saw_docker_compose_config_failed" -ne 0 ]; then
               printf 'Tenant nullability dry-run diagnostic class: docker compose config failed.\n' >&2
+            elif [ "$saw_api_container_unavailable" -ne 0 ]; then
+              printf 'Tenant nullability dry-run diagnostic class: api container unavailable.\n' >&2
             elif [ "$saw_docker_command_starting" -ne 0 ] && [ "$saw_container_command_started" -eq 0 ]; then
-              printf 'Tenant nullability dry-run diagnostic class: docker compose run did not start container command.\n' >&2
+              printf 'Tenant nullability dry-run diagnostic class: docker compose exec did not start container command.\n' >&2
             elif [ "$saw_container_stdout_empty" -ne 0 ]; then
               printf 'Tenant nullability dry-run diagnostic class: container command produced no stdout.\n' >&2
+            elif [ "$saw_container_script_staging_failed" -ne 0 ]; then
+              printf 'Tenant nullability dry-run diagnostic class: container script staging failed.\n' >&2
             elif [ "$saw_container_command_started" -ne 0 ] && [ "$saw_node_command_started" -eq 0 ]; then
               printf 'Tenant nullability dry-run diagnostic class: container command did not reach node start.\n' >&2
             elif [ "$saw_node_command_empty_report" -ne 0 ]; then

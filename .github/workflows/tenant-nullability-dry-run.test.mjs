@@ -8,6 +8,10 @@ const scpLines = workflow
   .split('\n')
   .filter((line) => /\bscp\b/.test(line))
   .join('\n');
+const dockerComposeLines = workflow
+  .split('\n')
+  .filter((line) => /docker compose/.test(line))
+  .join('\n');
 
 test('tenant nullability dry-run workflow is manual and uses fixed staging SSH secrets', () => {
   assert.match(workflow, /workflow_dispatch:/);
@@ -30,7 +34,7 @@ test('tenant nullability dry-run workflow runs only the fixed eligible-table gat
   assert.match(workflow, /scripts\/release\/tenant-nullability-dry-run\.mjs/);
   assert.match(
     workflow,
-    /docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml -f "\$tenant_override_file" run --rm --no-deps --entrypoint sh/,
+    /docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml exec -T api sh -lc/,
   );
   assert.match(workflow, /--fail-on-null/);
   assert.match(workflow, /--exclude AuditLog/);
@@ -71,11 +75,18 @@ test('tenant nullability dry-run workflow copies only the reviewed dry-run scrip
   assert.doesNotMatch(scpLines, /\* /);
 });
 
-test('tenant nullability dry-run workflow mounts only the remote script directory read-only', () => {
-  assert.match(workflow, /tenant_override_file="\$remote_tmp\/tenant-nullability\.override\.yml"/);
-  assert.match(workflow, /source: \$\{remote_script_dir\}/);
-  assert.match(workflow, /target: \/app\/scripts\/release/);
-  assert.match(workflow, /read_only: true/);
+test('tenant nullability dry-run workflow runs inside the existing api container', () => {
+  assert.match(
+    workflow,
+    /api_container_id="\$\(docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml ps -q api 2>> "\$remote_tmp\/transport\.err" \|\| true\)"/,
+  );
+  assert.match(workflow, /docker inspect -f '\{\{\.State\.Running\}\}' "\$api_container_id"/);
+  assert.match(
+    workflow,
+    /docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml exec -T api sh -lc/,
+  );
+  assert.match(workflow, /< "\$remote_script_dir\/tenant-nullability-dry-run\.mjs" > "\$remote_tmp\/report\.out" 2> "\$remote_tmp\/transport\.err"/);
+  assert.doesNotMatch(dockerComposeLines, /docker compose[^\n]*\srun\s/);
   assert.doesNotMatch(workflow, /docker compose[\s\S]*run[^\n]*\s-v\s/);
   assert.doesNotMatch(workflow, /docker compose[\s\S]*run[^\n]*--volume/);
   assert.doesNotMatch(workflow, /-v "\$PWD\/scripts\/release:\/app\/scripts\/release:ro"/);
@@ -83,27 +94,46 @@ test('tenant nullability dry-run workflow mounts only the remote script director
   assert.doesNotMatch(workflow, /\/opt\/oasis-care\/scripts\/release/);
 });
 
-test('tenant nullability dry-run workflow uses compose override for script mount', () => {
-  const overrideFileIndex = workflow.indexOf('tenant_override_file="$remote_tmp/tenant-nullability.override.yml"');
-  const overrideWriteIndex = workflow.indexOf('cat > "$tenant_override_file" <<OVERRIDE');
-  const configIndex = workflow.indexOf(
-    'docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml -f "$tenant_override_file" config --quiet',
-  );
-  const runIndex = workflow.indexOf(
-    'docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml -f "$tenant_override_file" run --rm --no-deps --entrypoint sh',
-  );
+test('tenant nullability dry-run workflow stages reviewed script through container stdin', () => {
+  const configIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml config --quiet');
+  const execIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml exec -T api sh -lc');
+  const workDirIndex = workflow.indexOf('container_work_dir="$(mktemp -d /tmp/tenant-nullability-work.XXXXXX)"');
+  const scriptsDirIndex = workflow.indexOf('mkdir -p "$container_work_dir/scripts/release"');
+  const libsSymlinkIndex = workflow.indexOf('ln -s /app/libs "$container_work_dir/libs"');
+  const scriptFileIndex = workflow.indexOf('container_script_file="$container_work_dir/scripts/release/tenant-nullability-dry-run.mjs"');
+  const scriptWriteIndex = workflow.indexOf('cat > "$container_script_file"');
+  const chmodIndex = workflow.indexOf('chmod 0444 "$container_script_file"');
+  const nodeIndex = workflow.indexOf('node "$container_script_file" --fail-on-null --exclude AuditLog > "$container_report_file"');
+  const removeIndex = workflow.indexOf('rm -rf "$container_work_dir"', nodeIndex);
 
-  assert.notEqual(overrideFileIndex, -1);
-  assert.notEqual(overrideWriteIndex, -1);
   assert.notEqual(configIndex, -1);
-  assert.notEqual(runIndex, -1);
-  assert(overrideFileIndex < overrideWriteIndex);
-  assert(overrideWriteIndex < configIndex);
-  assert(configIndex < runIndex);
-  assert.match(workflow, /services:\n\s+api:\n\s+volumes:/);
-  assert.match(workflow, /source: \$\{remote_script_dir\}/);
-  assert.match(workflow, /target: \/app\/scripts\/release/);
-  assert.match(workflow, /read_only: true/);
+  assert.notEqual(execIndex, -1);
+  assert.notEqual(workDirIndex, -1);
+  assert.notEqual(scriptsDirIndex, -1);
+  assert.notEqual(libsSymlinkIndex, -1);
+  assert.notEqual(scriptFileIndex, -1);
+  assert.notEqual(scriptWriteIndex, -1);
+  assert.notEqual(chmodIndex, -1);
+  assert.notEqual(nodeIndex, -1);
+  assert.notEqual(removeIndex, -1);
+  assert(configIndex < execIndex);
+  assert(execIndex < workDirIndex);
+  assert(workDirIndex < scriptsDirIndex);
+  assert(scriptsDirIndex < libsSymlinkIndex);
+  assert(libsSymlinkIndex < scriptFileIndex);
+  assert(scriptFileIndex < scriptWriteIndex);
+  assert(scriptWriteIndex < chmodIndex);
+  assert(chmodIndex < nodeIndex);
+  assert(nodeIndex < removeIndex);
+  assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed/);
+  assert.match(
+    workflow,
+    /if ! ln -s \/app\/libs "\$container_work_dir\/libs"; then\s*\n\s*printf "TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed\\n"\s*\n\s*rm -rf "\$container_work_dir"\s*\n\s*exit 1\s*\n\s*fi/,
+  );
+  assert.match(workflow, /rm -rf "\$container_work_dir"/);
+  assert.doesNotMatch(workflow, /mktemp \/tmp\/tenant-nullability-script\.XXXXXX\.mjs/);
+  assert.doesNotMatch(workflow, /tenant_override_file/);
+  assert.doesNotMatch(workflow, /cat > "\$tenant_override_file"/);
 });
 
 test('tenant nullability dry-run workflow does not print env files or secrets', () => {
@@ -143,7 +173,7 @@ test('tenant nullability dry-run workflow separates report output from transport
   );
   assert.match(
     workflow,
-    /node \/app\/scripts\/release\/tenant-nullability-dry-run\.mjs --fail-on-null --exclude AuditLog > "\$container_report_file"/,
+    /node "\$container_script_file" --fail-on-null --exclude AuditLog > "\$container_report_file"/,
   );
   assert.match(workflow, /cat "\$container_report_file"/);
   assert.match(workflow, /> "\$remote_tmp\/report\.out" 2> "\$remote_tmp\/transport\.err"/);
@@ -157,34 +187,38 @@ test('tenant nullability dry-run workflow separates report output from transport
 
 test('tenant nullability dry-run workflow preserves report when dry-run exits nonzero', () => {
   const containerReportNeedle = 'container_report_file="$(mktemp /tmp/tenant-nullability-report.XXXXXX)"';
+  const containerScriptNeedle = 'container_script_file="$container_work_dir/scripts/release/tenant-nullability-dry-run.mjs"';
   const nodeCommandNeedle =
-    'node /app/scripts/release/tenant-nullability-dry-run.mjs --fail-on-null --exclude AuditLog > "$container_report_file"';
+    'node "$container_script_file" --fail-on-null --exclude AuditLog > "$container_report_file"';
   const nodeStatusNeedle = 'node_status="$?"';
   const catReportNeedle = 'cat "$container_report_file"';
   const exitNodeStatusNeedle = 'exit "$node_status"';
 
   const containerReportIndex = workflow.indexOf(containerReportNeedle);
+  const containerScriptIndex = workflow.indexOf(containerScriptNeedle);
   const nodeCommandIndex = workflow.indexOf(nodeCommandNeedle);
   const nodeStatusIndex = workflow.indexOf(nodeStatusNeedle);
   const catReportIndex = workflow.indexOf(catReportNeedle);
   const exitNodeStatusIndex = workflow.indexOf(exitNodeStatusNeedle);
-  const innerShellStartIndex = workflow.lastIndexOf("api -lc '", containerReportIndex);
+  const innerShellStartIndex = workflow.lastIndexOf("exec -T api sh -lc '", containerReportIndex);
   const innerShellBeforeNode = workflow.slice(innerShellStartIndex, nodeCommandIndex);
 
   assert.notEqual(containerReportIndex, -1);
+  assert.notEqual(containerScriptIndex, -1);
   assert.notEqual(nodeCommandIndex, -1);
   assert.notEqual(nodeStatusIndex, -1);
   assert.notEqual(catReportIndex, -1);
   assert.notEqual(exitNodeStatusIndex, -1);
   assert.match(innerShellBeforeNode, /\n\s*set -u\n/);
   assert.doesNotMatch(innerShellBeforeNode, /\n\s*set -eu\b/);
+  assert(containerScriptIndex < nodeCommandIndex);
   assert(containerReportIndex < nodeCommandIndex);
   assert(nodeCommandIndex < nodeStatusIndex);
   assert(nodeStatusIndex < catReportIndex);
   assert(catReportIndex < exitNodeStatusIndex);
   assert.match(
     workflow,
-    /set \+e\s*\n\s*node \/app\/scripts\/release\/tenant-nullability-dry-run\.mjs --fail-on-null --exclude AuditLog > "\$container_report_file"\s*\n\s*node_status="\$\?"\s*\n\s*set -e/,
+    /set \+e\s*\n\s*node "\$container_script_file" --fail-on-null --exclude AuditLog > "\$container_report_file"\s*\n\s*node_status="\$\?"\s*\n\s*set -e/,
   );
 });
 
@@ -266,6 +300,9 @@ test('tenant nullability dry-run workflow classifies no-report failures without 
 
   assert.match(workflow, /Tenant nullability dry-run diagnostic class: remote command produced no report\./);
   assert.match(workflow, /Tenant nullability dry-run diagnostic class: empty report output\./);
+  assert.match(workflow, /Tenant nullability dry-run diagnostic class: api container unavailable\./);
+  assert.match(workflow, /Tenant nullability dry-run diagnostic class: docker compose exec did not start container command\./);
+  assert.match(workflow, /Tenant nullability dry-run diagnostic class: container script staging failed\./);
   assert.match(workflow, /Tenant nullability dry-run diagnostic class: container command produced no stdout\./);
   assert.match(workflow, /Tenant nullability dry-run diagnostic class: container command did not reach node start\./);
   assert.match(workflow, /Tenant nullability dry-run diagnostic class: node command produced empty report\./);
@@ -289,12 +326,13 @@ test('tenant nullability dry-run workflow classifies no-report failures without 
   assert.doesNotMatch(workflow, /cat "\$remote_tmp\/transport\.(out|err)"/);
 });
 
-test('tenant nullability dry-run workflow classifies docker startup failures separately', () => {
+test('tenant nullability dry-run workflow classifies docker exec startup failures separately', () => {
   const dockerUnavailableIndex = workflow.indexOf('TENANT_NULLABILITY_DIAGNOSTIC: docker unavailable');
   const composeUnavailableIndex = workflow.indexOf('TENANT_NULLABILITY_DIAGNOSTIC: docker compose unavailable');
   const composeConfigFailedIndex = workflow.indexOf('TENANT_NULLABILITY_DIAGNOSTIC: docker compose config failed');
-  const composeRunNoContainerIndex = workflow.indexOf(
-    'Tenant nullability dry-run diagnostic class: docker compose run did not start container command.',
+  const apiUnavailableIndex = workflow.indexOf('TENANT_NULLABILITY_DIAGNOSTIC: api container unavailable');
+  const composeExecNoContainerIndex = workflow.indexOf(
+    'Tenant nullability dry-run diagnostic class: docker compose exec did not start container command.',
   );
   const containerNoNodeIndex = workflow.indexOf(
     'Tenant nullability dry-run diagnostic class: container command did not reach node start.',
@@ -303,43 +341,46 @@ test('tenant nullability dry-run workflow classifies docker startup failures sep
   assert.notEqual(dockerUnavailableIndex, -1);
   assert.notEqual(composeUnavailableIndex, -1);
   assert.notEqual(composeConfigFailedIndex, -1);
-  assert.notEqual(composeRunNoContainerIndex, -1);
+  assert.notEqual(apiUnavailableIndex, -1);
+  assert.notEqual(composeExecNoContainerIndex, -1);
   assert.notEqual(containerNoNodeIndex, -1);
   assert.match(workflow, /command -v docker >\/dev\/null 2>&1/);
   assert.match(workflow, /docker compose version >\/dev\/null 2>&1/);
   assert.match(
     workflow,
-    /docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml -f "\$tenant_override_file" config --quiet >\/dev\/null 2>> "\$remote_tmp\/transport\.err"/,
+    /docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml config --quiet >\/dev\/null 2>> "\$remote_tmp\/transport\.err"/,
   );
+  assert.match(workflow, /docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml ps -q api/);
+  assert.match(workflow, /docker inspect -f '\{\{\.State\.Running\}\}' "\$api_container_id"/);
   assert.match(workflow, /saw_docker_command_starting=1/);
   assert.match(workflow, /saw_container_command_started=1/);
   assert.match(workflow, /saw_node_command_started=1/);
   assert(
-    composeRunNoContainerIndex < containerNoNodeIndex,
-    'docker compose startup failure should be classified before container-started pre-node failure',
+    composeExecNoContainerIndex < containerNoNodeIndex,
+    'docker compose exec startup failure should be classified before container-started pre-node failure',
   );
 });
 
-test('tenant nullability dry-run workflow checks compose no-start before generic empty stdout', () => {
-  const composeRunConditionIndex = workflow.indexOf(
+test('tenant nullability dry-run workflow checks compose exec no-start before generic empty stdout', () => {
+  const composeExecConditionIndex = workflow.indexOf(
     'elif [ "$saw_docker_command_starting" -ne 0 ] && [ "$saw_container_command_started" -eq 0 ]; then',
   );
   const stdoutEmptyConditionIndex = workflow.indexOf('elif [ "$saw_container_stdout_empty" -ne 0 ]; then');
 
-  assert.notEqual(composeRunConditionIndex, -1);
+  assert.notEqual(composeExecConditionIndex, -1);
   assert.notEqual(stdoutEmptyConditionIndex, -1);
   assert(
-    composeRunConditionIndex < stdoutEmptyConditionIndex,
-    'compose run no-start must not be masked by the generic empty-stdout classifier',
+    composeExecConditionIndex < stdoutEmptyConditionIndex,
+    'compose exec no-start must not be masked by the generic empty-stdout classifier',
   );
 });
 
 test('tenant nullability dry-run workflow reserves container no-node class for started containers', () => {
-  const composeRunConditionIndex = workflow.indexOf(
+  const composeExecConditionIndex = workflow.indexOf(
     'elif [ "$saw_docker_command_starting" -ne 0 ] && [ "$saw_container_command_started" -eq 0 ]; then',
   );
-  const composeRunClassIndex = workflow.indexOf(
-    "printf 'Tenant nullability dry-run diagnostic class: docker compose run did not start container command.\\n' >&2",
+  const composeExecClassIndex = workflow.indexOf(
+    "printf 'Tenant nullability dry-run diagnostic class: docker compose exec did not start container command.\\n' >&2",
   );
   const containerNoNodeConditionIndex = workflow.indexOf(
     'elif [ "$saw_container_command_started" -ne 0 ] && [ "$saw_node_command_started" -eq 0 ]; then',
@@ -348,11 +389,11 @@ test('tenant nullability dry-run workflow reserves container no-node class for s
     "printf 'Tenant nullability dry-run diagnostic class: container command did not reach node start.\\n' >&2",
   );
 
-  assert.notEqual(composeRunConditionIndex, -1);
-  assert.notEqual(composeRunClassIndex, -1);
+  assert.notEqual(composeExecConditionIndex, -1);
+  assert.notEqual(composeExecClassIndex, -1);
   assert.notEqual(containerNoNodeConditionIndex, -1);
   assert.notEqual(containerNoNodeClassIndex, -1);
-  assert(composeRunConditionIndex < composeRunClassIndex);
+  assert(composeExecConditionIndex < composeExecClassIndex);
   assert(containerNoNodeConditionIndex < containerNoNodeClassIndex);
   assert.doesNotMatch(
     workflow,
@@ -364,13 +405,17 @@ test('tenant nullability dry-run workflow emits class-only diagnostic markers fo
   assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: remote command started/);
   assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: docker command starting/);
   assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: docker command exited status=%s/);
+  assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: api container unavailable/);
   assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: container command started/);
+  assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed/);
   assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: node command started/);
   assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: node command exited status=%s/);
   assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: node command produced empty report/);
   assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: container report cat attempted/);
   assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: container command produced no stdout/);
+  assert.match(workflow, /saw_api_container_unavailable=0/);
   assert.match(workflow, /saw_container_command_started=0/);
+  assert.match(workflow, /saw_container_script_staging_failed=0/);
   assert.match(workflow, /saw_node_command_started=0/);
   assert.match(workflow, /saw_node_command_empty_report=0/);
   assert.match(workflow, /saw_container_report_cat_attempted=0/);
