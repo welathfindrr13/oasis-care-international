@@ -289,6 +289,20 @@ test('tenant nullability dry-run workflow classifies docker startup failures sep
   );
 });
 
+test('tenant nullability dry-run workflow checks compose no-start before generic empty stdout', () => {
+  const composeRunConditionIndex = workflow.indexOf(
+    'elif [ "$saw_docker_command_starting" -ne 0 ] && [ "$saw_container_command_started" -eq 0 ]; then',
+  );
+  const stdoutEmptyConditionIndex = workflow.indexOf('elif [ "$saw_container_stdout_empty" -ne 0 ]; then');
+
+  assert.notEqual(composeRunConditionIndex, -1);
+  assert.notEqual(stdoutEmptyConditionIndex, -1);
+  assert(
+    composeRunConditionIndex < stdoutEmptyConditionIndex,
+    'compose run no-start must not be masked by the generic empty-stdout classifier',
+  );
+});
+
 test('tenant nullability dry-run workflow reserves container no-node class for started containers', () => {
   const composeRunConditionIndex = workflow.indexOf(
     'elif [ "$saw_docker_command_starting" -ne 0 ] && [ "$saw_container_command_started" -eq 0 ]; then',

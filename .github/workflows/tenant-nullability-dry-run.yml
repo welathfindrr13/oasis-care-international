@@ -228,10 +228,10 @@ jobs:
               printf 'Tenant nullability dry-run diagnostic class: docker compose unavailable.\n' >&2
             elif [ "$saw_docker_compose_config_failed" -ne 0 ]; then
               printf 'Tenant nullability dry-run diagnostic class: docker compose config failed.\n' >&2
-            elif [ "$saw_container_stdout_empty" -ne 0 ]; then
-              printf 'Tenant nullability dry-run diagnostic class: container command produced no stdout.\n' >&2
             elif [ "$saw_docker_command_starting" -ne 0 ] && [ "$saw_container_command_started" -eq 0 ]; then
               printf 'Tenant nullability dry-run diagnostic class: docker compose run did not start container command.\n' >&2
+            elif [ "$saw_container_stdout_empty" -ne 0 ]; then
+              printf 'Tenant nullability dry-run diagnostic class: container command produced no stdout.\n' >&2
             elif [ "$saw_container_command_started" -ne 0 ] && [ "$saw_node_command_started" -eq 0 ]; then
               printf 'Tenant nullability dry-run diagnostic class: container command did not reach node start.\n' >&2
             elif [ "$saw_node_command_empty_report" -ne 0 ]; then
