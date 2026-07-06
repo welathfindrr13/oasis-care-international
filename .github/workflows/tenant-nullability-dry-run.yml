@@ -112,26 +112,39 @@ jobs:
           docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml exec -T api sh -lc '
               set -u
               printf "TENANT_NULLABILITY_DIAGNOSTIC: container command started\n"
-              container_script_file="$(mktemp /tmp/tenant-nullability-script.XXXXXX.mjs)" || {
+              container_work_dir="$(mktemp -d /tmp/tenant-nullability-work.XXXXXX)" || {
                 printf "TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed\n"
                 exit 1
               }
 
+              if ! mkdir -p "$container_work_dir/scripts/release"; then
+                printf "TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed\n"
+                rm -rf "$container_work_dir"
+                exit 1
+              fi
+
+              if ! ln -s /app/libs "$container_work_dir/libs"; then
+                printf "TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed\n"
+                rm -rf "$container_work_dir"
+                exit 1
+              }
+
+              container_script_file="$container_work_dir/scripts/release/tenant-nullability-dry-run.mjs"
               if ! cat > "$container_script_file"; then
                 printf "TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed\n"
-                rm -f "$container_script_file"
+                rm -rf "$container_work_dir"
                 exit 1
               fi
 
               if ! chmod 0444 "$container_script_file"; then
                 printf "TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed\n"
-                rm -f "$container_script_file"
+                rm -rf "$container_work_dir"
                 exit 1
               fi
 
               container_report_file="$(mktemp /tmp/tenant-nullability-report.XXXXXX)" || {
                 printf "TENANT_NULLABILITY_DIAGNOSTIC: node command produced empty report\n"
-                rm -f "$container_script_file"
+                rm -rf "$container_work_dir"
                 exit 1
               }
 
@@ -140,7 +153,7 @@ jobs:
               node "$container_script_file" --fail-on-null --exclude AuditLog > "$container_report_file"
               node_status="$?"
               set -e
-              rm -f "$container_script_file"
+              rm -rf "$container_work_dir"
               printf "TENANT_NULLABILITY_DIAGNOSTIC: node command exited status=%s\n" "$node_status"
 
               if [ -s "$container_report_file" ]; then

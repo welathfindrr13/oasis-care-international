@@ -97,27 +97,37 @@ test('tenant nullability dry-run workflow runs inside the existing api container
 test('tenant nullability dry-run workflow stages reviewed script through container stdin', () => {
   const configIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml config --quiet');
   const execIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml exec -T api sh -lc');
-  const scriptFileIndex = workflow.indexOf('container_script_file="$(mktemp /tmp/tenant-nullability-script.XXXXXX.mjs)"');
+  const workDirIndex = workflow.indexOf('container_work_dir="$(mktemp -d /tmp/tenant-nullability-work.XXXXXX)"');
+  const scriptsDirIndex = workflow.indexOf('mkdir -p "$container_work_dir/scripts/release"');
+  const libsSymlinkIndex = workflow.indexOf('ln -s /app/libs "$container_work_dir/libs"');
+  const scriptFileIndex = workflow.indexOf('container_script_file="$container_work_dir/scripts/release/tenant-nullability-dry-run.mjs"');
   const scriptWriteIndex = workflow.indexOf('cat > "$container_script_file"');
   const chmodIndex = workflow.indexOf('chmod 0444 "$container_script_file"');
   const nodeIndex = workflow.indexOf('node "$container_script_file" --fail-on-null --exclude AuditLog > "$container_report_file"');
-  const removeIndex = workflow.indexOf('rm -f "$container_script_file"', nodeIndex);
+  const removeIndex = workflow.indexOf('rm -rf "$container_work_dir"', nodeIndex);
 
   assert.notEqual(configIndex, -1);
   assert.notEqual(execIndex, -1);
+  assert.notEqual(workDirIndex, -1);
+  assert.notEqual(scriptsDirIndex, -1);
+  assert.notEqual(libsSymlinkIndex, -1);
   assert.notEqual(scriptFileIndex, -1);
   assert.notEqual(scriptWriteIndex, -1);
   assert.notEqual(chmodIndex, -1);
   assert.notEqual(nodeIndex, -1);
   assert.notEqual(removeIndex, -1);
   assert(configIndex < execIndex);
-  assert(execIndex < scriptFileIndex);
+  assert(execIndex < workDirIndex);
+  assert(workDirIndex < scriptsDirIndex);
+  assert(scriptsDirIndex < libsSymlinkIndex);
+  assert(libsSymlinkIndex < scriptFileIndex);
   assert(scriptFileIndex < scriptWriteIndex);
   assert(scriptWriteIndex < chmodIndex);
   assert(chmodIndex < nodeIndex);
   assert(nodeIndex < removeIndex);
   assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed/);
-  assert.match(workflow, /rm -f "\$container_script_file"/);
+  assert.match(workflow, /rm -rf "\$container_work_dir"/);
+  assert.doesNotMatch(workflow, /mktemp \/tmp\/tenant-nullability-script\.XXXXXX\.mjs/);
   assert.doesNotMatch(workflow, /tenant_override_file/);
   assert.doesNotMatch(workflow, /cat > "\$tenant_override_file"/);
 });
@@ -173,6 +183,7 @@ test('tenant nullability dry-run workflow separates report output from transport
 
 test('tenant nullability dry-run workflow preserves report when dry-run exits nonzero', () => {
   const containerReportNeedle = 'container_report_file="$(mktemp /tmp/tenant-nullability-report.XXXXXX)"';
+  const containerScriptNeedle = 'container_script_file="$container_work_dir/scripts/release/tenant-nullability-dry-run.mjs"';
   const nodeCommandNeedle =
     'node "$container_script_file" --fail-on-null --exclude AuditLog > "$container_report_file"';
   const nodeStatusNeedle = 'node_status="$?"';
@@ -180,6 +191,7 @@ test('tenant nullability dry-run workflow preserves report when dry-run exits no
   const exitNodeStatusNeedle = 'exit "$node_status"';
 
   const containerReportIndex = workflow.indexOf(containerReportNeedle);
+  const containerScriptIndex = workflow.indexOf(containerScriptNeedle);
   const nodeCommandIndex = workflow.indexOf(nodeCommandNeedle);
   const nodeStatusIndex = workflow.indexOf(nodeStatusNeedle);
   const catReportIndex = workflow.indexOf(catReportNeedle);
@@ -188,12 +200,14 @@ test('tenant nullability dry-run workflow preserves report when dry-run exits no
   const innerShellBeforeNode = workflow.slice(innerShellStartIndex, nodeCommandIndex);
 
   assert.notEqual(containerReportIndex, -1);
+  assert.notEqual(containerScriptIndex, -1);
   assert.notEqual(nodeCommandIndex, -1);
   assert.notEqual(nodeStatusIndex, -1);
   assert.notEqual(catReportIndex, -1);
   assert.notEqual(exitNodeStatusIndex, -1);
   assert.match(innerShellBeforeNode, /\n\s*set -u\n/);
   assert.doesNotMatch(innerShellBeforeNode, /\n\s*set -eu\b/);
+  assert(containerScriptIndex < nodeCommandIndex);
   assert(containerReportIndex < nodeCommandIndex);
   assert(nodeCommandIndex < nodeStatusIndex);
   assert(nodeStatusIndex < catReportIndex);
