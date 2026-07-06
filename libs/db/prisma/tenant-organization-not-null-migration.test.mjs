@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 
 const migrationPath = new URL(
@@ -9,6 +10,7 @@ const migrationPath = new URL(
 const schemaPath = new URL('./schema.prisma', import.meta.url).pathname;
 const dryRunPath = new URL('../../../scripts/release/tenant-nullability-dry-run.mjs', import.meta.url)
   .pathname;
+const apiSrcDir = new URL('../../../apps/api/src', import.meta.url).pathname;
 
 const eligibleTables = [
   ['Carer', 'carer'],
@@ -85,3 +87,25 @@ test('tenant dry-run inventory remains aligned with NOT NULL migration scope', (
   assert.match(dryRun, /\{ model: 'AuditLog', table: 'audit_log'/);
   assert.match(dryRun, /--exclude/);
 });
+
+test('tenant organization NOT NULL fields are not queried with nullable filters', () => {
+  const source = readTree(apiSrcDir);
+
+  assert.doesNotMatch(source, /organization_id:\s*\{\s*not:\s*null\s*\}/);
+});
+
+function readTree(dir) {
+  return readdirSync(dir)
+    .map((entry) => join(dir, entry))
+    .map((path) => {
+      const stat = statSync(path);
+      if (stat.isDirectory()) {
+        return readTree(path);
+      }
+      if (stat.isFile() && /\.(?:ts|tsx|js|mjs)$/.test(path)) {
+        return readFileSync(path, 'utf8');
+      }
+      return '';
+    })
+    .join('\n');
+}
