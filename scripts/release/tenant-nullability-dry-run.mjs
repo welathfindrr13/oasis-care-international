@@ -71,20 +71,31 @@ export function selectTenantNullabilityTables({ excludeModels = [] } = {}) {
   return SENSITIVE_TENANT_TABLES.filter((table) => !excluded.has(table.model));
 }
 
+export function tenantNullabilityCountSql(table) {
+  const isKnownTable = SENSITIVE_TENANT_TABLES.some(
+    (entry) => entry.model === table.model && entry.table === table.table,
+  );
+  if (!isKnownTable) {
+    throw new Error(`Table is not in tenant nullability inventory: ${table.model}`);
+  }
+
+  return `SELECT COUNT(*)::int AS count FROM "${table.table}" WHERE organization_id IS NULL`;
+}
+
 export async function collectTenantNullabilityCounts(prisma, { tables = SENSITIVE_TENANT_TABLES } = {}) {
   const results = [];
 
   for (const table of tables) {
-    const delegate = prisma?.[table.delegate];
-    if (!delegate || typeof delegate.count !== 'function') {
-      throw new Error(`Prisma delegate missing for ${table.model}`);
+    if (!prisma || typeof prisma.$queryRawUnsafe !== 'function') {
+      throw new Error('Prisma raw query client missing for tenant nullability dry-run');
     }
 
-    const count = await delegate.count({
-      where: {
-        organization_id: null,
-      },
-    });
+    // Safe because table names come only from SENSITIVE_TENANT_TABLES above.
+    const rows = await prisma.$queryRawUnsafe(tenantNullabilityCountSql(table));
+    const count = Number(rows?.[0]?.count ?? 0);
+    if (!Number.isSafeInteger(count) || count < 0) {
+      throw new Error(`Invalid null tenant count for ${table.model}`);
+    }
 
     results.push({
       model: table.model,
@@ -100,11 +111,12 @@ export async function runTenantNullabilityDryRun({
   prisma,
   failOnNull = false,
   excludeModels = [],
+  tables: selectedTables,
   log = console.log,
 } = {}) {
   let client = prisma;
   let shouldDisconnect = false;
-  const tables = selectTenantNullabilityTables({ excludeModels });
+  const tables = selectedTables ?? selectTenantNullabilityTables({ excludeModels });
 
   if (!client) {
     const { PrismaClient } = await import('../../libs/db/src/generated/client/index.js');
