@@ -76,6 +76,21 @@ jobs:
           remote_tmp="$(mktemp -d)"
           trap 'rm -rf "$remote_tmp"' EXIT
 
+          if ! command -v docker >/dev/null 2>&1; then
+            printf 'TENANT_NULLABILITY_DIAGNOSTIC: docker unavailable\n'
+            exit 127
+          fi
+
+          if ! docker compose version >/dev/null 2>&1; then
+            printf 'TENANT_NULLABILITY_DIAGNOSTIC: docker compose unavailable\n'
+            exit 127
+          fi
+
+          if ! docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml config --quiet >/dev/null 2>> "$remote_tmp/transport.err"; then
+            printf 'TENANT_NULLABILITY_DIAGNOSTIC: docker compose config failed\n'
+            exit 1
+          fi
+
           printf 'TENANT_NULLABILITY_DIAGNOSTIC: docker command starting\n'
           set +e
           docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml run --rm --no-deps --entrypoint sh \
@@ -127,6 +142,10 @@ jobs:
           sanitized_report=''
           sanitized_report_lines=0
           unallowlisted_output=0
+          saw_docker_unavailable=0
+          saw_docker_compose_unavailable=0
+          saw_docker_compose_config_failed=0
+          saw_docker_command_starting=0
           saw_container_command_started=0
           saw_node_command_started=0
           saw_node_command_empty_report=0
@@ -136,7 +155,19 @@ jobs:
             case "$line" in
               "")
                 ;;
-              "TENANT_NULLABILITY_DIAGNOSTIC: remote command started"|"TENANT_NULLABILITY_DIAGNOSTIC: docker command starting")
+              "TENANT_NULLABILITY_DIAGNOSTIC: remote command started")
+                ;;
+              "TENANT_NULLABILITY_DIAGNOSTIC: docker unavailable")
+                saw_docker_unavailable=1
+                ;;
+              "TENANT_NULLABILITY_DIAGNOSTIC: docker compose unavailable")
+                saw_docker_compose_unavailable=1
+                ;;
+              "TENANT_NULLABILITY_DIAGNOSTIC: docker compose config failed")
+                saw_docker_compose_config_failed=1
+                ;;
+              "TENANT_NULLABILITY_DIAGNOSTIC: docker command starting")
+                saw_docker_command_starting=1
                 ;;
               "TENANT_NULLABILITY_DIAGNOSTIC: container command started")
                 saw_container_command_started=1
@@ -191,11 +222,17 @@ jobs:
           fi
 
           if [ "$sanitized_report_lines" -eq 0 ]; then
-            if [ "$saw_container_stdout_empty" -ne 0 ]; then
+            if [ "$saw_docker_unavailable" -ne 0 ]; then
+              printf 'Tenant nullability dry-run diagnostic class: docker unavailable.\n' >&2
+            elif [ "$saw_docker_compose_unavailable" -ne 0 ]; then
+              printf 'Tenant nullability dry-run diagnostic class: docker compose unavailable.\n' >&2
+            elif [ "$saw_docker_compose_config_failed" -ne 0 ]; then
+              printf 'Tenant nullability dry-run diagnostic class: docker compose config failed.\n' >&2
+            elif [ "$saw_docker_command_starting" -ne 0 ] && [ "$saw_container_command_started" -eq 0 ]; then
+              printf 'Tenant nullability dry-run diagnostic class: docker compose run did not start container command.\n' >&2
+            elif [ "$saw_container_stdout_empty" -ne 0 ]; then
               printf 'Tenant nullability dry-run diagnostic class: container command produced no stdout.\n' >&2
-            elif [ "$saw_container_command_started" -eq 0 ]; then
-              printf 'Tenant nullability dry-run diagnostic class: container command did not reach node start.\n' >&2
-            elif [ "$saw_node_command_started" -eq 0 ]; then
+            elif [ "$saw_container_command_started" -ne 0 ] && [ "$saw_node_command_started" -eq 0 ]; then
               printf 'Tenant nullability dry-run diagnostic class: container command did not reach node start.\n' >&2
             elif [ "$saw_node_command_empty_report" -ne 0 ]; then
               printf 'Tenant nullability dry-run diagnostic class: node command produced empty report.\n' >&2

@@ -258,6 +258,77 @@ test('tenant nullability dry-run workflow classifies no-report failures without 
   assert.doesNotMatch(workflow, /cat "\$remote_tmp\/transport\.(out|err)"/);
 });
 
+test('tenant nullability dry-run workflow classifies docker startup failures separately', () => {
+  const dockerUnavailableIndex = workflow.indexOf('TENANT_NULLABILITY_DIAGNOSTIC: docker unavailable');
+  const composeUnavailableIndex = workflow.indexOf('TENANT_NULLABILITY_DIAGNOSTIC: docker compose unavailable');
+  const composeConfigFailedIndex = workflow.indexOf('TENANT_NULLABILITY_DIAGNOSTIC: docker compose config failed');
+  const composeRunNoContainerIndex = workflow.indexOf(
+    'Tenant nullability dry-run diagnostic class: docker compose run did not start container command.',
+  );
+  const containerNoNodeIndex = workflow.indexOf(
+    'Tenant nullability dry-run diagnostic class: container command did not reach node start.',
+  );
+
+  assert.notEqual(dockerUnavailableIndex, -1);
+  assert.notEqual(composeUnavailableIndex, -1);
+  assert.notEqual(composeConfigFailedIndex, -1);
+  assert.notEqual(composeRunNoContainerIndex, -1);
+  assert.notEqual(containerNoNodeIndex, -1);
+  assert.match(workflow, /command -v docker >\/dev\/null 2>&1/);
+  assert.match(workflow, /docker compose version >\/dev\/null 2>&1/);
+  assert.match(
+    workflow,
+    /docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml config --quiet >\/dev\/null 2>> "\$remote_tmp\/transport\.err"/,
+  );
+  assert.match(workflow, /saw_docker_command_starting=1/);
+  assert.match(workflow, /saw_container_command_started=1/);
+  assert.match(workflow, /saw_node_command_started=1/);
+  assert(
+    composeRunNoContainerIndex < containerNoNodeIndex,
+    'docker compose startup failure should be classified before container-started pre-node failure',
+  );
+});
+
+test('tenant nullability dry-run workflow checks compose no-start before generic empty stdout', () => {
+  const composeRunConditionIndex = workflow.indexOf(
+    'elif [ "$saw_docker_command_starting" -ne 0 ] && [ "$saw_container_command_started" -eq 0 ]; then',
+  );
+  const stdoutEmptyConditionIndex = workflow.indexOf('elif [ "$saw_container_stdout_empty" -ne 0 ]; then');
+
+  assert.notEqual(composeRunConditionIndex, -1);
+  assert.notEqual(stdoutEmptyConditionIndex, -1);
+  assert(
+    composeRunConditionIndex < stdoutEmptyConditionIndex,
+    'compose run no-start must not be masked by the generic empty-stdout classifier',
+  );
+});
+
+test('tenant nullability dry-run workflow reserves container no-node class for started containers', () => {
+  const composeRunConditionIndex = workflow.indexOf(
+    'elif [ "$saw_docker_command_starting" -ne 0 ] && [ "$saw_container_command_started" -eq 0 ]; then',
+  );
+  const composeRunClassIndex = workflow.indexOf(
+    "printf 'Tenant nullability dry-run diagnostic class: docker compose run did not start container command.\\n' >&2",
+  );
+  const containerNoNodeConditionIndex = workflow.indexOf(
+    'elif [ "$saw_container_command_started" -ne 0 ] && [ "$saw_node_command_started" -eq 0 ]; then',
+  );
+  const containerNoNodeClassIndex = workflow.indexOf(
+    "printf 'Tenant nullability dry-run diagnostic class: container command did not reach node start.\\n' >&2",
+  );
+
+  assert.notEqual(composeRunConditionIndex, -1);
+  assert.notEqual(composeRunClassIndex, -1);
+  assert.notEqual(containerNoNodeConditionIndex, -1);
+  assert.notEqual(containerNoNodeClassIndex, -1);
+  assert(composeRunConditionIndex < composeRunClassIndex);
+  assert(containerNoNodeConditionIndex < containerNoNodeClassIndex);
+  assert.doesNotMatch(
+    workflow,
+    /elif \[ "\$saw_container_command_started" -eq 0 \]; then\s*printf 'Tenant nullability dry-run diagnostic class: container command did not reach node start\\\.\\n' >&2/,
+  );
+});
+
 test('tenant nullability dry-run workflow emits class-only diagnostic markers for empty report paths', () => {
   assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: remote command started/);
   assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: docker command starting/);
