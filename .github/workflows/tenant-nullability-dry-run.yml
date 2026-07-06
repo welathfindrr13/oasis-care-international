@@ -127,7 +127,7 @@ jobs:
                 printf "TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed\n"
                 rm -rf "$container_work_dir"
                 exit 1
-              }
+              fi
 
               container_script_file="$container_work_dir/scripts/release/tenant-nullability-dry-run.mjs"
               if ! cat > "$container_script_file"; then

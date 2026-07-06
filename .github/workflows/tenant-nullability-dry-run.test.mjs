@@ -126,6 +126,10 @@ test('tenant nullability dry-run workflow stages reviewed script through contain
   assert(chmodIndex < nodeIndex);
   assert(nodeIndex < removeIndex);
   assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed/);
+  assert.match(
+    workflow,
+    /if ! ln -s \/app\/libs "\$container_work_dir\/libs"; then\s*\n\s*printf "TENANT_NULLABILITY_DIAGNOSTIC: container script staging failed\\n"\s*\n\s*rm -rf "\$container_work_dir"\s*\n\s*exit 1\s*\n\s*fi/,
+  );
   assert.match(workflow, /rm -rf "\$container_work_dir"/);
   assert.doesNotMatch(workflow, /mktemp \/tmp\/tenant-nullability-script\.XXXXXX\.mjs/);
   assert.doesNotMatch(workflow, /tenant_override_file/);
