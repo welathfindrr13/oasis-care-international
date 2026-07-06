@@ -55,7 +55,7 @@ jobs:
 
           cleanup() {
             if [ -n "${remote_script_dir:-}" ]; then
-              ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" "rm -rf '$remote_script_dir'" >/dev/null 2>> "$diagnostic_file" || true
+              ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" "chmod u+w '$remote_script_dir' 2>/dev/null || true; rm -rf '$remote_script_dir'" >/dev/null 2>> "$diagnostic_file" || true
             fi
             rm -f "$report_file" "$diagnostic_file"
           }
@@ -65,6 +65,7 @@ jobs:
           remote_script_dir="$(ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'mktemp -d' 2>> "$diagnostic_file")"
           scp -i ~/.ssh/oasis_vps -o BatchMode=yes scripts/release/tenant-nullability-dry-run.mjs "$OASIS_VPS_USER@$OASIS_VPS_HOST:$remote_script_dir/tenant-nullability-dry-run.mjs" 2>> "$diagnostic_file"
           ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" "chmod 0444 '$remote_script_dir/tenant-nullability-dry-run.mjs'" 2>> "$diagnostic_file"
+          ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" "chmod 0555 '$remote_script_dir'" 2>> "$diagnostic_file"
 
           set +e
           ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'bash -se' -- "$remote_script_dir" <<'REMOTE' > "$report_file" 2>> "$diagnostic_file"

@@ -59,6 +59,7 @@ test('tenant nullability dry-run workflow copies only the reviewed dry-run scrip
     /scp -i ~\/\.ssh\/oasis_vps -o BatchMode=yes scripts\/release\/tenant-nullability-dry-run\.mjs "\$OASIS_VPS_USER@\$OASIS_VPS_HOST:\$remote_script_dir\/tenant-nullability-dry-run\.mjs"/,
   );
   assert.match(workflow, /chmod 0444 '\$remote_script_dir\/tenant-nullability-dry-run\.mjs'/);
+  assert.match(workflow, /chmod 0555 '\$remote_script_dir'/);
   assert.doesNotMatch(scpLines, /deploy\/v2\/\.env/);
   assert.doesNotMatch(scpLines, /package\.json/);
   assert.doesNotMatch(scpLines, /(pnpm-lock\.yaml|package-lock\.json|yarn\.lock)/);
@@ -169,10 +170,23 @@ test('tenant nullability dry-run workflow avoids host chown and world-writable r
     'tenant report must be created inside the API container rather than a host bind mount',
   );
   assert.doesNotMatch(workflow, /\bchown\b/);
+  assert.doesNotMatch(workflow, /chmod -R 0?77[0-7]/);
+  assert.doesNotMatch(workflow, /chmod 0?777/);
   assert.doesNotMatch(workflow, /chmod 0777 "\$remote_tmp"/);
   assert.doesNotMatch(workflow, /chmod 0?77[0-7] "\$remote_tmp"/);
   assert.doesNotMatch(workflow, /-v "\$remote_tmp:\/tmp\/tenant-nullability:rw"/);
   assert.match(workflow, /trap 'rm -rf "\$remote_tmp"' EXIT/);
+});
+
+test('tenant nullability dry-run workflow restores temp script directory for cleanup', () => {
+  const restoreIndex = workflow.indexOf('chmod u+w \'$remote_script_dir\' 2>/dev/null || true');
+  const removeIndex = workflow.indexOf('rm -rf \'$remote_script_dir\'');
+
+  assert.notEqual(restoreIndex, -1);
+  assert.notEqual(removeIndex, -1);
+  assert(restoreIndex < removeIndex);
+  assert.match(workflow, /chmod 0555 '\$remote_script_dir'/);
+  assert.match(workflow, /chmod 0444 '\$remote_script_dir\/tenant-nullability-dry-run\.mjs'/);
 });
 
 test('tenant nullability dry-run workflow emits report only after validation', () => {
