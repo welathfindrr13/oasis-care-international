@@ -77,9 +77,6 @@ export class EmbeddingBatchService {
       // Get all clients with AI summary enabled  
       const clients = await this.prisma.client.findMany({
         where: {
-          organization_id: {
-            not: null,
-          },
           organization: {
             ai_summary_enabled: true,
           },

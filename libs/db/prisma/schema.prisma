@@ -14,7 +14,7 @@ generator client {
 
 model Carer {
   id                 String          @id @default(uuid())
-  organization_id    String?
+  organization_id    String
   first_name         String
   last_name          String
   email              String          @unique
@@ -25,7 +25,7 @@ model Carer {
   shifts             CarerShift[]
   care_logs          CareLog[]
   approved_summaries HealthSummary[]
-  organization       Organization?   @relation(fields: [organization_id], references: [id])
+  organization       Organization    @relation(fields: [organization_id], references: [id])
   created_at         DateTime        @default(now())
   updated_at         DateTime        @updatedAt
   deleted_at         DateTime?
@@ -42,11 +42,11 @@ model Client {
   city             String
   postcode         String
   date_of_birth    DateTime?
-  organization_id  String?
+  organization_id  String
   visits           Visit[]
   care_logs        CareLog[]
   prescriptions    Prescription[]
-  organization     Organization?   @relation(fields: [organization_id], references: [id])
+  organization     Organization    @relation(fields: [organization_id], references: [id])
   health_summaries HealthSummary[]
   care_rooms       CareRoom[]
   verified_visit_stories VerifiedVisitStory[]
@@ -65,7 +65,7 @@ model Client {
 
 model Visit {
   id                       String                     @id @default(uuid())
-  organization_id          String?
+  organization_id          String
   carer_id                 String
   client_id                String
   scheduled_start          DateTime
@@ -76,7 +76,7 @@ model Visit {
   notes                    String?
   carer                    Carer                      @relation(fields: [carer_id], references: [id])
   client                   Client                     @relation(fields: [client_id], references: [id])
-  organization             Organization?              @relation(fields: [organization_id], references: [id])
+  organization             Organization               @relation(fields: [organization_id], references: [id])
   tasks                    VisitTask[]
   care_logs                CareLog[]
   medication_administrations MedicationAdministration[]
@@ -115,7 +115,7 @@ model VisitTask {
 
 model CarerShift {
   id                    String                   @id @default(uuid())
-  organization_id       String?
+  organization_id       String
   carer_id              String
   clock_in_at           DateTime
   clock_out_at          DateTime?
@@ -134,7 +134,7 @@ model CarerShift {
   location_consent_at   DateTime?
   notes                 String?
   carer                 Carer                    @relation(fields: [carer_id], references: [id])
-  organization          Organization?            @relation(fields: [organization_id], references: [id])
+  organization          Organization             @relation(fields: [organization_id], references: [id])
   created_at            DateTime                 @default(now())
   updated_at            DateTime                 @updatedAt
   deleted_at            DateTime?
@@ -226,7 +226,7 @@ model MedicationAdministration {
 
 model MedicationAudit {
   id                           String                    @id @default(uuid())
-  organization_id              String?
+  organization_id              String
   prescription_id              String?
   medication_administration_id String?
   action                       MedicationAuditAction
@@ -234,7 +234,7 @@ model MedicationAudit {
   actor_role                   String
   changes                      String // JSON object of what changed
   timestamp                    DateTime                  @default(now())
-  organization                 Organization?             @relation(fields: [organization_id], references: [id])
+  organization                 Organization              @relation(fields: [organization_id], references: [id])
   prescription                 Prescription?             @relation(fields: [prescription_id], references: [id])
   medication_administration    MedicationAdministration? @relation(fields: [medication_administration_id], references: [id])
 
@@ -745,7 +745,7 @@ model FamilyPulse {
 
 model Assessment {
   id                  String           @id @default(uuid())
-  organization_id     String?
+  organization_id     String
   client_id           String
   visit_id            String?
   status              AssessmentStatus @default(DRAFT)
@@ -774,7 +774,7 @@ model Assessment {
 
 model CarePlan {
   id             String         @id @default(uuid())
-  organization_id String?
+  organization_id String
   client_id      String
   assessment_id  String?
   status         CarePlanStatus @default(DRAFT)
@@ -806,7 +806,7 @@ model CarePlan {
 
 model EvidencePack {
   id              String             @id @default(uuid())
-  organization_id String?
+  organization_id String
   client_id       String
   care_plan_id    String?
   status          EvidencePackStatus @default(DRAFT)
@@ -900,7 +900,7 @@ model OrganizationMembership {
 
 model CareLog {
   id                             String                    @id @default(uuid())
-  organization_id                String?
+  organization_id                String
   visit_id                       String?
   client_id                      String
   carer_id                       String
@@ -932,7 +932,7 @@ model CareLog {
   created_at                     DateTime                  @default(now())
   updated_at                     DateTime                  @updatedAt
   deleted_at                     DateTime?
-  organization                   Organization?             @relation(fields: [organization_id], references: [id])
+  organization                   Organization              @relation(fields: [organization_id], references: [id])
   visit                          Visit?                    @relation(fields: [visit_id], references: [id])
   client                         Client                    @relation(fields: [client_id], references: [id])
   carer                          Carer                     @relation(fields: [carer_id], references: [id])
@@ -988,7 +988,7 @@ model HealthSummary {
 
 model ConsentRecord {
   id               String   @id @default(uuid())
-  organization_id  String?
+  organization_id  String
   user_id          String
   consent_type     String   @db.VarChar(50)
   purpose          String   @db.VarChar(100)
@@ -997,7 +997,7 @@ model ConsentRecord {
   withdrawn_at     DateTime?
   legal_basis      String   @db.VarChar(50)
   metadata         Json?
-  organization     Organization? @relation(fields: [organization_id], references: [id])
+  organization     Organization @relation(fields: [organization_id], references: [id])
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
 
@@ -1047,7 +1047,7 @@ model RetentionPolicy {
 
 model ErasureQueue {
   id             String   @id @default(uuid())
-  organization_id String?
+  organization_id String
   user_id        String
   request_type   String   @db.VarChar(50)
   status         String   @db.VarChar(20) @default("PENDING")
@@ -1055,7 +1055,7 @@ model ErasureQueue {
   scheduled_for  DateTime?
   completed_at   DateTime?
   metadata       Json?
-  organization   Organization? @relation(fields: [organization_id], references: [id])
+  organization   Organization @relation(fields: [organization_id], references: [id])
   created_at     DateTime @default(now())
   updated_at     DateTime @updatedAt
 

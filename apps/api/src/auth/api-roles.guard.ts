@@ -126,7 +126,6 @@ export class ApiRolesGuard extends RolesGuard implements CanActivate {
       const byId = await this.prisma.carer.findMany({
         where: this.prisma.whereNotDeleted({
           id: userId,
-          organization_id: { not: null },
         }),
         select: { organization_id: true },
         take: 2,
@@ -140,7 +139,6 @@ export class ApiRolesGuard extends RolesGuard implements CanActivate {
       const byEmail = await this.prisma.carer.findMany({
         where: this.prisma.whereNotDeleted({
           email: normalizedEmail,
-          organization_id: { not: null },
         }),
         select: { organization_id: true },
         take: 2,
