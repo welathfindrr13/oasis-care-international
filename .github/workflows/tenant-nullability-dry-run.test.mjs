@@ -4,6 +4,10 @@ import fs from 'node:fs';
 
 const workflow = fs.readFileSync(new URL('./tenant-nullability-dry-run.yml', import.meta.url), 'utf8');
 const apiDockerfile = fs.readFileSync(new URL('../../apps/api/Dockerfile', import.meta.url), 'utf8');
+const scpLines = workflow
+  .split('\n')
+  .filter((line) => /\bscp\b/.test(line))
+  .join('\n');
 
 test('tenant nullability dry-run workflow is manual and uses fixed staging SSH secrets', () => {
   assert.match(workflow, /workflow_dispatch:/);
@@ -31,6 +35,46 @@ test('tenant nullability dry-run workflow runs only the fixed eligible-table gat
   assert.doesNotMatch(workflow, /workflow_dispatch:[\s\S]*inputs:/);
 });
 
+test('tenant nullability dry-run workflow uses the reviewed checkout script', () => {
+  const checkoutIndex = workflow.indexOf('uses: actions/checkout@');
+  const localCheckIndex = workflow.indexOf('test -f scripts/release/tenant-nullability-dry-run.mjs');
+  const remoteDirIndex = workflow.indexOf('remote_script_dir="$(ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST"');
+  const scpIndex = workflow.indexOf('scp -i ~/.ssh/oasis_vps -o BatchMode=yes scripts/release/tenant-nullability-dry-run.mjs');
+  const composeIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env');
+
+  assert.notEqual(checkoutIndex, -1);
+  assert.notEqual(localCheckIndex, -1);
+  assert.notEqual(remoteDirIndex, -1);
+  assert.notEqual(scpIndex, -1);
+  assert.notEqual(composeIndex, -1);
+  assert(checkoutIndex < localCheckIndex);
+  assert(localCheckIndex < remoteDirIndex);
+  assert(remoteDirIndex < scpIndex);
+  assert(scpIndex < composeIndex);
+});
+
+test('tenant nullability dry-run workflow copies only the reviewed dry-run script', () => {
+  assert.match(
+    workflow,
+    /scp -i ~\/\.ssh\/oasis_vps -o BatchMode=yes scripts\/release\/tenant-nullability-dry-run\.mjs "\$OASIS_VPS_USER@\$OASIS_VPS_HOST:\$remote_script_dir\/tenant-nullability-dry-run\.mjs"/,
+  );
+  assert.match(workflow, /chmod 0444 '\$remote_script_dir\/tenant-nullability-dry-run\.mjs'/);
+  assert.match(workflow, /chmod 0555 '\$remote_script_dir'/);
+  assert.doesNotMatch(scpLines, /deploy\/v2\/\.env/);
+  assert.doesNotMatch(scpLines, /package\.json/);
+  assert.doesNotMatch(scpLines, /(pnpm-lock\.yaml|package-lock\.json|yarn\.lock)/);
+  assert.doesNotMatch(scpLines, /(dist|build|\.next|apps|libs)\//);
+  assert.doesNotMatch(scpLines, /\s\.\s/);
+  assert.doesNotMatch(scpLines, /\* /);
+});
+
+test('tenant nullability dry-run workflow mounts only the remote script directory read-only', () => {
+  assert.match(workflow, /-v "\$remote_script_dir:\/app\/scripts\/release:ro"/);
+  assert.doesNotMatch(workflow, /-v "\$PWD\/scripts\/release:\/app\/scripts\/release:ro"/);
+  assert.doesNotMatch(workflow, /-v "\$PWD:\/app/);
+  assert.doesNotMatch(workflow, /\/opt\/oasis-care\/scripts\/release/);
+});
+
 test('tenant nullability dry-run workflow does not print env files or secrets', () => {
   assert.doesNotMatch(workflow, /cat deploy\/v2\/\.env/);
   assert.doesNotMatch(workflow, /\bprintenv\b/);
@@ -55,8 +99,10 @@ test('tenant nullability dry-run workflow validates sanitized output shape', () 
 test('tenant nullability dry-run workflow separates report output from transport diagnostics', () => {
   assert.match(workflow, /report_file="\$\(mktemp\)"/);
   assert.match(workflow, /diagnostic_file="\$\(mktemp\)"/);
-  assert.match(workflow, /trap 'rm -f "\$report_file" "\$diagnostic_file"' EXIT/);
-  assert.match(workflow, /ssh[\s\S]*<<'REMOTE'\s*> "\$report_file" 2> "\$diagnostic_file"/);
+  assert.match(workflow, /cleanup\(\) \{/);
+  assert.match(workflow, /rm -f "\$report_file" "\$diagnostic_file"/);
+  assert.match(workflow, /trap cleanup EXIT/);
+  assert.match(workflow, /ssh[\s\S]*<<'REMOTE'\s*> "\$report_file" 2>> "\$diagnostic_file"/);
   assert.match(workflow, /remote_tmp="\$\(mktemp -d\)"/);
   assert.match(workflow, /trap 'rm -rf "\$remote_tmp"' EXIT/);
   assert.doesNotMatch(workflow, /-v "\$remote_tmp:\/tmp\/tenant-nullability:rw"/);
@@ -124,10 +170,23 @@ test('tenant nullability dry-run workflow avoids host chown and world-writable r
     'tenant report must be created inside the API container rather than a host bind mount',
   );
   assert.doesNotMatch(workflow, /\bchown\b/);
+  assert.doesNotMatch(workflow, /chmod -R 0?77[0-7]/);
+  assert.doesNotMatch(workflow, /chmod 0?777/);
   assert.doesNotMatch(workflow, /chmod 0777 "\$remote_tmp"/);
   assert.doesNotMatch(workflow, /chmod 0?77[0-7] "\$remote_tmp"/);
   assert.doesNotMatch(workflow, /-v "\$remote_tmp:\/tmp\/tenant-nullability:rw"/);
   assert.match(workflow, /trap 'rm -rf "\$remote_tmp"' EXIT/);
+});
+
+test('tenant nullability dry-run workflow restores temp script directory for cleanup', () => {
+  const restoreIndex = workflow.indexOf('chmod u+w \'$remote_script_dir\' 2>/dev/null || true');
+  const removeIndex = workflow.indexOf('rm -rf \'$remote_script_dir\'');
+
+  assert.notEqual(restoreIndex, -1);
+  assert.notEqual(removeIndex, -1);
+  assert(restoreIndex < removeIndex);
+  assert.match(workflow, /chmod 0555 '\$remote_script_dir'/);
+  assert.match(workflow, /chmod 0444 '\$remote_script_dir\/tenant-nullability-dry-run\.mjs'/);
 });
 
 test('tenant nullability dry-run workflow emits report only after validation', () => {
