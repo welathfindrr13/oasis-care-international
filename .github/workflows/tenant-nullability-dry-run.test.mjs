@@ -176,6 +176,10 @@ test('tenant nullability dry-run workflow classifies no-report failures without 
 
   assert.match(workflow, /Tenant nullability dry-run diagnostic class: remote command produced no report\./);
   assert.match(workflow, /Tenant nullability dry-run diagnostic class: empty report output\./);
+  assert.match(workflow, /Tenant nullability dry-run diagnostic class: container command produced no stdout\./);
+  assert.match(workflow, /Tenant nullability dry-run diagnostic class: container command did not reach node start\./);
+  assert.match(workflow, /Tenant nullability dry-run diagnostic class: node command produced empty report\./);
+  assert.match(workflow, /Tenant nullability dry-run diagnostic class: node command exited before report output\./);
   assert.match(workflow, /Tenant nullability dry-run diagnostic class: report missing required header\./);
   assert.match(workflow, /Tenant nullability dry-run diagnostic class: report missing completion marker\./);
   assert.match(workflow, /\[ -s "\$diagnostic_file" \]/);
@@ -193,4 +197,40 @@ test('tenant nullability dry-run workflow classifies no-report failures without 
   assert.doesNotMatch(workflow, /printf '%s\\n' "\$diagnostic_file"/);
   assert.doesNotMatch(workflow, /cat "\$diagnostic_file"/);
   assert.doesNotMatch(workflow, /cat "\$remote_tmp\/transport\.(out|err)"/);
+});
+
+test('tenant nullability dry-run workflow emits class-only diagnostic markers for empty report paths', () => {
+  assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: remote command started/);
+  assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: docker command starting/);
+  assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: docker command exited status=%s/);
+  assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: container command started/);
+  assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: node command started/);
+  assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: node command exited status=%s/);
+  assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: node command produced empty report/);
+  assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: container report cat attempted/);
+  assert.match(workflow, /TENANT_NULLABILITY_DIAGNOSTIC: container command produced no stdout/);
+  assert.match(workflow, /saw_container_command_started=0/);
+  assert.match(workflow, /saw_node_command_started=0/);
+  assert.match(workflow, /saw_node_command_empty_report=0/);
+  assert.match(workflow, /saw_container_report_cat_attempted=0/);
+  assert.match(workflow, /saw_container_stdout_empty=0/);
+});
+
+test('tenant nullability dry-run workflow consumes diagnostic markers before report validation', () => {
+  const markerCaseIndex = workflow.indexOf('"TENANT_NULLABILITY_DIAGNOSTIC: remote command started"');
+  const headerCaseIndex = workflow.indexOf('"Tenant nullability dry-run"|"Excluded models: AuditLog"|"No data changed.")');
+  const noReportIndex = workflow.indexOf('[ "$sanitized_report_lines" -eq 0 ]');
+  const delimiterIndex = workflow.indexOf('TENANT_NULLABILITY_DRY_RUN_REPORT_START');
+  const nodeStatusPatternIndex = workflow.indexOf('^TENANT_NULLABILITY_DIAGNOSTIC: (node|docker) command exited status=[0-9]+$');
+
+  assert.notEqual(markerCaseIndex, -1);
+  assert.notEqual(headerCaseIndex, -1);
+  assert.notEqual(noReportIndex, -1);
+  assert.notEqual(delimiterIndex, -1);
+  assert.notEqual(nodeStatusPatternIndex, -1);
+  assert(markerCaseIndex < headerCaseIndex);
+  assert(headerCaseIndex < noReportIndex);
+  assert(noReportIndex < delimiterIndex);
+  assert.match(workflow, /sanitized_report="\$\{sanitized_report\}\$\{line\}"/);
+  assert.doesNotMatch(workflow, /sanitized_report=.*TENANT_NULLABILITY_DIAGNOSTIC/);
 });

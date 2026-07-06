@@ -53,31 +53,44 @@ jobs:
           set +e
           ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'bash -se' <<'REMOTE' > "$report_file" 2> "$diagnostic_file"
           set -euo pipefail
+          printf 'TENANT_NULLABILITY_DIAGNOSTIC: remote command started\n'
           cd /opt/oasis-care
           test -f scripts/release/tenant-nullability-dry-run.mjs
           remote_tmp="$(mktemp -d)"
           trap 'rm -rf "$remote_tmp"' EXIT
 
+          printf 'TENANT_NULLABILITY_DIAGNOSTIC: docker command starting\n'
           set +e
           docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml run --rm --no-deps --entrypoint sh \
             -v "$PWD/scripts/release:/app/scripts/release:ro" \
             api -lc '
               set -u
+              printf "TENANT_NULLABILITY_DIAGNOSTIC: container command started\n"
               container_report_file="$(mktemp /tmp/tenant-nullability-report.XXXXXX)"
 
+              printf "TENANT_NULLABILITY_DIAGNOSTIC: node command started\n"
               set +e
               node /app/scripts/release/tenant-nullability-dry-run.mjs --fail-on-null --exclude AuditLog > "$container_report_file"
               node_status="$?"
               set -e
+              printf "TENANT_NULLABILITY_DIAGNOSTIC: node command exited status=%s\n" "$node_status"
 
-              cat "$container_report_file"
+              if [ -s "$container_report_file" ]; then
+                printf "TENANT_NULLABILITY_DIAGNOSTIC: container report cat attempted\n"
+                cat "$container_report_file"
+              else
+                printf "TENANT_NULLABILITY_DIAGNOSTIC: node command produced empty report\n"
+              fi
               exit "$node_status"
             ' > "$remote_tmp/report.out" 2> "$remote_tmp/transport.err"
           status=$?
           set -e
+          printf 'TENANT_NULLABILITY_DIAGNOSTIC: docker command exited status=%s\n' "$status"
 
-          if [ -f "$remote_tmp/report.out" ]; then
+          if [ -s "$remote_tmp/report.out" ]; then
             cat "$remote_tmp/report.out"
+          else
+            printf 'TENANT_NULLABILITY_DIAGNOSTIC: container command produced no stdout\n'
           fi
 
           exit "$status"
@@ -97,9 +110,36 @@ jobs:
           sanitized_report=''
           sanitized_report_lines=0
           unallowlisted_output=0
+          saw_container_command_started=0
+          saw_node_command_started=0
+          saw_node_command_empty_report=0
+          saw_container_report_cat_attempted=0
+          saw_container_stdout_empty=0
           while IFS= read -r line || [ -n "$line" ]; do
             case "$line" in
               "")
+                ;;
+              "TENANT_NULLABILITY_DIAGNOSTIC: remote command started"|"TENANT_NULLABILITY_DIAGNOSTIC: docker command starting")
+                ;;
+              "TENANT_NULLABILITY_DIAGNOSTIC: container command started")
+                saw_container_command_started=1
+                ;;
+              "TENANT_NULLABILITY_DIAGNOSTIC: node command started")
+                saw_node_command_started=1
+                ;;
+              "TENANT_NULLABILITY_DIAGNOSTIC: node command produced empty report")
+                saw_node_command_empty_report=1
+                ;;
+              "TENANT_NULLABILITY_DIAGNOSTIC: container report cat attempted")
+                saw_container_report_cat_attempted=1
+                ;;
+              "TENANT_NULLABILITY_DIAGNOSTIC: container command produced no stdout")
+                saw_container_stdout_empty=1
+                ;;
+              "TENANT_NULLABILITY_DIAGNOSTIC: node command exited status="*|"TENANT_NULLABILITY_DIAGNOSTIC: docker command exited status="*)
+                if ! printf '%s\n' "$line" | grep -Eq '^TENANT_NULLABILITY_DIAGNOSTIC: (node|docker) command exited status=[0-9]+$'; then
+                  unallowlisted_output=1
+                fi
                 ;;
               "Tenant nullability dry-run"|"Excluded models: AuditLog"|"No data changed.")
                 sanitized_report="${sanitized_report}${line}"$'\n'
@@ -134,7 +174,17 @@ jobs:
           fi
 
           if [ "$sanitized_report_lines" -eq 0 ]; then
-            if [ -s "$diagnostic_file" ]; then
+            if [ "$saw_container_stdout_empty" -ne 0 ]; then
+              printf 'Tenant nullability dry-run diagnostic class: container command produced no stdout.\n' >&2
+            elif [ "$saw_container_command_started" -eq 0 ]; then
+              printf 'Tenant nullability dry-run diagnostic class: container command did not reach node start.\n' >&2
+            elif [ "$saw_node_command_started" -eq 0 ]; then
+              printf 'Tenant nullability dry-run diagnostic class: container command did not reach node start.\n' >&2
+            elif [ "$saw_node_command_empty_report" -ne 0 ]; then
+              printf 'Tenant nullability dry-run diagnostic class: node command produced empty report.\n' >&2
+            elif [ "$saw_container_report_cat_attempted" -eq 0 ]; then
+              printf 'Tenant nullability dry-run diagnostic class: node command exited before report output.\n' >&2
+            elif [ -s "$diagnostic_file" ]; then
               printf 'Tenant nullability dry-run diagnostic class: remote command produced no report.\n' >&2
             else
               printf 'Tenant nullability dry-run diagnostic class: empty report output.\n' >&2
