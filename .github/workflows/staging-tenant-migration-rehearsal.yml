@@ -288,23 +288,99 @@ jobs:
           remote_tmp="$(mktemp -d)"
           trap 'rm -rf "$remote_tmp"' EXIT
 
+          set +e
           docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml exec -T api sh -lc '
             set -eu
-            cd /app
+            MIGRATION_NAME="$1"
+            if ! cd /app; then
+              printf "PENDING_MIGRATION_WORKDIR_INVALID\n"
+              exit 1
+            fi
+            if [ ! -f libs/db/prisma/schema.prisma ]; then
+              printf "PENDING_MIGRATION_SCHEMA_MISSING\n"
+              exit 1
+            fi
+            if [ ! -d libs/db/prisma/migrations ]; then
+              printf "PENDING_MIGRATION_DIR_MISSING\n"
+              exit 1
+            fi
+            if [ ! -f "libs/db/prisma/migrations/$MIGRATION_NAME/migration.sql" ]; then
+              printf "PENDING_MIGRATION_FILE_NOT_VISIBLE\n"
+              exit 1
+            fi
+            if ! command -v npx >/dev/null 2>&1; then
+              printf "PENDING_MIGRATION_NPX_UNAVAILABLE\n"
+              exit 1
+            fi
+            if ! npx --no-install prisma --version >/dev/null 2>&1; then
+              printf "PENDING_MIGRATION_PRISMA_UNAVAILABLE\n"
+              exit 1
+            fi
             status_file="$(mktemp /tmp/staging-migration-status.XXXXXX)"
             set +e
             npx prisma migrate status --schema libs/db/prisma/schema.prisma > "$status_file" 2>&1
             status="$?"
             set -e
-            sed -n "/[Ff]ollowing migration.*not yet been applied/,\$p" "$status_file" | grep -Eo "^[[:space:]]*[0-9]{14}_[A-Za-z0-9_]+" | tr -d " " | sort -u || true
+            if [ ! -s "$status_file" ]; then
+              printf "PENDING_MIGRATION_STATUS_EMPTY\n"
+              rm -f "$status_file"
+              exit 1
+            fi
+            if grep -Eiq "://|bearer|secret|token|cookie|jwt|authorization|password|[[:alnum:]_.%+-]+@[[:alnum:].-]+" "$status_file"; then
+              printf "PENDING_MIGRATION_STATUS_UNSAFE\n"
+              rm -f "$status_file"
+              exit 1
+            fi
+            if grep -Eiq "migration history.*diverg|histories.*diverg|failed migration|modified after.*applied" "$status_file"; then
+              printf "PENDING_MIGRATION_HISTORY_DIVERGED\n"
+              rm -f "$status_file"
+              exit 1
+            fi
+            pending_block="$(sed -n "/following migration.*not yet been applied/I,\$p" "$status_file" || true)"
+            if [ -n "$pending_block" ]; then
+              parsed_pending="$(printf "%s\n" "$pending_block" | grep -Eo "^[[:space:]]*[0-9]{14}_[A-Za-z0-9_]+" | tr -d " " | sort -u || true)"
+              parsed_pending_count="$(printf "%s\n" "$parsed_pending" | grep -Ec "^[0-9]{14}_[A-Za-z0-9_]+$" || true)"
+              if [ "$parsed_pending_count" -eq 0 ]; then
+                printf "PENDING_MIGRATION_STATUS_UNPARSEABLE\n"
+                rm -f "$status_file"
+                exit 1
+              fi
+              printf "%s\n" "$parsed_pending"
+              rm -f "$status_file"
+              exit 0
+            fi
             if [ "$status" -eq 0 ]; then
               printf "PRISMA_MIGRATION_STATUS_UP_TO_DATE\n"
+              rm -f "$status_file"
+              exit 0
+            fi
+            if [ "$status" -ne 0 ]; then
+              printf "PENDING_MIGRATION_STATUS_NONZERO_NO_PARSE\n"
+              rm -f "$status_file"
+              exit 1
             fi
             rm -f "$status_file"
-          ' > "$remote_tmp/pending.out" 2> "$remote_tmp/transport.err"
+          ' sh "$MIGRATION_NAME" > "$remote_tmp/pending.out" 2> "$remote_tmp/transport.err"
+          pending_command_status=$?
+          set -e
+
+          if [ "$pending_command_status" -eq 127 ]; then
+            printf 'PENDING_MIGRATION_COMMAND_UNAVAILABLE\n'
+            exit 1
+          fi
+
+          if [ ! -s "$remote_tmp/pending.out" ]; then
+            printf 'PENDING_MIGRATION_STATUS_EMPTY\n'
+            exit 1
+          fi
 
           if grep -Eiq '://|bearer|secret|token|cookie|jwt|authorization|password|[[:alnum:]_.%+-]+@[[:alnum:].-]+' "$remote_tmp/pending.out"; then
             printf 'PENDING_MIGRATION_SET_UNSAFE\n'
+            exit 1
+          fi
+
+          if grep -Eq '^PENDING_MIGRATION_(COMMAND_UNAVAILABLE|NPX_UNAVAILABLE|PRISMA_UNAVAILABLE|WORKDIR_INVALID|SCHEMA_MISSING|DIR_MISSING|FILE_NOT_VISIBLE|STATUS_EMPTY|STATUS_NONZERO_NO_PARSE|STATUS_UNSAFE|STATUS_UNPARSEABLE|HISTORY_DIVERGED)$' "$remote_tmp/pending.out"; then
+            grep -E '^PENDING_MIGRATION_(COMMAND_UNAVAILABLE|NPX_UNAVAILABLE|PRISMA_UNAVAILABLE|WORKDIR_INVALID|SCHEMA_MISSING|DIR_MISSING|FILE_NOT_VISIBLE|STATUS_EMPTY|STATUS_NONZERO_NO_PARSE|STATUS_UNSAFE|STATUS_UNPARSEABLE|HISTORY_DIVERGED)$' "$remote_tmp/pending.out"
             exit 1
           fi
 
@@ -343,8 +419,8 @@ jobs:
               return 0
             fi
 
-            if grep -Eq '^PENDING_MIGRATION_SET_(ZERO|MULTIPLE|UNKNOWN|UNSAFE)$' "$proof_file"; then
-              grep -E '^PENDING_MIGRATION_SET_(ZERO|MULTIPLE|UNKNOWN|UNSAFE)$' "$proof_file" >&2
+            if grep -Eq '^PENDING_MIGRATION_(COMMAND_UNAVAILABLE|NPX_UNAVAILABLE|PRISMA_UNAVAILABLE|WORKDIR_INVALID|SCHEMA_MISSING|DIR_MISSING|FILE_NOT_VISIBLE|STATUS_EMPTY|STATUS_NONZERO_NO_PARSE|STATUS_UNSAFE|STATUS_UNPARSEABLE|HISTORY_DIVERGED|SET_ZERO|SET_MULTIPLE|SET_UNKNOWN|SET_UNSAFE)$' "$proof_file"; then
+              grep -E '^PENDING_MIGRATION_(COMMAND_UNAVAILABLE|NPX_UNAVAILABLE|PRISMA_UNAVAILABLE|WORKDIR_INVALID|SCHEMA_MISSING|DIR_MISSING|FILE_NOT_VISIBLE|STATUS_EMPTY|STATUS_NONZERO_NO_PARSE|STATUS_UNSAFE|STATUS_UNPARSEABLE|HISTORY_DIVERGED|SET_ZERO|SET_MULTIPLE|SET_UNKNOWN|SET_UNSAFE)$' "$proof_file" >&2
               return 1
             fi
 
