@@ -4,6 +4,11 @@ import fs from 'node:fs';
 
 const workflow = fs.readFileSync(new URL('./deploy-vps.yml', import.meta.url), 'utf8');
 
+test('VPS deploy workflow shares the staging mutation concurrency group', () => {
+  assert.match(workflow, /concurrency:\s*\n\s*group: staging-vps-mutation\s*\n\s*cancel-in-progress: false/);
+  assert.doesNotMatch(workflow, /group: deploy-vps/);
+});
+
 test('VPS deploy workflow is manually triggered and uses GitHub secrets for SSH', () => {
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /OASIS_VPS_SSH_KEY/);

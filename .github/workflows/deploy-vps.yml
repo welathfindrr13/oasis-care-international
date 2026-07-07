@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-vps
+  group: staging-vps-mutation
   cancel-in-progress: false
 
 permissions:
