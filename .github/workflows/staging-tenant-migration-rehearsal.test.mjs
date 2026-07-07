@@ -20,6 +20,11 @@ test('staging tenant migration rehearsal workflow is manual only', () => {
   assert.doesNotMatch(workflow, /workflow_dispatch:[\s\S]*inputs:/);
 });
 
+test('staging tenant migration rehearsal serializes with Deploy VPS', () => {
+  assert.match(workflow, /concurrency:\s*\n\s*group: staging-vps-mutation\s*\n\s*cancel-in-progress: false/);
+  assert.doesNotMatch(workflow, /group: staging-tenant-migration-rehearsal/);
+});
+
 test('staging target proof fails closed before staging repo access or migration work', () => {
   const markerIndex = workflow.indexOf('/etc/oasis/deploy-target-class');
   const stagingLabelIndex = workflow.indexOf('DEPLOY_TARGET_STAGING');

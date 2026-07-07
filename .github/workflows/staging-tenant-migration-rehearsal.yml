@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: staging-tenant-migration-rehearsal
+  group: staging-vps-mutation
   cancel-in-progress: false
 
 permissions:
