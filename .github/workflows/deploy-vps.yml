@@ -55,7 +55,7 @@ jobs:
           git checkout main
           git pull --ff-only origin main
           node deploy/v2/scripts/preflight-env.mjs deploy/v2/.env
-          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml up -d --build --wait --wait-timeout 180
+          RUN_MIGRATIONS=false docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml up -d --build --wait --wait-timeout 180
           docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml ps
           REMOTE
 
