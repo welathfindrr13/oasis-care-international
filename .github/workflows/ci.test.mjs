@@ -21,3 +21,10 @@ test('Deployment V2 CI synthetic env includes required Clerk redirect URLs', () 
 test('Deployment V2 CI runs tenant nullability dry-run workflow static guard', () => {
   assert.match(workflow, /node --test \.github\/workflows\/tenant-nullability-dry-run\.test\.mjs/);
 });
+
+test('Deployment V2 CI runs staging migration rehearsal workflow static guard', () => {
+  assert.match(
+    workflow,
+    /node --test \.github\/workflows\/staging-tenant-migration-rehearsal\.test\.mjs/,
+  );
+});

@@ -1,0 +1,446 @@
+name: Staging Tenant Migration Rehearsal
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: staging-tenant-migration-rehearsal
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # EXPECTED_STAGING_SHA: bcf0bf56bf40a8c60533bf345f5c20e7b0ad5bc3
+  EXPECTED_STAGING_SHA: bcf0bf56bf40a8c60533bf345f5c20e7b0ad5bc3
+  MIGRATION_NAME: 20260707090000_tenant_organization_not_null
+  MIGRATION_PATH: libs/db/prisma/migrations/20260707090000_tenant_organization_not_null/migration.sql
+
+jobs:
+  rehearse:
+    name: Rehearse single staging tenant migration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout reviewed workflow commit
+        uses: actions/checkout@v3
+
+      - name: Validate SSH secrets
+        shell: bash
+        env:
+          OASIS_VPS_HOST: ${{ secrets.OASIS_VPS_HOST }}
+          OASIS_VPS_USER: ${{ secrets.OASIS_VPS_USER }}
+          OASIS_VPS_SSH_KEY: ${{ secrets.OASIS_VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$OASIS_VPS_HOST"
+          test -n "$OASIS_VPS_USER"
+          test -n "$OASIS_VPS_SSH_KEY"
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          OASIS_VPS_HOST: ${{ secrets.OASIS_VPS_HOST }}
+          OASIS_VPS_SSH_KEY: ${{ secrets.OASIS_VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$OASIS_VPS_SSH_KEY" > ~/.ssh/oasis_vps
+          chmod 600 ~/.ssh/oasis_vps
+          ssh-keyscan -H "$OASIS_VPS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Rehearse approved staging migration
+        shell: bash
+        env:
+          OASIS_VPS_HOST: ${{ secrets.OASIS_VPS_HOST }}
+          OASIS_VPS_USER: ${{ secrets.OASIS_VPS_USER }}
+          EXPECTED_STAGING_SHA: ${{ env.EXPECTED_STAGING_SHA }}
+          MIGRATION_NAME: ${{ env.MIGRATION_NAME }}
+          MIGRATION_PATH: ${{ env.MIGRATION_PATH }}
+        run: |
+          set -euo pipefail
+
+          test -f scripts/release/tenant-nullability-dry-run.mjs
+
+          validate_tenant_report() {
+            local report_file="$1"
+            local status="$2"
+            local phase="$3"
+            local sanitized_report=""
+            local sanitized_report_lines=0
+            local unallowlisted_output=0
+            local malformed_count_line=0
+            local saw_header=0
+            local saw_no_data_changed=0
+
+            if [ ! -s "$report_file" ]; then
+              printf 'Tenant nullability dry-run diagnostic class: empty report output.\n' >&2
+              printf 'Tenant nullability dry-run failed before report generation.\n' >&2
+              return 1
+            fi
+
+            if grep -Eiq '://|bearer|secret|token|cookie|jwt|authorization|password|[[:alnum:]_.%+-]+@[[:alnum:].-]+' "$report_file"; then
+              printf 'Tenant nullability dry-run rejected output class: unsafe pattern.\n' >&2
+              printf 'Tenant nullability dry-run failed with unsafe output suppressed.\n' >&2
+              return 1
+            fi
+
+            while IFS= read -r line || [ -n "$line" ]; do
+              case "$line" in
+                "")
+                  ;;
+                "Tenant nullability dry-run")
+                  saw_header=1
+                  sanitized_report="${sanitized_report}${line}"$'\n'
+                  sanitized_report_lines=$((sanitized_report_lines + 1))
+                  ;;
+                "Excluded models: AuditLog")
+                  sanitized_report="${sanitized_report}${line}"$'\n'
+                  sanitized_report_lines=$((sanitized_report_lines + 1))
+                  ;;
+                "No data changed.")
+                  saw_no_data_changed=1
+                  sanitized_report="${sanitized_report}${line}"$'\n'
+                  sanitized_report_lines=$((sanitized_report_lines + 1))
+                  ;;
+                *": null organization_id rows = "*)
+                  if [[ "$line" =~ ^[A-Za-z]+[[:space:]]\([a-z_]+\):[[:space:]]null[[:space:]]organization_id[[:space:]]rows[[:space:]]=[[:space:]][0-9]+$ ]]; then
+                    sanitized_report="${sanitized_report}${line}"$'\n'
+                    sanitized_report_lines=$((sanitized_report_lines + 1))
+                  else
+                    malformed_count_line=1
+                  fi
+                  ;;
+                *)
+                  unallowlisted_output=1
+                  ;;
+              esac
+            done < "$report_file"
+
+            if [ "$malformed_count_line" -ne 0 ]; then
+              printf 'Tenant nullability dry-run rejected output class: malformed count line.\n' >&2
+              printf 'Tenant nullability dry-run failed with unsafe output suppressed.\n' >&2
+              return 1
+            fi
+
+            if [ "$unallowlisted_output" -ne 0 ]; then
+              printf 'Tenant nullability dry-run rejected output class: unallowlisted line.\n' >&2
+              printf 'Tenant nullability dry-run failed with unsafe output suppressed.\n' >&2
+              return 1
+            fi
+
+            if [ "$saw_header" -ne 1 ]; then
+              printf 'Tenant nullability dry-run diagnostic class: report missing required header.\n' >&2
+              printf 'Tenant nullability dry-run failed before report generation.\n' >&2
+              return 1
+            fi
+
+            if [ "$saw_no_data_changed" -ne 1 ]; then
+              printf 'Tenant nullability dry-run diagnostic class: report missing completion marker.\n' >&2
+              printf 'Tenant nullability dry-run failed before report generation.\n' >&2
+              return 1
+            fi
+
+            if [ "$sanitized_report_lines" -eq 0 ]; then
+              printf 'Tenant nullability dry-run diagnostic class: empty report output.\n' >&2
+              printf 'Tenant nullability dry-run failed before report generation.\n' >&2
+              return 1
+            fi
+
+            printf 'TENANT_NULLABILITY_DRY_RUN_REPORT_START\n'
+            printf '%s' "$sanitized_report"
+            printf 'TENANT_NULLABILITY_DRY_RUN_REPORT_END\n'
+
+            if [ "$status" -eq 0 ]; then
+              printf 'PASS: tenant nullability eligible-table gate passed.\n'
+              printf 'TENANT_NULLABILITY_%s_PASS\n' "$phase"
+              return 0
+            fi
+
+            printf 'FAIL: tenant nullability eligible-table gate failed.\n' >&2
+            printf 'TENANT_NULLABILITY_%s_FAILED\n' "$phase" >&2
+            return 1
+          }
+
+          run_tenant_dry_run() {
+            local phase="$1"
+            local report_file
+            local diagnostic_file
+            local remote_script_dir=""
+            report_file="$(mktemp)"
+            diagnostic_file="$(mktemp)"
+
+            cleanup_dry_run() {
+              if [ -n "${remote_script_dir:-}" ]; then
+                ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" "chmod u+w '$remote_script_dir' 2>/dev/null || true; rm -rf '$remote_script_dir'" >/dev/null 2>> "$diagnostic_file" || true
+              fi
+              rm -f "$report_file" "$diagnostic_file"
+              trap - RETURN
+            }
+            trap cleanup_dry_run RETURN
+
+            remote_script_dir="$(ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'mktemp -d' 2>> "$diagnostic_file")"
+            scp -i ~/.ssh/oasis_vps -o BatchMode=yes scripts/release/tenant-nullability-dry-run.mjs "$OASIS_VPS_USER@$OASIS_VPS_HOST:$remote_script_dir/tenant-nullability-dry-run.mjs" 2>> "$diagnostic_file"
+            ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" "chmod 0444 '$remote_script_dir/tenant-nullability-dry-run.mjs'; chmod 0555 '$remote_script_dir'" 2>> "$diagnostic_file"
+
+            set +e
+            ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'bash -se' -- "$remote_script_dir" <<'REMOTE' > "$report_file" 2>> "$diagnostic_file"
+          set -euo pipefail
+          remote_script_dir="$1"
+          cd /opt/oasis-care
+          remote_tmp="$(mktemp -d)"
+          trap 'rm -rf "$remote_tmp"' EXIT
+
+          if ! docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml config --quiet >/dev/null 2>> "$remote_tmp/transport.err"; then
+            exit 1
+          fi
+
+          api_container_id="$(docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml ps -q api 2>> "$remote_tmp/transport.err" || true)"
+          if [ -z "$api_container_id" ]; then
+            exit 1
+          fi
+
+          if ! docker inspect -f '{{.State.Running}}' "$api_container_id" 2>> "$remote_tmp/transport.err" | grep -qx true; then
+            exit 1
+          fi
+
+          set +e
+          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml exec -T api sh -lc '
+              set -u
+              container_work_dir="$(mktemp -d /tmp/tenant-nullability-work.XXXXXX)" || exit 1
+              mkdir -p "$container_work_dir/scripts/release" || { rm -rf "$container_work_dir"; exit 1; }
+              ln -s /app/libs "$container_work_dir/libs" || { rm -rf "$container_work_dir"; exit 1; }
+              container_script_file="$container_work_dir/scripts/release/tenant-nullability-dry-run.mjs"
+              cat > "$container_script_file" || { rm -rf "$container_work_dir"; exit 1; }
+              chmod 0444 "$container_script_file" || { rm -rf "$container_work_dir"; exit 1; }
+              container_report_file="$(mktemp /tmp/tenant-nullability-report.XXXXXX)" || { rm -rf "$container_work_dir"; exit 1; }
+              set +e
+              node "$container_script_file" --fail-on-null --exclude AuditLog > "$container_report_file"
+              node_status="$?"
+              set -e
+              rm -rf "$container_work_dir"
+              if [ -s "$container_report_file" ]; then
+                cat "$container_report_file"
+              fi
+              rm -f "$container_report_file"
+              exit "$node_status"
+            ' < "$remote_script_dir/tenant-nullability-dry-run.mjs" > "$remote_tmp/report.out" 2> "$remote_tmp/transport.err"
+          status=$?
+          set -e
+          if [ -s "$remote_tmp/report.out" ]; then
+            cat "$remote_tmp/report.out"
+          fi
+          exit "$status"
+          REMOTE
+            status=$?
+            set -e
+
+            validate_tenant_report "$report_file" "$status" "$phase"
+          }
+
+          run_remote_gate() {
+            ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'bash -se' -- "$EXPECTED_STAGING_SHA" "$MIGRATION_PATH" <<'REMOTE'
+          set -euo pipefail
+          expected_sha="$1"
+          migration_path="$2"
+          target_class="$(tr -d '\r\n' < /etc/oasis/deploy-target-class 2>/dev/null || true)"
+          if [ "$target_class" = "staging" ]; then
+            printf 'DEPLOY_TARGET_STAGING\n'
+          elif [ -z "$target_class" ]; then
+            printf 'DEPLOY_TARGET_UNKNOWN\n' >&2
+            exit 1
+          else
+            printf 'DEPLOY_TARGET_NOT_STAGING\n' >&2
+            exit 1
+          fi
+
+          cd /opt/oasis-care
+          current_sha="$(git rev-parse HEAD)"
+          if [ "$current_sha" = "$expected_sha" ]; then
+            printf 'STAGING_CODE_SHA_OK\n'
+          else
+            printf 'STAGING_CODE_SHA_MISMATCH\n' >&2
+            exit 1
+          fi
+
+          if test -f libs/db/prisma/migrations/20260707090000_tenant_organization_not_null/migration.sql && test -f "$migration_path"; then
+            printf 'MIGRATION_FILE_PRESENT\n'
+          else
+            printf 'MIGRATION_FILE_MISSING\n' >&2
+            exit 1
+          fi
+          REMOTE
+          }
+
+          prove_pending_migration_set() {
+            local proof_file
+            local diagnostic_file
+            proof_file="$(mktemp)"
+            diagnostic_file="$(mktemp)"
+            trap 'rm -f "$proof_file" "$diagnostic_file"; trap - RETURN' RETURN
+
+            set +e
+            ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'bash -se' -- "$MIGRATION_NAME" <<'REMOTE' > "$proof_file" 2>> "$diagnostic_file"
+          set -euo pipefail
+          MIGRATION_NAME="$1"
+          cd /opt/oasis-care
+          remote_tmp="$(mktemp -d)"
+          trap 'rm -rf "$remote_tmp"' EXIT
+
+          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml exec -T api sh -lc '
+            set -eu
+            cd /app
+            status_file="$(mktemp /tmp/staging-migration-status.XXXXXX)"
+            set +e
+            npx prisma migrate status --schema libs/db/prisma/schema.prisma > "$status_file" 2>&1
+            status="$?"
+            set -e
+            sed -n "/following migration.*not yet been applied/,\$p; /Following migrations.*not yet been applied/,\$p" "$status_file" | grep -Eo "^[[:space:]]*[0-9]{14}_[A-Za-z0-9_]+" | tr -d " " | sort -u || true
+            if [ "$status" -eq 0 ]; then
+              printf "PRISMA_MIGRATION_STATUS_UP_TO_DATE\n"
+            fi
+            rm -f "$status_file"
+          ' > "$remote_tmp/pending.out" 2> "$remote_tmp/transport.err"
+
+          if grep -Eiq '://|bearer|secret|token|cookie|jwt|authorization|password|[[:alnum:]_.%+-]+@[[:alnum:].-]+' "$remote_tmp/pending.out"; then
+            printf 'PENDING_MIGRATION_SET_UNSAFE\n'
+            exit 1
+          fi
+
+          pending_name="$(grep -E '^[0-9]{14}_[A-Za-z0-9_]+$' "$remote_tmp/pending.out" | head -n 1 || true)"
+          pending_count="$(grep -Ec '^[0-9]{14}_[A-Za-z0-9_]+$' "$remote_tmp/pending.out" || true)"
+
+          if grep -qx 'PRISMA_MIGRATION_STATUS_UP_TO_DATE' "$remote_tmp/pending.out" && [ "$pending_count" -eq 0 ]; then
+            printf 'PENDING_MIGRATION_SET_ZERO\n'
+            exit 1
+          fi
+
+          if [ "$pending_count" -eq 1 ] && [ "$pending_name" = "$MIGRATION_NAME" ]; then
+            printf 'PENDING_MIGRATION_SET_EXACT: %s\n' "$MIGRATION_NAME"
+            exit 0
+          fi
+
+          if [ "$pending_count" -eq 0 ]; then
+            printf 'PENDING_MIGRATION_SET_UNKNOWN\n'
+            exit 1
+          fi
+
+          printf 'PENDING_MIGRATION_SET_MULTIPLE\n'
+          exit 1
+          REMOTE
+            status=$?
+            set -e
+
+            if grep -Eiq '://|bearer|secret|token|cookie|jwt|authorization|password|[[:alnum:]_.%+-]+@[[:alnum:].-]+' "$proof_file"; then
+              printf 'PENDING_MIGRATION_SET_UNSAFE\n' >&2
+              return 1
+            fi
+
+            if grep -Eq '^PENDING_MIGRATION_SET_EXACT: 20260707090000_tenant_organization_not_null$' "$proof_file"; then
+              printf 'PENDING_MIGRATION_SET_EXACT: %s\n' "$MIGRATION_NAME"
+              return 0
+            fi
+
+            if grep -Eq '^PENDING_MIGRATION_SET_(ZERO|MULTIPLE|UNKNOWN|UNSAFE)$' "$proof_file"; then
+              grep -E '^PENDING_MIGRATION_SET_(ZERO|MULTIPLE|UNKNOWN|UNSAFE)$' "$proof_file" >&2
+              return 1
+            fi
+
+            printf 'PENDING_MIGRATION_SET_UNKNOWN\n' >&2
+            return "$status"
+          }
+
+          run_single_migration() {
+            local result_file
+            local diagnostic_file
+            result_file="$(mktemp)"
+            diagnostic_file="$(mktemp)"
+            trap 'rm -f "$result_file" "$diagnostic_file"; trap - RETURN' RETURN
+
+            printf 'MIGRATION_REHEARSAL_STARTED: %s\n' "$MIGRATION_NAME"
+            set +e
+            ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'bash -se' <<'REMOTE' > "$result_file" 2>> "$diagnostic_file"
+          set -euo pipefail
+          cd /opt/oasis-care
+          remote_tmp="$(mktemp -d)"
+          trap 'rm -rf "$remote_tmp"' EXIT
+
+          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml exec -T api sh -lc '
+            set -eu
+            cd /app
+            deploy_file="$(mktemp /tmp/staging-migration-deploy.XXXXXX)"
+            set +e
+            npx prisma migrate deploy --schema libs/db/prisma/schema.prisma > "$deploy_file" 2>&1
+            status="$?"
+            set -e
+            rm -f "$deploy_file"
+            exit "$status"
+          ' > "$remote_tmp/deploy.out" 2> "$remote_tmp/transport.err"
+          REMOTE
+            status=$?
+            set -e
+
+            if [ "$status" -eq 0 ]; then
+              printf 'MIGRATION_REHEARSAL_SUCCEEDED: %s\n' "$MIGRATION_NAME"
+              return 0
+            fi
+
+            printf 'MIGRATION_REHEARSAL_FAILED\n' >&2
+            return "$status"
+          }
+
+          prove_migration_applied() {
+            local status_file
+            local diagnostic_file
+            status_file="$(mktemp)"
+            diagnostic_file="$(mktemp)"
+            trap 'rm -f "$status_file" "$diagnostic_file"; trap - RETURN' RETURN
+
+            set +e
+            ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'bash -se' -- "$MIGRATION_NAME" <<'REMOTE' > "$status_file" 2>> "$diagnostic_file"
+          set -euo pipefail
+          migration_name="$1"
+          cd /opt/oasis-care
+          remote_tmp="$(mktemp -d)"
+          trap 'rm -rf "$remote_tmp"' EXIT
+
+          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml exec -T api sh -lc '
+            set -eu
+            cd /app
+            status_file="$(mktemp /tmp/staging-migration-status.XXXXXX)"
+            set +e
+            npx prisma migrate status --schema libs/db/prisma/schema.prisma > "$status_file" 2>&1
+            status="$?"
+            set -e
+            if [ "$status" -eq 0 ]; then
+              printf "PRISMA_MIGRATION_STATUS_UP_TO_DATE\n"
+            fi
+            rm -f "$status_file"
+            exit "$status"
+          ' > "$remote_tmp/status.out" 2> "$remote_tmp/transport.err"
+
+          if grep -qx 'PRISMA_MIGRATION_STATUS_UP_TO_DATE' "$remote_tmp/status.out"; then
+            printf 'MIGRATION_STATUS_APPLIED: %s\n' "$migration_name"
+            exit 0
+          fi
+
+          printf 'MIGRATION_STATUS_UNKNOWN\n'
+          exit 1
+          REMOTE
+            status=$?
+            set -e
+
+            if grep -Eq '^MIGRATION_STATUS_APPLIED: 20260707090000_tenant_organization_not_null$' "$status_file"; then
+              printf 'MIGRATION_STATUS_APPLIED: %s\n' "$MIGRATION_NAME"
+              return 0
+            fi
+
+            printf 'MIGRATION_STATUS_UNKNOWN\n' >&2
+            return "$status"
+          }
+
+          run_remote_gate
+          run_tenant_dry_run pre
+          prove_pending_migration_set
+          run_single_migration
+          prove_migration_applied
+          run_tenant_dry_run post
