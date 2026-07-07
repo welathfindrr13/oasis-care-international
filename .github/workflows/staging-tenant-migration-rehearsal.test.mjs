@@ -110,6 +110,17 @@ test('pending migration proof gates deploy on exactly the approved migration', (
   assert.match(workflow, /\[ "\$pending_name" = "\$MIGRATION_NAME" \]/);
 });
 
+test('pending migration proof parses Prisma singular pending heading', () => {
+  const pendingProof = workflowSlice(
+    'prove_pending_migration_set() {',
+    '\n          run_single_migration() {',
+  );
+
+  assert.match(pendingProof, /\[Ff\]ollowing migration\.\*not yet been applied/);
+  assert.doesNotMatch(pendingProof, /Following migrations\.\*not yet been applied/);
+  assert.match(pendingProof, /grep -Eo "\^\[\[:space:\]\]\*\[0-9\]\{14\}_\[A-Za-z0-9_\]\+"/);
+});
+
 test('pending migration proof cannot continue after unknown or malformed output', () => {
   const pendingProof = workflowSlice(
     'prove_pending_migration_set() {',
