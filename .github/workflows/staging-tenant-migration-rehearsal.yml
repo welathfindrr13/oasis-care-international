@@ -296,7 +296,7 @@ jobs:
             npx prisma migrate status --schema libs/db/prisma/schema.prisma > "$status_file" 2>&1
             status="$?"
             set -e
-            sed -n "/following migration.*not yet been applied/,\$p; /Following migrations.*not yet been applied/,\$p" "$status_file" | grep -Eo "^[[:space:]]*[0-9]{14}_[A-Za-z0-9_]+" | tr -d " " | sort -u || true
+            sed -n "/[Ff]ollowing migration.*not yet been applied/,\$p" "$status_file" | grep -Eo "^[[:space:]]*[0-9]{14}_[A-Za-z0-9_]+" | tr -d " " | sort -u || true
             if [ "$status" -eq 0 ]; then
               printf "PRISMA_MIGRATION_STATUS_UP_TO_DATE\n"
             fi
