@@ -12,6 +12,14 @@ const migrationPath =
   'libs/db/prisma/migrations/20260707090000_tenant_organization_not_null/migration.sql';
 const expectedSha = 'bcf0bf56bf40a8c60533bf345f5c20e7b0ad5bc3';
 
+function workflowSlice(start, end) {
+  const startIndex = workflow.indexOf(start);
+  const endIndex = workflow.indexOf(end, startIndex + start.length);
+  assert.notEqual(startIndex, -1, `missing start marker: ${start}`);
+  assert.notEqual(endIndex, -1, `missing end marker: ${end}`);
+  return workflow.slice(startIndex, endIndex);
+}
+
 test('staging tenant migration rehearsal workflow is manual only', () => {
   assert.match(workflow, /^on:\n\s+workflow_dispatch:\n/m);
   assert.doesNotMatch(workflow, /\bpush:/);
@@ -100,6 +108,64 @@ test('pending migration proof gates deploy on exactly the approved migration', (
   assert.match(workflow, /PENDING_MIGRATION_SET_UNSAFE/);
   assert.match(workflow, /\[ "\$pending_count" -eq 1 \]/);
   assert.match(workflow, /\[ "\$pending_name" = "\$MIGRATION_NAME" \]/);
+});
+
+test('pending migration proof cannot continue after unknown or malformed output', () => {
+  const pendingProof = workflowSlice(
+    'prove_pending_migration_set() {',
+    '\n          run_single_migration() {',
+  );
+
+  assert.match(pendingProof, /PENDING_MIGRATION_SET_ZERO[\s\S]*?return 1/);
+  assert.match(pendingProof, /PENDING_MIGRATION_SET_MULTIPLE[\s\S]*?return 1/);
+  assert.match(pendingProof, /PENDING_MIGRATION_SET_UNKNOWN[\s\S]*?return 1/);
+  assert.match(pendingProof, /PENDING_MIGRATION_SET_UNSAFE[\s\S]*?return 1/);
+  assert.doesNotMatch(pendingProof, /printf 'PENDING_MIGRATION_SET_UNKNOWN\\n' >&2\s*\n\s*return "\$status"/);
+});
+
+test('only exact pending proof can approve migration execution', () => {
+  const pendingProof = workflowSlice(
+    'prove_pending_migration_set() {',
+    '\n          run_single_migration() {',
+  );
+  const exactPendingIndex = pendingProof.indexOf(
+    'PENDING_MIGRATION_SET_EXACT: 20260707090000_tenant_organization_not_null',
+  );
+  const approvalIndex = pendingProof.indexOf(`MIGRATION_GATE_APPROVED="${migrationName}"`);
+
+  assert.notEqual(exactPendingIndex, -1);
+  assert.notEqual(approvalIndex, -1);
+  assert(exactPendingIndex < approvalIndex, 'exact pending proof must happen before approval token');
+  assert.match(pendingProof, new RegExp(`MIGRATION_GATE_APPROVED="${migrationName}"[\\s\\S]*?return 0`));
+});
+
+test('migration execution refuses to run without exact approval token', () => {
+  const migrationRunner = workflowSlice(
+    'run_single_migration() {',
+    '\n          prove_migration_applied() {',
+  );
+  const gateIndex = migrationRunner.indexOf('MIGRATION_GATE_NOT_APPROVED');
+  const startedIndex = migrationRunner.indexOf('MIGRATION_REHEARSAL_STARTED');
+  const migrateIndex = migrationRunner.indexOf('npx prisma migrate deploy');
+
+  assert.notEqual(gateIndex, -1);
+  assert.notEqual(startedIndex, -1);
+  assert.notEqual(migrateIndex, -1);
+  assert(gateIndex < startedIndex, 'approval gate must run before rehearsal start marker');
+  assert(gateIndex < migrateIndex, 'approval gate must run before prisma migrate deploy');
+  assert.match(migrationRunner, new RegExp(`\\[ "\\$\\{MIGRATION_GATE_APPROVED:-\\}" != "${migrationName}" \\]`));
+  assert.match(migrationRunner, /printf 'MIGRATION_GATE_NOT_APPROVED\\n' >&2[\s\S]*?return 1/);
+});
+
+test('migration command unavailable is classified without raw deploy logs', () => {
+  const migrationRunner = workflowSlice(
+    'run_single_migration() {',
+    '\n          prove_migration_applied() {',
+  );
+
+  assert.match(migrationRunner, /\[ "\$status" -eq 127 \]/);
+  assert.match(migrationRunner, /printf 'MIGRATION_REHEARSAL_COMMAND_UNAVAILABLE\\n' >&2/);
+  assert.doesNotMatch(migrationRunner, /cat "\$result_file"|cat "\$diagnostic_file"|cat "\$deploy_file"/);
 });
 
 test('migration deploy is normal Prisma deploy only and captures safe status', () => {

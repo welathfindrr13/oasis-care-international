@@ -60,6 +60,7 @@ jobs:
           set -euo pipefail
 
           test -f scripts/release/tenant-nullability-dry-run.mjs
+          MIGRATION_GATE_APPROVED=""
 
           validate_tenant_report() {
             local report_file="$1"
@@ -274,6 +275,7 @@ jobs:
           prove_pending_migration_set() {
             local proof_file
             local diagnostic_file
+            MIGRATION_GATE_APPROVED=""
             proof_file="$(mktemp)"
             diagnostic_file="$(mktemp)"
             trap 'rm -f "$proof_file" "$diagnostic_file"; trap - RETURN' RETURN
@@ -337,6 +339,7 @@ jobs:
 
             if grep -Eq '^PENDING_MIGRATION_SET_EXACT: 20260707090000_tenant_organization_not_null$' "$proof_file"; then
               printf 'PENDING_MIGRATION_SET_EXACT: %s\n' "$MIGRATION_NAME"
+              MIGRATION_GATE_APPROVED="20260707090000_tenant_organization_not_null"
               return 0
             fi
 
@@ -346,7 +349,7 @@ jobs:
             fi
 
             printf 'PENDING_MIGRATION_SET_UNKNOWN\n' >&2
-            return "$status"
+            return 1
           }
 
           run_single_migration() {
@@ -355,6 +358,11 @@ jobs:
             result_file="$(mktemp)"
             diagnostic_file="$(mktemp)"
             trap 'rm -f "$result_file" "$diagnostic_file"; trap - RETURN' RETURN
+
+            if [ "${MIGRATION_GATE_APPROVED:-}" != "20260707090000_tenant_organization_not_null" ]; then
+              printf 'MIGRATION_GATE_NOT_APPROVED\n' >&2
+              return 1
+            fi
 
             printf 'MIGRATION_REHEARSAL_STARTED: %s\n' "$MIGRATION_NAME"
             set +e
@@ -382,6 +390,11 @@ jobs:
             if [ "$status" -eq 0 ]; then
               printf 'MIGRATION_REHEARSAL_SUCCEEDED: %s\n' "$MIGRATION_NAME"
               return 0
+            fi
+
+            if [ "$status" -eq 127 ]; then
+              printf 'MIGRATION_REHEARSAL_COMMAND_UNAVAILABLE\n' >&2
+              return "$status"
             fi
 
             printf 'MIGRATION_REHEARSAL_FAILED\n' >&2
