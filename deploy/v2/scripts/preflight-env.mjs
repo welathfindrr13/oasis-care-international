@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 const PLACEHOLDER_RE = /(<[^>]+>|replace-me|changeme|change-me|placeholder|example\.com|example\.invalid|oasis-care\.local|your-domain|your-|ci-|dummy|test-secret)/i;
 const LOCALHOST_RE = /(^|[/:@])(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?=$|[/:?#])/i;
 const WEAK_SECRET_RE = /^(password|secret|jwt-secret|nextauth-secret|postgres|oasis|admin|changeme|replace-me)$/i;
+const RUN_MIGRATIONS_NOT_TRUE = 'RUN_MIGRATIONS_NOT_TRUE';
+const RUN_MIGRATIONS_TRUE = 'RUN_MIGRATIONS_TRUE';
+const RUN_MIGRATIONS_UNKNOWN = 'RUN_MIGRATIONS_UNKNOWN';
 
 const REQUIRED = [
   'APP_DOMAIN',
@@ -114,6 +117,12 @@ function add(errors, message) {
 
 function isTruthy(value) {
   return ['true', '1', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+function classifyRunMigrations(values) {
+  return String(values.RUN_MIGRATIONS ?? '').trim() === 'true'
+    ? RUN_MIGRATIONS_TRUE
+    : RUN_MIGRATIONS_NOT_TRUE;
 }
 
 function splitCsv(value) {
@@ -326,12 +335,28 @@ function main() {
 
   const fullPath = path.resolve(envFile);
   if (!fs.existsSync(fullPath)) {
-    console.error(`Env file not found: ${fullPath}`);
+    console.log(`RUN_MIGRATIONS safety class: ${RUN_MIGRATIONS_UNKNOWN}`);
+    console.error('Deployment V2 env preflight failed: RUN_MIGRATIONS_UNKNOWN');
     process.exit(2);
   }
 
-  const fileValues = parseEnvFile(fullPath);
+  let fileValues;
+  try {
+    fileValues = parseEnvFile(fullPath);
+  } catch {
+    console.log(`RUN_MIGRATIONS safety class: ${RUN_MIGRATIONS_UNKNOWN}`);
+    console.error('Deployment V2 env preflight failed: RUN_MIGRATIONS_UNKNOWN');
+    process.exit(2);
+  }
+
   const values = fileValues;
+  const runMigrationsClass = classifyRunMigrations(values);
+  console.log(`RUN_MIGRATIONS safety class: ${runMigrationsClass}`);
+  if (runMigrationsClass !== RUN_MIGRATIONS_NOT_TRUE) {
+    console.error('Deployment V2 env preflight failed: RUN_MIGRATIONS must not be true for this deploy lane.');
+    process.exit(1);
+  }
+
   const { errors, warnings } = validate(values);
 
   for (const warning of warnings) {
@@ -357,4 +382,14 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   main();
 }
 
-export { CLERK_REQUIRED, REQUIRED, authModeProof, parseEnvFile, validate };
+export {
+  CLERK_REQUIRED,
+  REQUIRED,
+  RUN_MIGRATIONS_NOT_TRUE,
+  RUN_MIGRATIONS_TRUE,
+  RUN_MIGRATIONS_UNKNOWN,
+  authModeProof,
+  classifyRunMigrations,
+  parseEnvFile,
+  validate,
+};

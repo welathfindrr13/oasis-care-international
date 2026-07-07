@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -159,9 +159,78 @@ test('successful preflight prints sanitized Clerk auth-mode proof', () => {
   });
 
   assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /RUN_MIGRATIONS safety class: RUN_MIGRATIONS_NOT_TRUE/);
   assert.match(result.stdout, /AUTH_IDENTITY_PROVIDER is clerk: YES/);
   assert.match(result.stdout, /NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER is clerk: YES/);
   assert.match(result.stdout, /Auth provider envs match: YES/);
+});
+
+test('preflight refuses RUN_MIGRATIONS=true without printing env values', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'oasis-preflight-'));
+  const envFile = path.join(tempDir, 'deploy.env');
+  const leakedDbUrl = `postgresql://oasis:${strongSecret}@postgres:5432/oasis`;
+  const fileEnv = Object.entries(validEnv({
+    DATABASE_URL: leakedDbUrl,
+    RUN_MIGRATIONS: 'true',
+  }))
+    .map(([name, value]) => `${name}=${value}`)
+    .join('\n');
+  writeFileSync(envFile, `${fileEnv}\n`);
+
+  const result = spawnSync(process.execPath, [scriptPath, envFile], {
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stdout, /RUN_MIGRATIONS safety class: RUN_MIGRATIONS_TRUE/);
+  assert.doesNotMatch(result.stdout + result.stderr, /RUN_MIGRATIONS=true/);
+  assert.doesNotMatch(result.stdout + result.stderr, new RegExp(strongSecret));
+  assert.doesNotMatch(result.stdout + result.stderr, /postgresql:\/\//);
+});
+
+test('preflight fails closed when RUN_MIGRATIONS cannot be checked', () => {
+  const result = spawnSync(process.execPath, [scriptPath, '/path/that/does/not/exist/deploy.env'], {
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.match(result.stdout, /RUN_MIGRATIONS safety class: RUN_MIGRATIONS_UNKNOWN/);
+  assert.doesNotMatch(result.stdout + result.stderr, /\.env contents|DATABASE_URL|postgresql:\/\//);
+});
+
+test('preflight fails closed when env file is unreadable', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'oasis-preflight-'));
+  const envFile = path.join(tempDir, 'deploy.env');
+  writeFileSync(envFile, 'RUN_MIGRATIONS=false\n');
+  chmodSync(envFile, 0o000);
+
+  const result = spawnSync(process.execPath, [scriptPath, envFile], {
+    encoding: 'utf8',
+  });
+
+  chmodSync(envFile, 0o600);
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.match(result.stdout, /RUN_MIGRATIONS safety class: RUN_MIGRATIONS_UNKNOWN/);
+  assert.doesNotMatch(result.stdout + result.stderr, /\.env contents|DATABASE_URL|postgresql:\/\//);
+});
+
+test('preflight treats absent RUN_MIGRATIONS as not true for the safety gate', () => {
+  const values = validEnv();
+  delete values.RUN_MIGRATIONS;
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'oasis-preflight-'));
+  const envFile = path.join(tempDir, 'deploy.env');
+  const fileEnv = Object.entries(values)
+    .map(([name, value]) => `${name}=${value}`)
+    .join('\n');
+  writeFileSync(envFile, `${fileEnv}\n`);
+
+  const result = spawnSync(process.execPath, [scriptPath, envFile], {
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stdout, /RUN_MIGRATIONS safety class: RUN_MIGRATIONS_NOT_TRUE/);
+  assert.match(result.stderr, /RUN_MIGRATIONS is required/);
 });
 
 test('failed preflight does not print secret values', () => {
