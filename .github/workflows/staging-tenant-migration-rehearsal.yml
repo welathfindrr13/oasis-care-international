@@ -345,16 +345,19 @@ jobs:
               rm -f "$status_file"
               exit 1
             fi
-            pending_block="$(sed -n "/following migration.*not yet been applied/I,\$p" "$status_file" || true)"
-            if [ -n "$pending_block" ]; then
-              parsed_pending="$(printf "%s\n" "$pending_block" | grep -Eo "^[[:space:]]*[0-9]{14}_[A-Za-z0-9_]+" | tr -d " " | sort -u || true)"
-              parsed_pending_count="$(printf "%s\n" "$parsed_pending" | grep -Ec "^[0-9]{14}_[A-Za-z0-9_]+$" || true)"
-              if [ "$parsed_pending_count" -eq 0 ]; then
-                printf "PENDING_MIGRATION_STATUS_UNPARSEABLE\n"
-                rm -f "$status_file"
-                exit 1
-              fi
-              printf "%s\n" "$parsed_pending"
+            pending_header_found=0
+            expected_name_found=0
+            if grep -Eiq "following migration.*not yet been applied" "$status_file"; then
+              pending_header_found=1
+            fi
+            if grep -Fq "$MIGRATION_NAME" "$status_file"; then
+              expected_name_found=1
+            fi
+            expected_line_count="$(grep -Ec "^[[:space:]]*$MIGRATION_NAME[[:space:]]*$" "$status_file" || true)"
+            migration_line_count="$(grep -Ec "^[[:space:]]*[0-9]{14}_[A-Za-z0-9_]+[[:space:]]*$" "$status_file" || true)"
+
+            if [ "$status" -eq 1 ] && [ "$pending_header_found" -eq 1 ] && [ "$expected_name_found" -eq 1 ] && [ "$expected_line_count" -eq 1 ] && [ "$migration_line_count" -eq 1 ]; then
+              printf "%s\n" "$MIGRATION_NAME"
               rm -f "$status_file"
               exit 0
             fi
@@ -362,6 +365,21 @@ jobs:
               printf "PRISMA_MIGRATION_STATUS_UP_TO_DATE\n"
               rm -f "$status_file"
               exit 0
+            fi
+            if [ "$pending_header_found" -eq 1 ] && [ "$migration_line_count" -gt 1 ]; then
+              printf "PENDING_MIGRATION_SET_MULTIPLE\n"
+              rm -f "$status_file"
+              exit 1
+            fi
+            if [ "$pending_header_found" -eq 1 ] && [ "$expected_name_found" -eq 1 ] && [ "$expected_line_count" -ne 1 ]; then
+              printf "PENDING_MIGRATION_STATUS_UNPARSEABLE\n"
+              rm -f "$status_file"
+              exit 1
+            fi
+            if [ "$pending_header_found" -eq 1 ] && [ "$migration_line_count" -eq 0 ]; then
+              printf "PENDING_MIGRATION_SET_UNKNOWN\n"
+              rm -f "$status_file"
+              exit 1
             fi
             if [ "$status" -ne 0 ]; then
               printf "PENDING_MIGRATION_STATUS_NONZERO_NO_PARSE\n"
@@ -391,8 +409,8 @@ jobs:
           grep -Ev '^(PRISMA_WORKDIR_OK|PRISMA_CLI_AVAILABLE)$' "$remote_tmp/pending.out" > "$remote_tmp/pending.filtered" || true
           mv "$remote_tmp/pending.filtered" "$remote_tmp/pending.out"
 
-          if grep -Eq '^PENDING_MIGRATION_(COMMAND_UNAVAILABLE|NPX_UNAVAILABLE|PRISMA_UNAVAILABLE|WORKDIR_INVALID|SCHEMA_MISSING|DIR_MISSING|FILE_NOT_VISIBLE|STATUS_EMPTY|STATUS_NONZERO_NO_PARSE|STATUS_UNSAFE|STATUS_UNPARSEABLE|HISTORY_DIVERGED)$' "$remote_tmp/pending.out"; then
-            grep -E '^PENDING_MIGRATION_(COMMAND_UNAVAILABLE|NPX_UNAVAILABLE|PRISMA_UNAVAILABLE|WORKDIR_INVALID|SCHEMA_MISSING|DIR_MISSING|FILE_NOT_VISIBLE|STATUS_EMPTY|STATUS_NONZERO_NO_PARSE|STATUS_UNSAFE|STATUS_UNPARSEABLE|HISTORY_DIVERGED)$' "$remote_tmp/pending.out"
+          if grep -Eq '^PENDING_MIGRATION_(COMMAND_UNAVAILABLE|NPX_UNAVAILABLE|PRISMA_UNAVAILABLE|WORKDIR_INVALID|SCHEMA_MISSING|DIR_MISSING|FILE_NOT_VISIBLE|STATUS_EMPTY|STATUS_NONZERO_NO_PARSE|STATUS_UNSAFE|STATUS_UNPARSEABLE|HISTORY_DIVERGED|SET_MULTIPLE|SET_UNKNOWN)$' "$remote_tmp/pending.out"; then
+            grep -E '^PENDING_MIGRATION_(COMMAND_UNAVAILABLE|NPX_UNAVAILABLE|PRISMA_UNAVAILABLE|WORKDIR_INVALID|SCHEMA_MISSING|DIR_MISSING|FILE_NOT_VISIBLE|STATUS_EMPTY|STATUS_NONZERO_NO_PARSE|STATUS_UNSAFE|STATUS_UNPARSEABLE|HISTORY_DIVERGED|SET_MULTIPLE|SET_UNKNOWN)$' "$remote_tmp/pending.out"
             exit 1
           fi
 

@@ -122,12 +122,45 @@ test('pending migration proof parses Prisma singular pending heading', () => {
   const pendingHeadingPattern = /following migration.*not yet been applied/i;
 
   assert.match(pendingProof, /following migration\.\*not yet been applied/);
-  assert.match(pendingProof, /sed -n .*\/I/);
   assert.doesNotMatch(pendingProof, /Following migrations\.\*not yet been applied/);
-  assert.match(pendingProof, /grep -Eo "\^\[\[:space:\]\]\*\[0-9\]\{14\}_\[A-Za-z0-9_\]\+"/);
+  assert.match(pendingProof, /grep -Eiq "following migration\.\*not yet been applied"/);
+  assert.match(pendingProof, /grep -Ec "\^\[\[:space:\]\]\*\[0-9\]\{14\}_\[A-Za-z0-9_\]\+\[\[:space:\]\]\*\$"/);
   assert.match('Following migration 20260707090000_tenant_organization_not_null have not yet been applied:', pendingHeadingPattern);
   assert.match('Following migrations have not yet been applied:', pendingHeadingPattern);
   assert.match('FOLLOWING MIGRATIONS HAVE NOT YET BEEN APPLIED:', pendingHeadingPattern);
+});
+
+test('pending migration proof treats Prisma exit 1 with the exact pending line as approved', () => {
+  const pendingProof = workflowSlice(
+    'prove_pending_migration_set() {',
+    '\n          run_single_migration() {',
+  );
+
+  assert.doesNotMatch(pendingProof, /pending_block=/);
+  assert.doesNotMatch(pendingProof, /sed -n .*following migration/);
+  assert.match(pendingProof, /pending_header_found=/);
+  assert.match(pendingProof, /expected_name_found=/);
+  assert.match(pendingProof, /expected_line_count=/);
+  assert.match(pendingProof, /migration_line_count=/);
+  assert.match(
+    pendingProof,
+    /\[ "\$status" -eq 1 \][\s\S]*?\[ "\$pending_header_found" -eq 1 \][\s\S]*?\[ "\$expected_name_found" -eq 1 \][\s\S]*?\[ "\$expected_line_count" -eq 1 \][\s\S]*?\[ "\$migration_line_count" -eq 1 \]/,
+  );
+  assert.match(pendingProof, /printf "%s\\n" "\$MIGRATION_NAME"[\s\S]*?exit 0/);
+});
+
+test('pending migration proof does not approve prose-only or multiple pending migrations', () => {
+  const pendingProof = workflowSlice(
+    'prove_pending_migration_set() {',
+    '\n          run_single_migration() {',
+  );
+
+  assert.match(pendingProof, /expected_name_found=/);
+  assert.match(pendingProof, /expected_line_count=/);
+  assert.match(pendingProof, /migration_line_count=/);
+  assert.match(pendingProof, /\[ "\$expected_name_found" -eq 1 \][\s\S]*?\[ "\$expected_line_count" -ne 1 \][\s\S]*?PENDING_MIGRATION_STATUS_UNPARSEABLE/);
+  assert.match(pendingProof, /\[ "\$migration_line_count" -gt 1 \][\s\S]*?PENDING_MIGRATION_SET_MULTIPLE/);
+  assert.match(pendingProof, /\[ "\$migration_line_count" -eq 0 \][\s\S]*?PENDING_MIGRATION_SET_UNKNOWN/);
 });
 
 test('pending migration proof exposes safe diagnostic classes for status setup failures', () => {
@@ -161,7 +194,7 @@ test('pending migration proof classifies empty nonzero unparseable unsafe and di
   assert.match(pendingProof, /PENDING_MIGRATION_STATUS_UNSAFE/);
   assert.match(pendingProof, /PENDING_MIGRATION_HISTORY_DIVERGED/);
   assert.match(pendingProof, /\[ "\$status" -eq 127 \][\s\S]*?PENDING_MIGRATION_PRISMA_UNAVAILABLE/);
-  assert.match(pendingProof, /\[ "\$parsed_pending_count" -eq 0 \]/);
+  assert.match(pendingProof, /\[ "\$expected_line_count" -ne 1 \]/);
   assert.match(pendingProof, /\[ "\$status" -ne 0 \]/);
   assert.doesNotMatch(pendingProof, /cat "\$status_file"|cat "\$remote_tmp\/pending\.out"|cat "\$diagnostic_file"/);
 });
