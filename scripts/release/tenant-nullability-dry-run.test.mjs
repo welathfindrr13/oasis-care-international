@@ -29,14 +29,16 @@ const trackedFiles = execFileSync('git', ['ls-files'], {
   .filter(Boolean);
 
 function createPrismaWithCounts(countsByModel = {}) {
-  return Object.fromEntries(
-    SENSITIVE_TENANT_TABLES.map((table) => [
-      table.delegate,
-      {
-        count: async () => countsByModel[table.model] ?? 0,
-      },
-    ]),
-  );
+  const queries = [];
+  return {
+    queries,
+    $queryRawUnsafe: async (sql) => {
+      queries.push(sql);
+      const tableMatch = sql.match(/FROM "([^"]+)"/);
+      const table = SENSITIVE_TENANT_TABLES.find((entry) => entry.table === tableMatch?.[1]);
+      return [{ count: table ? countsByModel[table.model] ?? 0 : 0 }];
+    },
+  };
 }
 
 test('tenant nullability dry-run inventory includes sensitive nullable tenant tables', () => {
@@ -121,6 +123,48 @@ test('tenant nullability dry-run rejects unknown excluded models safely', async 
       }),
     /Unknown model in --exclude: DefinitelyNotAModel/,
   );
+});
+
+test('tenant nullability dry-run uses raw SQL counts from static table inventory', async () => {
+  const prisma = createPrismaWithCounts({ Client: 2 });
+  const lines = [];
+  const exitCode = await runTenantNullabilityDryRun({
+    prisma,
+    excludeModels: ['AuditLog'],
+    log: (line) => lines.push(line),
+  });
+
+  assert.equal(exitCode, 0);
+  assert.match(lines.join('\n'), /Client \(client\): null organization_id rows = 2/);
+  assert.equal(prisma.queries.length, SENSITIVE_TENANT_TABLES.length - 1);
+
+  for (const sql of prisma.queries) {
+    assert.match(sql, /^SELECT COUNT\(\*\)::int AS count FROM "[a-z_]+" WHERE organization_id IS NULL$/);
+    assert.doesNotMatch(sql, /\b(?:UPDATE|DELETE|INSERT|TRUNCATE|DROP|CREATE|ALTER)\b/i);
+  }
+});
+
+test('tenant nullability dry-run rejects non-inventory raw SQL table names', async () => {
+  await assert.rejects(
+    () =>
+      runTenantNullabilityDryRun({
+        prisma: createPrismaWithCounts(),
+        tables: [{ model: 'Injected', table: 'client"; DELETE FROM client; --' }],
+      }),
+    /Table is not in tenant nullability inventory/,
+  );
+});
+
+test('tenant nullability dry-run does not use Prisma nullable organization filters', () => {
+  assert.doesNotMatch(scriptSource, /organization_id:\s*null/);
+  assert.doesNotMatch(scriptSource, /organization_id:\s*\{\s*not:\s*null\s*\}/);
+  assert.doesNotMatch(scriptSource, /\.count\(\{\s*where:/s);
+});
+
+test('tenant nullability raw SQL remains read-only', () => {
+  assert.match(scriptSource, /SELECT COUNT\(\*\)::int AS count FROM/);
+  assert.match(scriptSource, /WHERE organization_id IS NULL/);
+  assert.doesNotMatch(scriptSource, /\b(?:UPDATE|DELETE|INSERT|TRUNCATE|DROP|CREATE|ALTER)\b/i);
 });
 
 test('tenant nullability dry-run uses the generated workspace Prisma client', () => {
