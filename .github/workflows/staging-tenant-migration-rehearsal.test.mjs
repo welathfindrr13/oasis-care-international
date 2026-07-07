@@ -115,10 +115,46 @@ test('pending migration proof parses Prisma singular pending heading', () => {
     'prove_pending_migration_set() {',
     '\n          run_single_migration() {',
   );
+  const pendingHeadingPattern = /following migration.*not yet been applied/i;
 
-  assert.match(pendingProof, /\[Ff\]ollowing migration\.\*not yet been applied/);
+  assert.match(pendingProof, /following migration\.\*not yet been applied/);
+  assert.match(pendingProof, /sed -n .*\/I/);
   assert.doesNotMatch(pendingProof, /Following migrations\.\*not yet been applied/);
   assert.match(pendingProof, /grep -Eo "\^\[\[:space:\]\]\*\[0-9\]\{14\}_\[A-Za-z0-9_\]\+"/);
+  assert.match('Following migration 20260707090000_tenant_organization_not_null have not yet been applied:', pendingHeadingPattern);
+  assert.match('Following migrations have not yet been applied:', pendingHeadingPattern);
+  assert.match('FOLLOWING MIGRATIONS HAVE NOT YET BEEN APPLIED:', pendingHeadingPattern);
+});
+
+test('pending migration proof exposes safe diagnostic classes for status setup failures', () => {
+  const pendingProof = workflowSlice(
+    'prove_pending_migration_set() {',
+    '\n          run_single_migration() {',
+  );
+
+  assert.match(pendingProof, /PENDING_MIGRATION_COMMAND_UNAVAILABLE/);
+  assert.match(pendingProof, /PENDING_MIGRATION_NPX_UNAVAILABLE/);
+  assert.match(pendingProof, /PENDING_MIGRATION_PRISMA_UNAVAILABLE/);
+  assert.match(pendingProof, /PENDING_MIGRATION_WORKDIR_INVALID/);
+  assert.match(pendingProof, /PENDING_MIGRATION_SCHEMA_MISSING/);
+  assert.match(pendingProof, /PENDING_MIGRATION_DIR_MISSING/);
+  assert.match(pendingProof, /PENDING_MIGRATION_FILE_NOT_VISIBLE/);
+});
+
+test('pending migration proof classifies empty nonzero unparseable unsafe and diverged status output', () => {
+  const pendingProof = workflowSlice(
+    'prove_pending_migration_set() {',
+    '\n          run_single_migration() {',
+  );
+
+  assert.match(pendingProof, /PENDING_MIGRATION_STATUS_EMPTY/);
+  assert.match(pendingProof, /PENDING_MIGRATION_STATUS_NONZERO_NO_PARSE/);
+  assert.match(pendingProof, /PENDING_MIGRATION_STATUS_UNPARSEABLE/);
+  assert.match(pendingProof, /PENDING_MIGRATION_STATUS_UNSAFE/);
+  assert.match(pendingProof, /PENDING_MIGRATION_HISTORY_DIVERGED/);
+  assert.match(pendingProof, /\[ "\$parsed_pending_count" -eq 0 \]/);
+  assert.match(pendingProof, /\[ "\$status" -ne 0 \]/);
+  assert.doesNotMatch(pendingProof, /cat "\$status_file"|cat "\$remote_tmp\/pending\.out"|cat "\$diagnostic_file"/);
 });
 
 test('pending migration proof cannot continue after unknown or malformed output', () => {
@@ -131,6 +167,10 @@ test('pending migration proof cannot continue after unknown or malformed output'
   assert.match(pendingProof, /PENDING_MIGRATION_SET_MULTIPLE[\s\S]*?return 1/);
   assert.match(pendingProof, /PENDING_MIGRATION_SET_UNKNOWN[\s\S]*?return 1/);
   assert.match(pendingProof, /PENDING_MIGRATION_SET_UNSAFE[\s\S]*?return 1/);
+  assert.match(pendingProof, /PENDING_MIGRATION_STATUS_EMPTY[\s\S]*?return 1/);
+  assert.match(pendingProof, /PENDING_MIGRATION_STATUS_NONZERO_NO_PARSE[\s\S]*?return 1/);
+  assert.match(pendingProof, /PENDING_MIGRATION_STATUS_UNPARSEABLE[\s\S]*?return 1/);
+  assert.match(pendingProof, /PENDING_MIGRATION_FILE_NOT_VISIBLE[\s\S]*?return 1/);
   assert.doesNotMatch(pendingProof, /printf 'PENDING_MIGRATION_SET_UNKNOWN\\n' >&2\s*\n\s*return "\$status"/);
 });
 
