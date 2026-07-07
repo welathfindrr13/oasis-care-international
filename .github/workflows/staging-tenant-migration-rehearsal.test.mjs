@@ -6,6 +6,10 @@ const workflow = fs.readFileSync(
   new URL('./staging-tenant-migration-rehearsal.yml', import.meta.url),
   'utf8',
 );
+const apiEntrypoint = fs.readFileSync(
+  new URL('../../apps/api/docker-entrypoint.sh', import.meta.url),
+  'utf8',
+);
 
 const migrationName = '20260707090000_tenant_organization_not_null';
 const migrationPath =
@@ -132,6 +136,10 @@ test('pending migration proof exposes safe diagnostic classes for status setup f
     '\n          run_single_migration() {',
   );
 
+  assert.match(pendingProof, /PRISMA_WORKDIR_OK/);
+  assert.match(pendingProof, /PRISMA_WORKDIR_INVALID/);
+  assert.match(pendingProof, /PRISMA_CLI_AVAILABLE/);
+  assert.match(pendingProof, /PRISMA_CLI_UNAVAILABLE/);
   assert.match(pendingProof, /PENDING_MIGRATION_COMMAND_UNAVAILABLE/);
   assert.match(pendingProof, /PENDING_MIGRATION_NPX_UNAVAILABLE/);
   assert.match(pendingProof, /PENDING_MIGRATION_PRISMA_UNAVAILABLE/);
@@ -152,9 +160,36 @@ test('pending migration proof classifies empty nonzero unparseable unsafe and di
   assert.match(pendingProof, /PENDING_MIGRATION_STATUS_UNPARSEABLE/);
   assert.match(pendingProof, /PENDING_MIGRATION_STATUS_UNSAFE/);
   assert.match(pendingProof, /PENDING_MIGRATION_HISTORY_DIVERGED/);
+  assert.match(pendingProof, /\[ "\$status" -eq 127 \][\s\S]*?PENDING_MIGRATION_PRISMA_UNAVAILABLE/);
   assert.match(pendingProof, /\[ "\$parsed_pending_count" -eq 0 \]/);
   assert.match(pendingProof, /\[ "\$status" -ne 0 \]/);
   assert.doesNotMatch(pendingProof, /cat "\$status_file"|cat "\$remote_tmp\/pending\.out"|cat "\$diagnostic_file"/);
+});
+
+test('pending proof and deploy use the API entrypoint Prisma working directory', () => {
+  const pendingProof = workflowSlice(
+    'prove_pending_migration_set() {',
+    '\n          run_single_migration() {',
+  );
+  const migrationRunner = workflowSlice(
+    'run_single_migration() {',
+    '\n          prove_migration_applied() {',
+  );
+  const appliedProof = workflowSlice(
+    'prove_migration_applied() {',
+    '\n          run_remote_gate',
+  );
+
+  assert.match(apiEntrypoint, /cd \/app\/libs\/db\s+npx prisma migrate deploy/);
+  assert.match(pendingProof, /cd \/app\/libs\/db/);
+  assert.match(migrationRunner, /cd \/app\/libs\/db/);
+  assert.match(appliedProof, /cd \/app\/libs\/db/);
+  assert.match(pendingProof, /npx prisma migrate status --schema prisma\/schema\.prisma/);
+  assert.match(migrationRunner, /npx prisma migrate deploy --schema prisma\/schema\.prisma/);
+  assert.match(appliedProof, /npx prisma migrate status --schema prisma\/schema\.prisma/);
+  assert.doesNotMatch(pendingProof, /cd \/app\s+npx prisma migrate status/);
+  assert.doesNotMatch(migrationRunner, /cd \/app\s+npx prisma migrate deploy/);
+  assert.doesNotMatch(appliedProof, /cd \/app\s+npx prisma migrate status/);
 });
 
 test('pending migration proof cannot continue after unknown or malformed output', () => {

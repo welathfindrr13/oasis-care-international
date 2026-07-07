@@ -292,19 +292,21 @@ jobs:
           docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml exec -T api sh -lc '
             set -eu
             MIGRATION_NAME="$1"
-            if ! cd /app; then
+            if ! cd /app/libs/db; then
+              printf "PRISMA_WORKDIR_INVALID\n"
               printf "PENDING_MIGRATION_WORKDIR_INVALID\n"
               exit 1
             fi
-            if [ ! -f libs/db/prisma/schema.prisma ]; then
+            printf "PRISMA_WORKDIR_OK\n"
+            if [ ! -f prisma/schema.prisma ]; then
               printf "PENDING_MIGRATION_SCHEMA_MISSING\n"
               exit 1
             fi
-            if [ ! -d libs/db/prisma/migrations ]; then
+            if [ ! -d prisma/migrations ]; then
               printf "PENDING_MIGRATION_DIR_MISSING\n"
               exit 1
             fi
-            if [ ! -f "libs/db/prisma/migrations/$MIGRATION_NAME/migration.sql" ]; then
+            if [ ! -f "prisma/migrations/$MIGRATION_NAME/migration.sql" ]; then
               printf "PENDING_MIGRATION_FILE_NOT_VISIBLE\n"
               exit 1
             fi
@@ -313,12 +315,14 @@ jobs:
               exit 1
             fi
             if ! npx --no-install prisma --version >/dev/null 2>&1; then
+              printf "PRISMA_CLI_UNAVAILABLE\n"
               printf "PENDING_MIGRATION_PRISMA_UNAVAILABLE\n"
               exit 1
             fi
+            printf "PRISMA_CLI_AVAILABLE\n"
             status_file="$(mktemp /tmp/staging-migration-status.XXXXXX)"
             set +e
-            npx prisma migrate status --schema libs/db/prisma/schema.prisma > "$status_file" 2>&1
+            npx prisma migrate status --schema prisma/schema.prisma > "$status_file" 2>&1
             status="$?"
             set -e
             if [ ! -s "$status_file" ]; then
@@ -333,6 +337,11 @@ jobs:
             fi
             if grep -Eiq "migration history.*diverg|histories.*diverg|failed migration|modified after.*applied" "$status_file"; then
               printf "PENDING_MIGRATION_HISTORY_DIVERGED\n"
+              rm -f "$status_file"
+              exit 1
+            fi
+            if [ "$status" -eq 127 ]; then
+              printf "PENDING_MIGRATION_PRISMA_UNAVAILABLE\n"
               rm -f "$status_file"
               exit 1
             fi
@@ -378,6 +387,9 @@ jobs:
             printf 'PENDING_MIGRATION_SET_UNSAFE\n'
             exit 1
           fi
+
+          grep -Ev '^(PRISMA_WORKDIR_OK|PRISMA_CLI_AVAILABLE)$' "$remote_tmp/pending.out" > "$remote_tmp/pending.filtered" || true
+          mv "$remote_tmp/pending.filtered" "$remote_tmp/pending.out"
 
           if grep -Eq '^PENDING_MIGRATION_(COMMAND_UNAVAILABLE|NPX_UNAVAILABLE|PRISMA_UNAVAILABLE|WORKDIR_INVALID|SCHEMA_MISSING|DIR_MISSING|FILE_NOT_VISIBLE|STATUS_EMPTY|STATUS_NONZERO_NO_PARSE|STATUS_UNSAFE|STATUS_UNPARSEABLE|HISTORY_DIVERGED)$' "$remote_tmp/pending.out"; then
             grep -E '^PENDING_MIGRATION_(COMMAND_UNAVAILABLE|NPX_UNAVAILABLE|PRISMA_UNAVAILABLE|WORKDIR_INVALID|SCHEMA_MISSING|DIR_MISSING|FILE_NOT_VISIBLE|STATUS_EMPTY|STATUS_NONZERO_NO_PARSE|STATUS_UNSAFE|STATUS_UNPARSEABLE|HISTORY_DIVERGED)$' "$remote_tmp/pending.out"
@@ -450,10 +462,10 @@ jobs:
 
           docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml exec -T api sh -lc '
             set -eu
-            cd /app
+            cd /app/libs/db
             deploy_file="$(mktemp /tmp/staging-migration-deploy.XXXXXX)"
             set +e
-            npx prisma migrate deploy --schema libs/db/prisma/schema.prisma > "$deploy_file" 2>&1
+            npx prisma migrate deploy --schema prisma/schema.prisma > "$deploy_file" 2>&1
             status="$?"
             set -e
             rm -f "$deploy_file"
@@ -494,10 +506,10 @@ jobs:
 
           docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml exec -T api sh -lc '
             set -eu
-            cd /app
+            cd /app/libs/db
             status_file="$(mktemp /tmp/staging-migration-status.XXXXXX)"
             set +e
-            npx prisma migrate status --schema libs/db/prisma/schema.prisma > "$status_file" 2>&1
+            npx prisma migrate status --schema prisma/schema.prisma > "$status_file" 2>&1
             status="$?"
             set -e
             if [ "$status" -eq 0 ]; then
