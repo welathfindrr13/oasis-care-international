@@ -37,6 +37,17 @@ test('VPS deploy workflow requires no-migration preflight before compose up', ()
   assert.doesNotMatch(workflow, /prisma migrate|migrate deploy|run-migration|backfill/i);
 });
 
+test('VPS deploy workflow forces compose migrations disabled for the deploy command', () => {
+  assert.match(
+    workflow,
+    /RUN_MIGRATIONS=false docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml up -d --build --wait --wait-timeout \d+/,
+  );
+  assert.doesNotMatch(
+    workflow,
+    /(?<!RUN_MIGRATIONS=false )docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml up -d --build --wait/,
+  );
+});
+
 test('VPS deploy workflow does not trigger tenant dry-run or print env contents', () => {
   assert.doesNotMatch(workflow, /tenant-nullability-dry-run\.yml|gh workflow run|workflow_dispatch.*Tenant Nullability/is);
   assert.doesNotMatch(workflow, /cat deploy\/v2\/\.env|grep .*DATABASE_URL|printenv|env \|/);

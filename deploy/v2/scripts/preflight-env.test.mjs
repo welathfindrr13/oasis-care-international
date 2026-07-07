@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -198,17 +198,13 @@ test('preflight fails closed when RUN_MIGRATIONS cannot be checked', () => {
   assert.doesNotMatch(result.stdout + result.stderr, /\.env contents|DATABASE_URL|postgresql:\/\//);
 });
 
-test('preflight fails closed when env file is unreadable', () => {
+test('preflight fails closed when env path cannot be read as a file', () => {
   const tempDir = mkdtempSync(path.join(tmpdir(), 'oasis-preflight-'));
-  const envFile = path.join(tempDir, 'deploy.env');
-  writeFileSync(envFile, 'RUN_MIGRATIONS=false\n');
-  chmodSync(envFile, 0o000);
 
-  const result = spawnSync(process.execPath, [scriptPath, envFile], {
+  const result = spawnSync(process.execPath, [scriptPath, tempDir], {
     encoding: 'utf8',
   });
 
-  chmodSync(envFile, 0o600);
   assert.equal(result.status, 2, result.stdout + result.stderr);
   assert.match(result.stdout, /RUN_MIGRATIONS safety class: RUN_MIGRATIONS_UNKNOWN/);
   assert.doesNotMatch(result.stdout + result.stderr, /\.env contents|DATABASE_URL|postgresql:\/\//);
