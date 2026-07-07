@@ -26,6 +26,31 @@ test('VPS deploy workflow runs env preflight against the real env file before co
   assert(preflightIndex < composeUpIndex, 'preflight must run before compose up');
 });
 
+test('VPS deploy workflow proves staging target before git sync and compose', () => {
+  const markerIndex = workflow.indexOf('/etc/oasis/deploy-target-class');
+  const stagingIndex = workflow.indexOf('DEPLOY_TARGET_STAGING');
+  const gitFetchIndex = workflow.indexOf('git fetch origin main');
+  const composeUpIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml up');
+
+  assert.notEqual(markerIndex, -1);
+  assert.notEqual(stagingIndex, -1);
+  assert.notEqual(gitFetchIndex, -1);
+  assert.notEqual(composeUpIndex, -1);
+  assert(markerIndex < gitFetchIndex, 'target marker must be checked before git fetch');
+  assert(stagingIndex < gitFetchIndex, 'staging target proof must happen before git fetch');
+  assert(markerIndex < composeUpIndex, 'target marker must be checked before compose up');
+});
+
+test('VPS deploy workflow fails closed unless target marker is staging', () => {
+  assert.match(workflow, /target_class="\$\(tr -d '\\r\\n' < \/etc\/oasis\/deploy-target-class 2>\/dev\/null \|\| true\)"/);
+  assert.match(workflow, /if \[ "\$target_class" = "staging" \]; then/);
+  assert.match(workflow, /printf 'DEPLOY_TARGET_STAGING\\n'/);
+  assert.match(workflow, /printf 'DEPLOY_TARGET_UNKNOWN\\n' >&2/);
+  assert.match(workflow, /printf 'DEPLOY_TARGET_NOT_STAGING\\n' >&2/);
+  assert.match(workflow, /exit 1/);
+  assert.doesNotMatch(workflow, /printf .*target_class|echo .*target_class|cat \/etc\/oasis\/deploy-target-class/);
+});
+
 test('VPS deploy workflow requires no-migration preflight before compose up', () => {
   const preflightIndex = workflow.indexOf('node deploy/v2/scripts/preflight-env.mjs deploy/v2/.env');
   const composeUpIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml up');

@@ -50,6 +50,16 @@ jobs:
           set -euo pipefail
           ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'bash -se' <<'REMOTE'
           set -euo pipefail
+          target_class="$(tr -d '\r\n' < /etc/oasis/deploy-target-class 2>/dev/null || true)"
+          if [ "$target_class" = "staging" ]; then
+            printf 'DEPLOY_TARGET_STAGING\n'
+          elif [ -z "$target_class" ]; then
+            printf 'DEPLOY_TARGET_UNKNOWN\n' >&2
+            exit 1
+          else
+            printf 'DEPLOY_TARGET_NOT_STAGING\n' >&2
+            exit 1
+          fi
           cd /opt/oasis-care
           git fetch origin main
           git checkout main
