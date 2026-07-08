@@ -10,6 +10,10 @@ const apiEntrypoint = fs.readFileSync(
   new URL('../../apps/api/docker-entrypoint.sh', import.meta.url),
   'utf8',
 );
+const migrationDirectories = fs
+  .readdirSync(new URL('../../libs/db/prisma/migrations', import.meta.url), { withFileTypes: true })
+  .filter((dirent) => dirent.isDirectory())
+  .map((dirent) => dirent.name);
 
 const migrationName = '20260707090000_tenant_organization_not_null';
 const migrationPath =
@@ -124,7 +128,7 @@ test('pending migration proof parses Prisma singular pending heading', () => {
   assert.match(pendingProof, /following migration\.\*not yet been applied/);
   assert.doesNotMatch(pendingProof, /Following migrations\.\*not yet been applied/);
   assert.match(pendingProof, /grep -Eiq "following migration\.\*not yet been applied"/);
-  assert.match(pendingProof, /grep -Ec "\^\[\[:space:\]\]\*\[0-9\]\{14\}_\[A-Za-z0-9_\]\+\[\[:space:\]\]\*\$"/);
+  assert.match(pendingProof, /grep -Ec "\^\[\[:space:\]\]\*\[0-9\]\+_\[A-Za-z0-9_\]\+\[\[:space:\]\]\*\$"/);
   assert.match('Following migration 20260707090000_tenant_organization_not_null have not yet been applied:', pendingHeadingPattern);
   assert.match('Following migrations have not yet been applied:', pendingHeadingPattern);
   assert.match('FOLLOWING MIGRATIONS HAVE NOT YET BEEN APPLIED:', pendingHeadingPattern);
@@ -149,6 +153,22 @@ test('pending migration proof treats Prisma exit 1 with the exact pending line a
   assert.match(pendingProof, /printf "%s\\n" "\$MIGRATION_NAME"[\s\S]*?exit 0/);
 });
 
+test('pending migration proof counts all digit-prefix Prisma migration names', () => {
+  const pendingProof = workflowSlice(
+    'prove_pending_migration_set() {',
+    '\n          run_single_migration() {',
+  );
+
+  assert.match(pendingProof, /migration_line_count=/);
+  assert.match(pendingProof, /pending_count=/);
+  assert.doesNotMatch(pendingProof, /\[0-9\]\{14\}_\[A-Za-z0-9_\]\+/);
+  assert.doesNotMatch(pendingProof, /\[0-9\]\{14\}_/);
+  assert.match(pendingProof, /\[0-9\]\+_\[A-Za-z0-9_\]\+/);
+  assert.match(pendingProof, /PENDING_MIGRATION_SET_MULTIPLE/);
+  assert(migrationDirectories.includes('20250805_init_emar_tables'));
+  assert.match('20250805_init_emar_tables', /^[0-9]+_[A-Za-z0-9_]+$/);
+});
+
 test('pending migration proof does not approve prose-only or multiple pending migrations', () => {
   const pendingProof = workflowSlice(
     'prove_pending_migration_set() {',
@@ -161,6 +181,10 @@ test('pending migration proof does not approve prose-only or multiple pending mi
   assert.match(pendingProof, /\[ "\$expected_name_found" -eq 1 \][\s\S]*?\[ "\$expected_line_count" -ne 1 \][\s\S]*?PENDING_MIGRATION_STATUS_UNPARSEABLE/);
   assert.match(pendingProof, /\[ "\$migration_line_count" -gt 1 \][\s\S]*?PENDING_MIGRATION_SET_MULTIPLE/);
   assert.match(pendingProof, /\[ "\$migration_line_count" -eq 0 \][\s\S]*?PENDING_MIGRATION_SET_UNKNOWN/);
+  assert.match(
+    '20260707090000_tenant_organization_not_null\n20250805_init_emar_tables',
+    /^[0-9]+_[A-Za-z0-9_]+$/m,
+  );
 });
 
 test('pending migration proof exposes safe diagnostic classes for status setup failures', () => {

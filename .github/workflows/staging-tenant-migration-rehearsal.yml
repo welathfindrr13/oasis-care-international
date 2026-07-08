@@ -354,7 +354,7 @@ jobs:
               expected_name_found=1
             fi
             expected_line_count="$(grep -Ec "^[[:space:]]*$MIGRATION_NAME[[:space:]]*$" "$status_file" || true)"
-            migration_line_count="$(grep -Ec "^[[:space:]]*[0-9]{14}_[A-Za-z0-9_]+[[:space:]]*$" "$status_file" || true)"
+            migration_line_count="$(grep -Ec "^[[:space:]]*[0-9]+_[A-Za-z0-9_]+[[:space:]]*$" "$status_file" || true)"
 
             if [ "$status" -eq 1 ] && [ "$pending_header_found" -eq 1 ] && [ "$expected_name_found" -eq 1 ] && [ "$expected_line_count" -eq 1 ] && [ "$migration_line_count" -eq 1 ]; then
               printf "%s\n" "$MIGRATION_NAME"
@@ -414,8 +414,8 @@ jobs:
             exit 1
           fi
 
-          pending_name="$(grep -E '^[0-9]{14}_[A-Za-z0-9_]+$' "$remote_tmp/pending.out" | head -n 1 || true)"
-          pending_count="$(grep -Ec '^[0-9]{14}_[A-Za-z0-9_]+$' "$remote_tmp/pending.out" || true)"
+          pending_name="$(grep -E '^[0-9]+_[A-Za-z0-9_]+$' "$remote_tmp/pending.out" | head -n 1 || true)"
+          pending_count="$(grep -Ec '^[0-9]+_[A-Za-z0-9_]+$' "$remote_tmp/pending.out" || true)"
 
           if grep -qx 'PRISMA_MIGRATION_STATUS_UP_TO_DATE' "$remote_tmp/pending.out" && [ "$pending_count" -eq 0 ]; then
             printf 'PENDING_MIGRATION_SET_ZERO\n'
