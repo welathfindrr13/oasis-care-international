@@ -28,3 +28,10 @@ test('Deployment V2 CI runs staging migration rehearsal workflow static guard', 
     /node --test \.github\/workflows\/staging-tenant-migration-rehearsal\.test\.mjs/,
   );
 });
+
+test('Deployment V2 CI runs production migration gate workflow static guard', () => {
+  assert.match(
+    workflow,
+    /node --test \.github\/workflows\/production-tenant-migration-gate\.test\.mjs/,
+  );
+});
