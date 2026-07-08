@@ -387,7 +387,7 @@ jobs:
               exit 1
             fi
             rm -f "$status_file"
-          ' sh "$MIGRATION_NAME" > "$remote_tmp/pending.out" 2> "$remote_tmp/transport.err"
+          ' sh "$MIGRATION_NAME" > "$remote_tmp/pending.out" 2> "$remote_tmp/transport.err" < /dev/null
           pending_command_status=$?
           set -e
 
@@ -488,7 +488,7 @@ jobs:
             set -e
             rm -f "$deploy_file"
             exit "$status"
-          ' > "$remote_tmp/deploy.out" 2> "$remote_tmp/transport.err"
+          ' > "$remote_tmp/deploy.out" 2> "$remote_tmp/transport.err" < /dev/null
           REMOTE
             status=$?
             set -e
@@ -535,7 +535,7 @@ jobs:
             fi
             rm -f "$status_file"
             exit "$status"
-          ' > "$remote_tmp/status.out" 2> "$remote_tmp/transport.err"
+          ' > "$remote_tmp/status.out" 2> "$remote_tmp/transport.err" < /dev/null
 
           if grep -qx 'PRISMA_MIGRATION_STATUS_UP_TO_DATE' "$remote_tmp/status.out"; then
             printf 'MIGRATION_STATUS_APPLIED: %s\n' "$migration_name"
