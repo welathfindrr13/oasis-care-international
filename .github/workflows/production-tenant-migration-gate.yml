@@ -261,10 +261,11 @@ jobs:
           }
 
           run_remote_gate() {
-            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- "$EXPECTED_PRODUCTION_SHA" "$MIGRATION_PATH" <<'REMOTE'
+            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- "$EXPECTED_PRODUCTION_SHA" "$MIGRATION_PATH" "$MIGRATION_NAME" <<'REMOTE'
           set -euo pipefail
           expected_sha="$1"
           migration_path="$2"
+          MIGRATION_NAME="$3"
           target_class="$(tr -d '\r\n' < /etc/oasis/production-deploy-target-class 2>/dev/null || true)"
           if [ "$target_class" = "production" ]; then
             printf 'DEPLOY_TARGET_PRODUCTION\n'
@@ -291,6 +292,62 @@ jobs:
             printf 'MIGRATION_FILE_MISSING\n' >&2
             exit 1
           fi
+
+          repo_migration_hash="$(sha256sum "$migration_path" | cut -d ' ' -f 1 || true)"
+          if [ -z "$repo_migration_hash" ]; then
+            printf 'API_MIGRATION_CONTENT_UNKNOWN\n' >&2
+            exit 1
+          fi
+
+          remote_tmp="$(mktemp -d)"
+          trap 'rm -rf "$remote_tmp"' EXIT
+
+          set +e
+          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml exec -T api sh -lc '
+            set -eu
+            MIGRATION_NAME="$1"
+            container_migration_file="/app/libs/db/prisma/migrations/$MIGRATION_NAME/migration.sql"
+            if [ ! -f "$container_migration_file" ]; then
+              printf "API_MIGRATION_CONTENT_MISSING\n"
+              exit 1
+            fi
+            if ! command -v sha256sum >/dev/null 2>&1; then
+              printf "API_MIGRATION_CONTENT_UNKNOWN\n"
+              exit 1
+            fi
+            sha256sum "$container_migration_file" | cut -d " " -f 1
+          ' sh "$MIGRATION_NAME" > "$remote_tmp/api-migration-hash.out" 2> "$remote_tmp/transport.err" < /dev/null
+          container_hash_status=$?
+          set -e
+
+          if [ ! -s "$remote_tmp/api-migration-hash.out" ]; then
+            printf 'API_MIGRATION_CONTENT_UNKNOWN\n' >&2
+            exit 1
+          fi
+
+          if grep -Eq '^API_MIGRATION_CONTENT_(MISSING|UNKNOWN)$' "$remote_tmp/api-migration-hash.out"; then
+            grep -E '^API_MIGRATION_CONTENT_(MISSING|UNKNOWN)$' "$remote_tmp/api-migration-hash.out" >&2
+            exit 1
+          fi
+
+          if [ "$container_hash_status" -ne 0 ]; then
+            printf 'API_MIGRATION_CONTENT_UNKNOWN\n' >&2
+            exit 1
+          fi
+
+          container_migration_hash="$(grep -E '^[0-9a-f]{64}$' "$remote_tmp/api-migration-hash.out" | head -n 1 || true)"
+          container_hash_count="$(grep -Ec '^[0-9a-f]{64}$' "$remote_tmp/api-migration-hash.out" || true)"
+          if [ "$container_hash_count" -ne 1 ]; then
+            printf 'API_MIGRATION_CONTENT_UNKNOWN\n' >&2
+            exit 1
+          fi
+
+          if [ "$container_migration_hash" != "$repo_migration_hash" ]; then
+            printf 'API_MIGRATION_CONTENT_MISMATCH\n' >&2
+            exit 1
+          fi
+
+          printf 'API_MIGRATION_CONTENT_OK\n'
           REMOTE
           }
 

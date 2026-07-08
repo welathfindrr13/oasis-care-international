@@ -72,6 +72,45 @@ test('production target and SHA proof happen before dry-run pending proof and mi
   assert.doesNotMatch(workflow, /printf .*target_class|echo .*target_class|printf .*current_sha|echo .*current_sha/);
 });
 
+test('production gate proves running API container migration content before migration work', () => {
+  const remoteGate = workflowSlice(
+    'run_remote_gate() {',
+    '\n          prove_pending_migration_set() {',
+  );
+  const containerProofIndex = remoteGate.indexOf('API_MIGRATION_CONTENT_OK');
+  const preDryRunIndex = workflow.lastIndexOf('\n          run_tenant_dry_run pre');
+  const pendingProofIndex = workflow.lastIndexOf('\n          prove_pending_migration_set');
+  const migrateIndex = workflow.lastIndexOf('\n          run_single_migration');
+
+  assert.notEqual(containerProofIndex, -1, 'running API migration content proof is required');
+  assert.match(remoteGate, /sha256sum "\$migration_path"/);
+  assert.match(
+    remoteGate,
+    /container_migration_file="\/app\/libs\/db\/prisma\/migrations\/\$MIGRATION_NAME\/migration\.sql"/,
+  );
+  assert.match(remoteGate, /sha256sum "\$container_migration_file"/);
+  assert.match(remoteGate, /API_MIGRATION_CONTENT_OK/);
+  assert.match(remoteGate, /API_MIGRATION_CONTENT_MISSING/);
+  assert.match(remoteGate, /API_MIGRATION_CONTENT_MISMATCH/);
+  assert.match(remoteGate, /API_MIGRATION_CONTENT_UNKNOWN/);
+  assert.match(remoteGate, /< \/dev\/null/);
+  assert(
+    workflow.indexOf('API_MIGRATION_CONTENT_OK') < preDryRunIndex,
+    'API content proof must happen before pre-migration dry-run',
+  );
+  assert(
+    workflow.indexOf('API_MIGRATION_CONTENT_OK') < pendingProofIndex,
+    'API content proof must happen before pending proof',
+  );
+  assert(
+    workflow.indexOf('API_MIGRATION_CONTENT_OK') < migrateIndex,
+    'API content proof must happen before migration',
+  );
+  assert.doesNotMatch(remoteGate, /cat "\$migration_path"|cat .*migration\.sql/);
+  assert.doesNotMatch(remoteGate, /printf .*repo_migration_hash|echo .*repo_migration_hash/);
+  assert.doesNotMatch(remoteGate, /printf .*container_migration_hash|echo .*container_migration_hash/);
+});
+
 test('production migration file and tenant dry-runs are gated safely', () => {
   const preDryRunIndex = workflow.lastIndexOf('\n          run_tenant_dry_run pre');
   const pendingProofIndex = workflow.lastIndexOf('\n          prove_pending_migration_set');
@@ -145,7 +184,7 @@ test('production docker compose exec calls declare explicit stdin handling', () 
   const execLinePattern = /docker compose .*exec -T api sh -lc '/g;
   const matches = [...workflow.matchAll(execLinePattern)];
 
-  assert.equal(matches.length, 4);
+  assert.equal(matches.length, 5);
   for (const match of matches) {
     const redirectEnd = workflow.indexOf('2> "$remote_tmp/transport.err"', match.index);
     assert.notEqual(redirectEnd, -1);
