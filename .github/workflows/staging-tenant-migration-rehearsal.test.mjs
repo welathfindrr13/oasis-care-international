@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const workflow = fs.readFileSync(
   new URL('./staging-tenant-migration-rehearsal.yml', import.meta.url),
@@ -26,6 +29,18 @@ function workflowSlice(start, end) {
   assert.notEqual(startIndex, -1, `missing start marker: ${start}`);
   assert.notEqual(endIndex, -1, `missing end marker: ${end}`);
   return workflow.slice(startIndex, endIndex);
+}
+
+function pendingProofDockerExecLine() {
+  const pendingProof = workflowSlice(
+    'prove_pending_migration_set() {',
+    '\n          run_single_migration() {',
+  );
+  const match = pendingProof.match(
+    /docker compose --env-file deploy\/v2\/\.env -f deploy\/v2\/docker-compose\.yml exec -T api sh -lc '[\s\S]*?' sh "\$MIGRATION_NAME" > "\$remote_tmp\/pending\.out" 2> "\$remote_tmp\/transport\.err"(?: < \/dev\/null)?/,
+  );
+  assert.ok(match, 'missing pending proof docker compose exec invocation');
+  return match[0];
 }
 
 test('staging tenant migration rehearsal workflow is manual only', () => {
@@ -151,6 +166,70 @@ test('pending migration proof treats Prisma exit 1 with the exact pending line a
     /\[ "\$status" -eq 1 \][\s\S]*?\[ "\$pending_header_found" -eq 1 \][\s\S]*?\[ "\$expected_name_found" -eq 1 \][\s\S]*?\[ "\$expected_line_count" -eq 1 \][\s\S]*?\[ "\$migration_line_count" -eq 1 \]/,
   );
   assert.match(pendingProof, /printf "%s\\n" "\$MIGRATION_NAME"[\s\S]*?exit 0/);
+});
+
+test('pending migration proof docker exec cannot drain the heredoc-fed remote script', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oasis-rehearsal-stdin-'));
+  try {
+    const binDir = path.join(tempDir, 'bin');
+    fs.mkdirSync(binDir);
+    fs.writeFileSync(
+      path.join(binDir, 'docker'),
+      [
+        '#!/usr/bin/env bash',
+        'cat > /dev/null',
+        `printf '${migrationName}\\n'`,
+        '',
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+
+    const remoteTmp = path.join(tempDir, 'remote');
+    const body = [
+      'set -euo pipefail',
+      `MIGRATION_NAME="${migrationName}"`,
+      `remote_tmp="${remoteTmp}"`,
+      'mkdir -p "$remote_tmp"',
+      pendingProofDockerExecLine(),
+      'pending_name="$(grep -E \'^[0-9]+_[A-Za-z0-9_]+$\' "$remote_tmp/pending.out" | head -n 1 || true)"',
+      'pending_count="$(grep -Ec \'^[0-9]+_[A-Za-z0-9_]+$\' "$remote_tmp/pending.out" || true)"',
+      'if [ "$pending_count" -eq 1 ] && [ "$pending_name" = "$MIGRATION_NAME" ]; then',
+      '  printf \'PENDING_MIGRATION_SET_EXACT: %s\\n\' "$MIGRATION_NAME"',
+      'fi',
+      '',
+    ].join('\n');
+
+    const result = spawnSync('bash', ['-s', '--', migrationName], {
+      input: body,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
+      },
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, new RegExp(`PENDING_MIGRATION_SET_EXACT: ${migrationName}`));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('docker compose exec calls declare explicit stdin handling', () => {
+  const execLinePattern = /docker compose .*exec -T api sh -lc '/g;
+  const matches = [...workflow.matchAll(execLinePattern)];
+
+  assert.equal(matches.length, 4);
+  for (const match of matches) {
+    const redirectEnd = workflow.indexOf('2> "$remote_tmp/transport.err"', match.index);
+    assert.notEqual(redirectEnd, -1);
+    const execBlock = workflow.slice(match.index, workflow.indexOf('\n', redirectEnd));
+    assert.match(
+      execBlock,
+      /< \/dev\/null|< "\$remote_script_dir\/tenant-nullability-dry-run\.mjs"/,
+      `docker compose exec call must explicitly handle stdin:\n${execBlock}`,
+    );
+  }
 });
 
 test('pending migration proof counts all digit-prefix Prisma migration names', () => {
