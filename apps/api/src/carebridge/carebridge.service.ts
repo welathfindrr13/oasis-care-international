@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import {
+  AccessGrantScope,
   CareRoomMembershipStatus,
   ConcernEventType,
   ConcernStatus,
@@ -9,6 +10,7 @@ import {
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
 import { CarebridgeRepository } from './carebridge.repository';
+import { CarebridgeAccessService } from './access/carebridge-access.service';
 import {
   InviteFamilyContactInput,
   RaiseConcernInput,
@@ -36,6 +38,7 @@ export class CarebridgeService {
   constructor(
     private readonly repository: CarebridgeRepository,
     private readonly prisma: PrismaService,
+    private readonly accessService: CarebridgeAccessService,
   ) {}
 
   async createCareRoom(clientId: string, actorUserId: string, actorRole: string, organizationId: string) {
@@ -135,12 +138,23 @@ export class CarebridgeService {
       for (const candidate of this.familyLookupCandidates(lookup)) {
         const rooms = await this.repository.listRoomsForFamilyAccess(candidate);
         if (rooms.length > 0) {
-          return rooms.flatMap((room: any) => {
+          const authorizedRooms = [];
+          for (const room of rooms) {
             const membership = this.findFamilyMembership(room.memberships, candidate);
-            return membership
-              ? [this.mapCareRoom(room, { familyMembership: membership })]
-              : [];
-          });
+            if (!membership) {
+              continue;
+            }
+            await this.requireFamilyScopes(
+              room.id,
+              membership.id,
+              candidate,
+              [AccessGrantScope.VIEW_UPDATES],
+            );
+            authorizedRooms.push(
+              this.mapCareRoom(room, { familyMembership: membership }),
+            );
+          }
+          return authorizedRooms;
         }
       }
       return [];
@@ -156,13 +170,11 @@ export class CarebridgeService {
 
   async getCareRoom(id: string, viewer: ViewerContext) {
     if (this.isExternalViewer(viewer)) {
-      const access = await this.findFamilyRoomAccess(
+      const access = await this.requireScopedFamilyRoomAccess(
         id,
-        this.requireFamilyAccessLookup(viewer),
+        viewer,
+        [AccessGrantScope.VIEW_UPDATES],
       );
-      if (!access) {
-        throw this.familyRoomForbidden();
-      }
       return this.mapCareRoom(access.room, { familyMembership: access.membership });
     }
 
@@ -179,8 +191,17 @@ export class CarebridgeService {
   }
 
   async listVerifiedVisitStories(careRoomId: string, viewer: ViewerContext) {
-    await this.getCareRoom(careRoomId, viewer);
     const familyVisible = this.isExternalViewer(viewer);
+    if (familyVisible) {
+      await this.requireScopedFamilyRoomAccess(careRoomId, viewer, [
+        AccessGrantScope.VIEW_UPDATES,
+        AccessGrantScope.VIEW_VISIT_TIMES,
+        AccessGrantScope.VIEW_TASK_SUMMARY,
+        AccessGrantScope.VIEW_MEDICATION_SUPPORT_STATUS,
+      ]);
+    } else {
+      await this.getCareRoom(careRoomId, viewer);
+    }
     const status = familyVisible ? 'PUBLISHED' : undefined;
     const stories = await this.repository.listVerifiedVisitStoriesByRoomId(careRoomId, status as any);
     return stories.map((story: any) => this.mapStory(story, { familyVisible }));
@@ -346,13 +367,15 @@ export class CarebridgeService {
   }
 
   async raiseConcern(input: RaiseConcernInput, viewer: ViewerContext) {
-    const familyAccess = this.isExternalViewer(viewer)
-      ? await this.findFamilyRoomAccess(
+    const externalViewer = this.isExternalViewer(viewer);
+    const familyAccess = externalViewer
+      ? await this.requireScopedFamilyRoomAccess(
           input.careRoomId,
-          this.requireFamilyAccessLookup(viewer),
+          viewer,
+          [AccessGrantScope.RAISE_CONCERNS],
         )
       : undefined;
-    const room = this.isExternalViewer(viewer)
+    const room = externalViewer
       ? familyAccess?.room
       : await this.repository.findRoomByIdForOrganization(
           input.careRoomId,
@@ -363,6 +386,20 @@ export class CarebridgeService {
       throw this.familyRoomForbidden();
     }
 
+    return this.createConcernForRoom(
+      input,
+      viewer,
+      room,
+      familyAccess?.membership.id,
+    );
+  }
+
+  private async createConcernForRoom(
+    input: RaiseConcernInput,
+    viewer: ViewerContext,
+    room: any,
+    raisedByMembershipId?: string,
+  ) {
     const now = new Date();
     const concern = await this.repository.createConcern({
       organization_id: room.organization_id,
@@ -374,6 +411,9 @@ export class CarebridgeService {
       severity: input.severity,
       priority: input.severity === 'HIGH' || input.severity === 'CRITICAL' ? 'URGENT' as any : 'ROUTINE' as any,
       status: 'OPEN' as any,
+      ...(raisedByMembershipId
+        ? { raised_by_membership_id: raisedByMembershipId }
+        : {}),
       acknowledgement_due_at: new Date(now.getTime() + 60 * 60 * 1000),
       response_due_at: new Date(now.getTime() + 4 * 60 * 60 * 1000),
       resolution_due_at: new Date(now.getTime() + 24 * 60 * 60 * 1000),
@@ -462,12 +502,19 @@ export class CarebridgeService {
         HttpStatus.FORBIDDEN,
       );
     }
-    const lookup = this.requireFamilyAccessLookup(viewer);
-
-    const access = await this.findFamilyRoomAccess(input.careRoomId, lookup);
-    if (!access) {
-      throw this.familyRoomForbidden();
-    }
+    const createsConcern = Boolean(
+      (input.sentiment === FamilyPulseSentiment.CONCERNED ||
+        input.sentiment === FamilyPulseSentiment.NEED_CALL) &&
+        input.note,
+    );
+    const access = await this.requireScopedFamilyRoomAccess(
+      input.careRoomId,
+      viewer,
+      [
+        AccessGrantScope.SUBMIT_PULSE,
+        ...(createsConcern ? [AccessGrantScope.RAISE_CONCERNS] : []),
+      ],
+    );
     const { membership, room } = access;
 
     const pulse = await this.repository.createFamilyPulse({
@@ -482,11 +529,8 @@ export class CarebridgeService {
       sentiment: input.sentiment,
     });
 
-    if (
-      (input.sentiment === FamilyPulseSentiment.CONCERNED || input.sentiment === FamilyPulseSentiment.NEED_CALL) &&
-      input.note
-    ) {
-      await this.raiseConcern(
+    if (createsConcern) {
+      await this.createConcernForRoom(
         {
           careRoomId: input.careRoomId,
           title: input.sentiment === FamilyPulseSentiment.NEED_CALL ? 'Callback requested' : 'Family confidence concern',
@@ -495,6 +539,8 @@ export class CarebridgeService {
           category: 'COMMUNICATION' as any,
         },
         viewer,
+        room,
+        membership.id,
       );
     }
 
@@ -572,9 +618,47 @@ export class CarebridgeService {
       }
 
       const membership = this.findFamilyMembership(room.memberships, candidate);
-      return membership ? { room, membership } : undefined;
+      return membership ? { room, membership, lookup: candidate } : undefined;
     }
     return undefined;
+  }
+
+  private async requireScopedFamilyRoomAccess(
+    id: string,
+    viewer: ViewerContext,
+    requiredScopes: AccessGrantScope[],
+  ) {
+    const access = await this.findFamilyRoomAccess(
+      id,
+      this.requireFamilyAccessLookup(viewer),
+    );
+    if (!access) {
+      throw this.familyRoomForbidden();
+    }
+
+    await this.requireFamilyScopes(
+      id,
+      access.membership.id,
+      access.lookup,
+      requiredScopes,
+    );
+    return access;
+  }
+
+  private async requireFamilyScopes(
+    careRoomId: string,
+    membershipId: string,
+    lookup: FamilyAccessLookup,
+    requiredScopes: AccessGrantScope[],
+  ) {
+    await this.accessService.requireFamilyScopes({
+      membershipId,
+      careRoomId,
+      organizationId: lookup.organizationId,
+      authSubject: lookup.authSubject,
+      email: lookup.email,
+      requiredScopes,
+    });
   }
 
   private findFamilyMembership(memberships: any[], lookup: FamilyAccessLookup) {

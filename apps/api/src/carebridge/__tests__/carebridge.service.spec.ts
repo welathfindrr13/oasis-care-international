@@ -1,13 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CarebridgeService } from '../carebridge.service';
 import { CarebridgeRepository } from '../carebridge.repository';
-import { PrismaService } from '@oasis/db';
+import {
+  AccessGrantScope,
+  FamilyPulseSentiment,
+  PrismaService,
+} from '@oasis/db';
 import { BaseHttpException } from '../../common/errors/base-http.exception';
 import { ErrorCode } from '../../common/errors/error-codes';
+import { CarebridgeAccessService } from '../access/carebridge-access.service';
 
 describe('CarebridgeService', () => {
   let service: CarebridgeService;
   let repository: jest.Mocked<CarebridgeRepository>;
+  let accessService: jest.Mocked<CarebridgeAccessService>;
 
   const familyMembership = (identity: { authSubject?: string; email?: string }) => ({
     id: 'membership-1',
@@ -47,9 +53,15 @@ describe('CarebridgeService', () => {
     rejectVerifiedVisitStory: jest.fn(),
     createConcern: jest.fn(),
     appendConcernEvent: jest.fn(),
+    appendConcernMessage: jest.fn(),
+    createFamilyPulse: jest.fn(),
     listConcernsForOrganization: jest.fn(),
     findConcernById: jest.fn(),
     updateConcern: jest.fn(),
+  };
+
+  const mockAccessService = {
+    requireFamilyScopes: jest.fn().mockResolvedValue({ id: 'membership-1' }),
   };
 
   const mockPrisma = {
@@ -73,12 +85,18 @@ describe('CarebridgeService', () => {
           provide: PrismaService,
           useValue: mockPrisma,
         },
+        {
+          provide: CarebridgeAccessService,
+          useValue: mockAccessService,
+        },
       ],
     }).compile();
 
     service = module.get(CarebridgeService);
     repository = module.get(CarebridgeRepository);
+    accessService = module.get(CarebridgeAccessService);
     jest.clearAllMocks();
+    mockAccessService.requireFamilyScopes.mockResolvedValue({ id: 'membership-1' });
   });
 
   it('creates a care room and ensures a default policy exists', async () => {
@@ -141,6 +159,14 @@ describe('CarebridgeService', () => {
       organizationId: 'org-1',
       authSubject: undefined,
       email: 'daughter@example.com',
+    });
+    expect(accessService.requireFamilyScopes).toHaveBeenCalledWith({
+      membershipId: 'membership-1',
+      careRoomId: 'room-1',
+      organizationId: 'org-1',
+      authSubject: undefined,
+      email: 'daughter@example.com',
+      requiredScopes: [AccessGrantScope.VIEW_UPDATES],
     });
     expect(result).toHaveLength(1);
     expect(result[0].client?.fullName).toBe('Mary Smith');
@@ -242,6 +268,7 @@ describe('CarebridgeService', () => {
     expect(repository.findRoomByIdForFamilyAccess).not.toHaveBeenCalled();
     expect(repository.listVerifiedVisitStoriesByRoomId).not.toHaveBeenCalled();
     expect(repository.createConcern).not.toHaveBeenCalled();
+    expect(accessService.requireFamilyScopes).not.toHaveBeenCalled();
   });
 
   it('denies a family viewer with no identity before any family repository access', async () => {
@@ -276,6 +303,7 @@ describe('CarebridgeService', () => {
     expect(repository.findRoomByIdForFamilyAccess).not.toHaveBeenCalled();
     expect(repository.listVerifiedVisitStoriesByRoomId).not.toHaveBeenCalled();
     expect(repository.createConcern).not.toHaveBeenCalled();
+    expect(accessService.requireFamilyScopes).not.toHaveBeenCalled();
   });
 
   it('returns only the matching family membership and its grants', async () => {
@@ -416,7 +444,32 @@ describe('CarebridgeService', () => {
 
     expect(repository.findRoomByIdForOrganization).toHaveBeenCalledWith('room-1', 'org-1');
     expect(repository.findRoomByIdForFamilyAccess).not.toHaveBeenCalled();
+    expect(accessService.requireFamilyScopes).not.toHaveBeenCalled();
     expect(result.id).toBe('room-1');
+  });
+
+  it('requires update scope for family room detail', async () => {
+    repository.findRoomByIdForFamilyAccess.mockResolvedValue({
+      id: 'room-1',
+      organization_id: 'org-1',
+      client_id: 'client-1',
+      memberships: [familyMembership({ authSubject: 'family-subject' })],
+    } as any);
+
+    await service.getCareRoom('room-1', {
+      role: 'user',
+      organizationId: 'org-1',
+      authSubject: 'family-subject',
+    });
+
+    expect(accessService.requireFamilyScopes).toHaveBeenCalledWith(
+      expect.objectContaining({
+        membershipId: 'membership-1',
+        careRoomId: 'room-1',
+        organizationId: 'org-1',
+        requiredScopes: [AccessGrantScope.VIEW_UPDATES],
+      }),
+    );
   });
 
   it('fails closed when same-tenant email fallback is ambiguous', async () => {
@@ -616,10 +669,46 @@ describe('CarebridgeService', () => {
     });
 
     expect(repository.listVerifiedVisitStoriesByRoomId).toHaveBeenCalledWith('room-1', 'PUBLISHED');
+    expect(accessService.requireFamilyScopes).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requiredScopes: [
+          AccessGrantScope.VIEW_UPDATES,
+          AccessGrantScope.VIEW_VISIT_TIMES,
+          AccessGrantScope.VIEW_TASK_SUMMARY,
+          AccessGrantScope.VIEW_MEDICATION_SUPPORT_STATUS,
+        ],
+      }),
+    );
     expect(result).toHaveLength(1);
     expect(result[0].draftTitle).toBe('Wellbeing visit completed');
     expect(result[0].draftBody).toBe('Mary had a calm visit and completed her usual routine.');
     expect(result[0].draftBody).not.toContain('staff-only');
+  });
+
+  it('does not read published stories when any required scope is denied', async () => {
+    repository.findRoomByIdForFamilyAccess.mockResolvedValue({
+      id: 'room-1',
+      organization_id: 'org-1',
+      client_id: 'client-1',
+      memberships: [familyMembership({ email: 'daughter@example.com' })],
+    } as any);
+    accessService.requireFamilyScopes.mockRejectedValue(
+      new BaseHttpException(
+        ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
+        'Family access is not permitted for this care room.',
+        403,
+      ),
+    );
+
+    await expect(
+      service.listVerifiedVisitStories('room-1', {
+        role: 'user',
+        organizationId: 'org-1',
+        email: 'daughter@example.com',
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+
+    expect(repository.listVerifiedVisitStoriesByRoomId).not.toHaveBeenCalled();
   });
 
   it('raises a concern with SLA timestamps and an initial event', async () => {
@@ -648,6 +737,7 @@ describe('CarebridgeService', () => {
     expect(repository.createConcern).toHaveBeenCalledWith(
       expect.objectContaining({
         care_room_id: 'room-1',
+        raised_by_membership_id: 'membership-1',
         status: 'OPEN',
         acknowledgement_due_at: expect.any(Date),
         response_due_at: expect.any(Date),
@@ -655,7 +745,146 @@ describe('CarebridgeService', () => {
       })
     );
     expect(repository.appendConcernEvent).toHaveBeenCalled();
+    expect(accessService.requireFamilyScopes).toHaveBeenCalledWith(
+      expect.objectContaining({
+        membershipId: 'membership-1',
+        requiredScopes: [AccessGrantScope.RAISE_CONCERNS],
+      }),
+    );
     expect(result.id).toBe('concern-1');
+  });
+
+  it('keeps staff concern creation organization-scoped without family attribution', async () => {
+    repository.findRoomByIdForOrganization.mockResolvedValue({
+      id: 'room-1',
+      organization_id: 'org-1',
+      client_id: 'client-1',
+    } as any);
+    repository.createConcern.mockResolvedValue({ id: 'concern-1', status: 'OPEN' } as any);
+
+    await service.raiseConcern(
+      {
+        careRoomId: 'room-1',
+        title: 'Staff concern',
+        severity: 'MEDIUM',
+        category: 'VISIT_DELIVERY',
+      },
+      { role: 'carer', organizationId: 'org-1', userId: 'staff-1' },
+    );
+
+    expect(accessService.requireFamilyScopes).not.toHaveBeenCalled();
+    expect(repository.createConcern).toHaveBeenCalledWith(
+      expect.not.objectContaining({ raised_by_membership_id: expect.anything() }),
+    );
+  });
+
+  it('requires only pulse scope for a non-escalating family pulse', async () => {
+    repository.findRoomByIdForFamilyAccess.mockResolvedValue({
+      id: 'room-1',
+      organization_id: 'org-1',
+      client_id: 'client-1',
+      memberships: [familyMembership({ email: 'daughter@example.com' })],
+    } as any);
+    repository.createFamilyPulse.mockResolvedValue({
+      id: 'pulse-1',
+      sentiment: FamilyPulseSentiment.CONFIDENT,
+      note: null,
+      created_at: new Date('2026-04-24T09:00:00Z'),
+    } as any);
+
+    await service.submitFamilyPulse(
+      {
+        careRoomId: 'room-1',
+        sentiment: FamilyPulseSentiment.CONFIDENT,
+      },
+      { role: 'user', organizationId: 'org-1', email: 'daughter@example.com' },
+    );
+
+    expect(accessService.requireFamilyScopes).toHaveBeenCalledWith(
+      expect.objectContaining({
+        membershipId: 'membership-1',
+        requiredScopes: [AccessGrantScope.SUBMIT_PULSE],
+      }),
+    );
+    expect(repository.createConcern).not.toHaveBeenCalled();
+  });
+
+  it('preflights both scopes before an escalating pulse and reuses membership attribution', async () => {
+    repository.findRoomByIdForFamilyAccess.mockResolvedValue({
+      id: 'room-1',
+      organization_id: 'org-1',
+      client_id: 'client-1',
+      memberships: [familyMembership({ email: 'daughter@example.com' })],
+    } as any);
+    repository.createFamilyPulse.mockResolvedValue({
+      id: 'pulse-1',
+      sentiment: FamilyPulseSentiment.CONCERNED,
+      note: 'Please call me.',
+      created_at: new Date('2026-04-24T09:00:00Z'),
+    } as any);
+    repository.createConcern.mockResolvedValue({ id: 'concern-1', status: 'OPEN' } as any);
+
+    await service.submitFamilyPulse(
+      {
+        careRoomId: 'room-1',
+        sentiment: FamilyPulseSentiment.CONCERNED,
+        note: 'Please call me.',
+      },
+      { role: 'user', organizationId: 'org-1', email: 'daughter@example.com' },
+    );
+
+    expect(accessService.requireFamilyScopes).toHaveBeenCalledTimes(1);
+    expect(accessService.requireFamilyScopes).toHaveBeenCalledWith(
+      expect.objectContaining({
+        membershipId: 'membership-1',
+        requiredScopes: [
+          AccessGrantScope.SUBMIT_PULSE,
+          AccessGrantScope.RAISE_CONCERNS,
+        ],
+      }),
+    );
+    expect(accessService.requireFamilyScopes.mock.invocationCallOrder[0]).toBeLessThan(
+      repository.createFamilyPulse.mock.invocationCallOrder[0],
+    );
+    expect(repository.createFamilyPulse).toHaveBeenCalledWith(
+      expect.objectContaining({ care_room_membership_id: 'membership-1' }),
+    );
+    expect(repository.createConcern).toHaveBeenCalledWith(
+      expect.objectContaining({ raised_by_membership_id: 'membership-1' }),
+    );
+  });
+
+  it('performs zero pulse, concern, event, message, or audit writes when escalation scope is denied', async () => {
+    repository.findRoomByIdForFamilyAccess.mockResolvedValue({
+      id: 'room-1',
+      organization_id: 'org-1',
+      client_id: 'client-1',
+      memberships: [familyMembership({ email: 'daughter@example.com' })],
+    } as any);
+    accessService.requireFamilyScopes.mockRejectedValue(
+      new BaseHttpException(
+        ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
+        'Family access is not permitted for this care room.',
+        403,
+      ),
+    );
+
+    await expect(
+      service.submitFamilyPulse(
+        {
+          careRoomId: 'room-1',
+          sentiment: FamilyPulseSentiment.NEED_CALL,
+          note: 'Please call me.',
+        },
+        { role: 'user', organizationId: 'org-1', email: 'daughter@example.com' },
+      ),
+    ).rejects.toMatchObject({ status: 403 });
+
+    expect(repository.createFamilyPulse).not.toHaveBeenCalled();
+    expect(repository.createConcern).not.toHaveBeenCalled();
+    expect(repository.appendConcernEvent).not.toHaveBeenCalled();
+    expect(repository.appendConcernMessage).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
   });
 
   it('lists the concern inbox for staff in the same organization', async () => {

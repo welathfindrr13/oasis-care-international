@@ -46,12 +46,17 @@ export class CarebridgeFeedResolver {
   @CarebridgeRoles('user')
   async careRoomFeed(@Args('careRoomId') careRoomId: string, @Context() ctx: any) {
     const actor = getCarebridgeActor(ctx);
-    await this.accessService.requireFamilyScope({
+    await this.accessService.requireFamilyScopes({
       careRoomId,
-      organizationId: actor.organizationId,
+      organizationId: actor.organizationId || '',
       authSubject: actor.userId,
       email: actor.email,
-      requiredScope: AccessGrantScope.VIEW_UPDATES,
+      requiredScopes: [
+        AccessGrantScope.VIEW_UPDATES,
+        AccessGrantScope.VIEW_VISIT_TIMES,
+        AccessGrantScope.VIEW_TASK_SUMMARY,
+        AccessGrantScope.VIEW_MEDICATION_SUPPORT_STATUS,
+      ],
     });
     const stories = await this.feedService.listPublishedStoriesForRoom(careRoomId);
     return stories.map(mapVerifiedVisitStory);
