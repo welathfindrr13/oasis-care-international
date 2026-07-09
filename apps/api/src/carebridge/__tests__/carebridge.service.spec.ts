@@ -9,6 +9,23 @@ describe('CarebridgeService', () => {
   let service: CarebridgeService;
   let repository: jest.Mocked<CarebridgeRepository>;
 
+  const familyMembership = (identity: { authSubject?: string; email?: string }) => ({
+    id: 'membership-1',
+    status: 'ACTIVE',
+    role: 'FAMILY',
+    access_basis: 'CLIENT_CONSENT',
+    family_contact: {
+      id: 'contact-1',
+      organization_id: 'org-1',
+      auth_subject: identity.authSubject ?? null,
+      email: identity.email ?? null,
+      full_name: 'Authorized Relative',
+      relationship: 'Daughter',
+      disabled_at: null,
+    },
+    access_grants: [],
+  });
+
   const mockRepository = {
     ensureClientInOrganization: jest.fn(),
     createCareRoom: jest.fn(),
@@ -97,7 +114,7 @@ describe('CarebridgeService', () => {
     });
   });
 
-  it('lists care rooms for a family user by email instead of organization scope', async () => {
+  it('lists care rooms for a family user by same-tenant email fallback', async () => {
     repository.listRoomsForFamilyAccess.mockResolvedValue([
       {
         id: 'room-1',
@@ -110,15 +127,18 @@ describe('CarebridgeService', () => {
           id: 'client-1',
           full_name: 'Mary Smith',
         },
+        memberships: [familyMembership({ email: 'daughter@example.com' })],
       },
     ] as any);
 
     const result = await service.listCareRooms({
       role: 'user',
+      organizationId: 'org-1',
       email: 'daughter@example.com',
     });
 
     expect(repository.listRoomsForFamilyAccess).toHaveBeenCalledWith({
+      organizationId: 'org-1',
       authSubject: undefined,
       email: 'daughter@example.com',
     });
@@ -139,16 +159,19 @@ describe('CarebridgeService', () => {
           id: 'client-1',
           full_name: 'Mary Smith',
         },
+        memberships: [familyMembership({ authSubject: 'clerk-family-subject' })],
       },
     ] as any);
 
     const result = await service.listCareRooms({
       role: 'user',
+      organizationId: 'org-1',
       userId: 'clerk-family-subject',
       authSubject: 'clerk-family-subject',
     });
 
     expect(repository.listRoomsForFamilyAccess).toHaveBeenCalledWith({
+      organizationId: 'org-1',
       authSubject: 'clerk-family-subject',
       email: undefined,
     });
@@ -169,19 +192,261 @@ describe('CarebridgeService', () => {
           id: 'client-1',
           full_name: 'Mary Smith',
         },
+        memberships: [familyMembership({ email: 'daughter@example.com' })],
       },
     ] as any);
 
     const result = await service.listCareRooms({
       role: 'client',
+      organizationId: 'org-1',
       email: 'daughter@example.com',
     });
 
     expect(repository.listRoomsForFamilyAccess).toHaveBeenCalledWith({
+      organizationId: 'org-1',
       authSubject: undefined,
       email: 'daughter@example.com',
     });
     expect(result).toHaveLength(1);
+  });
+
+  it('denies a family viewer with no tenant before any family repository access', async () => {
+    const viewer = { role: 'user', email: 'daughter@example.com' };
+    const actions = [
+      () => service.listCareRooms(viewer),
+      () => service.getCareRoom('room-1', viewer),
+      () => service.listVerifiedVisitStories('room-1', viewer),
+      () => service.raiseConcern({
+        careRoomId: 'room-1',
+        title: 'Concern',
+        severity: 'MEDIUM' as any,
+        category: 'COMMUNICATION' as any,
+      }, viewer),
+      () => service.submitFamilyPulse({
+        careRoomId: 'room-1',
+        sentiment: 'OK' as any,
+      }, viewer),
+    ];
+
+    for (const action of actions) {
+      await expect(action()).rejects.toMatchObject({
+        status: 403,
+        response: {
+          code: ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
+          message: 'Family access is not permitted.',
+        },
+      });
+    }
+
+    expect(repository.listRoomsForFamilyAccess).not.toHaveBeenCalled();
+    expect(repository.findRoomByIdForFamilyAccess).not.toHaveBeenCalled();
+    expect(repository.listVerifiedVisitStoriesByRoomId).not.toHaveBeenCalled();
+    expect(repository.createConcern).not.toHaveBeenCalled();
+  });
+
+  it('denies a family viewer with no identity before any family repository access', async () => {
+    const viewer = { role: 'user', organizationId: 'org-1' };
+    const actions = [
+      () => service.listCareRooms(viewer),
+      () => service.getCareRoom('room-1', viewer),
+      () => service.listVerifiedVisitStories('room-1', viewer),
+      () => service.raiseConcern({
+        careRoomId: 'room-1',
+        title: 'Concern',
+        severity: 'MEDIUM' as any,
+        category: 'COMMUNICATION' as any,
+      }, viewer),
+      () => service.submitFamilyPulse({
+        careRoomId: 'room-1',
+        sentiment: 'OK' as any,
+      }, viewer),
+    ];
+
+    for (const action of actions) {
+      await expect(action()).rejects.toMatchObject({
+        status: 403,
+        response: {
+          code: ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
+          message: 'Family access is not permitted.',
+        },
+      });
+    }
+
+    expect(repository.listRoomsForFamilyAccess).not.toHaveBeenCalled();
+    expect(repository.findRoomByIdForFamilyAccess).not.toHaveBeenCalled();
+    expect(repository.listVerifiedVisitStoriesByRoomId).not.toHaveBeenCalled();
+    expect(repository.createConcern).not.toHaveBeenCalled();
+  });
+
+  it('returns only the matching family membership and its grants', async () => {
+    repository.listRoomsForFamilyAccess.mockResolvedValue([
+      {
+        id: 'room-1',
+        organization_id: 'org-1',
+        client_id: 'client-1',
+        status: 'ACTIVE',
+        created_at: new Date('2026-04-21T09:00:00Z'),
+        updated_at: new Date('2026-04-21T09:00:00Z'),
+        client: { id: 'client-1', full_name: 'Mary Smith' },
+        memberships: [
+          {
+            id: 'membership-authorized',
+            status: 'ACTIVE',
+            role: 'FAMILY',
+            access_basis: 'CLIENT_CONSENT',
+            family_contact: {
+              id: 'contact-authorized',
+              organization_id: 'org-1',
+              auth_subject: 'family-subject',
+              email: 'daughter@example.com',
+              full_name: 'Authorized Relative',
+              relationship: 'Daughter',
+              disabled_at: null,
+            },
+            access_grants: [
+              { id: 'grant-authorized', scope: 'VIEW_UPDATES', granted_at: new Date(), revoked_at: null },
+            ],
+          },
+          {
+            id: 'membership-other',
+            status: 'ACTIVE',
+            role: 'FAMILY',
+            access_basis: 'CLIENT_CONSENT',
+            family_contact: {
+              id: 'contact-other',
+              organization_id: 'org-1',
+              auth_subject: 'other-subject',
+              email: 'daughter@example.com',
+              full_name: 'Other Relative',
+              relationship: 'Son',
+              disabled_at: null,
+            },
+            access_grants: [
+              { id: 'grant-other', scope: 'VIEW_UPDATES', granted_at: new Date(), revoked_at: null },
+            ],
+          },
+          {
+            id: 'membership-disabled',
+            status: 'ACTIVE',
+            role: 'FAMILY',
+            access_basis: 'CLIENT_CONSENT',
+            family_contact: {
+              id: 'contact-disabled',
+              organization_id: 'org-1',
+              auth_subject: 'family-subject',
+              email: 'daughter@example.com',
+              full_name: 'Disabled Relative',
+              relationship: 'Daughter',
+              disabled_at: new Date(),
+            },
+            access_grants: [],
+          },
+          {
+            id: 'membership-inactive',
+            status: 'REVOKED',
+            role: 'FAMILY',
+            access_basis: 'CLIENT_CONSENT',
+            family_contact: {
+              id: 'contact-inactive',
+              organization_id: 'org-1',
+              auth_subject: 'family-subject',
+              email: 'daughter@example.com',
+              full_name: 'Inactive Relative',
+              relationship: 'Daughter',
+              disabled_at: null,
+            },
+            access_grants: [],
+          },
+          {
+            id: 'membership-other-tenant',
+            status: 'ACTIVE',
+            role: 'FAMILY',
+            access_basis: 'CLIENT_CONSENT',
+            family_contact: {
+              id: 'contact-other-tenant',
+              organization_id: 'org-2',
+              auth_subject: 'family-subject',
+              email: 'daughter@example.com',
+              full_name: 'Other Tenant Relative',
+              relationship: 'Daughter',
+              disabled_at: null,
+            },
+            access_grants: [],
+          },
+        ],
+      },
+    ] as any);
+
+    const result = await service.listCareRooms({
+      role: 'user',
+      organizationId: 'org-1',
+      authSubject: 'family-subject',
+      email: 'daughter@example.com',
+    });
+
+    expect(result[0].memberships).toHaveLength(1);
+    expect(result[0].memberships[0].id).toBe('membership-authorized');
+    expect(result[0].memberships[0].familyContact.id).toBe('contact-authorized');
+    expect(result[0].memberships[0].accessGrants).toEqual([
+      expect.objectContaining({ id: 'grant-authorized' }),
+    ]);
+  });
+
+  it('keeps staff room listing on the organization path', async () => {
+    repository.listRoomsForOrganization.mockResolvedValue([]);
+
+    await service.listCareRooms({ role: 'admin', organizationId: 'org-1' });
+
+    expect(repository.listRoomsForOrganization).toHaveBeenCalledWith('org-1');
+    expect(repository.listRoomsForFamilyAccess).not.toHaveBeenCalled();
+  });
+
+  it('keeps staff room detail on the organization path', async () => {
+    repository.findRoomByIdForOrganization.mockResolvedValue({
+      id: 'room-1',
+      organization_id: 'org-1',
+      client_id: 'client-1',
+      memberships: [],
+    } as any);
+
+    const result = await service.getCareRoom('room-1', {
+      role: 'carer',
+      organizationId: 'org-1',
+    });
+
+    expect(repository.findRoomByIdForOrganization).toHaveBeenCalledWith('room-1', 'org-1');
+    expect(repository.findRoomByIdForFamilyAccess).not.toHaveBeenCalled();
+    expect(result.id).toBe('room-1');
+  });
+
+  it('fails closed when same-tenant email fallback is ambiguous', async () => {
+    repository.listRoomsForFamilyAccess.mockResolvedValue([
+      {
+        id: 'room-1',
+        organization_id: 'org-1',
+        client_id: 'client-1',
+        status: 'ACTIVE',
+        memberships: [
+          familyMembership({ email: 'shared@example.com' }),
+          {
+            ...familyMembership({ email: 'shared@example.com' }),
+            id: 'membership-2',
+            family_contact: {
+              ...familyMembership({ email: 'shared@example.com' }).family_contact,
+              id: 'contact-2',
+            },
+          },
+        ],
+      },
+    ] as any);
+
+    const result = await service.listCareRooms({
+      role: 'user',
+      organizationId: 'org-1',
+      email: 'shared@example.com',
+    });
+
+    expect(result).toEqual([]);
   });
 
   it('creates a verified visit story with source references', async () => {
@@ -329,6 +594,7 @@ describe('CarebridgeService', () => {
       id: 'room-1',
       organization_id: 'org-1',
       client_id: 'client-1',
+      memberships: [familyMembership({ email: 'daughter@example.com' })],
     } as any);
     repository.listVerifiedVisitStoriesByRoomId.mockResolvedValue([
       {
@@ -345,6 +611,7 @@ describe('CarebridgeService', () => {
 
     const result = await service.listVerifiedVisitStories('room-1', {
       role: 'user',
+      organizationId: 'org-1',
       email: 'daughter@example.com',
     });
 
@@ -360,6 +627,7 @@ describe('CarebridgeService', () => {
       id: 'room-1',
       organization_id: 'org-1',
       client_id: 'client-1',
+      memberships: [familyMembership({ email: 'daughter@example.com' })],
     } as any);
     repository.createConcern.mockResolvedValue({
       id: 'concern-1',
@@ -374,7 +642,7 @@ describe('CarebridgeService', () => {
         severity: 'MEDIUM',
         category: 'VISIT_DELIVERY',
       },
-      { role: 'user', email: 'daughter@example.com' }
+      { role: 'user', organizationId: 'org-1', email: 'daughter@example.com' }
     );
 
     expect(repository.createConcern).toHaveBeenCalledWith(

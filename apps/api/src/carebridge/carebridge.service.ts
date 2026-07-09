@@ -25,6 +25,12 @@ interface ViewerContext {
   authSubject?: string;
 }
 
+interface FamilyAccessLookup {
+  organizationId: string;
+  authSubject?: string;
+  email?: string;
+}
+
 @Injectable()
 export class CarebridgeService {
   constructor(
@@ -125,12 +131,19 @@ export class CarebridgeService {
 
   async listCareRooms(viewer: ViewerContext) {
     if (this.isExternalViewer(viewer)) {
-      const lookup = this.familyAccessLookup(viewer);
-      if (!lookup.authSubject && !lookup.email) {
-        return [];
+      const lookup = this.requireFamilyAccessLookup(viewer);
+      for (const candidate of this.familyLookupCandidates(lookup)) {
+        const rooms = await this.repository.listRoomsForFamilyAccess(candidate);
+        if (rooms.length > 0) {
+          return rooms.flatMap((room: any) => {
+            const membership = this.findFamilyMembership(room.memberships, candidate);
+            return membership
+              ? [this.mapCareRoom(room, { familyMembership: membership })]
+              : [];
+          });
+        }
       }
-      const rooms = await this.repository.listRoomsForFamilyAccess(lookup);
-      return rooms.map((room: any) => this.mapCareRoom(room));
+      return [];
     }
 
     if (!viewer.organizationId) {
@@ -142,16 +155,24 @@ export class CarebridgeService {
   }
 
   async getCareRoom(id: string, viewer: ViewerContext) {
-    const room = this.isExternalViewer(viewer)
-      ? await this.repository.findRoomByIdForFamilyAccess(id, this.familyAccessLookup(viewer))
-      : await this.repository.findRoomByIdForOrganization(id, viewer.organizationId || '');
+    if (this.isExternalViewer(viewer)) {
+      const access = await this.findFamilyRoomAccess(
+        id,
+        this.requireFamilyAccessLookup(viewer),
+      );
+      if (!access) {
+        throw this.familyRoomForbidden();
+      }
+      return this.mapCareRoom(access.room, { familyMembership: access.membership });
+    }
+
+    const room = await this.repository.findRoomByIdForOrganization(
+      id,
+      viewer.organizationId || '',
+    );
 
     if (!room) {
-      throw new BaseHttpException(
-        ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
-        'You do not have access to this CareBridge room.',
-        HttpStatus.FORBIDDEN,
-      );
+      throw this.familyRoomForbidden();
     }
 
     return this.mapCareRoom(room);
@@ -325,16 +346,21 @@ export class CarebridgeService {
   }
 
   async raiseConcern(input: RaiseConcernInput, viewer: ViewerContext) {
+    const familyAccess = this.isExternalViewer(viewer)
+      ? await this.findFamilyRoomAccess(
+          input.careRoomId,
+          this.requireFamilyAccessLookup(viewer),
+        )
+      : undefined;
     const room = this.isExternalViewer(viewer)
-      ? await this.repository.findRoomByIdForFamilyAccess(input.careRoomId, this.familyAccessLookup(viewer))
-      : await this.repository.findRoomByIdForOrganization(input.careRoomId, viewer.organizationId || '');
+      ? familyAccess?.room
+      : await this.repository.findRoomByIdForOrganization(
+          input.careRoomId,
+          viewer.organizationId || '',
+        );
 
     if (!room) {
-      throw new BaseHttpException(
-        ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
-        'You do not have access to this CareBridge room.',
-        HttpStatus.FORBIDDEN,
-      );
+      throw this.familyRoomForbidden();
     }
 
     const now = new Date();
@@ -429,40 +455,20 @@ export class CarebridgeService {
   }
 
   async submitFamilyPulse(input: SubmitFamilyPulseInput, viewer: ViewerContext) {
-    const lookup = this.familyAccessLookup(viewer);
-    if (!this.isExternalViewer(viewer) || (!lookup.authSubject && !lookup.email)) {
+    if (!this.isExternalViewer(viewer)) {
       throw new BaseHttpException(
         ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
         'Only family-access users can submit confidence checks.',
         HttpStatus.FORBIDDEN,
       );
     }
+    const lookup = this.requireFamilyAccessLookup(viewer);
 
-    const room = await this.repository.findRoomByIdForFamilyAccess(input.careRoomId, lookup);
-    if (!room) {
-      throw new BaseHttpException(
-        ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
-        'You do not have access to this CareBridge room.',
-        HttpStatus.FORBIDDEN,
-      );
+    const access = await this.findFamilyRoomAccess(input.careRoomId, lookup);
+    if (!access) {
+      throw this.familyRoomForbidden();
     }
-
-    const membership = room.memberships.find(
-      (item: any) =>
-        item.status === CareRoomMembershipStatus.ACTIVE &&
-        (
-          (lookup.authSubject && item.family_contact?.auth_subject === lookup.authSubject) ||
-          (lookup.email && item.family_contact?.email?.toLowerCase() === lookup.email)
-        ),
-    );
-
-    if (!membership) {
-      throw new BaseHttpException(
-        ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
-        'No active family membership was found for this care room.',
-        HttpStatus.FORBIDDEN,
-      );
-    }
+    const { membership, room } = access;
 
     const pulse = await this.repository.createFamilyPulse({
       organization_id: room.organization_id,
@@ -533,10 +539,72 @@ export class CarebridgeService {
     return !['admin', 'carer'].includes((viewer.role || '').trim().toLowerCase());
   }
 
-  private familyAccessLookup(viewer: ViewerContext) {
+  private requireFamilyAccessLookup(viewer: ViewerContext): FamilyAccessLookup {
+    const organizationId = (viewer.organizationId || '').trim();
     const authSubject = (viewer.authSubject || viewer.userId || '').trim() || undefined;
     const email = (viewer.email || '').trim().toLowerCase() || undefined;
-    return { authSubject, email };
+    if (!organizationId || (!authSubject && !email)) {
+      throw new BaseHttpException(
+        ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
+        'Family access is not permitted.',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    return { organizationId, authSubject, email };
+  }
+
+  private familyLookupCandidates(lookup: FamilyAccessLookup) {
+    return [
+      ...(lookup.authSubject
+        ? [{ organizationId: lookup.organizationId, authSubject: lookup.authSubject }]
+        : []),
+      ...(lookup.email
+        ? [{ organizationId: lookup.organizationId, email: lookup.email }]
+        : []),
+    ];
+  }
+
+  private async findFamilyRoomAccess(id: string, lookup: FamilyAccessLookup) {
+    for (const candidate of this.familyLookupCandidates(lookup)) {
+      const room = await this.repository.findRoomByIdForFamilyAccess(id, candidate);
+      if (!room) {
+        continue;
+      }
+
+      const membership = this.findFamilyMembership(room.memberships, candidate);
+      return membership ? { room, membership } : undefined;
+    }
+    return undefined;
+  }
+
+  private findFamilyMembership(memberships: any[], lookup: FamilyAccessLookup) {
+    const eligibleMemberships = (memberships ?? []).filter((membership: any) =>
+      this.isEligibleFamilyMembership(membership, lookup),
+    );
+    const matches = eligibleMemberships.filter((membership: any) =>
+      lookup.authSubject
+        ? membership.family_contact.auth_subject === lookup.authSubject
+        : membership.family_contact.email?.trim().toLowerCase() === lookup.email,
+    );
+    return matches.length === 1 ? matches[0] : undefined;
+  }
+
+  private isEligibleFamilyMembership(membership: any, lookup: FamilyAccessLookup) {
+    const familyContact = membership.family_contact;
+    return (
+      membership.status === CareRoomMembershipStatus.ACTIVE &&
+      Boolean(familyContact) &&
+      familyContact.organization_id === lookup.organizationId &&
+      !familyContact.disabled_at
+    );
+  }
+
+  private familyRoomForbidden() {
+    return new BaseHttpException(
+      ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
+      'You do not have access to this CareBridge room.',
+      HttpStatus.FORBIDDEN,
+    );
   }
 
   private mapConcernEventType(status: ConcernStatus) {
@@ -569,7 +637,11 @@ export class CarebridgeService {
     });
   }
 
-  private mapCareRoom(room: any) {
+  private mapCareRoom(room: any, options?: { familyMembership?: any }) {
+    const memberships = options?.familyMembership
+      ? [options.familyMembership]
+      : (room.memberships ?? []);
+
     return {
       id: room.id,
       status: room.status,
@@ -579,7 +651,7 @@ export class CarebridgeService {
             fullName: room.client.full_name,
           }
         : null,
-      memberships: (room.memberships ?? []).map((membership: any) => this.mapMembership(membership)),
+      memberships: memberships.map((membership: any) => this.mapMembership(membership)),
       policy: room.policies?.[0] ? this.mapPolicy(room.policies[0]) : null,
       createdAt: room.created_at,
       updatedAt: room.updated_at,

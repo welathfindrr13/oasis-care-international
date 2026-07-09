@@ -5,25 +5,48 @@ import {
   AccessGrantScope,
   CarebridgeContentStatus,
   CareRoomMembershipStatus,
+  CareRoomStatus,
 } from '@oasis/db';
+
+interface FamilyAccessLookup {
+  organizationId: string;
+  authSubject?: string;
+  email?: string;
+}
 
 @Injectable()
 export class CarebridgeRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  private familyContactWhere(input: { authSubject?: string | null; email?: string | null }) {
+  private familyContactWhere(input: FamilyAccessLookup): Prisma.FamilyContactWhereInput {
     const authSubject = (input.authSubject || '').trim();
     const email = (input.email || '').trim().toLowerCase();
-    const candidates = [
-      ...(authSubject ? [{ auth_subject: authSubject }] : []),
-      ...(email ? [{ email }] : []),
-    ];
+    const identity = authSubject
+      ? { auth_subject: authSubject }
+      : email
+        ? { email }
+        : null;
 
-    if (candidates.length > 0) {
-      return { OR: candidates };
+    if (identity) {
+      return {
+        organization_id: input.organizationId,
+        disabled_at: null,
+        ...identity,
+      };
     }
 
-    return { id: '__no-family-access__' };
+    return {
+      organization_id: input.organizationId,
+      disabled_at: null,
+      id: '__no-family-access__',
+    };
+  }
+
+  private familyMembershipWhere(input: FamilyAccessLookup): Prisma.CareRoomMembershipWhereInput {
+    return {
+      status: CareRoomMembershipStatus.ACTIVE,
+      family_contact: this.familyContactWhere(input),
+    };
   }
 
   async ensureClientInOrganization(clientId: string, organizationId: string): Promise<boolean> {
@@ -146,22 +169,21 @@ export class CarebridgeRepository {
     });
   }
 
-  async listRoomsForFamilyEmail(email: string) {
-    return this.listRoomsForFamilyAccess({ email });
+  async listRoomsForFamilyEmail(email: string, organizationId: string) {
+    return this.listRoomsForFamilyAccess({ email, organizationId });
   }
 
-  async listRoomsForFamilyAccess(input: { authSubject?: string | null; email?: string | null }) {
+  async listRoomsForFamilyAccess(input: FamilyAccessLookup) {
     return this.prisma.careRoom.findMany({
       where: {
+        organization_id: input.organizationId,
+        status: CareRoomStatus.ACTIVE,
         memberships: {
-          some: {
-            status: CareRoomMembershipStatus.ACTIVE,
-            family_contact: this.familyContactWhere(input),
-          },
+          some: this.familyMembershipWhere(input),
         },
       },
       orderBy: { updated_at: 'desc' },
-      include: this.roomInclude(),
+      include: this.familyRoomInclude(input),
     });
   }
 
@@ -172,22 +194,21 @@ export class CarebridgeRepository {
     });
   }
 
-  async findRoomByIdForFamilyEmail(id: string, email: string) {
-    return this.findRoomByIdForFamilyAccess(id, { email });
+  async findRoomByIdForFamilyEmail(id: string, email: string, organizationId: string) {
+    return this.findRoomByIdForFamilyAccess(id, { email, organizationId });
   }
 
-  async findRoomByIdForFamilyAccess(id: string, input: { authSubject?: string | null; email?: string | null }) {
+  async findRoomByIdForFamilyAccess(id: string, input: FamilyAccessLookup) {
     return this.prisma.careRoom.findFirst({
       where: {
         id,
+        organization_id: input.organizationId,
+        status: CareRoomStatus.ACTIVE,
         memberships: {
-          some: {
-            status: CareRoomMembershipStatus.ACTIVE,
-            family_contact: this.familyContactWhere(input),
-          },
+          some: this.familyMembershipWhere(input),
         },
       },
-      include: this.roomInclude(),
+      include: this.familyRoomInclude(input),
     });
   }
 
@@ -338,6 +359,32 @@ export class CarebridgeRepository {
       memberships: {
         include: {
           family_contact: true,
+          access_grants: {
+            where: { revoked_at: null },
+          },
+        },
+      },
+    };
+  }
+
+  private familyRoomInclude(input: FamilyAccessLookup) {
+    return {
+      client: true,
+      policies: { take: 1, orderBy: { updated_at: 'desc' as const } },
+      memberships: {
+        where: this.familyMembershipWhere(input),
+        include: {
+          family_contact: {
+            select: {
+              id: true,
+              organization_id: true,
+              auth_subject: true,
+              email: true,
+              full_name: true,
+              relationship: true,
+              disabled_at: true,
+            },
+          },
           access_grants: {
             where: { revoked_at: null },
           },
