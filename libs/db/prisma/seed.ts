@@ -1,5 +1,26 @@
 import { PrismaClient } from '../src/generated/client';
 
+const DEMO_SEED_CONFIRMATION = 'I_UNDERSTAND_THIS_RESETS_LOCAL_DEMO_DATA';
+
+function assertSeedAllowed() {
+  const nodeEnv = process.env.NODE_ENV;
+  const confirmation = process.env.OASIS_ALLOW_DEMO_SEED;
+
+  if (nodeEnv !== 'development' && nodeEnv !== 'test') {
+    throw new Error(
+      'Demo seed is disabled in production, staging, and every non-local environment.',
+    );
+  }
+
+  if (confirmation !== DEMO_SEED_CONFIRMATION) {
+    throw new Error(
+      `Demo seed requires OASIS_ALLOW_DEMO_SEED=${DEMO_SEED_CONFIRMATION}.`,
+    );
+  }
+}
+
+assertSeedAllowed();
+
 const prisma = new PrismaClient();
 
 async function main() {

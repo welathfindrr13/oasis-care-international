@@ -21,7 +21,6 @@ import { CareLogModule } from './care-log/care-log.module';
 import { CarePlanningModule } from './care-planning/care-planning.module';
 import { formatGraphQLError } from './common/filters/graphql-error.filter';
 import { GdprModule } from './gdpr/gdpr.module';
-import { DemoModule } from './demo/demo.module';
 import { AiSummaryModule } from './ai-summary/ai-summary.module';
 import { CarebridgeModule } from './carebridge/carebridge.module';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
@@ -69,7 +68,6 @@ import { GqlRolesGuard } from './auth/gql-roles.guard';
     CarePlanningModule,
     AiSummaryModule,
     CarebridgeModule,
-    DemoModule,
     // GDPR module (feature-flagged)
     ...(process.env.GDPR_ENABLED === 'true' ? [GdprModule] : []),
   ],
