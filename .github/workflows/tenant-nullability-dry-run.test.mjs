@@ -13,18 +13,21 @@ const dockerComposeLines = workflow
   .filter((line) => /docker compose/.test(line))
   .join('\n');
 
-test('tenant nullability dry-run workflow is manual and uses fixed staging SSH secrets', () => {
+test('tenant nullability dry-run workflow is manual and uses fixed production SSH secrets', () => {
   assert.match(workflow, /workflow_dispatch:/);
-  assert.match(workflow, /OASIS_VPS_SSH_KEY/);
-  assert.match(workflow, /OASIS_VPS_HOST/);
-  assert.match(workflow, /OASIS_VPS_USER/);
+  assert.match(workflow, /OASIS_PRODUCTION_VPS_SSH_KEY/);
+  assert.match(workflow, /OASIS_PRODUCTION_VPS_HOST/);
+  assert.match(workflow, /OASIS_PRODUCTION_VPS_USER/);
+  assert.match(workflow, /~\/\.ssh\/oasis_production_vps/);
+  assert.doesNotMatch(workflow, /OASIS_VPS_SSH_KEY|OASIS_VPS_HOST|OASIS_VPS_USER/);
+  assert.doesNotMatch(workflow, /~\/\.ssh\/oasis_vps/);
   assert.doesNotMatch(workflow, /inputs:/);
 });
 
 test('tenant nullability dry-run workflow proves production target before remote temp or compose access', () => {
   const markerIndex = workflow.indexOf('/etc/oasis/production-deploy-target-class');
   const productionIndex = workflow.indexOf('TENANT_NULLABILITY_TARGET_PRODUCTION');
-  const remoteTempIndex = workflow.indexOf("remote_script_dir=\"$(ssh -i ~/.ssh/oasis_vps");
+  const remoteTempIndex = workflow.indexOf("remote_script_dir=\"$(ssh -i ~/.ssh/oasis_production_vps");
   const composeIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env');
 
   assert.notEqual(markerIndex, -1);
@@ -68,8 +71,8 @@ test('tenant nullability dry-run workflow runs only the fixed eligible-table gat
 test('tenant nullability dry-run workflow uses the reviewed checkout script', () => {
   const checkoutIndex = workflow.indexOf('uses: actions/checkout@');
   const localCheckIndex = workflow.indexOf('test -f scripts/release/tenant-nullability-dry-run.mjs');
-  const remoteDirIndex = workflow.indexOf('remote_script_dir="$(ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST"');
-  const scpIndex = workflow.indexOf('scp -i ~/.ssh/oasis_vps -o BatchMode=yes scripts/release/tenant-nullability-dry-run.mjs');
+  const remoteDirIndex = workflow.indexOf('remote_script_dir="$(ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST"');
+  const scpIndex = workflow.indexOf('scp -i ~/.ssh/oasis_production_vps -o BatchMode=yes scripts/release/tenant-nullability-dry-run.mjs');
   const composeIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env');
 
   assert.notEqual(checkoutIndex, -1);
@@ -86,7 +89,7 @@ test('tenant nullability dry-run workflow uses the reviewed checkout script', ()
 test('tenant nullability dry-run workflow copies only the reviewed dry-run script', () => {
   assert.match(
     workflow,
-    /scp -i ~\/\.ssh\/oasis_vps -o BatchMode=yes scripts\/release\/tenant-nullability-dry-run\.mjs "\$OASIS_VPS_USER@\$OASIS_VPS_HOST:\$remote_script_dir\/tenant-nullability-dry-run\.mjs"/,
+    /scp -i ~\/\.ssh\/oasis_production_vps -o BatchMode=yes scripts\/release\/tenant-nullability-dry-run\.mjs "\$OASIS_PRODUCTION_VPS_USER@\$OASIS_PRODUCTION_VPS_HOST:\$remote_script_dir\/tenant-nullability-dry-run\.mjs"/,
   );
   assert.match(workflow, /chmod 0444 '\$remote_script_dir\/tenant-nullability-dry-run\.mjs'/);
   assert.match(workflow, /chmod 0555 '\$remote_script_dir'/);
