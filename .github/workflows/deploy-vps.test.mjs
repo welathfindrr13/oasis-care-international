@@ -67,6 +67,22 @@ test('VPS deploy workflow requires no-migration preflight before compose up', ()
   assert.doesNotMatch(workflow, /prisma migrate|migrate deploy|run-migration|backfill/i);
 });
 
+test('VPS deploy workflow exports safe live revision proof before compose up', () => {
+  const commitIndex = workflow.indexOf('APP_COMMIT_SHA="$(git rev-parse HEAD)"');
+  const versionIndex = workflow.indexOf('APP_VERSION="$(git rev-parse --short HEAD)"');
+  const exportIndex = workflow.indexOf('export APP_COMMIT_SHA APP_VERSION');
+  const composeUpIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml up');
+
+  assert.notEqual(commitIndex, -1);
+  assert.notEqual(versionIndex, -1);
+  assert.notEqual(exportIndex, -1);
+  assert.notEqual(composeUpIndex, -1);
+  assert(commitIndex < exportIndex);
+  assert(versionIndex < exportIndex);
+  assert(exportIndex < composeUpIndex);
+  assert.doesNotMatch(workflow, /APP_COMMIT_SHA=.*DATABASE_URL|APP_VERSION=.*DATABASE_URL/);
+});
+
 test('VPS deploy workflow forces compose migrations disabled for the deploy command', () => {
   assert.match(
     workflow,
