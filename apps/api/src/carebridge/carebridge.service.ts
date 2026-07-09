@@ -33,6 +33,15 @@ interface FamilyAccessLookup {
   email?: string;
 }
 
+interface CreateCarebridgeAuditOptions {
+  organizationId: string;
+  actorId?: string | null;
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  newValues: unknown;
+}
+
 @Injectable()
 export class CarebridgeService {
   constructor(
@@ -64,8 +73,13 @@ export class CarebridgeService {
       client_id: clientId,
     });
     await this.repository.ensurePolicyForRoom(room.id, organizationId, clientId);
-    await this.createAudit(actorUserId, 'CAREBRIDGE_ROOM_CREATED', 'CareRoom', room.id, {
-      clientId,
+    await this.createAudit({
+      organizationId: room.organization_id,
+      actorId: actorUserId,
+      action: 'CAREBRIDGE_ROOM_CREATED',
+      resourceType: 'CareRoom',
+      resourceId: room.id,
+      newValues: { clientId },
     });
     return this.mapCareRoom({
       ...room,
@@ -98,10 +112,17 @@ export class CarebridgeService {
       access_basis: input.accessBasis,
     });
 
-    await this.createAudit(actorUserId, 'CAREBRIDGE_FAMILY_INVITED', 'CareRoomMembership', membership.id, {
-      careRoomId: room.id,
-      familyContactId: familyContact.id,
-      accessBasis: input.accessBasis,
+    await this.createAudit({
+      organizationId: room.organization_id,
+      actorId: actorUserId,
+      action: 'CAREBRIDGE_FAMILY_INVITED',
+      resourceType: 'CareRoomMembership',
+      resourceId: membership.id,
+      newValues: {
+        careRoomId: room.id,
+        familyContactId: familyContact.id,
+        accessBasis: input.accessBasis,
+      },
     });
 
     return this.mapMembership(membership);
@@ -125,8 +146,13 @@ export class CarebridgeService {
       require_approval_for_all_content: input.requireApprovalForAllContent ?? undefined,
     });
 
-    await this.createAudit(actorUserId, 'CAREBRIDGE_POLICY_UPDATED', 'CareBridgePolicy', policy.id, {
-      careRoomId: input.careRoomId,
+    await this.createAudit({
+      organizationId: room.organization_id,
+      actorId: actorUserId,
+      action: 'CAREBRIDGE_POLICY_UPDATED',
+      resourceType: 'CareBridgePolicy',
+      resourceId: policy.id,
+      newValues: { careRoomId: input.careRoomId },
     });
 
     return this.mapPolicy(policy);
@@ -286,9 +312,16 @@ export class CarebridgeService {
       source_refs: sourceRefs,
     });
 
-    await this.createAudit(actorUserId, 'CAREBRIDGE_VISIT_STORY_DRAFTED', 'VerifiedVisitStory', story.id, {
-      visitId,
-      careRoomId: room.id,
+    await this.createAudit({
+      organizationId: story.organization_id,
+      actorId: actorUserId,
+      action: 'CAREBRIDGE_VISIT_STORY_DRAFTED',
+      resourceType: 'VerifiedVisitStory',
+      resourceId: story.id,
+      newValues: {
+        visitId,
+        careRoomId: room.id,
+      },
     });
 
     return this.mapStory(story);
@@ -323,7 +356,14 @@ export class CarebridgeService {
       story.draft_body,
       approvalActorUserId,
     );
-    await this.createAudit(approvalActorUserId, 'CAREBRIDGE_VISIT_STORY_PUBLISHED', 'VerifiedVisitStory', storyId, {});
+    await this.createAudit({
+      organizationId: story.organization_id,
+      actorId: approvalActorUserId,
+      action: 'CAREBRIDGE_VISIT_STORY_PUBLISHED',
+      resourceType: 'VerifiedVisitStory',
+      resourceId: storyId,
+      newValues: {},
+    });
     return this.mapStory(published);
   }
 
@@ -360,8 +400,13 @@ export class CarebridgeService {
     }
 
     const rejected = await this.repository.rejectVerifiedVisitStory(storyId, reason);
-    await this.createAudit(rejectionActorUserId, 'CAREBRIDGE_VISIT_STORY_REJECTED', 'VerifiedVisitStory', storyId, {
-      rejectionReason: reason,
+    await this.createAudit({
+      organizationId: story.organization_id,
+      actorId: rejectionActorUserId,
+      action: 'CAREBRIDGE_VISIT_STORY_REJECTED',
+      resourceType: 'VerifiedVisitStory',
+      resourceId: storyId,
+      newValues: { rejectionReason: reason },
     });
     return this.mapStory(rejected);
   }
@@ -390,7 +435,7 @@ export class CarebridgeService {
       input,
       viewer,
       room,
-      familyAccess?.membership.id,
+      familyAccess?.membership,
     );
   }
 
@@ -398,8 +443,13 @@ export class CarebridgeService {
     input: RaiseConcernInput,
     viewer: ViewerContext,
     room: any,
-    raisedByMembershipId?: string,
+    familyMembership?: any,
+    familyAuditActorId?: string,
   ) {
+    const externalViewer = this.isExternalViewer(viewer);
+    const auditActorId = externalViewer
+      ? familyAuditActorId || this.requireFamilyAuditActorId(viewer, familyMembership)
+      : viewer.userId;
     const now = new Date();
     const concern = await this.repository.createConcern({
       organization_id: room.organization_id,
@@ -411,8 +461,8 @@ export class CarebridgeService {
       severity: input.severity,
       priority: input.severity === 'HIGH' || input.severity === 'CRITICAL' ? 'URGENT' as any : 'ROUTINE' as any,
       status: 'OPEN' as any,
-      ...(raisedByMembershipId
-        ? { raised_by_membership_id: raisedByMembershipId }
+      ...(familyMembership?.id
+        ? { raised_by_membership_id: familyMembership.id }
         : {}),
       acknowledgement_due_at: new Date(now.getTime() + 60 * 60 * 1000),
       response_due_at: new Date(now.getTime() + 4 * 60 * 60 * 1000),
@@ -439,8 +489,13 @@ export class CarebridgeService {
       }
     }
 
-    await this.createAudit(viewer.userId ?? viewer.email ?? 'family-user', 'CAREBRIDGE_CONCERN_RAISED', 'Concern', concern.id, {
-      careRoomId: room.id,
+    await this.createAudit({
+      organizationId: room.organization_id,
+      actorId: auditActorId,
+      action: 'CAREBRIDGE_CONCERN_RAISED',
+      resourceType: 'Concern',
+      resourceId: concern.id,
+      newValues: { careRoomId: room.id },
     });
 
     return this.mapConcern(concern);
@@ -486,9 +541,16 @@ export class CarebridgeService {
       metadata: input.outcome ? { outcome: input.outcome } : undefined,
     });
 
-    await this.createAudit(actorUserId, 'CAREBRIDGE_CONCERN_UPDATED', 'Concern', input.concernId, {
-      status: input.status,
-      outcome: input.outcome ?? null,
+    await this.createAudit({
+      organizationId: concern.organization_id,
+      actorId: actorUserId,
+      action: 'CAREBRIDGE_CONCERN_UPDATED',
+      resourceType: 'Concern',
+      resourceId: input.concernId,
+      newValues: {
+        status: input.status,
+        outcome: input.outcome ?? null,
+      },
     });
 
     return this.mapConcern(updated);
@@ -516,6 +578,7 @@ export class CarebridgeService {
       ],
     );
     const { membership, room } = access;
+    const familyAuditActorId = this.requireFamilyAuditActorId(viewer, membership);
 
     const pulse = await this.repository.createFamilyPulse({
       organization_id: room.organization_id,
@@ -525,8 +588,13 @@ export class CarebridgeService {
       note: input.note ?? null,
     });
 
-    await this.createAudit(viewer.email, 'CAREBRIDGE_PULSE_SUBMITTED', 'FamilyPulse', pulse.id, {
-      sentiment: input.sentiment,
+    await this.createAudit({
+      organizationId: pulse.organization_id,
+      actorId: familyAuditActorId,
+      action: 'CAREBRIDGE_PULSE_SUBMITTED',
+      resourceType: 'FamilyPulse',
+      resourceId: pulse.id,
+      newValues: { sentiment: input.sentiment },
     });
 
     if (createsConcern) {
@@ -540,7 +608,8 @@ export class CarebridgeService {
         },
         viewer,
         room,
-        membership.id,
+        membership,
+        familyAuditActorId,
       );
     }
 
@@ -691,6 +760,23 @@ export class CarebridgeService {
     );
   }
 
+  private requireFamilyAuditActorId(viewer: ViewerContext, membership: any) {
+    const actorId = (
+      viewer.authSubject ||
+      viewer.userId ||
+      membership?.family_contact?.id ||
+      ''
+    ).trim();
+    if (!actorId) {
+      throw new BaseHttpException(
+        ErrorCode.INTERNAL_ERROR,
+        'CareBridge audit actor context is required.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+    return actorId;
+  }
+
   private mapConcernEventType(status: ConcernStatus) {
     switch (status) {
       case ConcernStatus.ACKNOWLEDGED:
@@ -704,19 +790,23 @@ export class CarebridgeService {
     }
   }
 
-  private async createAudit(userId: string | undefined, action: string, resourceType: string, resourceId: string, newValues: unknown) {
-    const organizationId =
-      typeof (newValues as any)?.organizationId === 'string'
-        ? (newValues as any).organizationId
-        : null;
+  private async createAudit(options: CreateCarebridgeAuditOptions) {
+    const organizationId = (options.organizationId || '').trim();
+    if (!organizationId) {
+      throw new BaseHttpException(
+        ErrorCode.INTERNAL_ERROR,
+        'CareBridge audit organization context is required.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
     await this.prisma.auditLog.create({
       data: {
-        user_id: userId ?? null,
+        user_id: options.actorId?.trim() || null,
         organization_id: organizationId,
-        action,
-        resource_type: resourceType,
-        resource_id: resourceId,
-        new_values: newValues as any,
+        action: options.action,
+        resource_type: options.resourceType,
+        resource_id: options.resourceId,
+        new_values: options.newValues as any,
       },
     });
   }

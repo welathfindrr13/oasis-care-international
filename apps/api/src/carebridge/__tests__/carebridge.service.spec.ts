@@ -38,6 +38,7 @@ describe('CarebridgeService', () => {
     ensurePolicyForRoom: jest.fn(),
     upsertFamilyContact: jest.fn(),
     createMembershipWithDefaultScopes: jest.fn(),
+    updatePolicy: jest.fn(),
     listRoomsForOrganization: jest.fn(),
     listRoomsForFamilyAccess: jest.fn(),
     listRoomsForFamilyEmail: jest.fn(),
@@ -118,6 +119,14 @@ describe('CarebridgeService', () => {
 
     expect(repository.ensureClientInOrganization).toHaveBeenCalledWith('client-1', 'org-1');
     expect(repository.ensurePolicyForRoom).toHaveBeenCalledWith('room-1', 'org-1', 'client-1');
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organization_id: 'org-1',
+        user_id: 'admin-1',
+        action: 'CAREBRIDGE_ROOM_CREATED',
+        new_values: { clientId: 'client-1' },
+      }),
+    });
     expect(result.id).toBe('room-1');
     expect(result.client?.fullName).toBe('Mary Smith');
   });
@@ -129,6 +138,79 @@ describe('CarebridgeService', () => {
       service.createCareRoom('client-1', 'admin-1', 'admin', 'org-1')
     ).rejects.toMatchObject({
       response: { code: ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY },
+    });
+  });
+
+  it('tenant-stamps family invitation audits from the authorized room', async () => {
+    repository.findRoomByIdForOrganization.mockResolvedValue({
+      id: 'room-1',
+      organization_id: 'org-1',
+    } as any);
+    repository.upsertFamilyContact.mockResolvedValue({ id: 'contact-1' } as any);
+    repository.createMembershipWithDefaultScopes.mockResolvedValue({
+      ...familyMembership({ email: 'daughter@example.com' }),
+      role: 'FAMILY',
+      access_basis: 'CLIENT_CONSENT',
+    } as any);
+
+    await service.inviteFamilyContact(
+      {
+        careRoomId: 'room-1',
+        fullName: 'Authorized Relative',
+        email: 'daughter@example.com',
+        relationship: 'Daughter',
+        role: 'FAMILY' as any,
+        accessBasis: 'CLIENT_CONSENT' as any,
+      },
+      'admin-1',
+      'admin',
+      'org-1',
+    );
+
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organization_id: 'org-1',
+        user_id: 'admin-1',
+        action: 'CAREBRIDGE_FAMILY_INVITED',
+        new_values: {
+          careRoomId: 'room-1',
+          familyContactId: 'contact-1',
+          accessBasis: 'CLIENT_CONSENT',
+        },
+      }),
+    });
+  });
+
+  it('tenant-stamps policy audits from the authorized room', async () => {
+    repository.findRoomByIdForOrganization.mockResolvedValue({
+      id: 'room-1',
+      organization_id: 'org-1',
+    } as any);
+    repository.updatePolicy.mockResolvedValue({
+      id: 'policy-1',
+      show_visit_times_default: true,
+      show_task_summary_default: true,
+      show_medication_support_default: false,
+      require_approval_for_all_content: true,
+      family_can_raise_concerns: true,
+      family_can_reply_to_concerns: true,
+      family_can_submit_pulse: true,
+    } as any);
+
+    await service.updatePolicy(
+      { careRoomId: 'room-1', showVisitTimesDefault: true },
+      'admin-1',
+      'admin',
+      'org-1',
+    );
+
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organization_id: 'org-1',
+        user_id: 'admin-1',
+        action: 'CAREBRIDGE_POLICY_UPDATED',
+        new_values: { careRoomId: 'room-1' },
+      }),
     });
   });
 
@@ -522,6 +604,7 @@ describe('CarebridgeService', () => {
     } as any);
     repository.createVerifiedVisitStory.mockResolvedValue({
       id: 'story-1',
+      organization_id: 'org-1',
       status: 'DRAFT',
       source_refs: [{ type: 'Visit', id: 'visit-1' }],
     } as any);
@@ -537,6 +620,14 @@ describe('CarebridgeService', () => {
       })
     );
     expect(result.id).toBe('story-1');
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organization_id: 'org-1',
+        user_id: 'admin-1',
+        action: 'CAREBRIDGE_VISIT_STORY_DRAFTED',
+        new_values: { visitId: 'visit-1', careRoomId: 'room-client-1' },
+      }),
+    });
   });
 
   it('refuses to publish a verified visit story without source references', async () => {
@@ -562,6 +653,34 @@ describe('CarebridgeService', () => {
       service.publishVerifiedVisitStory('story-1', '', 'org-1')
     ).rejects.toMatchObject({
       response: { code: ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS },
+    });
+  });
+
+  it('tenant-stamps published story audits from the authorized story', async () => {
+    repository.findVerifiedVisitStoryById.mockResolvedValue({
+      id: 'story-1',
+      organization_id: 'org-1',
+      source_refs: [{ type: 'Visit', id: 'visit-1' }],
+      draft_title: 'Visit recorded',
+      draft_body: 'Draft body',
+    } as any);
+    repository.publishVerifiedVisitStory.mockResolvedValue({
+      id: 'story-1',
+      status: 'PUBLISHED',
+      approved_title: 'Visit recorded',
+      approved_body: 'Draft body',
+      source_refs: [{ type: 'Visit', id: 'visit-1' }],
+    } as any);
+
+    await service.publishVerifiedVisitStory('story-1', 'admin-1', 'org-1');
+
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organization_id: 'org-1',
+        user_id: 'admin-1',
+        action: 'CAREBRIDGE_VISIT_STORY_PUBLISHED',
+        new_values: {},
+      }),
     });
   });
 
@@ -609,6 +728,7 @@ describe('CarebridgeService', () => {
   it('rejects a verified visit story with an explicit reason', async () => {
     repository.findVerifiedVisitStoryById.mockResolvedValue({
       id: 'story-1',
+      organization_id: 'org-1',
       status: 'DRAFT',
       source_refs: [{ type: 'Visit', id: 'visit-1' }],
     } as any);
@@ -632,6 +752,14 @@ describe('CarebridgeService', () => {
     expect(repository.rejectVerifiedVisitStory).toHaveBeenCalledWith('story-1', 'Need clearer timeline details');
     expect(result.status).toBe('REJECTED');
     expect(result.rejectionReason).toBe('Need clearer timeline details');
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organization_id: 'org-1',
+        user_id: 'admin-1',
+        action: 'CAREBRIDGE_VISIT_STORY_REJECTED',
+        new_values: { rejectionReason: 'Need clearer timeline details' },
+      }),
+    });
   });
 
   it('requires a rejection reason when rejecting a verified visit story', async () => {
@@ -716,7 +844,7 @@ describe('CarebridgeService', () => {
       id: 'room-1',
       organization_id: 'org-1',
       client_id: 'client-1',
-      memberships: [familyMembership({ email: 'daughter@example.com' })],
+      memberships: [familyMembership({ authSubject: 'family-subject' })],
     } as any);
     repository.createConcern.mockResolvedValue({
       id: 'concern-1',
@@ -731,7 +859,7 @@ describe('CarebridgeService', () => {
         severity: 'MEDIUM',
         category: 'VISIT_DELIVERY',
       },
-      { role: 'user', organizationId: 'org-1', email: 'daughter@example.com' }
+      { role: 'user', organizationId: 'org-1', authSubject: 'family-subject' }
     );
 
     expect(repository.createConcern).toHaveBeenCalledWith(
@@ -745,6 +873,14 @@ describe('CarebridgeService', () => {
       })
     );
     expect(repository.appendConcernEvent).toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organization_id: 'org-1',
+        user_id: 'family-subject',
+        action: 'CAREBRIDGE_CONCERN_RAISED',
+        new_values: { careRoomId: 'room-1' },
+      }),
+    });
     expect(accessService.requireFamilyScopes).toHaveBeenCalledWith(
       expect.objectContaining({
         membershipId: 'membership-1',
@@ -776,6 +912,13 @@ describe('CarebridgeService', () => {
     expect(repository.createConcern).toHaveBeenCalledWith(
       expect.not.objectContaining({ raised_by_membership_id: expect.anything() }),
     );
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organization_id: 'org-1',
+        user_id: 'staff-1',
+        action: 'CAREBRIDGE_CONCERN_RAISED',
+      }),
+    });
   });
 
   it('requires only pulse scope for a non-escalating family pulse', async () => {
@@ -787,6 +930,7 @@ describe('CarebridgeService', () => {
     } as any);
     repository.createFamilyPulse.mockResolvedValue({
       id: 'pulse-1',
+      organization_id: 'org-1',
       sentiment: FamilyPulseSentiment.CONFIDENT,
       note: null,
       created_at: new Date('2026-04-24T09:00:00Z'),
@@ -807,6 +951,14 @@ describe('CarebridgeService', () => {
       }),
     );
     expect(repository.createConcern).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organization_id: 'org-1',
+        user_id: 'contact-1',
+        action: 'CAREBRIDGE_PULSE_SUBMITTED',
+        new_values: { sentiment: FamilyPulseSentiment.CONFIDENT },
+      }),
+    });
   });
 
   it('preflights both scopes before an escalating pulse and reuses membership attribution', async () => {
@@ -818,6 +970,7 @@ describe('CarebridgeService', () => {
     } as any);
     repository.createFamilyPulse.mockResolvedValue({
       id: 'pulse-1',
+      organization_id: 'org-1',
       sentiment: FamilyPulseSentiment.CONCERNED,
       note: 'Please call me.',
       created_at: new Date('2026-04-24T09:00:00Z'),
@@ -852,6 +1005,22 @@ describe('CarebridgeService', () => {
     expect(repository.createConcern).toHaveBeenCalledWith(
       expect.objectContaining({ raised_by_membership_id: 'membership-1' }),
     );
+    expect(mockPrisma.auditLog.create).toHaveBeenNthCalledWith(1, {
+      data: expect.objectContaining({
+        organization_id: 'org-1',
+        user_id: 'contact-1',
+        action: 'CAREBRIDGE_PULSE_SUBMITTED',
+        new_values: { sentiment: FamilyPulseSentiment.CONCERNED },
+      }),
+    });
+    expect(mockPrisma.auditLog.create).toHaveBeenNthCalledWith(2, {
+      data: expect.objectContaining({
+        organization_id: 'org-1',
+        user_id: 'contact-1',
+        action: 'CAREBRIDGE_CONCERN_RAISED',
+        new_values: { careRoomId: 'room-1' },
+      }),
+    });
   });
 
   it('performs zero pulse, concern, event, message, or audit writes when escalation scope is denied', async () => {
@@ -920,5 +1089,39 @@ describe('CarebridgeService', () => {
     expect(result).toHaveLength(1);
     expect(result[0].careRoomId).toBe('room-1');
     expect(result[0].acknowledgedAt).toBeNull();
+  });
+
+  it('tenant-stamps concern update audits from the authorized concern', async () => {
+    repository.findConcernById.mockResolvedValue({
+      id: 'concern-1',
+      organization_id: 'org-1',
+      status: 'OPEN',
+    } as any);
+    repository.updateConcern.mockResolvedValue({
+      id: 'concern-1',
+      care_room_id: 'room-1',
+      client_id: 'client-1',
+      title: 'Concern',
+      severity: 'MEDIUM',
+      priority: 'ROUTINE',
+      category: 'VISIT_DELIVERY',
+      status: 'ACKNOWLEDGED',
+    } as any);
+
+    await service.updateConcernStatus(
+      { concernId: 'concern-1', status: 'ACKNOWLEDGED' as any },
+      'staff-1',
+      'carer',
+      'org-1',
+    );
+
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organization_id: 'org-1',
+        user_id: 'staff-1',
+        action: 'CAREBRIDGE_CONCERN_UPDATED',
+        new_values: { status: 'ACKNOWLEDGED', outcome: null },
+      }),
+    });
   });
 });
