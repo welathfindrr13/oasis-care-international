@@ -1,65 +1,33 @@
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
-import { ValidationPipe, HttpStatus, ValidationError } from '@nestjs/common';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { BaseHttpException } from './common/errors/base-http.exception';
-import { ErrorCode } from './common/errors/error-codes';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 import { PrismaService } from '@oasis/db';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import {
+  applyApiHardening,
+  createApiValidationPipe,
+} from './security/api-hardening';
 
 async function bootstrap() {
   console.log('>>> BOOTSTRAP START');
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+  });
   console.log('>>> APP CREATED');
 
-  const httpAdapter = app.getHttpAdapter();
-  const httpInstance = httpAdapter.getInstance() as any;
-  if (typeof httpInstance?.disable === 'function') {
-    httpInstance.disable('x-powered-by');
-  }
-  app.use((req: any, res: any, next: () => void) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('Referrer-Policy', 'no-referrer');
-    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
-    next();
-  });
-  
   // Enable CORS for frontend
   const origins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3000')
     .split(',')
     .filter(Boolean);
   app.enableCors({ origin: origins, credentials: true });
+  applyApiHardening(app);
 
   // Global exception filters
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // Global validation pipe with custom error factory
-  app.useGlobalPipes(
-    new ValidationPipe({
-      exceptionFactory: (errors: ValidationError[] = []) => {
-        const details = errors
-          .flatMap((error) => {
-            const constraints = error?.constraints ? Object.values(error.constraints) : [];
-            if (!constraints.length) return [];
-            return constraints.map((msg) => `${error.property}: ${msg}`);
-          })
-          .slice(0, 5);
-
-        const message =
-          details.length > 0
-            ? `Validation failed: ${details.join('; ')}`
-            : 'Validation failed';
-
-        return new BaseHttpException(
-          ErrorCode.VALIDATION_FAILED,
-          message,
-          HttpStatus.BAD_REQUEST,
-        );
-      },
-    }),
-  );
+  app.useGlobalPipes(createApiValidationPipe());
 
   // Global audit logging interceptor (with PII masking)
   const prismaService = app.get(PrismaService);
