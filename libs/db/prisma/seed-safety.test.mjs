@@ -6,48 +6,42 @@ import { spawnSync } from 'node:child_process';
 const seedSource = fs.readFileSync(new URL('./seed.ts', import.meta.url), 'utf8');
 
 test('Prisma seed refuses production and staging before creating a Prisma client', () => {
-  const guardIndex = seedSource.indexOf('assertSeedAllowed');
-  const clientIndex = seedSource.indexOf('new PrismaClient');
-
-  assert.notEqual(guardIndex, -1);
-  assert.notEqual(clientIndex, -1);
-  assert(
-    guardIndex < clientIndex,
-    'seed safety guard must run before opening any database connection',
-  );
   assert.match(seedSource, /NODE_ENV/);
   assert.match(seedSource, /production|staging/);
+  assert.doesNotMatch(seedSource, /new PrismaClient/);
 });
 
-test('Prisma seed requires explicit local confirmation', () => {
-  assert.match(seedSource, /OASIS_ALLOW_DEMO_SEED/);
-  assert.match(seedSource, /I_UNDERSTAND_THIS_RESETS_LOCAL_DEMO_DATA/);
+test('Prisma seed is a no-op with no destructive database calls', () => {
+  assert.doesNotMatch(seedSource, /deleteMany|createMany|upsert|create\(|updateMany|new PrismaClient/);
+  assert.match(seedSource, /No demo seed data is created/);
 });
 
-test('Prisma seed has no reachable unscoped destructive deleteMany path before the guard', () => {
-  const guardIndex = seedSource.indexOf('assertSeedAllowed');
-  const firstDeleteManyIndex = seedSource.indexOf('.deleteMany(');
-
-  assert.notEqual(guardIndex, -1);
-  assert.notEqual(firstDeleteManyIndex, -1);
-  assert(
-    guardIndex < firstDeleteManyIndex,
-    'seed safety guard must precede any deleteMany call',
-  );
-});
-
-test('Prisma seed exits before database work in production', () => {
+test('Prisma seed exits before database work in production and staging', () => {
   const result = spawnSync('node_modules/.bin/tsx', ['libs/db/prisma/seed.ts'], {
     cwd: new URL('../../..', import.meta.url),
     env: {
       ...process.env,
       NODE_ENV: 'production',
-      OASIS_ALLOW_DEMO_SEED: 'I_UNDERSTAND_THIS_RESETS_LOCAL_DEMO_DATA',
     },
     encoding: 'utf8',
   });
 
   assert.notEqual(result.status, 0);
   assert.match(`${result.stderr}\n${result.stdout}`, /disabled in production, staging/);
-  assert.doesNotMatch(`${result.stderr}\n${result.stdout}`, /Seeding demo database/);
+  assert.doesNotMatch(`${result.stderr}\n${result.stdout}`, /PrismaClient|Seeding demo database/);
+});
+
+test('Prisma seed no-ops in local test mode', () => {
+  const result = spawnSync('node_modules/.bin/tsx', ['libs/db/prisma/seed.ts'], {
+    cwd: new URL('../../..', import.meta.url),
+    env: {
+      ...process.env,
+      NODE_ENV: 'test',
+    },
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(`${result.stderr}\n${result.stdout}`, /No demo seed data is created/);
+  assert.doesNotMatch(`${result.stderr}\n${result.stdout}`, /deleteMany|PrismaClient/);
 });
