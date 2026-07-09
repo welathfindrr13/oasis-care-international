@@ -64,4 +64,5 @@ node --test apps/web/next.config.test.js
 node --test deploy/v2/Caddyfile.test.mjs
 node --test deploy/v2/scripts/preflight-env.test.mjs
 node --test deploy/v2/scripts/smoke-test.test.mjs
+node --test deploy/v2/scripts/backup-restore.test.mjs
 node deploy/v2/scripts/preflight-env.mjs "$TEMP_ENV"
