@@ -4,13 +4,19 @@ import { HealthController, StandardHealthController } from '../health.controller
 
 describe('HealthController', () => {
   let controller: HealthController;
+  const originalEnv = process.env;
 
   beforeEach(async () => {
+    process.env = { ...originalEnv };
     const module: TestingModule = await Test.createTestingModule({
       controllers: [HealthController],
     }).compile();
 
     controller = module.get<HealthController>(HealthController);
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
   it('should be defined', () => {
@@ -22,6 +28,20 @@ describe('HealthController', () => {
     expect(result).toEqual(
       expect.objectContaining({
         status: 'ok',
+      }),
+    );
+  });
+
+  it('returns safe live revision metadata when deployment provides it', () => {
+    process.env.APP_VERSION = 'abc1234';
+    process.env.APP_COMMIT_SHA = 'abc1234def5678';
+
+    const result = controller.health();
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        version: 'abc1234',
+        commitSha: 'abc1234def5678',
       }),
     );
   });

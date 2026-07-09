@@ -62,6 +62,19 @@ jobs:
           trap cleanup EXIT
 
           test -f scripts/release/tenant-nullability-dry-run.mjs
+          ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'bash -se' <<'REMOTE'
+          set -euo pipefail
+          target_class="$(tr -d '\r\n' < /etc/oasis/production-deploy-target-class 2>/dev/null || true)"
+          if [ "$target_class" = "production" ]; then
+            printf 'TENANT_NULLABILITY_TARGET_PRODUCTION\n'
+          elif [ -z "$target_class" ]; then
+            printf 'TENANT_NULLABILITY_TARGET_UNKNOWN\n' >&2
+            exit 1
+          else
+            printf 'TENANT_NULLABILITY_TARGET_NOT_PRODUCTION\n' >&2
+            exit 1
+          fi
+          REMOTE
           remote_script_dir="$(ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'mktemp -d' 2>> "$diagnostic_file")"
           scp -i ~/.ssh/oasis_vps -o BatchMode=yes scripts/release/tenant-nullability-dry-run.mjs "$OASIS_VPS_USER@$OASIS_VPS_HOST:$remote_script_dir/tenant-nullability-dry-run.mjs" 2>> "$diagnostic_file"
           ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" "chmod 0444 '$remote_script_dir/tenant-nullability-dry-run.mjs'" 2>> "$diagnostic_file"

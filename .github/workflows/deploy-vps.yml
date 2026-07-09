@@ -65,6 +65,9 @@ jobs:
           git checkout main
           git pull --ff-only origin main
           node deploy/v2/scripts/preflight-env.mjs deploy/v2/.env
+          APP_COMMIT_SHA="$(git rev-parse HEAD)"
+          APP_VERSION="$(git rev-parse --short HEAD)"
+          export APP_COMMIT_SHA APP_VERSION
           RUN_MIGRATIONS=false docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml up -d --build --wait --wait-timeout 180
           docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml ps
           REMOTE

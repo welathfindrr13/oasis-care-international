@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const compose = fs.readFileSync(new URL('./docker-compose.yml', import.meta.url), 'utf8');
 const webDockerfile = fs.readFileSync(new URL('../../apps/web/Dockerfile', import.meta.url), 'utf8');
+const apiDockerfile = fs.readFileSync(new URL('../../apps/api/Dockerfile', import.meta.url), 'utf8');
 const deployDir = path.dirname(fileURLToPath(import.meta.url));
 
 function serviceBlock(name) {
@@ -62,6 +63,25 @@ test('web Dockerfile promotes every Clerk public redirect build arg into build e
     assert.match(webDockerfile, new RegExp(`ARG ${name}=`));
     assert.match(webDockerfile, new RegExp(`ENV ${name}=\\$${name}`));
   }
+});
+
+test('web and api services expose only safe live revision metadata to health endpoints', () => {
+  for (const service of ['web', 'api']) {
+    const block = serviceBlock(service);
+
+    assert.match(block, /APP_VERSION:\s*\$\{APP_VERSION:-unknown\}/);
+    assert.match(block, /APP_COMMIT_SHA:\s*\$\{APP_COMMIT_SHA:-unknown\}/);
+  }
+
+  assert.match(webDockerfile, /ARG APP_VERSION=unknown/);
+  assert.match(webDockerfile, /ARG APP_COMMIT_SHA=unknown/);
+  assert.match(webDockerfile, /ENV APP_VERSION=\$APP_VERSION/);
+  assert.match(webDockerfile, /ENV APP_COMMIT_SHA=\$APP_COMMIT_SHA/);
+  assert.match(apiDockerfile, /ARG APP_VERSION=unknown/);
+  assert.match(apiDockerfile, /ARG APP_COMMIT_SHA=unknown/);
+  assert.match(apiDockerfile, /ENV APP_VERSION=\$APP_VERSION/);
+  assert.match(apiDockerfile, /ENV APP_COMMIT_SHA=\$APP_COMMIT_SHA/);
+  assert.doesNotMatch(compose, /APP_COMMIT_SHA:\s*\$\{DATABASE_URL|APP_VERSION:\s*\$\{DATABASE_URL/);
 });
 
 test('api service does not inject a default Clerk audience', () => {

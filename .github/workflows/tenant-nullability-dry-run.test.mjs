@@ -21,6 +21,29 @@ test('tenant nullability dry-run workflow is manual and uses fixed staging SSH s
   assert.doesNotMatch(workflow, /inputs:/);
 });
 
+test('tenant nullability dry-run workflow proves production target before remote temp or compose access', () => {
+  const markerIndex = workflow.indexOf('/etc/oasis/production-deploy-target-class');
+  const productionIndex = workflow.indexOf('TENANT_NULLABILITY_TARGET_PRODUCTION');
+  const remoteTempIndex = workflow.indexOf("remote_script_dir=\"$(ssh -i ~/.ssh/oasis_vps");
+  const composeIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env');
+
+  assert.notEqual(markerIndex, -1);
+  assert.notEqual(productionIndex, -1);
+  assert.notEqual(remoteTempIndex, -1);
+  assert.notEqual(composeIndex, -1);
+  assert(markerIndex < remoteTempIndex, 'target marker must be checked before remote temp setup');
+  assert(productionIndex < remoteTempIndex, 'production target proof must happen before remote temp setup');
+  assert(markerIndex < composeIndex, 'target marker must be checked before compose access');
+  assert.match(workflow, /target_class="\$\(tr -d '\\r\\n' < \/etc\/oasis\/production-deploy-target-class 2>\/dev\/null \|\| true\)"/);
+  assert.match(workflow, /if \[ "\$target_class" = "production" \]; then/);
+  assert.match(workflow, /printf 'TENANT_NULLABILITY_TARGET_PRODUCTION\\n'/);
+  assert.match(workflow, /printf 'TENANT_NULLABILITY_TARGET_UNKNOWN\\n' >&2/);
+  assert.match(workflow, /printf 'TENANT_NULLABILITY_TARGET_NOT_PRODUCTION\\n' >&2/);
+  assert.doesNotMatch(workflow, /cat \/etc\/oasis\/production-deploy-target-class/);
+  assert.doesNotMatch(workflow, /printf .*target_class|echo .*target_class/);
+  assert.doesNotMatch(workflow, /\/etc\/oasis\/deploy-target-class/);
+});
+
 test('tenant nullability dry-run workflow cannot deploy rebuild restart migrate or backfill', () => {
   assert.doesNotMatch(workflow, /git pull/);
   assert.doesNotMatch(workflow, /git checkout/);

@@ -30,6 +30,10 @@ RUN corepack enable && corepack prepare pnpm@9.13.1 --activate
 
 ENV NODE_ENV=production
 ENV PORT=4000
+ARG APP_VERSION=unknown
+ARG APP_COMMIT_SHA=unknown
+ENV APP_VERSION=$APP_VERSION
+ENV APP_COMMIT_SHA=$APP_COMMIT_SHA
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
