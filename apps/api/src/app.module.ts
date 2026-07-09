@@ -26,6 +26,7 @@ import { CarebridgeModule } from './carebridge/carebridge.module';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 import { ApiRolesGuard } from './auth/api-roles.guard';
 import { GqlRolesGuard } from './auth/gql-roles.guard';
+import { getGraphQLSecurityOptions } from './security/api-hardening';
 
 // FIX: ClsModule must come before LoggerModule (RequestIdMiddleware depends on ClsService)
 @Module({
@@ -47,7 +48,7 @@ import { GqlRolesGuard } from './auth/gql-roles.guard';
       driver: ApolloDriver,
       autoSchemaFile: true,
       sortSchema: true,
-      playground: process.env.NODE_ENV !== 'production',
+      ...getGraphQLSecurityOptions(),
       formatError: formatGraphQLError,
     }),
     PassportModule.register({ defaultStrategy: 'jwt' }),
