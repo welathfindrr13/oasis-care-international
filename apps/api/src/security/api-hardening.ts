@@ -27,6 +27,11 @@ const DEFAULT_URLENCODED_BODY_LIMIT = '64kb';
 const DEFAULT_URLENCODED_PARAMETER_LIMIT = 100;
 const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
 const DEFAULT_RATE_LIMIT_MAX = 300;
+const RATE_LIMIT_EXEMPT_PROBE_PATHS = new Set([
+  '/health',
+  '/ready',
+  '/healthz',
+]);
 
 function readPositiveInteger(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -68,7 +73,7 @@ export function getApiHardeningOptions(
 export function createApiValidationPipe(): ValidationPipe {
   return new ValidationPipe({
     transform: true,
-    forbidUnknownValues: true,
+    forbidUnknownValues: false,
     validationError: {
       target: false,
       value: false,
@@ -140,6 +145,9 @@ export function applyApiHardening(
       limit: options.rateLimit.max,
       standardHeaders: 'draft-7',
       legacyHeaders: false,
+      skip: (request) =>
+        request.method === 'GET' &&
+        RATE_LIMIT_EXEMPT_PROBE_PATHS.has(request.path),
       message: {
         statusCode: 429,
         error: 'Too Many Requests',

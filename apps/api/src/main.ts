@@ -17,6 +17,9 @@ async function bootstrap() {
   });
   console.log('>>> APP CREATED');
 
+  // Caddy is the single public reverse-proxy hop in production.
+  app.set('trust proxy', 1);
+
   // Enable CORS for frontend
   const origins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3000')
     .split(',')

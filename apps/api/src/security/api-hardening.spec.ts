@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Module, Post } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { Field, InputType } from '@nestjs/graphql';
 import { IsString } from 'class-validator';
 import request from 'supertest';
 import {
@@ -11,6 +12,12 @@ import {
 
 class StrictInput {
   @IsString()
+  name!: string;
+}
+
+@InputType()
+class GraphQLStyleInput {
+  @Field()
   name!: string;
 }
 
@@ -27,8 +34,26 @@ class HardeningTestController {
   }
 }
 
+@Controller()
+class ProbeTestController {
+  @Get('health')
+  health() {
+    return { status: 'ok' };
+  }
+
+  @Get('ready')
+  ready() {
+    return { status: 'ready' };
+  }
+
+  @Get('healthz')
+  healthz() {
+    return { status: 'ok' };
+  }
+}
+
 @Module({
-  controllers: [HardeningTestController],
+  controllers: [HardeningTestController, ProbeTestController],
 })
 class HardeningTestModule {}
 
@@ -117,6 +142,81 @@ describe('API hardening', () => {
     await app.close();
   });
 
+  it('rate limits forwarded clients independently behind one trusted proxy', async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [HardeningTestModule],
+    }).compile();
+    const app = moduleFixture.createNestApplication<NestExpressApplication>({
+      bodyParser: false,
+    });
+
+    app.set('trust proxy', 1);
+    applyApiHardening(app, {
+      jsonBodyLimit: '1kb',
+      urlencodedBodyLimit: '1kb',
+      rateLimit: { windowMs: 60_000, max: 2 },
+    });
+    await app.init();
+
+    await request(app.getHttpServer())
+      .get('/hardening-test')
+      .set('X-Forwarded-For', '198.51.100.10')
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/hardening-test')
+      .set('X-Forwarded-For', '198.51.100.10')
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/hardening-test')
+      .set('X-Forwarded-For', '203.0.113.20')
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/hardening-test')
+      .set('X-Forwarded-For', '198.51.100.10')
+      .expect(429);
+
+    await app.close();
+  });
+
+  it('does not rate limit public probe endpoints', async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [HardeningTestModule],
+    }).compile();
+    const app = moduleFixture.createNestApplication<NestExpressApplication>({
+      bodyParser: false,
+    });
+
+    app.set('trust proxy', 1);
+    applyApiHardening(app, {
+      jsonBodyLimit: '1kb',
+      urlencodedBodyLimit: '1kb',
+      rateLimit: { windowMs: 60_000, max: 1 },
+    });
+    await app.init();
+
+    for (const path of ['/health', '/ready', '/healthz']) {
+      await request(app.getHttpServer())
+        .get(path)
+        .set('X-Forwarded-For', '198.51.100.10')
+        .expect(200);
+      await request(app.getHttpServer())
+        .get(path)
+        .set('X-Forwarded-For', '198.51.100.10')
+        .expect(200);
+    }
+
+    await request(app.getHttpServer())
+      .get('/hardening-test')
+      .set('X-Forwarded-For', '198.51.100.10')
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/hardening-test')
+      .set('X-Forwarded-For', '198.51.100.10')
+      .expect(429);
+
+    await app.close();
+  });
+
   it('transforms DTO input and returns sanitized validation errors', async () => {
     const pipe = createApiValidationPipe();
 
@@ -134,5 +234,17 @@ describe('API hardening', () => {
         { type: 'body', metatype: StrictInput },
       ),
     ).rejects.toThrow(/Validation failed: name: name must be a string/);
+  });
+
+  it('does not reject GraphQL-style inputs without validation metadata', async () => {
+    const pipe = createApiValidationPipe();
+
+    const value = await pipe.transform(
+      { name: 'Ada' },
+      { type: 'body', metatype: GraphQLStyleInput },
+    );
+
+    expect(value).toBeInstanceOf(GraphQLStyleInput);
+    expect(value).toEqual({ name: 'Ada' });
   });
 });
