@@ -1,19 +1,45 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PrismaService } from '@oasis/db';
+import { AccessGrantScope, PrismaService } from '@oasis/db';
 import { CarebridgeAccessService } from './carebridge-access.service';
 
 describe('CarebridgeAccessService', () => {
   let service: CarebridgeAccessService;
   let prisma: {
     careRoomMembership: {
-      findFirst: jest.Mock;
+      findMany: jest.Mock;
     };
   };
+
+  const membershipWithScopes = (scopes: AccessGrantScope[]) => ({
+    id: 'membership-1',
+    care_room_id: 'room-1',
+    family_contact_id: 'family-1',
+    status: 'ACTIVE',
+    family_contact: {
+      id: 'family-1',
+      organization_id: 'org-1',
+      auth_subject: 'auth-sub-1',
+      disabled_at: null,
+    },
+    care_room: {
+      id: 'room-1',
+      organization_id: 'org-1',
+      status: 'ACTIVE',
+    },
+    access_grants: scopes.map((scope) => ({ scope, revoked_at: null })),
+  });
+
+  const storyScopes = [
+    AccessGrantScope.VIEW_UPDATES,
+    AccessGrantScope.VIEW_VISIT_TIMES,
+    AccessGrantScope.VIEW_TASK_SUMMARY,
+    AccessGrantScope.VIEW_MEDICATION_SUPPORT_STATUS,
+  ];
 
   beforeEach(async () => {
     prisma = {
       careRoomMembership: {
-        findFirst: jest.fn(),
+        findMany: jest.fn(),
       },
     };
 
@@ -30,127 +56,132 @@ describe('CarebridgeAccessService', () => {
     service = module.get(CarebridgeAccessService);
   });
 
-  it('returns the active membership when the family contact has the required scope', async () => {
-    prisma.careRoomMembership.findFirst.mockResolvedValue({
-      id: 'membership-1',
-      care_room_id: 'room-1',
-      family_contact_id: 'family-1',
-      status: 'ACTIVE',
-      family_contact: {
-        id: 'family-1',
-        auth_subject: 'auth-sub-1',
-      },
-      care_room: {
-        id: 'room-1',
-        organization_id: 'org-1',
-      },
-      access_grants: [
-        {
-          scope: 'VIEW_UPDATES',
-          revoked_at: null,
-        },
-      ],
-    });
+  it('requires the exact active tenant membership and one non-revoked scope', async () => {
+    prisma.careRoomMembership.findMany.mockResolvedValue([
+      membershipWithScopes([AccessGrantScope.VIEW_UPDATES]),
+    ]);
 
-    const membership = await service.requireFamilyScope({
+    const membership = await service.requireFamilyScopes({
+      membershipId: 'membership-1',
       careRoomId: 'room-1',
       organizationId: 'org-1',
       authSubject: 'auth-sub-1',
-      requiredScope: 'VIEW_UPDATES' as any,
+      email: 'ignored@example.com',
+      requiredScopes: [AccessGrantScope.VIEW_UPDATES],
     });
 
-    expect(prisma.careRoomMembership.findFirst).toHaveBeenCalled();
+    expect(prisma.careRoomMembership.findMany).toHaveBeenCalledWith({
+      where: {
+        id: 'membership-1',
+        care_room_id: 'room-1',
+        status: 'ACTIVE',
+        care_room: {
+          status: 'ACTIVE',
+          organization_id: 'org-1',
+        },
+        family_contact: {
+          organization_id: 'org-1',
+          disabled_at: null,
+          auth_subject: 'auth-sub-1',
+        },
+      },
+      include: {
+        care_room: true,
+        family_contact: true,
+        access_grants: {
+          where: { revoked_at: null },
+        },
+      },
+      take: 2,
+    });
     expect(membership.id).toBe('membership-1');
   });
 
-  it('enforces active room membership and non-revoked grants for family access', async () => {
-    prisma.careRoomMembership.findFirst.mockResolvedValue({
-      id: 'membership-1',
-      care_room_id: 'room-1',
-      family_contact_id: 'family-1',
-      status: 'ACTIVE',
-      family_contact: {
-        id: 'family-1',
-        email: 'relative@example.com',
-      },
-      care_room: {
-        id: 'room-1',
-        organization_id: 'org-1',
-        status: 'ACTIVE',
-      },
-      access_grants: [
-        {
-          scope: 'VIEW_UPDATES',
-          revoked_at: null,
-        },
-      ],
-    });
-
-    await service.requireFamilyScope({
-      careRoomId: 'room-1',
-      organizationId: 'org-1',
-      email: 'Relative@Example.com',
-      requiredScope: 'VIEW_UPDATES' as any,
-    });
-
-    expect(prisma.careRoomMembership.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          care_room_id: 'room-1',
-          status: 'ACTIVE',
-          care_room: expect.objectContaining({
-            status: 'ACTIVE',
-            organization_id: 'org-1',
-          }),
-          family_contact: expect.objectContaining({
-            disabled_at: null,
-            OR: [{ email: 'relative@example.com' }],
-          }),
-          access_grants: {
-            some: {
-              scope: 'VIEW_UPDATES',
-              revoked_at: null,
-            },
-          },
-        }),
-        include: expect.objectContaining({
-          access_grants: {
-            where: {
-              revoked_at: null,
-            },
-          },
-        }),
-      }),
-    );
-  });
-
-  it('throws when the family contact is missing the required scope', async () => {
-    prisma.careRoomMembership.findFirst.mockResolvedValue(null);
+  it('requires all requested published-story scopes', async () => {
+    prisma.careRoomMembership.findMany.mockResolvedValue([
+      membershipWithScopes(storyScopes),
+    ]);
 
     await expect(
-      service.requireFamilyScope({
+      service.requireFamilyScopes({
+        careRoomId: 'room-1',
+        organizationId: 'org-1',
+        email: 'Relative@Example.com',
+        requiredScopes: storyScopes,
+      }),
+    ).resolves.toMatchObject({ id: 'membership-1' });
+  });
+
+  it.each(storyScopes)(
+    'denies published stories when %s is missing',
+    async (missingScope) => {
+      prisma.careRoomMembership.findMany.mockResolvedValue([
+        membershipWithScopes(storyScopes.filter((scope) => scope !== missingScope)),
+      ]);
+
+      await expect(
+        service.requireFamilyScopes({
+          membershipId: 'membership-1',
+          careRoomId: 'room-1',
+          organizationId: 'org-1',
+          authSubject: 'auth-sub-1',
+          requiredScopes: storyScopes,
+        }),
+      ).rejects.toMatchObject({ status: 403 });
+    },
+  );
+
+  it('denies when any required scope is missing or revoked', async () => {
+    prisma.careRoomMembership.findMany.mockResolvedValue([
+      membershipWithScopes([AccessGrantScope.SUBMIT_PULSE]),
+    ]);
+
+    await expect(
+      service.requireFamilyScopes({
+        membershipId: 'membership-1',
         careRoomId: 'room-1',
         organizationId: 'org-1',
         authSubject: 'auth-sub-1',
-        requiredScope: 'VIEW_UPDATES' as any,
+        requiredScopes: [
+          AccessGrantScope.SUBMIT_PULSE,
+          AccessGrantScope.RAISE_CONCERNS,
+        ],
       }),
     ).rejects.toMatchObject({
+      status: 403,
       response: { code: 'FORBIDDEN_INSUFFICIENT_PERMISSIONS' },
     });
   });
 
-  it('throws when access was revoked or membership is no longer active', async () => {
-    prisma.careRoomMembership.findFirst.mockResolvedValue(null);
+  it('fails closed when identity lookup is ambiguous', async () => {
+    prisma.careRoomMembership.findMany.mockResolvedValue([
+      membershipWithScopes([AccessGrantScope.VIEW_UPDATES]),
+      { ...membershipWithScopes([AccessGrantScope.VIEW_UPDATES]), id: 'membership-2' },
+    ]);
 
     await expect(
-      service.requireFamilyScope({
+      service.requireFamilyScopes({
         careRoomId: 'room-1',
         organizationId: 'org-1',
-        authSubject: 'auth-sub-1',
-        requiredScope: 'VIEW_UPDATES' as any,
+        email: 'shared@example.com',
+        requiredScopes: [AccessGrantScope.VIEW_UPDATES],
       }),
-    ).rejects.toMatchObject({
-      response: { code: 'FORBIDDEN_INSUFFICIENT_PERMISSIONS' },
-    });
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it.each([
+    ['missing organization', { organizationId: '', authSubject: 'auth-sub-1', requiredScopes: [AccessGrantScope.VIEW_UPDATES] }],
+    ['missing identity', { organizationId: 'org-1', requiredScopes: [AccessGrantScope.VIEW_UPDATES] }],
+    ['missing scopes', { organizationId: 'org-1', authSubject: 'auth-sub-1', requiredScopes: [] }],
+  ])('denies %s before database access', async (_label, invalid) => {
+    await expect(
+      service.requireFamilyScopes({
+        membershipId: 'membership-1',
+        careRoomId: 'room-1',
+        ...invalid,
+      } as any),
+    ).rejects.toMatchObject({ status: 403 });
+
+    expect(prisma.careRoomMembership.findMany).not.toHaveBeenCalled();
   });
 });

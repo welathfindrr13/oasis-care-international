@@ -25,12 +25,12 @@ export class CarebridgeConcernResolver {
   @CarebridgeRoles('user')
   async raiseCareRoomConcern(@Args('input') input: RaiseConcernInput, @Context() ctx: any) {
     const actor = getCarebridgeActor(ctx);
-    const membership = await this.accessService.requireFamilyScope({
+    const membership = await this.accessService.requireFamilyScopes({
       careRoomId: input.careRoomId,
-      organizationId: actor.organizationId,
+      organizationId: actor.organizationId || '',
       authSubject: actor.userId,
       email: actor.email,
-      requiredScope: AccessGrantScope.RAISE_CONCERNS,
+      requiredScopes: [AccessGrantScope.RAISE_CONCERNS],
     });
 
     const concern = await this.concernService.raiseConcern({
@@ -84,12 +84,12 @@ export class CarebridgeConcernResolver {
   @CarebridgeRoles('user')
   async careRoomConcerns(@Args('careRoomId') careRoomId: string, @Context() ctx: any) {
     const actor = getCarebridgeActor(ctx);
-    const membership = await this.accessService.requireFamilyScope({
+    const membership = await this.accessService.requireFamilyScopes({
       careRoomId,
-      organizationId: actor.organizationId,
+      organizationId: actor.organizationId || '',
       authSubject: actor.userId,
       email: actor.email,
-      requiredScope: AccessGrantScope.RAISE_CONCERNS,
+      requiredScopes: [AccessGrantScope.RAISE_CONCERNS],
     });
 
     const concerns = await this.concernService.listConcernsForRoom(
