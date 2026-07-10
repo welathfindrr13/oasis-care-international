@@ -6,6 +6,7 @@
   "scripts": {
     "prebuild": "pnpm prisma generate",
     "build": "tsc",
+    "test": "node --test prisma/*.test.mjs",
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
