@@ -339,8 +339,8 @@ test("deactivation immediately denies a previously signed-in Carer", async ({
     role: "user",
     callbackUrl: "http://localhost:3002/admin/carers",
   });
-  await refreshMountedNextAuthSession(page);
-  await expect(page).toHaveURL("/today");
+  await page.reload();
+  await expect(page.getByText("Local Admin", { exact: true })).toBeVisible();
   await page.goto("/admin/carers");
   page.once("dialog", (dialog) => dialog.accept());
   const activeRow = page
