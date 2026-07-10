@@ -14,16 +14,34 @@ export interface AccessContext {
 
 export type RouteDecision =
   | { action: 'allow' }
-  | { action: 'redirect'; destination: '/today' | '/family' }
+  | { action: 'redirect'; destination: '/login' | '/today' | '/family' }
 
 const ADMIN_ONLY_PATHS = [
   /^\/admin(?:\/|$)/,
   /^\/activity(?:\/|$)/,
+  /^\/management(?:\/|$)/,
+  /^\/staff(?:\/|$)/,
+  /^\/evidence(?:\/|$)/,
+  /^\/reports(?:\/|$)/,
   /^\/clients\/new$/,
+  /^\/people\/new$/,
   /^\/visits\/new$/,
+  /^\/schedule\/new$/,
   /^\/clients\/[^/]+\/edit$/,
 ]
 const FAMILY_PATH = /^\/family(?:\/|$)/
+
+export function resolveProtectedRoute(
+  pathname: string,
+  authenticated: boolean,
+  rawRoles: unknown,
+): RouteDecision {
+  if (!authenticated) {
+    return { action: 'redirect', destination: '/login' }
+  }
+
+  return resolveAuthenticatedRoute(pathname, rawRoles)
+}
 
 export function getAccessContext(rawRoles: unknown): AccessContext {
   const roles = normalizeAppRoles(rawRoles)

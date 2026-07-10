@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   getAccessContext,
   resolveAuthenticatedRoute,
+  resolveProtectedRoute,
 } from './access'
 
 test('treats generic authenticated users as external family users', () => {
@@ -110,4 +111,70 @@ test('redirects family users away from activity reporting', () => {
     action: 'redirect',
     destination: '/family',
   })
+})
+
+const managementRoutes = [
+  '/management',
+  '/management/operations',
+  '/activity',
+  '/staff',
+  '/staff/training',
+  '/evidence',
+  '/reports',
+  '/admin',
+  '/admin/carers',
+  '/admin/analytics',
+  '/admin/metrics',
+  '/people/new',
+  '/clients/new',
+  '/schedule/new',
+  '/visits/new',
+]
+
+test('allows admins to access management routes and equivalent aliases', () => {
+  for (const pathname of managementRoutes) {
+    assert.deepEqual(resolveProtectedRoute(pathname, true, ['admin']), {
+      action: 'allow',
+    }, pathname)
+  }
+})
+
+test('denies carers who enter management routes and aliases directly', () => {
+  for (const pathname of managementRoutes) {
+    assert.deepEqual(resolveProtectedRoute(pathname, true, ['carer']), {
+      action: 'redirect',
+      destination: '/today',
+    }, pathname)
+  }
+})
+
+test('denies family users before management content can render', () => {
+  for (const pathname of managementRoutes) {
+    assert.deepEqual(resolveProtectedRoute(pathname, true, ['user']), {
+      action: 'redirect',
+      destination: '/family',
+    }, pathname)
+  }
+})
+
+test('redirects logged-out management requests to login before render', () => {
+  assert.deepEqual(resolveProtectedRoute('/management', false, []), {
+    action: 'redirect',
+    destination: '/login',
+  })
+})
+
+test('keeps shared staff workflows available to carers', () => {
+  for (const pathname of [
+    '/people',
+    '/schedule',
+    '/medication',
+    '/family-updates',
+    '/care-planning',
+    '/settings',
+  ]) {
+    assert.deepEqual(resolveAuthenticatedRoute(pathname, ['carer']), {
+      action: 'allow',
+    }, pathname)
+  }
 })
