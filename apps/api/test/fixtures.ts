@@ -15,7 +15,7 @@ export async function createTestFixtures(prisma: PrismaClient) {
   // Create test carer (matches JWT mock user)
   const carer = await prisma.carer.create({
     data: {
-      id: TEST_USERS.carer.sub, // 'carer-123'
+      id: '11111111-1111-4111-8111-111111111111',
       organization_id: organization.id,
       first_name: 'Jane',
       last_name: 'Doe',
@@ -29,7 +29,7 @@ export async function createTestFixtures(prisma: PrismaClient) {
   // Create another test carer
   const otherCarer = await prisma.carer.create({
     data: {
-      id: TEST_USERS.otherCarer.sub, // 'carer-456'
+      id: '22222222-2222-4222-8222-222222222222',
       organization_id: organization.id,
       first_name: 'John',
       last_name: 'Smith',
@@ -66,6 +66,51 @@ export async function createTestFixtures(prisma: PrismaClient) {
       date_of_birth: new Date('1945-03-20'),
     },
   });
+
+  const [adminMembership, carerMembership, otherCarerMembership, clientMembership] = await Promise.all([
+    prisma.organizationMembership.create({
+      data: {
+        organization_id: organization.id,
+        identity_provider: 'cognito',
+        auth_subject: TEST_USERS.admin.sub,
+        normalized_email: 'admin@example.test',
+        role: 'admin',
+        status: 'ACTIVE',
+      },
+    }),
+    prisma.organizationMembership.create({
+      data: {
+        organization_id: organization.id,
+        identity_provider: 'cognito',
+        auth_subject: TEST_USERS.carer.sub,
+        normalized_email: 'jane.doe@oasis.uk',
+        role: 'carer',
+        status: 'ACTIVE',
+        carer_id: carer.id,
+      } as any,
+    }),
+    prisma.organizationMembership.create({
+      data: {
+        organization_id: organization.id,
+        identity_provider: 'cognito',
+        auth_subject: TEST_USERS.otherCarer.sub,
+        normalized_email: 'john.smith@oasis.uk',
+        role: 'carer',
+        status: 'ACTIVE',
+        carer_id: otherCarer.id,
+      } as any,
+    }),
+    prisma.organizationMembership.create({
+      data: {
+        organization_id: organization.id,
+        identity_provider: 'cognito',
+        auth_subject: TEST_USERS.client.sub,
+        normalized_email: 'mary.jones@example.test',
+        role: 'client',
+        status: 'ACTIVE',
+      },
+    }),
+  ]);
 
   // Create some test visits
   const scheduledVisit = await prisma.visit.create({
@@ -110,6 +155,12 @@ export async function createTestFixtures(prisma: PrismaClient) {
     organization,
     carers: { carer, otherCarer },
     clients: { client, otherClient },
+    memberships: {
+      adminMembership,
+      carerMembership,
+      otherCarerMembership,
+      clientMembership,
+    },
     visits: { scheduledVisit, completedVisit },
   };
 }
@@ -117,9 +168,16 @@ export async function createTestFixtures(prisma: PrismaClient) {
 export async function cleanDatabase(prisma: PrismaClient) {
   // Delete in correct order to respect foreign key constraints
   await prisma.$transaction([
+    prisma.auditLog.deleteMany(),
+    prisma.medicationAudit.deleteMany(),
+    prisma.medicationAdministration.deleteMany(),
+    prisma.prescription.deleteMany(),
+    prisma.medication.deleteMany(),
+    prisma.carerShift.deleteMany(),
     prisma.careLog.deleteMany(),
     prisma.visitTask.deleteMany(),
     prisma.visit.deleteMany(),
+    prisma.organizationMembership.deleteMany(),
     prisma.carer.deleteMany(),
     prisma.client.deleteMany(),
     prisma.organizationIdentity.deleteMany(),

@@ -3,7 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { PrismaService } from '@oasis/db';
-import { MetricsModule } from '../src/metrics/metrics.module';
+import { MetricsDynamicModule } from '../src/metrics/metrics.dynamic.module';
 import { VisitModule } from '../src/visit/visit.module';
 import { ClsModule } from 'nestjs-cls';
 import { execSync } from 'child_process';
@@ -28,7 +28,7 @@ describe('/metrics (e2e)', () => {
 
   beforeAll(async () => {
     // Start PostgreSQL container
-    postgresContainer = await new PostgreSqlContainer('postgres:16-alpine')
+    postgresContainer = await new PostgreSqlContainer('pgvector/pgvector:pg16')
       .withDatabase('oasis_test')
       .withUsername('test')
       .withPassword('test')
@@ -38,6 +38,8 @@ describe('/metrics (e2e)', () => {
     const databaseUrl = `postgresql://test:test@${postgresContainer.getHost()}:${postgresContainer.getMappedPort(5432)}/oasis_test`;
     process.env.DATABASE_URL = databaseUrl;
     process.env.JWT_SECRET = getTestJwtSecret();
+    process.env.AUTH_IDENTITY_PROVIDER = 'cognito';
+    process.env.TENANT_MEMBERSHIP_REQUIRED = 'true';
 
     // Run migrations
     execSync(`cd ../../libs/db && npx prisma migrate deploy`, {
@@ -77,7 +79,7 @@ describe('/metrics (e2e)', () => {
           secret: getTestJwtSecret(),
           signOptions: { expiresIn: '1h' },
         }),
-        MetricsModule,
+        MetricsDynamicModule.register(true),
         VisitModule,
       ],
       providers: [
@@ -92,7 +94,7 @@ describe('/metrics (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     prisma = app.get<PrismaService>(PrismaService);
-    
+
     await app.init();
     await app.getHttpServer();   // ensures all async providers (Prometheus) are ready
 
@@ -101,8 +103,12 @@ describe('/metrics (e2e)', () => {
   }, 180000);
 
   afterAll(async () => {
-    await app.close();
-    await postgresContainer.stop();
+    if (app) {
+      await app.close();
+    }
+    if (postgresContainer) {
+      await postgresContainer.stop();
+    }
   });
 
   beforeEach(async () => {
@@ -144,7 +150,7 @@ describe('/metrics (e2e)', () => {
     // Should contain our custom counters
     expect(res.text).toContain('visit_overlap_total');
     expect(res.text).toContain('visits_created_total');
-    
+
     // Should contain default Node.js metrics
     expect(res.text).toContain('process_cpu_user_seconds_total');
     expect(res.text).toContain('nodejs_heap_size_total_bytes');

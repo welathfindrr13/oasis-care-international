@@ -27,6 +27,14 @@ import { AuthGuard } from '@nestjs/passport';
 import { formatGraphQLError } from '../src/common/filters/graphql-error.filter';
 import { GraphqlExceptionFilter } from '../src/common/filters/gql-exception.filter';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
+import { CarerAccessService } from '../src/carer/carer-access.service';
+import { GqlRolesGuard } from '../src/auth/gql-roles.guard';
+import { ShiftResolver } from '../src/shift/shift.resolver';
+import { ShiftService } from '../src/shift/shift.service';
+import { ShiftRepository } from '../src/shift/shift.repository';
+import { MedicationResolver } from '../src/medication/medication.resolver';
+import { MedicationService } from '../src/medication/medication.service';
+import { MedicationRepository } from '../src/medication/medication.repository';
 
 describe('Visit E2E Tests', () => {
   let app: INestApplication;
@@ -46,6 +54,8 @@ describe('Visit E2E Tests', () => {
     const databaseUrl = `postgresql://test:test@${postgresContainer.getHost()}:${postgresContainer.getMappedPort(5432)}/oasis_test`;
     process.env.DATABASE_URL = databaseUrl;
     process.env.JWT_SECRET = getTestJwtSecret();
+    process.env.AUTH_IDENTITY_PROVIDER = 'cognito';
+    process.env.TENANT_MEMBERSHIP_REQUIRED = 'true';
 
     // Run migrations
     execSync(`cd ../../libs/db && npx prisma migrate deploy`, {
@@ -58,11 +68,13 @@ describe('Visit E2E Tests', () => {
       imports: [
         ConfigModule.forRoot({
           isGlobal: true,
-          load: [() => ({
-            DATABASE_URL: databaseUrl,
-            JWT_SECRET: getTestJwtSecret(),
-            NODE_ENV: 'test',
-          })],
+          load: [
+            () => ({
+              DATABASE_URL: databaseUrl,
+              JWT_SECRET: getTestJwtSecret(),
+              NODE_ENV: 'test',
+            }),
+          ],
         }),
         ClsModule.forRoot({
           global: true,
@@ -93,10 +105,20 @@ describe('Visit E2E Tests', () => {
         VisitRepository,
         CareLogService,
         CareLogRepository,
+        CarerAccessService,
+        GqlRolesGuard,
+        ShiftResolver,
+        ShiftService,
+        ShiftRepository,
+        MedicationResolver,
+        MedicationService,
+        MedicationRepository,
         PrismaService,
         // Stub the Prometheus counters for testing
         { provide: 'visit_overlap_total', useValue: { inc: jest.fn() } },
         { provide: 'visits_created_total', useValue: { inc: jest.fn() } },
+        { provide: 'medication_administrations_total', useValue: { inc: jest.fn() } },
+        { provide: 'medication_overlaps_total', useValue: { inc: jest.fn() } },
       ],
     })
       .overrideGuard(AuthGuard('jwt'))
@@ -107,17 +129,14 @@ describe('Visit E2E Tests', () => {
 
     app = moduleFixture.createNestApplication();
     prisma = app.get<PrismaService>(PrismaService);
-    
+
     // Apply global filters
-    app.useGlobalFilters(
-      new HttpExceptionFilter(),
-      new GraphqlExceptionFilter(),
-    );
-    
+    app.useGlobalFilters(new HttpExceptionFilter(), new GraphqlExceptionFilter());
+
     // Initialize Passport
     const passport = require('passport');
     app.use(passport.initialize());
-    
+
     await app.init();
 
     // Create test fixtures
@@ -258,7 +277,7 @@ describe('Visit E2E Tests', () => {
       // Should only see their own visits
       expect(response.body.data.visits.items).toHaveLength(2);
       response.body.data.visits.items.forEach((visit: any) => {
-        expect(visit.carerId).toBe(TEST_USERS.carer.sub);
+        expect(visit.carerId).toBe(fixtures.carers.carer.id);
       });
     });
 
@@ -322,7 +341,7 @@ describe('Visit E2E Tests', () => {
   describe('Task Completion', () => {
     it('should allow carer to complete their visit tasks', async () => {
       const visitId = fixtures.visits.scheduledVisit.id;
-      
+
       // First get the task ID
       const getVisitResponse = await request(app.getHttpServer())
         .post('/graphql')
@@ -378,7 +397,7 @@ describe('Visit E2E Tests', () => {
 
     it('should prevent other carers from completing tasks', async () => {
       const visitId = fixtures.visits.scheduledVisit.id;
-      
+
       // Get task ID first
       const getVisitResponse = await request(app.getHttpServer())
         .post('/graphql')
@@ -567,6 +586,300 @@ describe('Visit E2E Tests', () => {
       expect(visit?.status).toBe('COMPLETED');
       expect(careLogCount).toBe(1);
       expect(storyCount).toBe(0);
+    });
+
+    it('denies every guided workflow write to a different linked Carer', async () => {
+      const visitId = fixtures.visits.scheduledVisit.id;
+      const task = await prisma.visitTask.findFirstOrThrow({
+        where: { visit_id: visitId },
+        orderBy: { created_at: 'asc' },
+      });
+      const attempts = [
+        {
+          query: `
+            mutation StartVisit($visitId: String!) {
+              startVisit(visitId: $visitId) { id }
+            }
+          `,
+          variables: { visitId },
+        },
+        {
+          query: `
+            mutation RecordVisitTaskOutcome($input: RecordVisitTaskOutcomeInput!) {
+              recordVisitTaskOutcome(input: $input) { id }
+            }
+          `,
+          variables: {
+            input: {
+              taskId: task.id,
+              outcome: 'DONE',
+              notes: 'Attempted by unassigned carer',
+            },
+          },
+        },
+        {
+          query: `
+            mutation SubmitVisitCareNote($input: SubmitVisitCareNoteInput!) {
+              submitVisitCareNote(input: $input) { id }
+            }
+          `,
+          variables: {
+            input: {
+              visitId,
+              category: 'OTHER',
+              notes: 'Attempted by unassigned carer',
+            },
+          },
+        },
+        {
+          query: `
+            mutation CompleteVisit($input: CompleteVisitInput!) {
+              completeVisit(input: $input) { id }
+            }
+          `,
+          variables: {
+            input: {
+              visitId,
+              notes: 'Attempted by unassigned carer',
+            },
+          },
+        },
+      ];
+
+      for (const attempt of attempts) {
+        const response = await request(app.getHttpServer())
+          .post('/graphql')
+          .set('Authorization', getBearerToken('otherCarer'))
+          .send(attempt)
+          .expect(200);
+
+        expect(response.body.data).toBeNull();
+        expect(response.body.errors?.[0]?.message).toContain('only access your own visits');
+      }
+
+      const [visit, persistedTask, careLogCount] = await Promise.all([
+        prisma.visit.findUniqueOrThrow({ where: { id: visitId } }),
+        prisma.visitTask.findUniqueOrThrow({ where: { id: task.id } }),
+        prisma.careLog.count({ where: { visit_id: visitId } }),
+      ]);
+      expect(visit.status).toBe('SCHEDULED');
+      expect(persistedTask.is_completed).toBe(false);
+      expect(careLogCount).toBe(0);
+    });
+  });
+
+  describe('Linked Carer Shifts', () => {
+    it('clocks in, reads history, and clocks out using the linked domain Carer UUID', async () => {
+      const clockInResponse = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('carer'))
+        .send({
+          query: `
+            mutation ClockIn($input: ClockInInput) {
+              clockIn(input: $input) {
+                id
+                carerId
+                isActive
+                clockInProof { method source }
+              }
+            }
+          `,
+          variables: {
+            input: {
+              method: 'MANUAL',
+              source: 'membership-e2e',
+              notes: 'Synthetic linked-carer shift',
+            },
+          },
+        })
+        .expect(200);
+
+      expect(clockInResponse.body.errors).toBeUndefined();
+      expect(clockInResponse.body.data.clockIn).toMatchObject({
+        carerId: fixtures.carers.carer.id,
+        isActive: true,
+        clockInProof: { method: 'MANUAL', source: 'membership-e2e' },
+      });
+      expect(clockInResponse.body.data.clockIn.carerId).not.toBe(TEST_USERS.carer.sub);
+
+      const activeResponse = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('carer'))
+        .send({
+          query: `
+            query MyActiveShift {
+              myActiveShift { id carerId isActive }
+            }
+          `,
+        })
+        .expect(200);
+      expect(activeResponse.body.data.myActiveShift).toMatchObject({
+        id: clockInResponse.body.data.clockIn.id,
+        carerId: fixtures.carers.carer.id,
+        isActive: true,
+      });
+
+      const recentResponse = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('carer'))
+        .send({
+          query: `
+            query MyRecentShifts {
+              myRecentShifts(take: 5) { id carerId isActive }
+            }
+          `,
+        })
+        .expect(200);
+      expect(recentResponse.body.data.myRecentShifts).toContainEqual({
+        id: clockInResponse.body.data.clockIn.id,
+        carerId: fixtures.carers.carer.id,
+        isActive: true,
+      });
+
+      const clockOutResponse = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('carer'))
+        .send({
+          query: `
+            mutation ClockOut($input: ClockOutInput) {
+              clockOut(input: $input) {
+                id
+                carerId
+                isActive
+                clockOutProof { method source }
+              }
+            }
+          `,
+          variables: {
+            input: {
+              method: 'MANUAL',
+              source: 'membership-e2e',
+            },
+          },
+        })
+        .expect(200);
+      expect(clockOutResponse.body.data.clockOut).toMatchObject({
+        id: clockInResponse.body.data.clockIn.id,
+        carerId: fixtures.carers.carer.id,
+        isActive: false,
+        clockOutProof: { method: 'MANUAL', source: 'membership-e2e' },
+      });
+
+      const persistedShift = await prisma.carerShift.findUniqueOrThrow({
+        where: { id: clockInResponse.body.data.clockIn.id },
+      });
+      expect(persistedShift.carer_id).toBe(fixtures.carers.carer.id);
+      expect(persistedShift.carer_id).not.toBe(TEST_USERS.carer.sub);
+      expect(persistedShift.clock_out_at).not.toBeNull();
+    });
+
+    it('denies shift access immediately after the linked membership is revoked', async () => {
+      await prisma.organizationMembership.update({
+        where: { id: fixtures.memberships.carerMembership.id },
+        data: {
+          status: 'REVOKED',
+          revoked_at: new Date(),
+        },
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('carer'))
+        .send({
+          query: `
+            query MyActiveShift {
+              myActiveShift { id }
+            }
+          `,
+        })
+        .expect(200);
+
+      expect(response.body.data.myActiveShift).toBeNull();
+      expect(response.body.errors?.[0]?.message).toBe(
+        'Active organization membership is required for tenant-scoped access',
+      );
+    });
+  });
+
+  describe('Linked Carer Medication Support', () => {
+    it('persists the domain Carer UUID while auditing the authenticated subject', async () => {
+      const medication = await prisma.medication.create({
+        data: {
+          name: 'Synthetic medicine',
+          dosage: '1',
+          unit: 'tablet',
+        },
+      });
+      const prescription = await prisma.prescription.create({
+        data: {
+          client_id: fixtures.clients.client.id,
+          medication_id: medication.id,
+          start_date: new Date('2024-01-01T00:00:00Z'),
+          frequency_per_day: 1,
+          administration_times: ['09:00'],
+        },
+      });
+      const administration = await prisma.medicationAdministration.create({
+        data: {
+          prescription_id: prescription.id,
+          visit_id: fixtures.visits.scheduledVisit.id,
+          scheduled_time: new Date('2024-02-01T09:15:00Z'),
+          status: 'SCHEDULED',
+        },
+      });
+
+      const dueResponse = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('carer'))
+        .send({
+          query: `
+            query DueMeds($visitId: String!) {
+              listDueMeds(visitId: $visitId) { id status }
+            }
+          `,
+          variables: { visitId: fixtures.visits.scheduledVisit.id },
+        })
+        .expect(200);
+      expect(dueResponse.body.data.listDueMeds).toEqual([
+        { id: administration.id, status: 'SCHEDULED' },
+      ]);
+
+      const recordResponse = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('carer'))
+        .send({
+          query: `
+            mutation RecordAdministration($input: RecordAdministrationInput!) {
+              recordAdministration(input: $input) { id status }
+            }
+          `,
+          variables: {
+            input: {
+              administrationId: administration.id,
+              status: 'ADMINISTERED',
+              notes: 'Synthetic linked-carer medication proof',
+            },
+          },
+        })
+        .expect(200);
+      expect(recordResponse.body.data.recordAdministration).toEqual({
+        id: administration.id,
+        status: 'ADMINISTERED',
+      });
+
+      const [persisted, audit] = await Promise.all([
+        prisma.medicationAdministration.findUniqueOrThrow({
+          where: { id: administration.id },
+        }),
+        prisma.medicationAudit.findFirstOrThrow({
+          where: { medication_administration_id: administration.id },
+          orderBy: { timestamp: 'desc' },
+        }),
+      ]);
+      expect(persisted.administered_by).toBe(fixtures.carers.carer.id);
+      expect(persisted.administered_by).not.toBe(TEST_USERS.carer.sub);
+      expect(audit.actor_id).toBe(TEST_USERS.carer.sub);
+      expect(audit.actor_id).not.toBe(fixtures.carers.carer.id);
     });
   });
 

@@ -3,9 +3,9 @@ import { IsBoolean, IsEmail, IsOptional, IsString, Matches, MaxLength } from 'cl
 
 @InputType()
 export class UpsertCarerInput {
-  // IMPORTANT: We set carer.id = Cognito user sub so Visit RBAC can match `visit.carer_id === sub`.
+  // Internal migration compatibility only. This DTO is intentionally not exposed by a resolver;
+  // request-facing Carer creation must use createAndLinkCarer and a verified membership.
   @Field(() => ID)
-  // Cognito `sub` may be UUID variants not accepted by older class-validator UUID checks.
   @Matches(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
   id!: string;
 

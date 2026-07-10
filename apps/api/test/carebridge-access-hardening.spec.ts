@@ -45,27 +45,20 @@ describe('CareBridge access hardening metadata', () => {
     expect(getRoles(MedicationResolver.prototype, 'createPrescription')).toEqual(['admin']);
   });
 
-  it('keeps care-planning internals staff-only', () => {
-    expect(getRoles(CarePlanningResolver.prototype, 'assessments')).toEqual(['admin', 'carer']);
-    expect(getRoles(CarePlanningResolver.prototype, 'carePlans')).toEqual(['admin', 'carer']);
-    expect(getRoles(CarePlanningResolver.prototype, 'evidencePacks')).toEqual(['admin', 'carer']);
-    expect(getRoles(CarePlanningResolver.prototype, 'evidenceSourceCandidates')).toEqual(['admin', 'carer']);
-    expect(getRoles(CarePlanningResolver.prototype, 'createAssessment')).toEqual(['admin', 'carer']);
-    expect(getRoles(CarePlanningResolver.prototype, 'createCarePlan')).toEqual(['admin', 'carer']);
-    expect(getRoles(CarePlanningResolver.prototype, 'createEvidencePack')).toEqual(['admin', 'carer']);
+  it('keeps care-planning internals admin-only', () => {
+    expect(getRoles(CarePlanningResolver.prototype, 'assessments')).toEqual(['admin']);
+    expect(getRoles(CarePlanningResolver.prototype, 'carePlans')).toEqual(['admin']);
+    expect(getRoles(CarePlanningResolver.prototype, 'evidencePacks')).toEqual(['admin']);
+    expect(getRoles(CarePlanningResolver.prototype, 'evidenceSourceCandidates')).toEqual(['admin']);
+    expect(getRoles(CarePlanningResolver.prototype, 'createAssessment')).toEqual(['admin']);
+    expect(getRoles(CarePlanningResolver.prototype, 'createCarePlan')).toEqual(['admin']);
+    expect(getRoles(CarePlanningResolver.prototype, 'createEvidencePack')).toEqual(['admin']);
   });
 
   it('keeps internal AI summary history staff-only', () => {
-    expect(getRoles(AiSummaryResolver.prototype, 'listHistory')).toEqual([
-      'admin',
-      'manager',
-      'carer',
-    ]);
-    expect(getRoles(AiSummaryResolver.prototype, 'currentWeekSummary')).toEqual([
-      'admin',
-      'manager',
-      'carer',
-    ]);
+    expect(getRoles(AiSummaryResolver.prototype, 'listHistory')).toEqual(['admin', 'manager']);
+    expect(getRoles(AiSummaryResolver.prototype, 'currentWeekSummary')).toEqual(['admin', 'manager']);
+    expect(getRoles(AiSummaryResolver.prototype, 'generateSummary')).toEqual(['admin', 'manager']);
   });
 
   it('keeps raw client management outside external access', () => {

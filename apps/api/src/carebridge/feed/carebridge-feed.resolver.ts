@@ -19,7 +19,7 @@ export class CarebridgeFeedResolver {
   ) {}
 
   @Mutation(() => VerifiedVisitStoryDTO)
-  @CarebridgeRoles('admin', 'carer')
+  @CarebridgeRoles('admin')
   async syncVerifiedVisitStory(@Args('visitId') visitId: string, @Context() ctx: any) {
     const actor = getCarebridgeActor(ctx);
     const story = await this.feedService.syncVerifiedVisitStory({
@@ -31,7 +31,7 @@ export class CarebridgeFeedResolver {
   }
 
   @Mutation(() => VerifiedVisitStoryDTO)
-  @CarebridgeRoles('admin', 'carer')
+  @CarebridgeRoles('admin')
   async publishVerifiedVisitStory(@Args('input') input: PublishVerifiedVisitStoryInput, @Context() ctx: any) {
     const actor = getCarebridgeActor(ctx);
     const story = await this.feedService.publishVerifiedVisitStory({

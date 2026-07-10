@@ -26,49 +26,44 @@ export class CarebridgeResolver {
   constructor(private readonly carebridgeService: CarebridgeService) {}
 
   @Query(() => [CareRoomDTO])
-  @Roles('admin', 'carer', 'user')
+  @Roles('admin', 'user')
   async careRooms(@Context() ctx: any) {
     return this.carebridgeService.listCareRooms(this.viewerFromContext(ctx));
   }
 
   @Query(() => CareRoomDTO)
-  @Roles('admin', 'carer', 'user')
+  @Roles('admin', 'user')
   async careRoom(@Args('id') id: string, @Context() ctx: any) {
     return this.carebridgeService.getCareRoom(id, this.viewerFromContext(ctx));
   }
 
   @Query(() => [VerifiedVisitStoryDTO])
-  @Roles('admin', 'carer', 'user')
+  @Roles('admin', 'user')
   async verifiedVisitStories(@Args('careRoomId') careRoomId: string, @Context() ctx: any) {
     return this.carebridgeService.listVerifiedVisitStories(careRoomId, this.viewerFromContext(ctx));
   }
 
   @Query(() => [ConcernDTO])
-  @Roles('admin', 'carer')
+  @Roles('admin')
   async carebridgeConcernInbox(
-    @Args('status', { type: () => String, nullable: true }) status: string | undefined,
+    @Args('status', { type: () => String, nullable: true })
+    status: string | undefined,
     @Context() ctx: any,
   ) {
-    return this.carebridgeService.listConcernInbox(
-      this.viewerFromContext(ctx),
-      status as any,
-    );
+    return this.carebridgeService.listConcernInbox(this.viewerFromContext(ctx), status as any);
   }
 
   @Query(() => [VerifiedVisitStoryDTO])
-  @Roles('admin', 'carer')
+  @Roles('admin')
   async verifiedVisitStoryApprovalQueue(
     @Context() ctx: any,
     @Args('careRoomId', { nullable: true }) careRoomId?: string,
   ) {
-    return this.carebridgeService.listVerifiedVisitStoryApprovalQueue(
-      this.viewerFromContext(ctx),
-      careRoomId,
-    );
+    return this.carebridgeService.listVerifiedVisitStoryApprovalQueue(this.viewerFromContext(ctx), careRoomId);
   }
 
   @Mutation(() => CareRoomDTO)
-  @Roles('admin', 'carer')
+  @Roles('admin')
   async createCareRoom(@Args('input') input: CreateCareRoomInput, @Context() ctx: any) {
     const viewer = this.viewerFromContext(ctx);
     return this.carebridgeService.createCareRoom(
@@ -80,7 +75,7 @@ export class CarebridgeResolver {
   }
 
   @Mutation(() => CareRoomMembershipDTO)
-  @Roles('admin', 'carer')
+  @Roles('admin')
   async inviteFamilyContact(@Args('input') input: InviteFamilyContactInput, @Context() ctx: any) {
     const viewer = this.viewerFromContext(ctx);
     return this.carebridgeService.inviteFamilyContact(
@@ -92,7 +87,7 @@ export class CarebridgeResolver {
   }
 
   @Mutation(() => CareBridgePolicyDTO)
-  @Roles('admin', 'carer')
+  @Roles('admin')
   async updateCarebridgePolicy(@Args('input') input: UpdateCarebridgePolicyInput, @Context() ctx: any) {
     const viewer = this.viewerFromContext(ctx);
     return this.carebridgeService.updatePolicy(
@@ -104,7 +99,7 @@ export class CarebridgeResolver {
   }
 
   @Mutation(() => VerifiedVisitStoryDTO)
-  @Roles('admin', 'carer')
+  @Roles('admin')
   async generateVerifiedVisitStory(@Args('visitId') visitId: string, @Context() ctx: any) {
     const viewer = this.viewerFromContext(ctx);
     return this.carebridgeService.generateVerifiedVisitStory(
@@ -115,18 +110,14 @@ export class CarebridgeResolver {
   }
 
   @Mutation(() => VerifiedVisitStoryDTO)
-  @Roles('admin', 'carer')
+  @Roles('admin')
   async publishVerifiedVisitStory(@Args('storyId') storyId: string, @Context() ctx: any) {
     const viewer = this.viewerFromContext(ctx);
-    return this.carebridgeService.publishVerifiedVisitStory(
-      storyId,
-      viewer.userId || '',
-      viewer.organizationId || '',
-    );
+    return this.carebridgeService.publishVerifiedVisitStory(storyId, viewer.userId || '', viewer.organizationId || '');
   }
 
   @Mutation(() => VerifiedVisitStoryDTO)
-  @Roles('admin', 'carer')
+  @Roles('admin')
   async rejectVerifiedVisitStory(@Args('input') input: RejectVerifiedVisitStoryInput, @Context() ctx: any) {
     const viewer = this.viewerFromContext(ctx);
     return this.carebridgeService.rejectVerifiedVisitStory(
@@ -138,13 +129,13 @@ export class CarebridgeResolver {
   }
 
   @Mutation(() => ConcernDTO)
-  @Roles('admin', 'carer', 'user')
+  @Roles('admin', 'user')
   async raiseCarebridgeConcern(@Args('input') input: RaiseConcernInput, @Context() ctx: any) {
     return this.carebridgeService.raiseConcern(input, this.viewerFromContext(ctx));
   }
 
   @Mutation(() => ConcernDTO)
-  @Roles('admin', 'carer')
+  @Roles('admin')
   async updateCarebridgeConcern(@Args('input') input: UpdateConcernStatusInput, @Context() ctx: any) {
     const viewer = this.viewerFromContext(ctx);
     return this.carebridgeService.updateConcernStatus(

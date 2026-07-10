@@ -520,7 +520,7 @@ describe('CarebridgeService', () => {
     } as any);
 
     const result = await service.getCareRoom('room-1', {
-      role: 'carer',
+      role: 'admin',
       organizationId: 'org-1',
     });
 
@@ -715,7 +715,7 @@ describe('CarebridgeService', () => {
 
     await service.listVerifiedVisitStoryApprovalQueue(
       {
-        role: 'carer',
+        role: 'admin',
         organizationId: 'org-1',
       },
       'room-1'
@@ -905,7 +905,7 @@ describe('CarebridgeService', () => {
         severity: 'MEDIUM',
         category: 'VISIT_DELIVERY',
       },
-      { role: 'carer', organizationId: 'org-1', userId: 'staff-1' },
+      { role: 'admin', organizationId: 'org-1', userId: 'staff-1' },
     );
 
     expect(accessService.requireFamilyScopes).not.toHaveBeenCalled();
@@ -1080,7 +1080,7 @@ describe('CarebridgeService', () => {
     ] as any);
 
     const result = await service.listConcernInbox({
-      role: 'carer',
+      role: 'admin',
       organizationId: 'org-1',
       userId: 'staff-1',
     });
@@ -1111,7 +1111,7 @@ describe('CarebridgeService', () => {
     await service.updateConcernStatus(
       { concernId: 'concern-1', status: 'ACKNOWLEDGED' as any },
       'staff-1',
-      'carer',
+      'admin',
       'org-1',
     );
 

@@ -4,6 +4,11 @@ import fs from 'node:fs';
 
 const workflow = fs.readFileSync(new URL('./ci.yml', import.meta.url), 'utf8');
 
+test('CI executes Prisma migrations before the linked-carer browser journey', () => {
+  assert.match(workflow, /run: pnpm --filter @oasis\/db exec prisma migrate deploy/);
+  assert.match(workflow, /run: pnpm test:browser:linked-carer/);
+});
+
 test('Deployment V2 CI compose verification uses the generated env file', () => {
   assert.match(workflow, /docker compose --env-file "\$TEMP_ENV" -f deploy\/v2\/docker-compose\.yml config/);
 });

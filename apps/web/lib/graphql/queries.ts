@@ -616,14 +616,46 @@ export const CREATE_VISIT_MUTATION = `
   }
 `;
 
-export const UPSERT_CARER_MUTATION = `
-  mutation UpsertCarer($input: UpsertCarerInput!) {
-    upsertCarer(input: $input) {
+export interface EligibleCarerMembership {
+  id: string
+  identityProvider: string
+  role: string
+  loginEmail?: string | null
+}
+
+export interface EligibleCarerMembershipsQueryResponse {
+  eligibleCarerMemberships: EligibleCarerMembership[]
+}
+
+export interface CreateAndLinkCarerMutationResponse {
+  createAndLinkCarer: {
+    membershipId: string
+    carer: Carer
+  }
+}
+
+export const ELIGIBLE_CARER_MEMBERSHIPS_QUERY = `
+  query EligibleCarerMemberships {
+    eligibleCarerMemberships {
       id
-      firstName
-      lastName
-      email
-      phone
+      identityProvider
+      role
+      loginEmail
+    }
+  }
+`;
+
+export const CREATE_AND_LINK_CARER_MUTATION = `
+  mutation CreateAndLinkCarer($input: CreateLinkedCarerInput!) {
+    createAndLinkCarer(input: $input) {
+      membershipId
+      carer {
+        id
+        firstName
+        lastName
+        email
+        phone
+      }
     }
   }
 `;

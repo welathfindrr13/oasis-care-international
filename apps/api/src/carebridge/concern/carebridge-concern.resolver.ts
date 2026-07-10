@@ -42,7 +42,7 @@ export class CarebridgeConcernResolver {
   }
 
   @Mutation(() => ConcernDTO)
-  @CarebridgeRoles('admin', 'carer')
+  @CarebridgeRoles('admin')
   async acknowledgeCareRoomConcern(@Args('input') input: AcknowledgeConcernInput, @Context() ctx: any) {
     const actor = getCarebridgeActor(ctx);
     const concern = await this.concernService.acknowledgeConcern({
@@ -54,7 +54,7 @@ export class CarebridgeConcernResolver {
   }
 
   @Mutation(() => ConcernDTO)
-  @CarebridgeRoles('admin', 'carer')
+  @CarebridgeRoles('admin')
   async respondToCareRoomConcern(@Args('input') input: RespondToConcernInput, @Context() ctx: any) {
     const actor = getCarebridgeActor(ctx);
     const concern = await this.concernService.respondToConcern({
@@ -67,7 +67,7 @@ export class CarebridgeConcernResolver {
   }
 
   @Mutation(() => ConcernDTO)
-  @CarebridgeRoles('admin', 'carer')
+  @CarebridgeRoles('admin')
   async resolveCareRoomConcern(@Args('input') input: ResolveConcernInput, @Context() ctx: any) {
     const actor = getCarebridgeActor(ctx);
     const concern = await this.concernService.resolveConcern({

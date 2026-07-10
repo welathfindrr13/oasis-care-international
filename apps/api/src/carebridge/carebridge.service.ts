@@ -617,10 +617,10 @@ export class CarebridgeService {
   }
 
   private assertStaffRole(role: string) {
-    if (!['admin', 'carer'].includes(role)) {
+    if (role !== 'admin') {
       throw new BaseHttpException(
         ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
-        'This action requires staff access.',
+        'This action requires administrator access.',
         HttpStatus.FORBIDDEN,
       );
     }
@@ -651,7 +651,15 @@ export class CarebridgeService {
   }
 
   private isExternalViewer(viewer: ViewerContext) {
-    return !['admin', 'carer'].includes((viewer.role || '').trim().toLowerCase());
+    const role = (viewer.role || '').trim().toLowerCase();
+    if (role === 'carer') {
+      throw new BaseHttpException(
+        ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
+        'This action requires administrator access.',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    return role !== 'admin';
   }
 
   private requireFamilyAccessLookup(viewer: ViewerContext): FamilyAccessLookup {

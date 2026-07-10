@@ -158,7 +158,7 @@ describe('CarePlanningService', () => {
         sourceTypes: [EvidenceSourceTypeGQL.VISIT],
         take: 25,
       },
-      { role: 'carer', organizationId: 'org-1', userId: 'carer-1' },
+      { role: 'admin', organizationId: 'org-1', userId: 'admin-1' },
     );
 
     expect(result).toHaveLength(1);
@@ -171,7 +171,18 @@ describe('CarePlanningService', () => {
     });
   });
 
-  it('denies evidence source candidates for family and user roles', async () => {
+  it('denies evidence source candidates for carer, family, and user roles', async () => {
+    await expect(
+      service.evidenceSourceCandidates(
+        {
+          clientId: 'client-1',
+          periodStart: new Date('2026-05-01T00:00:00.000Z'),
+          periodEnd: new Date('2026-05-07T23:59:59.000Z'),
+        },
+        { role: 'carer', organizationId: 'org-1' },
+      ),
+    ).rejects.toBeInstanceOf(BaseHttpException);
+
     await expect(
       service.evidenceSourceCandidates(
         {

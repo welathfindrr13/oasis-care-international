@@ -59,6 +59,7 @@ describe('ApiRolesGuard organization resolution', () => {
       {
         id: 'membership-1',
         organization_id: 'org-123',
+        external_organization_id: null,
         role: 'admin',
         status: 'ACTIVE',
       },
@@ -97,6 +98,62 @@ describe('ApiRolesGuard organization resolution', () => {
 
     expect(prisma.organizationIdentity.findMany).not.toHaveBeenCalled();
     expect(prisma.carer.findMany).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when one subject has multiple active memberships across tenants', async () => {
+    const { guard, prisma } = createGuard();
+    const user = {
+      id: 'carer-123',
+      organizationId: 'org-1',
+      role: 'carer',
+    };
+
+    process.env.TENANT_MEMBERSHIP_REQUIRED = 'true';
+    prisma.organizationMembership.findMany.mockResolvedValue([
+      {
+        id: 'membership-1',
+        organization_id: 'org-1',
+        external_organization_id: null,
+        role: 'carer',
+        status: 'ACTIVE',
+      },
+      {
+        id: 'membership-2',
+        organization_id: 'org-2',
+        external_organization_id: null,
+        role: 'carer',
+        status: 'ACTIVE',
+      },
+    ]);
+
+    await expect((guard as any).enrichOrganizationContext(user)).rejects.toThrow(
+      'Active organization membership is required',
+    );
+    expect(prisma.organizationMembership.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 2 }));
+  });
+
+  it('fails closed when the sole membership does not match the token organization', async () => {
+    const { guard, prisma } = createGuard();
+    const user = {
+      id: 'carer-123',
+      organizationId: 'org-token',
+      role: 'carer',
+    };
+
+    process.env.TENANT_MEMBERSHIP_REQUIRED = 'true';
+    prisma.organizationMembership.findMany.mockResolvedValue([
+      {
+        id: 'membership-1',
+        organization_id: 'org-database',
+        external_organization_id: null,
+        role: 'carer',
+        status: 'ACTIVE',
+      },
+    ]);
+
+    await expect((guard as any).enrichOrganizationContext(user)).rejects.toThrow(
+      'Active organization membership is required',
+    );
   });
 
   it('does not use email-domain inference when tenant membership is required', async () => {
@@ -154,6 +211,7 @@ describe('ApiRolesGuard organization resolution', () => {
       {
         id: 'membership-clerk-1',
         organization_id: 'org_internal_123',
+        external_organization_id: 'org_clerk_external',
         role: 'admin',
         status: 'ACTIVE',
       },
@@ -170,10 +228,7 @@ describe('ApiRolesGuard organization resolution', () => {
           identity_provider: 'clerk',
           auth_subject: 'user_clerk_123',
           status: 'ACTIVE',
-          OR: [
-            { organization_id: 'org_clerk_external' },
-            { external_organization_id: 'org_clerk_external' },
-          ],
+          revoked_at: null,
         }),
       }),
     );
@@ -189,9 +244,7 @@ describe('ApiRolesGuard organization resolution', () => {
 
     prisma.organizationMembership.findMany.mockResolvedValue([]);
     prisma.organizationIdentity.findMany.mockResolvedValue([]);
-    prisma.carer.findMany
-      .mockResolvedValueOnce([{ organization_id: 'org-789' }])
-      .mockResolvedValueOnce([]);
+    prisma.carer.findMany.mockResolvedValueOnce([{ organization_id: 'org-789' }]).mockResolvedValueOnce([]);
 
     await (guard as any).enrichOrganizationContext(user);
 
@@ -257,6 +310,7 @@ describe('ApiRolesGuard organization resolution', () => {
         {
           id: 'membership-clerk-1',
           organization_id: 'org-internal',
+          external_organization_id: 'org_clerk_external',
           role: membershipRole,
           status: 'ACTIVE',
         },
@@ -286,6 +340,7 @@ describe('ApiRolesGuard organization resolution', () => {
       {
         id: 'membership-clerk-1',
         organization_id: 'org-internal',
+        external_organization_id: 'org_clerk_external',
         role: 'user',
         status: 'ACTIVE',
       },
@@ -313,6 +368,7 @@ describe('ApiRolesGuard organization resolution', () => {
       {
         id: 'membership-clerk-1',
         organization_id: 'org-internal',
+        external_organization_id: 'org_clerk_external',
         role: 'user',
         status: 'ACTIVE',
       },
@@ -338,6 +394,7 @@ describe('ApiRolesGuard organization resolution', () => {
       {
         id: 'membership-clerk-1',
         organization_id: 'org-internal',
+        external_organization_id: 'org_clerk_external',
         role: 'billing',
         status: 'ACTIVE',
       },

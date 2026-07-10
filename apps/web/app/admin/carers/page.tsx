@@ -5,10 +5,13 @@ import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
 import { query } from '../../../lib/graphql/client'
 import {
   CARERS_QUERY,
+  ELIGIBLE_CARER_MEMBERSHIPS_QUERY,
   SHIFT_ANALYTICS_QUERY,
   type CarersQueryResponse,
+  type EligibleCarerMembershipsQueryResponse,
   type ShiftAnalyticsQueryResponse,
 } from '../../../lib/graphql/queries'
+import { CarerMembershipLinkForm } from './CarerMembershipLinkForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,8 +42,24 @@ async function getShiftAnalytics() {
   }
 }
 
+async function getEligibleMemberships() {
+  try {
+    const response = await query<EligibleCarerMembershipsQueryResponse>(
+      ELIGIBLE_CARER_MEMBERSHIPS_QUERY,
+    )
+    return { memberships: response.eligibleCarerMemberships, error: null as string | null }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to load workforce logins'
+    return { memberships: [], error: message }
+  }
+}
+
 export default async function AdminCarersPage() {
-  const [{ carers, error }, analytics] = await Promise.all([getCarers(), getShiftAnalytics()])
+  const [{ carers, error }, analytics, eligible] = await Promise.all([
+    getCarers(),
+    getShiftAnalytics(),
+    getEligibleMemberships(),
+  ])
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -52,7 +71,7 @@ export default async function AdminCarersPage() {
               Carer Directory
             </h1>
             <p className="text-slate-500 mt-1">
-              Read-only workforce records used for scheduling, visit assignment, and shift visibility.
+              Create trusted workforce records and explicitly link them to authenticated staff logins.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -71,6 +90,11 @@ export default async function AdminCarersPage() {
           <MetricCard label="Carers in directory" value={carers.length} />
         </div>
 
+        <CarerMembershipLinkForm
+          initialMemberships={eligible.memberships}
+          initialError={eligible.error}
+        />
+
         <Card>
           <CardHeader>
             <h2 className="text-xl font-semibold text-slate-900 font-heading">
@@ -79,12 +103,12 @@ export default async function AdminCarersPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-slate-600">
             <p>
-              This page is intentionally read-only. Carer identities must stay aligned with authenticated
-              workforce accounts so visit assignment, RBAC, and shift history remain trustworthy.
+              Carer identities must stay aligned with authenticated workforce accounts so visit assignment,
+              RBAC, and shift history remain trustworthy.
             </p>
             <p>
-              If a worker is missing here, complete their account onboarding and identity linking first, then
-              re-check the directory before scheduling visits against them.
+              Only active, unlinked carer or staff memberships appear in the linking form. Login identity is
+              selected explicitly; profile email is never used to choose or match an account.
             </p>
           </CardContent>
         </Card>

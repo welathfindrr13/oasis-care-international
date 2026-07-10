@@ -7,9 +7,9 @@ import { CreateCareLogInput } from './dto/create-care-log.input';
 import { CareLogFilterArgs } from './dto/care-log-filter.args';
 import { MonthlyCareSummaryDTO } from './dto/monthly-care-summary.dto';
 import { LegacyOperationalSurface } from '../auth/legacy-operational-access';
+import { requireOperationalActor } from '../carer/carer-access.service';
 
-const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
-  SetMetadata('roles', roles);
+const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => SetMetadata('roles', roles);
 
 @Resolver(() => CareLogDTO)
 @UseGuards(GqlRolesGuard)
@@ -19,12 +19,8 @@ export class CareLogResolver {
 
   @Mutation(() => CareLogDTO)
   @Roles('admin', 'carer')
-  async createCareLog(
-    @Args('input') input: CreateCareLogInput,
-    @Context() ctx: any,
-  ): Promise<CareLogDTO> {
-    const { sub: userId, realm_access, organizationId } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'carer';
+  async createCareLog(@Args('input') input: CreateCareLogInput, @Context() ctx: any): Promise<CareLogDTO> {
+    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
 
     const careLog = await this.careLogService.createCareLog(input, userId, userRole, organizationId);
     return this.mapToDTO(careLog);
@@ -32,12 +28,8 @@ export class CareLogResolver {
 
   @Query(() => CareLogPaginatedResponse)
   @Roles('admin', 'carer')
-  async careLogs(
-    @Args() filter: CareLogFilterArgs,
-    @Context() ctx: any,
-  ): Promise<CareLogPaginatedResponse> {
-    const { sub: userId, realm_access, organizationId } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'user';
+  async careLogs(@Args() filter: CareLogFilterArgs, @Context() ctx: any): Promise<CareLogPaginatedResponse> {
+    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
 
     const result = await this.careLogService.listCareLogs(filter, userId, userRole, organizationId);
     return {
@@ -54,16 +46,8 @@ export class CareLogResolver {
     @Args('month', { type: () => Int }) month: number,
     @Context() ctx: any,
   ): Promise<MonthlyCareSummaryDTO> {
-    const { sub: userId, realm_access, organizationId } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'user';
-    return this.careLogService.monthlyCareSummary(
-      clientId,
-      year,
-      month,
-      userId,
-      userRole,
-      organizationId,
-    );
+    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
+    return this.careLogService.monthlyCareSummary(clientId, year, month, userId, userRole, organizationId);
   }
 
   private mapToDTO(log: any): CareLogDTO {

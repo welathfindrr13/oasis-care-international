@@ -67,7 +67,7 @@ jobs:
       run: pnpm --filter @oasis/db exec prisma generate
       
     - name: Run Migrations
-      run: pnpm --filter @oasis/db prisma migrate deploy
+      run: pnpm --filter @oasis/db exec prisma migrate deploy
       env:
         DATABASE_URL: postgresql://test:test@localhost:5432/oasis_test
         
@@ -101,6 +101,15 @@ jobs:
         DATABASE_URL: postgresql://test:test@localhost:5432/oasis_test
         JWT_SECRET: test-secret-key-for-oasis-testing-only
         TESTCONTAINERS_RYUK_DISABLED: true
+
+    - name: Install Chromium for linked-carer browser journey
+      run: pnpm exec playwright install --with-deps chromium
+
+    - name: Linked-carer browser journey
+      run: pnpm test:browser:linked-carer
+      env:
+        DATABASE_URL: postgresql://test:test@localhost:5432/oasis_test
+        CI: true
         
     # - name: Upload coverage
     #   uses: codecov/codecov-action@v3

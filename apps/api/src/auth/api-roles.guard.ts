@@ -10,15 +10,18 @@ import {
 
 type AuthUser = AuthRoleCarrier & {
   id?: string;
+  sub?: string;
   email?: string;
   organizationId?: string | null;
   organizationMembershipId?: string | null;
+  organizationMembershipRole?: string | null;
   authMode?: string | null;
 };
 
 type OrganizationMembershipRow = {
   id: string;
   organization_id: string;
+  external_organization_id: string | null;
   role: string;
   status: string;
 };
@@ -55,14 +58,11 @@ export class ApiRolesGuard extends RolesGuard implements CanActivate {
     return user;
   }
 
-  private enforceLegacyOperationalAccess(
-    context: ExecutionContext,
-    user: AuthUser | undefined,
-  ): void {
-    const isLegacyOperationalSurface = this.appReflector.getAllAndOverride<boolean>(
-      LEGACY_OPERATIONAL_SURFACE_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+  private enforceLegacyOperationalAccess(context: ExecutionContext, user: AuthUser | undefined): void {
+    const isLegacyOperationalSurface = this.appReflector.getAllAndOverride<boolean>(LEGACY_OPERATIONAL_SURFACE_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
     if (!isLegacyOperationalSurface) {
       return;
@@ -81,40 +81,27 @@ export class ApiRolesGuard extends RolesGuard implements CanActivate {
     const identityProvider = (process.env.AUTH_IDENTITY_PROVIDER || 'cognito').trim().toLowerCase();
     const tokenOrganizationId = (user.organizationId || '').trim();
 
-    const membership = await this.resolveActiveMembership(
-      identityProvider,
-      userId,
-      tokenOrganizationId || undefined,
-    );
+    const membership = await this.resolveActiveMembership(identityProvider, userId, tokenOrganizationId || undefined);
     if (membership) {
       this.applyMembershipToUser(user, membership);
       return;
     }
 
     if (this.isTenantMembershipRequired()) {
-      throw new ForbiddenException(
-        'Active organization membership is required for tenant-scoped access',
-      );
+      throw new ForbiddenException('Active organization membership is required for tenant-scoped access');
     }
 
     if (tokenOrganizationId) {
       return;
     }
 
-    const identityMapped = await this.resolveOrganizationViaIdentityMap(
-      identityProvider,
-      userId,
-      normalizedEmail,
-    );
+    const identityMapped = await this.resolveOrganizationViaIdentityMap(identityProvider, userId, normalizedEmail);
     if (identityMapped) {
       user.organizationId = identityMapped;
       return;
     }
 
-    const domainMapped = await this.resolveOrganizationViaEmailDomain(
-      identityProvider,
-      normalizedEmail,
-    );
+    const domainMapped = await this.resolveOrganizationViaEmailDomain(identityProvider, normalizedEmail);
     if (domainMapped) {
       user.organizationId = domainMapped;
       await this.persistIdentityMap(identityProvider, userId, normalizedEmail, domainMapped);
@@ -179,34 +166,38 @@ export class ApiRolesGuard extends RolesGuard implements CanActivate {
     }
 
     try {
-      const organizationFilter = organizationId
-        ? identityProvider === 'clerk'
-          ? {
-              OR: [
-                { organization_id: organizationId },
-                { external_organization_id: organizationId },
-              ],
-            }
-          : { organization_id: organizationId }
-        : {};
-
       const memberships = await (this.prisma as any).organizationMembership.findMany({
         where: {
           identity_provider: identityProvider,
           auth_subject: userId,
           status: 'ACTIVE',
-          ...organizationFilter,
+          revoked_at: null,
         },
         select: {
           id: true,
           organization_id: true,
+          external_organization_id: true,
           role: true,
           status: true,
         },
         take: 2,
       });
 
-      return memberships.length === 1 ? memberships[0] : null;
+      if (memberships.length !== 1) {
+        return null;
+      }
+
+      const membership = memberships[0] as OrganizationMembershipRow;
+      if (organizationId) {
+        const matchesTokenOrganization =
+          membership.organization_id === organizationId ||
+          (identityProvider === 'clerk' && membership.external_organization_id === organizationId);
+        if (!matchesTokenOrganization) {
+          return null;
+        }
+      }
+
+      return membership;
     } catch (error) {
       if (this.isMissingMembershipTableError(error)) {
         return null;
@@ -219,6 +210,7 @@ export class ApiRolesGuard extends RolesGuard implements CanActivate {
     const normalizedRole = this.normalizeTenantRole(membership.role);
     user.organizationId = membership.organization_id;
     user.organizationMembershipId = membership.id;
+    user.organizationMembershipRole = membership.role.toLowerCase().trim();
     user.role = normalizedRole;
 
     user.realm_access = {
@@ -314,9 +306,7 @@ export class ApiRolesGuard extends RolesGuard implements CanActivate {
       });
 
       const organizationIds = new Set(
-        matches
-          .map((row) => row.organization_id)
-          .filter((value): value is string => Boolean(value)),
+        matches.map((row) => row.organization_id).filter((value): value is string => Boolean(value)),
       );
 
       return organizationIds.size === 1 ? Array.from(organizationIds)[0] : null;

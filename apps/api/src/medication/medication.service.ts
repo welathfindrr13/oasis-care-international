@@ -174,6 +174,7 @@ export class MedicationService {
     userId: string,
     userRole: string,
     organizationId?: string,
+    actorAuthSubject?: string,
   ): Promise<MedicationAdministration> {
     const orgId = await this.requireOrganizationId(organizationId);
     const normalizedRole = this.normalizeRole(userRole);
@@ -245,7 +246,7 @@ export class MedicationService {
       organizationId: orgId,
       medicationAdministrationId: updatedAdministration.id,
       action: this.getAuditActionForStatus(data.status),
-      actorId: userId,
+      actorId: actorAuthSubject || userId,
       actorRole: userRole,
       changes: {
         status: data.status,

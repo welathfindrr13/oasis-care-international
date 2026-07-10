@@ -17,9 +17,9 @@ import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { join } from 'path';
 import { ConfigModule } from '@nestjs/config';
-import { RolesGuard } from '@oasis/auth';
-import { MockAuthGuard } from './auth.guard.mock';
-import { AuthGuard } from '@nestjs/passport';
+import { CarerAccessService } from '../src/carer/carer-access.service';
+
+const EMAR_CARER_ID = '88888888-8888-4888-8888-888888888888';
 
 describe('eMAR real DB flow', () => {
   let app: INestApplication;
@@ -31,6 +31,8 @@ describe('eMAR real DB flow', () => {
     container = tc.container;
     process.env.DATABASE_URL = tc.dbUrl;
     process.env.JWT_SECRET = getTestJwtSecret();
+    process.env.AUTH_IDENTITY_PROVIDER = 'cognito';
+    process.env.TENANT_MEMBERSHIP_REQUIRED = 'true';
 
     const moduleRef = await Test.createTestingModule({
       imports: [
@@ -70,16 +72,12 @@ describe('eMAR real DB flow', () => {
         MedicationResolver,
         MedicationRepository,
         PrismaService,
+        CarerAccessService,
         // Mock Prometheus counters for testing
         { provide: 'medication_administrations_total', useValue: { inc: jest.fn() } },
         { provide: 'medication_overlaps_total', useValue: { inc: jest.fn() } },
       ],
-    })
-      .overrideGuard(AuthGuard('jwt'))
-      .useClass(MockAuthGuard)
-      .overrideGuard(RolesGuard)
-      .useClass(MockAuthGuard)
-      .compile();
+    }).compile();
 
     app = moduleRef.createNestApplication();
     await app.init();
@@ -95,29 +93,42 @@ describe('eMAR real DB flow', () => {
     });
 
     const client = await prisma.client.create({
-      data: { 
-        full_name: 'Test Client', 
-        address_line1: '1 Demo St', 
-        city: 'London', 
+      data: {
+        full_name: 'Test Client',
+        address_line1: '1 Demo St',
+        city: 'London',
         postcode: 'SW1A 1AA',
         organization_id: TEST_USERS.carer.organization_id,
       },
     });
 
     const carer = await prisma.carer.create({
-      data: { 
-        id: TEST_USERS.carer.sub, 
+      data: {
+        id: EMAR_CARER_ID,
         organization_id: TEST_USERS.carer.organization_id,
-        first_name: 'Jane', 
-        last_name: 'Doe', 
-        email: 'jane@demo.com' 
+        first_name: 'Jane',
+        last_name: 'Doe',
+        email: 'jane@demo.com'
+      },
+    });
+
+    await prisma.organizationMembership.create({
+      data: {
+        id: '99999999-9999-4999-8999-999999999999',
+        organization_id: TEST_USERS.carer.organization_id!,
+        identity_provider: 'cognito',
+        auth_subject: TEST_USERS.carer.sub,
+        normalized_email: 'jane@demo.com',
+        role: 'carer',
+        status: 'ACTIVE',
+        carer_id: carer.id,
       },
     });
 
     const med = await prisma.medication.create({
-      data: { 
-        name: 'Paracetamol', 
-        dosage: '500', 
+      data: {
+        name: 'Paracetamol',
+        dosage: '500',
         unit: 'mg',
         instructions: 'Take with food'
       },
@@ -177,11 +188,11 @@ describe('eMAR real DB flow', () => {
         }
       }
     `;
-    
+
     const variables = {
-      input: { 
-        administrationId: "adm-001", 
-        status: "ADMINISTERED" 
+      input: {
+        administrationId: "adm-001",
+        status: "ADMINISTERED"
       }
     };
 
@@ -193,9 +204,11 @@ describe('eMAR real DB flow', () => {
 
     expect(response.body.data.recordAdministration.status).toBe('ADMINISTERED');
 
-    const inDb = await prisma.medicationAdministration.findUnique({ 
+    const inDb = await prisma.medicationAdministration.findUnique({
       where: { id: 'adm-001' }
     });
     expect(inDb?.status).toBe('ADMINISTERED');
+    expect(inDb?.administered_by).toBe(EMAR_CARER_ID);
+    expect(inDb?.administered_by).not.toBe(TEST_USERS.carer.sub);
   });
 });

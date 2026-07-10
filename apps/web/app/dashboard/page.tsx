@@ -861,7 +861,11 @@ export default async function DashboardPage() {
                   </div>
                 ) : (
                   upcomingVisits.map((visit) => (
-                    <div key={visit.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50">
+                    <Link
+                      key={visit.id}
+                      href={`/schedule/${visit.id}`}
+                      className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 transition-colors hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2"
+                    >
                       <div className="text-sm font-mono font-medium text-slate-600 w-12">
                         {visit.time}
                       </div>
@@ -869,7 +873,7 @@ export default async function DashboardPage() {
                         <p className="font-medium text-slate-900 text-sm">{visit.client}</p>
                         <p className="text-xs text-slate-500">{visit.type}</p>
                       </div>
-                    </div>
+                    </Link>
                   ))
                 )}
               </div>

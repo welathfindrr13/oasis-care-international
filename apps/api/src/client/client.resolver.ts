@@ -6,9 +6,9 @@ import { CreateClientInput } from './dto/create-client.input';
 import { UpdateClientInput } from './dto/update-client.input';
 import { ClientService } from './client.service';
 import { LegacyOperationalSurface } from '../auth/legacy-operational-access';
+import { requireOperationalActor } from '../carer/carer-access.service';
 
-const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
-  SetMetadata('roles', roles);
+const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => SetMetadata('roles', roles);
 
 @Resolver(() => ClientDTO)
 @UseGuards(GqlRolesGuard)
@@ -19,32 +19,27 @@ export class ClientResolver {
   @Query(() => ClientPaginatedResponse)
   @Roles('admin', 'carer')
   async clients(
-    @Args('skip', { type: () => Int, nullable: true, defaultValue: 0 }) skip: number,
-    @Args('take', { type: () => Int, nullable: true, defaultValue: 20 }) take: number,
+    @Args('skip', { type: () => Int, nullable: true, defaultValue: 0 })
+    skip: number,
+    @Args('take', { type: () => Int, nullable: true, defaultValue: 20 })
+    take: number,
     @Args('search', { type: () => String, nullable: true }) search?: string,
     @Context() ctx?: any,
   ): Promise<ClientPaginatedResponse> {
-    const userId = ctx?.req?.user?.sub || ctx?.req?.user?.id || '';
-    const userRole = ctx?.req?.user?.realm_access?.roles?.[0] || 'carer';
-    const organizationId = ctx?.req?.user?.organizationId;
+    const { userId, userRole, organizationId } = requireOperationalActor(ctx?.req?.user);
     return this.clientService.findClients({ skip, take, search }, userId, userRole, organizationId);
   }
 
   @Query(() => ClientDTO)
   @Roles('admin', 'carer')
   async client(@Args('id') id: string, @Context() ctx: any): Promise<ClientDTO> {
-    const userId = ctx?.req?.user?.sub || ctx?.req?.user?.id || '';
-    const userRole = ctx?.req?.user?.realm_access?.roles?.[0] || 'carer';
-    const organizationId = ctx?.req?.user?.organizationId;
+    const { userId, userRole, organizationId } = requireOperationalActor(ctx?.req?.user);
     return this.clientService.findClientById(id, userId, userRole, organizationId);
   }
 
   @Mutation(() => ClientDTO)
   @Roles('admin')
-  async createClient(
-    @Args('input') input: CreateClientInput,
-    @Context() ctx: any,
-  ): Promise<ClientDTO> {
+  async createClient(@Args('input') input: CreateClientInput, @Context() ctx: any): Promise<ClientDTO> {
     // GDPR: Pass user ID for audit logging
     const userId = ctx.req?.user?.sub || ctx.req?.user?.id || 'anonymous';
     const organizationId = ctx.req?.user?.organizationId;
@@ -65,10 +60,7 @@ export class ClientResolver {
 
   @Mutation(() => ClientDTO)
   @Roles('admin')
-  async deleteClient(
-    @Args('id') id: string,
-    @Context() ctx: any,
-  ): Promise<ClientDTO> {
+  async deleteClient(@Args('id') id: string, @Context() ctx: any): Promise<ClientDTO> {
     const userId = ctx.req?.user?.sub || ctx.req?.user?.id || 'anonymous';
     const organizationId = ctx.req?.user?.organizationId;
     return this.clientService.deleteClient(id, userId, organizationId);
