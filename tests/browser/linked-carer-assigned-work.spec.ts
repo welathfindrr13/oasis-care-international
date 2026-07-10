@@ -8,22 +8,38 @@ async function signIn(
   page: import("playwright/test").Page,
   profile: { email: string; name: string; role: string; callbackUrl?: string },
 ) {
-  const csrfResponse = await page.request.get("/api/auth/csrf");
-  const { csrfToken } = await csrfResponse.json();
-  const authResponse = await page.request.post(
-    "/api/auth/callback/oasis-local",
-    {
-      form: {
-        csrfToken,
-        callbackUrl: profile.callbackUrl || "http://localhost:3002/access",
-        email: profile.email,
-        name: profile.name,
-        role: profile.role,
-        organizationId: "",
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const csrfResponse = await page.request.get("/api/auth/csrf");
+    const { csrfToken } = await csrfResponse.json();
+    const authResponse = await page.request.post(
+      "/api/auth/callback/oasis-local",
+      {
+        form: {
+          csrfToken,
+          callbackUrl: profile.callbackUrl || "http://localhost:3002/access",
+          email: profile.email,
+          name: profile.name,
+          role: profile.role,
+          organizationId: "",
+        },
       },
-    },
-  );
-  expect(authResponse.ok()).toBe(true);
+    );
+    if (!authResponse.ok()) continue;
+    for (let poll = 0; poll < 20; poll += 1) {
+      const sessionResponse = await page.request.get("/api/auth/session");
+      const session = sessionResponse.ok()
+        ? ((await sessionResponse.json()) as { user?: { email?: string } })
+        : null;
+      if (
+        session?.user?.email?.trim().toLowerCase() ===
+        profile.email.trim().toLowerCase()
+      ) {
+        return;
+      }
+      await page.waitForTimeout(100);
+    }
+  }
+  throw new Error(`Synthetic sign-in did not establish ${profile.email}`);
 }
 
 async function refreshMountedNextAuthSession(
