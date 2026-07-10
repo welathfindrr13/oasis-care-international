@@ -3,8 +3,8 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useSession } from 'next-auth/react';
 import { Header } from '../../components/oasis/Header';
+import { useClientAccess } from '../../components/providers/ClientAccessProvider';
 import { clientQuery } from '../../lib/graphql/client-side';
 
 interface MedicationAdministration {
@@ -131,11 +131,13 @@ const CREATE_PRESCRIPTION_MUTATION = `
 function EmarPageContent() {
   const searchParams = useSearchParams();
   const clientFilterId = searchParams.get('clientId') || '';
-  const { data: session } = useSession();
-  const roles = Array.isArray((session as any)?.roles)
-    ? (session as any).roles.map((r: unknown) => String(r).toLowerCase())
-    : [];
-  const isAdmin = roles.includes('admin');
+  const {
+    authenticated,
+    getBearerToken,
+    isAdmin,
+    isStaff,
+    status: authStatus,
+  } = useClientAccess();
 
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
@@ -170,13 +172,31 @@ function EmarPageContent() {
   });
 
   const fetchMedications = useCallback(async () => {
+    if (authStatus === 'loading') return;
+
     setLoading(true);
     setMedicationsError(null);
 
+    if (!authenticated) {
+      setMedicationsError('Unauthorized');
+      setMedications([]);
+      setLoading(false);
+      return;
+    }
+
+    if (!isStaff) {
+      setMedicationsError('Forbidden');
+      setMedications([]);
+      setLoading(false);
+      return;
+    }
+
     try {
-      const data = await clientQuery<GetTodaysMedicationsResponse>(EMAR_QUERY, {
-        date: selectedDate,
-      });
+      const data = await clientQuery<GetTodaysMedicationsResponse>(
+        EMAR_QUERY,
+        { date: selectedDate },
+        { getBearerToken },
+      );
       setMedications(data.getTodaysMedicationsByClient || []);
     } catch (err) {
       console.error('Failed to fetch medications:', err);
@@ -185,15 +205,15 @@ function EmarPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
+  }, [authenticated, authStatus, getBearerToken, isStaff, selectedDate]);
 
   const fetchProvisioningData = useCallback(async () => {
-    if (!isAdmin) return;
+    if (authStatus === 'loading' || !authenticated || !isAdmin) return;
     setProvisioningError(null);
     try {
       const [clientsData, medsData] = await Promise.all([
-        clientQuery<ClientsResponse>(CLIENTS_QUERY),
-        clientQuery<MedicationsResponse>(MEDICATIONS_QUERY),
+        clientQuery<ClientsResponse>(CLIENTS_QUERY, undefined, { getBearerToken }),
+        clientQuery<MedicationsResponse>(MEDICATIONS_QUERY, undefined, { getBearerToken }),
       ]);
       setClients(clientsData.clients.items || []);
       setMedicationOptions(medsData.medications.items || []);
@@ -203,7 +223,7 @@ function EmarPageContent() {
       setMedicationOptions([]);
       setProvisioningError(err instanceof Error ? err.message : 'Failed to load provisioning options');
     }
-  }, [isAdmin]);
+  }, [authenticated, authStatus, getBearerToken, isAdmin]);
 
   useEffect(() => {
     fetchMedications();
@@ -291,14 +311,18 @@ function EmarPageContent() {
     setProvisioningLoading(true);
     setProvisioningMessage(null);
     try {
-      await clientQuery(CREATE_MEDICATION_MUTATION, {
-        input: {
-          name: newMedication.name.trim(),
-          dosage: newMedication.dosage.trim(),
-          unit: newMedication.unit.trim(),
-          instructions: newMedication.instructions.trim() || null,
+      await clientQuery(
+        CREATE_MEDICATION_MUTATION,
+        {
+          input: {
+            name: newMedication.name.trim(),
+            dosage: newMedication.dosage.trim(),
+            unit: newMedication.unit.trim(),
+            instructions: newMedication.instructions.trim() || null,
+          },
         },
-      });
+        { getBearerToken },
+      );
       setNewMedication({ name: '', dosage: '', unit: '', instructions: '' });
       setProvisioningMessage('Medication created.');
       await fetchProvisioningData();
@@ -329,20 +353,24 @@ function EmarPageContent() {
     setProvisioningLoading(true);
     setProvisioningMessage(null);
     try {
-      await clientQuery(CREATE_PRESCRIPTION_MUTATION, {
-        input: {
-          clientId: newPrescription.clientId,
-          medicationId: newPrescription.medicationId,
-          startDate: `${newPrescription.startDate}T00:00:00.000Z`,
-          endDate: newPrescription.endDate
-            ? `${newPrescription.endDate}T23:59:59.999Z`
-            : null,
-          frequencyPerDay: Number(newPrescription.frequencyPerDay || '1'),
-          administrationTimes: times,
-          specialInstructions: newPrescription.specialInstructions.trim() || null,
-          isActive: true,
+      await clientQuery(
+        CREATE_PRESCRIPTION_MUTATION,
+        {
+          input: {
+            clientId: newPrescription.clientId,
+            medicationId: newPrescription.medicationId,
+            startDate: `${newPrescription.startDate}T00:00:00.000Z`,
+            endDate: newPrescription.endDate
+              ? `${newPrescription.endDate}T23:59:59.999Z`
+              : null,
+            frequencyPerDay: Number(newPrescription.frequencyPerDay || '1'),
+            administrationTimes: times,
+            specialInstructions: newPrescription.specialInstructions.trim() || null,
+            isActive: true,
+          },
         },
-      });
+        { getBearerToken },
+      );
 
       setProvisioningMessage('Prescription created and schedule materialized.');
       await fetchMedications();

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Header } from '../../../components/oasis/Header'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
 import { Button } from '../../../components/ui/Button'
+import { useClientAccess } from '../../../components/providers/ClientAccessProvider'
 import { clientQuery } from '../../../lib/graphql/client-side'
 import {
   CARERS_QUERY,
@@ -36,6 +37,7 @@ function toLocalDatetimeValue(date: Date) {
 
 export default function NewVisitPageClient({ initialClientId }: NewVisitPageClientProps) {
   const router = useRouter()
+  const { authenticated, getBearerToken, isAdmin, status } = useClientAccess()
   const [clients, setClients] = useState<ClientsQueryResponse['clients']['items']>([])
   const [carers, setCarers] = useState<CarersQueryResponse['carers']>([])
   const [loading, setLoading] = useState(true)
@@ -81,15 +83,33 @@ export default function NewVisitPageClient({ initialClientId }: NewVisitPageClie
     let cancelled = false
 
     async function loadData() {
+      if (status === 'loading') return
+
       setLoading(true)
       setError(null)
+
+      if (!authenticated) {
+        setError('Unauthorized')
+        setLoading(false)
+        return
+      }
+
+      if (!isAdmin) {
+        setError('Forbidden')
+        setLoading(false)
+        return
+      }
 
       let timeoutId: ReturnType<typeof setTimeout> | null = null
 
       try {
         const loadPromise = Promise.all([
-          clientQuery<ClientsQueryResponse>(CLIENTS_QUERY, { take: 200, skip: 0 }),
-          clientQuery<CarersQueryResponse>(CARERS_QUERY),
+          clientQuery<ClientsQueryResponse>(
+            CLIENTS_QUERY,
+            { take: 200, skip: 0 },
+            { getBearerToken },
+          ),
+          clientQuery<CarersQueryResponse>(CARERS_QUERY, undefined, { getBearerToken }),
         ])
 
         const timeoutPromise = new Promise<never>((_, reject) => {
@@ -121,23 +141,33 @@ export default function NewVisitPageClient({ initialClientId }: NewVisitPageClie
     return () => {
       cancelled = true
     }
-  }, [loadAttempt])
+  }, [authenticated, getBearerToken, isAdmin, loadAttempt, status])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+
+    if (!authenticated || !isAdmin) {
+      setError(authenticated ? 'Forbidden' : 'Unauthorized')
+      return
+    }
+
     setIsSubmitting(true)
     setError(null)
 
     try {
-      await clientQuery(CREATE_VISIT_MUTATION, {
-        input: {
-          clientId: form.clientId,
-          carerId: form.carerId,
-          scheduledStart: new Date(form.startTime).toISOString(),
-          scheduledEnd: new Date(form.endTime).toISOString(),
-          notes: form.notes || undefined,
+      await clientQuery(
+        CREATE_VISIT_MUTATION,
+        {
+          input: {
+            clientId: form.clientId,
+            carerId: form.carerId,
+            scheduledStart: new Date(form.startTime).toISOString(),
+            scheduledEnd: new Date(form.endTime).toISOString(),
+            notes: form.notes || undefined,
+          },
         },
-      })
+        { getBearerToken },
+      )
       router.push(`/schedule?clientId=${form.clientId}`)
     } catch (err: any) {
       setError(err.message || 'Failed to schedule visit')

@@ -3,8 +3,8 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useSession } from 'next-auth/react';
 import { Header } from '../../../../components/oasis/Header';
+import { useClientAccess } from '../../../../components/providers/ClientAccessProvider';
 import { clientQuery } from '../../../../lib/graphql/client-side';
 
 type CareLogCategory =
@@ -120,12 +120,13 @@ function nowLocalDatetime() {
 export default function ClientCareLogsPage() {
   const params = useParams();
   const clientId = String(params.id || '');
-  const { data: session } = useSession();
-
-  const roles = Array.isArray((session as any)?.roles)
-    ? (session as any).roles.map((r: unknown) => String(r).toLowerCase())
-    : [];
-  const canCreate = roles.includes('admin') || roles.includes('carer');
+  const {
+    authenticated,
+    getBearerToken,
+    isStaff,
+    status: authStatus,
+  } = useClientAccess();
+  const canCreate = authenticated && isStaff;
 
   const [clientName, setClientName] = useState<string>('Client');
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -171,26 +172,52 @@ export default function ClientCareLogsPage() {
 
   const loadData = useCallback(async () => {
     if (!clientId) return;
+    if (authStatus === 'loading') return;
+
     setLoading(true);
     setError(null);
     setLogsError(null);
     setSummaryError(null);
 
+    if (!authenticated) {
+      setError('Unauthorized');
+      setLoading(false);
+      return;
+    }
+
+    if (!isStaff) {
+      setError('Forbidden');
+      setLoading(false);
+      return;
+    }
+
     try {
       const [clientResult, logsResult, monthlyResult] = await Promise.allSettled([
-        clientQuery<{ client: { fullName: string } | null }>(CLIENT_QUERY, { id: clientId }),
-        clientQuery<{ careLogs: { items: CareLog[] } }>(CARE_LOGS_QUERY, {
-          clientId,
-          occurredFrom: monthRange.start.toISOString(),
-          occurredTo: monthRange.end.toISOString(),
-          skip: 0,
-          take: 100,
-        }),
-        clientQuery<{ monthlyCareSummary: MonthlySummary }>(MONTHLY_SUMMARY_QUERY, {
-          clientId,
-          year: monthRange.year,
-          month: monthRange.month,
-        }),
+        clientQuery<{ client: { fullName: string } | null }>(
+          CLIENT_QUERY,
+          { id: clientId },
+          { getBearerToken },
+        ),
+        clientQuery<{ careLogs: { items: CareLog[] } }>(
+          CARE_LOGS_QUERY,
+          {
+            clientId,
+            occurredFrom: monthRange.start.toISOString(),
+            occurredTo: monthRange.end.toISOString(),
+            skip: 0,
+            take: 100,
+          },
+          { getBearerToken },
+        ),
+        clientQuery<{ monthlyCareSummary: MonthlySummary }>(
+          MONTHLY_SUMMARY_QUERY,
+          {
+            clientId,
+            year: monthRange.year,
+            month: monthRange.month,
+          },
+          { getBearerToken },
+        ),
       ]);
 
       if (clientResult.status === 'fulfilled') {
@@ -217,7 +244,17 @@ export default function ClientCareLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [clientId, monthRange.end, monthRange.month, monthRange.start, monthRange.year]);
+  }, [
+    authenticated,
+    authStatus,
+    clientId,
+    getBearerToken,
+    isStaff,
+    monthRange.end,
+    monthRange.month,
+    monthRange.start,
+    monthRange.year,
+  ]);
 
   useEffect(() => {
     loadData();
@@ -269,7 +306,7 @@ export default function ClientCareLogsPage() {
       input.escalated = escalated;
       input.escalatedTo = escalated && escalatedTo ? escalatedTo : undefined;
 
-      await clientQuery(CREATE_CARE_LOG_MUTATION, { input });
+      await clientQuery(CREATE_CARE_LOG_MUTATION, { input }, { getBearerToken });
 
       setNotes('');
       setUrinePassed(false);

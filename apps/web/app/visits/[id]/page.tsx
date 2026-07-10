@@ -3,12 +3,11 @@
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useSession } from 'next-auth/react';
 import { Header } from '../../../components/oasis/Header';
+import { useClientAccess } from '../../../components/providers/ClientAccessProvider';
 import { Button } from '../../../components/ui/Button';
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card';
 import { clientQuery } from '../../../lib/graphql/client-side';
-import { hasRole, normalizeAppRoles } from '../../../lib/auth/roles';
 
 type VisitStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 type MedicationStatus = 'SCHEDULED' | 'ADMINISTERED' | 'MISSED' | 'REFUSED' | 'CANCELLED';
@@ -340,11 +339,14 @@ function taskOutcomeLabel(outcome: TaskOutcome): string {
 export default function VisitDetailPage() {
   const params = useParams();
   const visitId = String(params.id || '');
-  const { data: session, status: sessionStatus } = useSession();
-
-  const roles = normalizeAppRoles((session as any)?.roles ?? []);
-  const isAdmin = hasRole(roles, 'admin');
-  const isCarer = hasRole(roles, 'carer');
+  const {
+    authenticated,
+    getBearerToken,
+    isAdmin,
+    isCarer,
+    isStaff,
+    status,
+  } = useClientAccess();
   const canLogCare = isAdmin || isCarer;
   const canRecordMedication = isAdmin || isCarer;
   const canRunVisitWorkflow = isAdmin || isCarer;
@@ -380,14 +382,36 @@ export default function VisitDetailPage() {
 
   const loadWorkspace = useCallback(async () => {
     if (!visitId) return;
+    if (status === 'loading') return;
+
     setLoading(true);
     setError(null);
 
+    if (!authenticated) {
+      setError('Unauthorized');
+      setLoading(false);
+      return;
+    }
+
+    if (!isStaff) {
+      setError('Forbidden');
+      setLoading(false);
+      return;
+    }
+
     try {
       const [visitResult, careLogResult, medicationResult] = await Promise.all([
-        clientQuery<{ visit: Visit }>(VISIT_QUERY, { id: visitId }),
-        clientQuery<{ careLogs: { items: CareLog[] } }>(CARE_LOGS_QUERY, { visitId, skip: 0, take: 50 }),
-        clientQuery<{ listDueMeds: MedicationAdministration[] }>(DUE_MEDS_QUERY, { visitId }),
+        clientQuery<{ visit: Visit }>(VISIT_QUERY, { id: visitId }, { getBearerToken }),
+        clientQuery<{ careLogs: { items: CareLog[] } }>(
+          CARE_LOGS_QUERY,
+          { visitId, skip: 0, take: 50 },
+          { getBearerToken },
+        ),
+        clientQuery<{ listDueMeds: MedicationAdministration[] }>(
+          DUE_MEDS_QUERY,
+          { visitId },
+          { getBearerToken },
+        ),
       ]);
 
       setVisit(visitResult.visit);
@@ -409,7 +433,7 @@ export default function VisitDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [visitId]);
+  }, [authenticated, getBearerToken, isStaff, status, visitId]);
 
   useEffect(() => {
     loadWorkspace();
@@ -457,7 +481,11 @@ export default function VisitDetailPage() {
     setMessage(null);
 
     try {
-      await clientQuery(START_VISIT_MUTATION, { visitId: visit.id });
+      await clientQuery(
+        START_VISIT_MUTATION,
+        { visitId: visit.id },
+        { getBearerToken },
+      );
       setMessage('Visit started.');
       await loadWorkspace();
     } catch (err: any) {
@@ -483,13 +511,17 @@ export default function VisitDetailPage() {
     setMessage(null);
 
     try {
-      await clientQuery(RECORD_TASK_OUTCOME_MUTATION, {
-        input: {
-          taskId: task.id,
-          outcome,
-          notes: notesByOutcome[outcome],
+      await clientQuery(
+        RECORD_TASK_OUTCOME_MUTATION,
+        {
+          input: {
+            taskId: task.id,
+            outcome,
+            notes: notesByOutcome[outcome],
+          },
         },
-      });
+        { getBearerToken },
+      );
       setMessage(`Care action marked ${taskOutcomeLabel(outcome)}.`);
       await loadWorkspace();
     } catch (err: any) {
@@ -513,16 +545,20 @@ export default function VisitDetailPage() {
     setMessage(null);
 
     try {
-      await clientQuery(SUBMIT_CARE_NOTE_MUTATION, {
-        input: {
-          visitId: visit.id,
-          category: careNoteCategory,
-          notes: careNoteNotes.trim(),
-          occurredAt: careNoteOccurredAt ? new Date(careNoteOccurredAt).toISOString() : undefined,
-          escalated: careNoteEscalated,
-          escalatedTo: careNoteEscalatedTo.trim() || undefined,
+      await clientQuery(
+        SUBMIT_CARE_NOTE_MUTATION,
+        {
+          input: {
+            visitId: visit.id,
+            category: careNoteCategory,
+            notes: careNoteNotes.trim(),
+            occurredAt: careNoteOccurredAt ? new Date(careNoteOccurredAt).toISOString() : undefined,
+            escalated: careNoteEscalated,
+            escalatedTo: careNoteEscalatedTo.trim() || undefined,
+          },
         },
-      });
+        { getBearerToken },
+      );
 
       setCareNoteCategory('OTHER');
       setCareNoteOccurredAt(nowLocalDatetime());
@@ -546,13 +582,17 @@ export default function VisitDetailPage() {
     setMessage(null);
 
     try {
-      await clientQuery(RECORD_ADMINISTRATION_MUTATION, {
-        input: {
-          administrationId,
-          status,
-          notes: medicationNotes[administrationId]?.trim() || undefined,
+      await clientQuery(
+        RECORD_ADMINISTRATION_MUTATION,
+        {
+          input: {
+            administrationId,
+            status,
+            notes: medicationNotes[administrationId]?.trim() || undefined,
+          },
         },
-      });
+        { getBearerToken },
+      );
       setMessage(`Medication marked ${status.toLowerCase()}.`);
       await loadWorkspace();
     } catch (err: any) {
@@ -570,13 +610,17 @@ export default function VisitDetailPage() {
     setMessage(null);
 
     try {
-      await clientQuery(COMPLETE_VISIT_MUTATION, {
-        input: {
-          visitId: visit.id,
-          notes: visitCompletionNotes.trim() || undefined,
-          actualEnd: visitCompletionAt ? new Date(visitCompletionAt).toISOString() : undefined,
+      await clientQuery(
+        COMPLETE_VISIT_MUTATION,
+        {
+          input: {
+            visitId: visit.id,
+            notes: visitCompletionNotes.trim() || undefined,
+            actualEnd: visitCompletionAt ? new Date(visitCompletionAt).toISOString() : undefined,
+          },
         },
-      });
+        { getBearerToken },
+      );
       setMessage('Visit completed.');
       await loadWorkspace();
     } catch (err: any) {
@@ -594,15 +638,19 @@ export default function VisitDetailPage() {
     setMessage(null);
 
     try {
-      await clientQuery(UPDATE_VISIT_MUTATION, {
-        input: {
-          id: visit.id,
-          status: visitStatus,
-          notes: visitNotes.trim() || null,
-          actualStart: actualStart ? new Date(actualStart).toISOString() : null,
-          actualEnd: actualEnd ? new Date(actualEnd).toISOString() : null,
+      await clientQuery(
+        UPDATE_VISIT_MUTATION,
+        {
+          input: {
+            id: visit.id,
+            status: visitStatus,
+            notes: visitNotes.trim() || null,
+            actualStart: actualStart ? new Date(actualStart).toISOString() : null,
+            actualEnd: actualEnd ? new Date(actualEnd).toISOString() : null,
+          },
         },
-      });
+        { getBearerToken },
+      );
       setMessage('Visit oversight updated.');
       await loadWorkspace();
     } catch (err: any) {
@@ -904,7 +952,7 @@ export default function VisitDetailPage() {
                   <p className="text-sm text-slate-500">Capture care notes and escalation details for this visit.</p>
                 </CardHeader>
                 <CardContent className="mb-0">
-                  {sessionStatus === 'loading' ? (
+                  {status === 'loading' ? (
                     <p className="text-sm text-slate-500">Checking your access…</p>
                   ) : !canLogCare ? (
                     <p className="text-sm text-slate-500">You do not have permission to add care notes from this account.</p>

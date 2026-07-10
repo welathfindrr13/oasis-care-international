@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --test lib/auth/access.test.ts && node --test lib/auth/access-policy.test.js middleware.test.js"
+    "test": "tsx --test lib/auth/access.test.ts lib/auth/client-access.test.ts lib/graphql/client-side.test.ts lib/graphql/proxy-auth.test.ts && node --test app/clinical-client-auth.test.mjs lib/auth/access-policy.test.js middleware.test.js"
   },
   "dependencies": {
     "@clerk/nextjs": "^5.7.5",
