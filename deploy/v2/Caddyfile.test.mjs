@@ -12,3 +12,12 @@ test('Caddy routes stats REST traffic to the API before the web catch-all', () =
   assert.notEqual(catchAllIndex, -1);
   assert(statsRouteIndex < catchAllIndex);
 });
+
+test('Caddy routes public company requests directly to the API before the web catch-all', () => {
+  const requestRouteIndex = caddyfile.indexOf('handle /api/company-access-requests');
+  const catchAllIndex = caddyfile.indexOf('handle {');
+
+  assert.notEqual(requestRouteIndex, -1);
+  assert.match(caddyfile.slice(requestRouteIndex, catchAllIndex), /uri strip_prefix \/api/);
+  assert(requestRouteIndex < catchAllIndex);
+});

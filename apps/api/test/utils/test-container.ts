@@ -1,4 +1,4 @@
-import { GenericContainer, StartedTestContainer } from 'testcontainers';
+import { GenericContainer, StartedTestContainer, Wait } from 'testcontainers';
 import { execSync } from 'node:child_process';
 
 export async function startPostgres(): Promise<{
@@ -12,6 +12,10 @@ export async function startPostgres(): Promise<{
       POSTGRES_DB: 'oasis_test',
     })
     .withExposedPorts(5432)
+    .withWaitStrategy(
+      Wait.forLogMessage('database system is ready to accept connections', 2),
+    )
+    .withStartupTimeout(120_000)
     .start();
 
   const port = container.getMappedPort(5432);

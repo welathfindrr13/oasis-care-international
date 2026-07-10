@@ -88,7 +88,18 @@ test('api service does not inject a default Clerk audience', () => {
   const apiBlock = serviceBlock('api');
 
   assert.match(apiBlock, /CLERK_AUDIENCE:\s*\$\{CLERK_AUDIENCE:-\}/);
+  assert.match(apiBlock, /NEXT_PUBLIC_SITE_URL:\s*\$\{NEXT_PUBLIC_SITE_URL:\?/);
   assert.doesNotMatch(apiBlock, /CLERK_AUDIENCE:[^\n]*oasis-api/);
+});
+
+test('platform operator allowlist is server-only and required by the api', () => {
+  const apiBlock = serviceBlock('api');
+  const webBlock = serviceBlock('web');
+
+  assert.match(apiBlock, /PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID:\s*\$\{PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID:\?/);
+  assert.match(apiBlock, /PLATFORM_OPERATOR_CLERK_SUBJECTS:\s*\$\{PLATFORM_OPERATOR_CLERK_SUBJECTS:\?/);
+  assert.doesNotMatch(webBlock, /PLATFORM_OPERATOR_CLERK_/);
+  assert.doesNotMatch(compose, /NEXT_PUBLIC_PLATFORM_OPERATOR/);
 });
 
 test('production deployment config fails fast for required env instead of using placeholders', () => {
@@ -106,6 +117,8 @@ test('production deployment config fails fast for required env instead of using 
     'CLERK_ISSUER',
     'CLERK_JWKS_URL',
     'CLERK_AUTHORIZED_PARTIES',
+    'PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID',
+    'PLATFORM_OPERATOR_CLERK_SUBJECTS',
     'POSTGRES_PASSWORD',
     'JWT_SECRET',
   ]) {

@@ -31,6 +31,8 @@ CLERK_JWKS_URL=https://clerk.provider.org/.well-known/jwks.json
 CLERK_AUDIENCE=oasis-production-api
 CLERK_AUTHORIZED_PARTIES=https://care.example.org
 CLERK_SECRET_KEY=0123456789abcdef0123456789abcdefclerk
+PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID=org_oasis_platform_ops
+PLATFORM_OPERATOR_CLERK_SUBJECTS=user_oasis_platform_operator
 NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_Y2FyZS5leGFtcGxlLm9yZyQ=
 NEXT_PUBLIC_CLERK_SIGN_IN_URL=https://care.example.org/sign-in

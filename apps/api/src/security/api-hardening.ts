@@ -27,6 +27,8 @@ const DEFAULT_URLENCODED_BODY_LIMIT = '64kb';
 const DEFAULT_URLENCODED_PARAMETER_LIMIT = 100;
 const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
 const DEFAULT_RATE_LIMIT_MAX = 300;
+const DEFAULT_COMPANY_REQUEST_RATE_LIMIT_WINDOW_MS = 15 * 60_000;
+const DEFAULT_COMPANY_REQUEST_RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_EXEMPT_PROBE_PATHS = new Set([
   '/health',
   '/ready',
@@ -162,5 +164,27 @@ export function applyApiHardening(
     limit: options.urlencodedBodyLimit,
     parameterLimit: options.urlencodedParameterLimit,
     extended: true,
+  });
+}
+
+export function createCompanyAccessRequestRateLimiter(
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  return rateLimit({
+    windowMs: readPositiveInteger(
+      env.COMPANY_ACCESS_REQUEST_RATE_LIMIT_WINDOW_MS,
+      DEFAULT_COMPANY_REQUEST_RATE_LIMIT_WINDOW_MS,
+    ),
+    limit: readPositiveInteger(
+      env.COMPANY_ACCESS_REQUEST_RATE_LIMIT_MAX,
+      DEFAULT_COMPANY_REQUEST_RATE_LIMIT_MAX,
+    ),
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: {
+      statusCode: 429,
+      error: 'Too Many Requests',
+      message: 'Too many requests',
+    },
   });
 }

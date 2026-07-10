@@ -317,6 +317,8 @@ model Organization {
   memberships        OrganizationMembership[]
   company_access_requests CompanyAccessRequest[]
   membership_invitations OrganizationMembershipInvitation[]
+  provider_bindings OrganizationProviderBinding[]
+  provisioning_outbox OrganizationProvisioningOutbox[]
   carers             Carer[]
   clients            Client[]
   visits             Visit[]
@@ -368,6 +370,7 @@ model CompanyAccessRequest {
   updated_at                DateTime                   @updatedAt
   organization              Organization?              @relation(fields: [organization_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
   membership_invitation     OrganizationMembershipInvitation?
+  provisioning_outbox       OrganizationProvisioningOutbox?
 
   @@index([status, requested_at])
   @@index([normalized_business_email])
@@ -973,6 +976,7 @@ model OrganizationMembershipInvitation {
   organization            Organization                            @relation(fields: [organization_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
   source_request          CompanyAccessRequest?                   @relation(fields: [source_request_id, organization_id, normalized_email], references: [id, organization_id, normalized_business_email], onDelete: Restrict, onUpdate: Restrict, map: "organization_membership_invitation_source_request_fkey")
   activated_membership    OrganizationMembership?                 @relation("ActivatedOrganizationMembershipInvitation", fields: [organization_id, activated_membership_id, identity_provider, bound_auth_subject, normalized_email, intended_role], references: [organization_id, id, identity_provider, auth_subject, normalized_email, role], onDelete: Restrict, onUpdate: Restrict, map: "organization_membership_invitation_activated_membership_fkey")
+  provisioning_outbox     OrganizationProvisioningOutbox?
 
   @@index([organization_id, status, created_at], map: "organization_membership_invitation_org_status_created_idx")
   @@index([status, expires_at])
@@ -980,6 +984,53 @@ model OrganizationMembershipInvitation {
   @@unique([source_request_id, organization_id, normalized_email], map: "organization_membership_invitation_source_identity_key")
   @@unique([identity_provider, external_invitation_id], map: "organization_membership_invitation_provider_external_id_key")
   @@map("organization_membership_invitation")
+}
+
+model OrganizationProviderBinding {
+  id                       String       @id @default(uuid())
+  organization_id          String
+  identity_provider        String       @db.VarChar(50)
+  external_organization_id String       @db.VarChar(191)
+  external_slug            String       @db.VarChar(191)
+  organization             Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_at               DateTime     @default(now())
+  updated_at               DateTime     @updatedAt
+
+  @@unique([organization_id, identity_provider], map: "organization_provider_binding_org_provider_key")
+  @@unique([identity_provider, external_organization_id], map: "organization_provider_binding_external_key")
+  @@unique([identity_provider, external_slug], map: "organization_provider_binding_slug_key")
+  @@map("organization_provider_binding")
+}
+
+enum OrganizationProvisioningOutboxStatus {
+  PENDING
+  PROCESSING
+  RETRYABLE
+  DELIVERED
+  NEEDS_ATTENTION
+}
+
+model OrganizationProvisioningOutbox {
+  id                 String                               @id @default(uuid())
+  organization_id    String
+  source_request_id  String                               @unique(map: "organization_provisioning_outbox_source_request_id_key")
+  invitation_id      String                               @unique(map: "organization_provisioning_outbox_invitation_id_key")
+  status             OrganizationProvisioningOutboxStatus @default(PENDING)
+  attempt_count      Int                                  @default(0)
+  available_at       DateTime                             @default(now())
+  lease_token        String?                              @db.VarChar(191)
+  lease_expires_at   DateTime?
+  last_error_code    String?                              @db.VarChar(100)
+  delivered_at       DateTime?
+  organization       Organization                         @relation(fields: [organization_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  source_request     CompanyAccessRequest                 @relation(fields: [source_request_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  invitation         OrganizationMembershipInvitation     @relation(fields: [invitation_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_at         DateTime                             @default(now())
+  updated_at         DateTime                             @updatedAt
+
+  @@index([status, available_at], map: "organization_provisioning_outbox_status_available_idx")
+  @@index([organization_id, created_at], map: "organization_provisioning_outbox_org_created_idx")
+  @@map("organization_provisioning_outbox")
 }
 
 model CareLog {
