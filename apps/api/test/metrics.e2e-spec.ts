@@ -19,6 +19,7 @@ import { ConfigModule } from '@nestjs/config';
 import { RolesGuard } from '@oasis/auth';
 import { MockAuthGuard } from './auth.guard.mock';
 import { AuthGuard } from '@nestjs/passport';
+import { AuthAccessModule } from '../src/auth/auth-access.module';
 
 describe('/metrics (e2e)', () => {
   let app: INestApplication;
@@ -79,6 +80,7 @@ describe('/metrics (e2e)', () => {
           secret: getTestJwtSecret(),
           signOptions: { expiresIn: '1h' },
         }),
+        AuthAccessModule,
         MetricsDynamicModule.register(true),
         VisitModule,
       ],

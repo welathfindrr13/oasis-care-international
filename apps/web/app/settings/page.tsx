@@ -1,25 +1,51 @@
 'use client';
 
 import Link from 'next/link';
+import { useUser } from '@clerk/nextjs';
 import { useSession } from 'next-auth/react';
 import { Header } from '../../components/oasis/Header';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { InstallAppPrompt } from '../../components/pwa/InstallAppPrompt';
-import { hasRole, normalizeAppRoles } from '../../lib/auth/roles';
+import { useClientAccess } from '../../components/providers/ClientAccessProvider';
+import { resolveAuthMode } from '../../lib/auth/mode';
 
 function formatRole(role: string): string {
   return role.replace(/_/g, ' ').replace(/\b\w/g, (value) => value.toUpperCase());
 }
 
 export default function SettingsPage() {
+  const authMode = resolveAuthMode({
+    NODE_ENV: process.env.NODE_ENV,
+    NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: process.env.NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER,
+    NEXT_PUBLIC_LOCAL_AUTH_ENABLED: process.env.NEXT_PUBLIC_LOCAL_AUTH_ENABLED,
+  } as NodeJS.ProcessEnv);
+  return authMode === 'clerk' ? <ClerkSettings /> : <NextAuthSettings />;
+}
+
+function ClerkSettings() {
+  const { user } = useUser();
+  return (
+    <SettingsContent
+      userName={user?.fullName || user?.primaryEmailAddress?.emailAddress?.split('@')[0] || 'User'}
+      userEmail={user?.primaryEmailAddress?.emailAddress || ''}
+    />
+  );
+}
+
+function NextAuthSettings() {
   const { data: session } = useSession();
-  const roles = normalizeAppRoles((session as any)?.roles ?? []);
-  const userName = session?.user?.name || session?.user?.email?.split('@')[0] || 'User';
-  const userEmail = session?.user?.email || '';
-  const isAdmin = hasRole(roles, 'admin');
-  const isCarer = hasRole(roles, 'carer');
-  const primaryRole = roles[0] || 'user';
+  return (
+    <SettingsContent
+      userName={session?.user?.name || session?.user?.email?.split('@')[0] || 'User'}
+      userEmail={session?.user?.email || ''}
+    />
+  );
+}
+
+function SettingsContent({ userName, userEmail }: { userName: string; userEmail: string }) {
+  const { roles, isAdmin, isCarer } = useClientAccess();
+  const primaryRole = roles[0] || 'Access pending';
 
   return (
     <div className="min-h-screen bg-slate-50">

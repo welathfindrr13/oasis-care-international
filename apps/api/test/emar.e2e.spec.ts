@@ -18,6 +18,7 @@ import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { join } from 'path';
 import { ConfigModule } from '@nestjs/config';
 import { CarerAccessService } from '../src/carer/carer-access.service';
+import { AuthAccessModule } from '../src/auth/auth-access.module';
 
 const EMAR_CARER_ID = '88888888-8888-4888-8888-888888888888';
 
@@ -65,6 +66,7 @@ describe('eMAR real DB flow', () => {
           secret: getTestJwtSecret(),
           signOptions: { expiresIn: '1h' },
         }),
+        AuthAccessModule,
       ],
       providers: [
         JwtStrategy,

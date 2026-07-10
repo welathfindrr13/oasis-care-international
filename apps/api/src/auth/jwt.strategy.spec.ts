@@ -168,7 +168,7 @@ describe('JwtStrategy local auth gating', () => {
     ).rejects.toThrow('Clerk token is missing organization claim');
   });
 
-  it('rejects Clerk tokens with unsupported tenant roles', async () => {
+  it('uses a neutral token role when Clerk role claims are unsupported so membership stays authoritative', async () => {
     process.env.NODE_ENV = 'test';
     process.env.AUTH_IDENTITY_PROVIDER = 'clerk';
     process.env.CLERK_ISSUER = 'https://clerk.example.org';
@@ -184,7 +184,7 @@ describe('JwtStrategy local auth gating', () => {
         exp: Math.floor(Date.now() / 1000) + 3600,
         iat: Math.floor(Date.now() / 1000),
       }),
-    ).rejects.toThrow('Clerk token role is missing or unsupported');
+    ).resolves.toMatchObject({ role: 'user', organizationId: 'org_clerk_123' });
   });
 
   it('rejects Clerk tokens with invalid issuer, audience, or authorized party', async () => {

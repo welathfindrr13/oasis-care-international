@@ -1,10 +1,14 @@
 import { auth } from '@clerk/nextjs/server';
 import { getServerSession } from 'next-auth';
-
 import { authOptions } from '../../app/api/auth/[...nextauth]/authOptions';
-import { extractClerkRolesFromClaims } from './clerk';
+import {
+  AuthoritativeAccessSnapshot,
+  fetchAuthoritativeAccessSnapshot,
+  rolesFromAccessSnapshot,
+  unauthenticatedAccessSnapshot,
+  unavailableAccessSnapshot,
+} from './access-snapshot';
 import { resolveAuthMode, type AuthMode } from './mode';
-import { normalizeAppRoles } from './roles';
 
 export interface ServerAuthContext {
   authenticated: boolean;
@@ -13,34 +17,48 @@ export interface ServerAuthContext {
   organizationId: string | null;
   roles: string[];
   accessToken: string | null;
+  accessSnapshot: AuthoritativeAccessSnapshot;
 }
 
 export async function getServerAuthContext(): Promise<ServerAuthContext> {
   const authMode = resolveAuthMode(process.env);
-
   if (authMode === 'clerk') {
     const clerkAuth = auth();
-    const accessToken = clerkAuth.userId ? await clerkAuth.getToken() : null;
-
-    return {
-      authenticated: Boolean(clerkAuth.userId && accessToken),
-      authMode,
-      userId: clerkAuth.userId,
-      organizationId: clerkAuth.orgId || null,
-      roles: extractClerkRolesFromClaims(clerkAuth.sessionClaims as Record<string, any> | null),
-      accessToken,
-    };
+    let accessToken: string | null = null;
+    if (clerkAuth.userId) {
+      try {
+        accessToken = await clerkAuth.getToken();
+      } catch {
+        accessToken = null;
+      }
+    }
+    return buildContext(authMode, clerkAuth.userId, accessToken);
   }
 
   const session = await getServerSession(authOptions);
   const accessToken = (session as any)?.accessToken || (session as any)?.idToken || null;
+  const userId = (session as any)?.user?.id || (session as any)?.user?.email || null;
+  return buildContext(authMode, userId, accessToken);
+}
 
+async function buildContext(
+  authMode: AuthMode,
+  userId: string | null,
+  accessToken: string | null,
+): Promise<ServerAuthContext> {
+  const providerAuthenticated = Boolean(userId);
+  const accessSnapshot = !providerAuthenticated
+    ? unauthenticatedAccessSnapshot()
+    : accessToken
+      ? await fetchAuthoritativeAccessSnapshot(accessToken)
+      : unavailableAccessSnapshot();
   return {
-    authenticated: Boolean(session && accessToken),
+    authenticated: providerAuthenticated,
     authMode,
-    userId: (session as any)?.user?.id || (session as any)?.user?.email || null,
-    organizationId: (session as any)?.organizationId || null,
-    roles: normalizeAppRoles((session as any)?.roles ?? []),
+    userId,
+    organizationId: accessSnapshot.organizationId,
+    roles: rolesFromAccessSnapshot(accessSnapshot),
     accessToken,
+    accessSnapshot,
   };
 }

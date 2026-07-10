@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { useSession } from 'next-auth/react';
+import { useClientAccess } from '../../../../components/providers/ClientAccessProvider';
 import SummaryViewer from '../../../../components/HealthSummary/SummaryViewer';
 import ApprovalControls from '../../../../components/HealthSummary/ApprovalControls';
 import { Header } from '../../../../components/oasis/Header';
@@ -40,7 +40,7 @@ interface HealthSummary {
 export default function SummaryPage() {
   const params = useParams();
   const clientId = params.id as string;
-  const { data: session } = useSession();
+  const { roles } = useClientAccess();
   
   const [currentSummary, setCurrentSummary] = useState<HealthSummary | null>(null);
   const [aiEnabled, setAiEnabled] = useState<boolean | null>(null);
@@ -49,7 +49,7 @@ export default function SummaryPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isTogglingAi, setIsTogglingAi] = useState(false);
-  const userRole = ((session as any)?.roles?.[0] || 'carer').toLowerCase();
+  const userRole = String(roles[0] || '').toLowerCase();
   const canManageAi = userRole === 'admin' || userRole === 'manager';
 
   const loadCurrentSummary = useCallback(async () => {

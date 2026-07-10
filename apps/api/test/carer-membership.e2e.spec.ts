@@ -4,11 +4,13 @@ import { StartedTestContainer } from 'testcontainers';
 import { CarerAccessService } from '../src/carer/carer-access.service';
 import { CarerMembershipService } from '../src/carer/carer-membership.service';
 import { startPostgres } from './utils/test-container';
+import { AccessContextService } from '../src/auth/access-context.service';
 
 describe('Carer membership database integration', () => {
   let container: StartedTestContainer;
   let prisma: PrismaService;
   let accessService: CarerAccessService;
+  let canonicalAccessService: AccessContextService;
   let membershipService: CarerMembershipService;
 
   const organizationId = 'org-membership-e2e';
@@ -25,7 +27,8 @@ describe('Carer membership database integration', () => {
 
     prisma = new PrismaService();
     await prisma.$connect();
-    accessService = new CarerAccessService(prisma);
+    accessService = new CarerAccessService();
+    canonicalAccessService = new AccessContextService(prisma);
     membershipService = new CarerMembershipService(prisma);
   }, 180000);
 
@@ -89,9 +92,8 @@ describe('Carer membership database integration', () => {
       carer,
       membership,
       principal: {
-        organizationMembershipId: membership.id,
+        sub: subject,
         organizationId: membershipOrganizationId,
-        authSubject: subject,
       },
     };
   }
@@ -100,7 +102,8 @@ describe('Carer membership database integration', () => {
     const { carer, principal } = await createLinkedPrincipal();
 
     expect(carer.id).not.toBe(workerSubject);
-    await expect(accessService.requireCarerIdentity(principal)).resolves.toEqual({
+    const accessContext = await canonicalAccessService.resolve(principal);
+    await expect(accessService.requireCarerIdentity({ accessContext })).resolves.toEqual({
       carerId: carer.id,
       authSubject: workerSubject,
     });
@@ -116,7 +119,8 @@ describe('Carer membership database integration', () => {
   ])('fails closed for a real %s row', async (_label, overrides) => {
     const { principal } = await createLinkedPrincipal(overrides);
 
-    await expect(accessService.requireCarerIdentity(principal)).rejects.toEqual(
+    const accessContext = await canonicalAccessService.resolve(principal);
+    await expect(accessService.requireCarerIdentity({ accessContext })).rejects.toEqual(
       new ForbiddenException('Active carer membership link is required'),
     );
   });
@@ -125,10 +129,9 @@ describe('Carer membership database integration', () => {
     const { principal } = await createLinkedPrincipal();
 
     await expect(
-      accessService.requireCarerIdentity({
-        ...principal,
-        organizationId: otherOrganizationId,
-      }),
+      canonicalAccessService
+        .resolve({ ...principal, organizationId: otherOrganizationId })
+        .then((accessContext) => accessService.requireCarerIdentity({ accessContext })),
     ).rejects.toEqual(new ForbiddenException('Active carer membership link is required'));
   });
 
@@ -140,7 +143,8 @@ describe('Carer membership database integration', () => {
       subject: workerSubject,
     });
 
-    await expect(accessService.requireCarerIdentity(first.principal)).rejects.toEqual(
+    const accessContext = await canonicalAccessService.resolve(first.principal);
+    await expect(accessService.requireCarerIdentity({ accessContext })).rejects.toEqual(
       new ForbiddenException('Active carer membership link is required'),
     );
   });

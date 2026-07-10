@@ -24,8 +24,7 @@ import { GdprModule } from './gdpr/gdpr.module';
 import { AiSummaryModule } from './ai-summary/ai-summary.module';
 import { CarebridgeModule } from './carebridge/carebridge.module';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
-import { ApiRolesGuard } from './auth/api-roles.guard';
-import { GqlRolesGuard } from './auth/gql-roles.guard';
+import { AuthAccessModule } from './auth/auth-access.module';
 import { getGraphQLSecurityOptions } from './security/api-hardening';
 
 // FIX: ClsModule must come before LoggerModule (RequestIdMiddleware depends on ClsService)
@@ -44,6 +43,7 @@ import { getGraphQLSecurityOptions } from './security/api-hardening';
     LoggerModule,
     HealthModule,
     ConfigModule,
+    AuthAccessModule,
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: true,
@@ -76,8 +76,6 @@ import { getGraphQLSecurityOptions } from './security/api-hardening';
     JwtStrategy,
     PrismaService,
     AuditLogInterceptor,
-    ApiRolesGuard,
-    GqlRolesGuard,
   ],
 })
 export class AppModule {}

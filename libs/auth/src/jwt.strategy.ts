@@ -329,7 +329,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new Error('Clerk token is missing organization claim');
     }
 
-    JwtStrategy.resolveCanonicalRole(JwtStrategy.extractRawRoles(payload, 'clerk'), 'clerk');
   }
 
   private static extractOrganizationClaim(payload: JwtPayload, provider: string): string | null {
@@ -388,10 +387,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
     if (hasAny(['family', 'user', 'viewer', 'member', 'org:member', 'org:family', 'org:user', 'org:viewer'])) {
       return 'user';
-    }
-
-    if (provider === 'clerk') {
-      throw new Error('Clerk token role is missing or unsupported');
     }
 
     return 'user';

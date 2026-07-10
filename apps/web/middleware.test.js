@@ -17,7 +17,7 @@ test('Clerk middleware runs for authenticated API proxy routes', () => {
 test('logged-out users are redirected before protected route content can render', () => {
   assert.match(
     middlewareSource,
-    /callbacks:\s*\{\s*authorized:\s*\(\{ token \}\) => !!token,?\s*\}/,
+    /callbacks:\s*\{\s*authorized:\s*\(\{ token, req \}\) => isPublicRoute\(req as any\) \|\| !!token,?\s*\}/,
   )
   assert.match(middlewareSource, /pages:\s*\{\s*signIn:\s*'\/login',?\s*\}/)
 
@@ -27,7 +27,7 @@ test('logged-out users are redirected before protected route content can render'
   )
   const signedOutIndex = clerkBlock.indexOf('if (!authObject.userId)')
   const signInIndex = clerkBlock.indexOf('authObject.redirectToSignIn()')
-  const routeDecisionIndex = clerkBlock.indexOf('resolveAuthenticatedRoute')
+  const routeDecisionIndex = clerkBlock.indexOf('resolveAuthoritativeRoute')
   const renderIndex = clerkBlock.lastIndexOf('NextResponse.next()')
 
   assert.ok(signedOutIndex >= 0)
@@ -36,14 +36,29 @@ test('logged-out users are redirected before protected route content can render'
   assert.ok(renderIndex > routeDecisionIndex)
 })
 
+test('the self-authenticated access snapshot route bypasses workspace redirects', () => {
+  assert.match(middlewareSource, /'\/api\/access-context\(\.\*\)'/)
+
+  const nextAuthBlock = middlewareSource.slice(
+    middlewareSource.indexOf('const nextAuthMiddleware'),
+    middlewareSource.indexOf('const clerkAuthMiddleware'),
+  )
+  const publicRouteIndex = nextAuthBlock.indexOf('if (isPublicRoute(req))')
+  const routeDecisionIndex = nextAuthBlock.indexOf('resolveAuthoritativeRoute')
+
+  assert.ok(publicRouteIndex >= 0)
+  assert.ok(routeDecisionIndex > publicRouteIndex)
+})
+
 test('authenticated route decisions happen before Next.js renders protected content', () => {
   const nextAuthBlock = middlewareSource.slice(
     middlewareSource.indexOf('const nextAuthMiddleware'),
     middlewareSource.indexOf('const clerkAuthMiddleware'),
   )
-  const routeDecisionIndex = nextAuthBlock.indexOf('resolveAuthenticatedRoute')
-  const renderIndex = nextAuthBlock.indexOf('NextResponse.next()')
+  const routeDecisionIndex = nextAuthBlock.indexOf('resolveAuthoritativeRoute')
+  const applyIndex = nextAuthBlock.indexOf('return applyDecision')
 
   assert.ok(routeDecisionIndex >= 0)
-  assert.ok(renderIndex > routeDecisionIndex)
+  assert.ok(applyIndex >= 0)
+  assert.ok(routeDecisionIndex < applyIndex)
 })

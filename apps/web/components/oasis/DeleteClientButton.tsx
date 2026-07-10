@@ -2,19 +2,16 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useClientAccess } from '../providers/ClientAccessProvider'
 import { Button } from '../ui/Button'
 import { clientQuery } from '../../lib/graphql/client-side'
 import { DELETE_CLIENT_MUTATION } from '../../lib/graphql/queries'
 
 export function DeleteClientButton({ clientId, clientName }: { clientId: string; clientName: string }) {
   const router = useRouter()
-  const { data: session } = useSession()
+  const { isAdmin } = useClientAccess()
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const roles = Array.isArray((session as any)?.roles) ? (session as any).roles : []
-  const isAdmin = roles.some((r: any) => String(r).toLowerCase() === 'admin')
 
   if (!isAdmin) return null
 
@@ -50,4 +47,3 @@ export function DeleteClientButton({ clientId, clientName }: { clientId: string;
     </div>
   )
 }
-

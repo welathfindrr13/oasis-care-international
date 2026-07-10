@@ -9,6 +9,7 @@ function normalizeRawRoles(raw: unknown): string[] {
 
 export function normalizeAppRoles(raw: unknown): string[] {
   const normalizedRoles = normalizeRawRoles(raw);
+  if (normalizedRoles.length === 0) return [];
   const hasAdmin = normalizedRoles.includes('admin');
   const hasStaffRole = normalizedRoles.some((role) => STAFF_ROLES.has(role));
   const hasClient = normalizedRoles.includes('client');

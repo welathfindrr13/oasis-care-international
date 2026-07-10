@@ -9,11 +9,11 @@ import { cn } from '../../lib/utils'
 import { InstallAppPrompt } from '../pwa/InstallAppPrompt'
 import { resolveAuthMode } from '../../lib/auth/mode'
 import {
-  createClerkHeaderViewer,
-  createNextAuthHeaderViewer,
+  createHeaderViewer,
   getHeaderAccessLabel,
   type HeaderViewer,
 } from './headerIdentity'
+import { useClientAccess } from '../providers/ClientAccessProvider'
 
 const staffNavItems = [
   { href: '/today', label: 'Today', icon: '📊', aliases: ['/dashboard'] },
@@ -69,19 +69,16 @@ export function Header(props: HeaderProps) {
 
 function ClerkHeader({ className, notificationCount = 0 }: HeaderProps) {
   const pathname = usePathname()
-  const { isLoaded, isSignedIn, orgRole } = useAuth()
+  const { isLoaded } = useAuth()
   const { user } = useUser()
   const { signOut } = useClerk()
-  const viewer = createClerkHeaderViewer({
+  const access = useClientAccess()
+  const viewer = createHeaderViewer({
     pathname,
-    isLoaded,
-    isSignedIn,
+    status: isLoaded ? access.status : 'loading',
+    roles: access.roles,
     userName: user?.fullName,
     userEmail: user?.primaryEmailAddress?.emailAddress,
-    sessionClaims: {
-      org_role: orgRole,
-      public_metadata: user?.publicMetadata,
-    },
   })
 
   async function handleSignOut() {
@@ -102,10 +99,11 @@ function ClerkHeader({ className, notificationCount = 0 }: HeaderProps) {
 function NextAuthHeader({ className, notificationCount = 0 }: HeaderProps) {
   const pathname = usePathname()
   const { data: session, status } = useSession()
-  const viewer = createNextAuthHeaderViewer({
+  const access = useClientAccess()
+  const viewer = createHeaderViewer({
     pathname,
-    status,
-    roles: (session as any)?.roles ?? [],
+    status: status === 'loading' ? 'loading' : access.status,
+    roles: access.roles,
     userName: session?.user?.name,
     userEmail: session?.user?.email,
   })
@@ -141,7 +139,9 @@ function HeaderContent({
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const { accessContext, userName, userEmail, userInitial, isAdmin } = viewer
   const userRole = getHeaderAccessLabel(viewer)
-  const navItems = accessContext.isExternal
+  const navItems = accessContext.workspace === 'none'
+    ? []
+    : accessContext.isExternal
     ? familyNavItems
     : isAdmin
     ? [...staffNavItems, ...managementNavItems] as const

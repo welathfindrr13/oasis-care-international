@@ -14,6 +14,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ClsModule } from 'nestjs-cls';
 import { MockAuthGuard } from './auth.guard.mock';
+import { AuthAccessModule } from '../src/auth/auth-access.module';
 
 describe('Stats E2E Tests', () => {
   let app: INestApplication;
@@ -55,6 +56,7 @@ describe('Stats E2E Tests', () => {
           secret: getTestJwtSecret(),
           signOptions: { expiresIn: '1h' },
         }),
+        AuthAccessModule,
         StatsModule,
       ],
       providers: [

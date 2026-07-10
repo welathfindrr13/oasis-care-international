@@ -45,7 +45,7 @@ const visitsCreatedCounterProvider = {
   // Import Prometheus exactly once here
   imports: [PrometheusModule.register(), DbModule],
   controllers: [MetricsController],
-  providers: [ApiRolesGuard, visitOverlapCounterProvider, visitsCreatedCounterProvider],
+  providers: [visitOverlapCounterProvider, visitsCreatedCounterProvider],
   exports: [visitOverlapCounterProvider, visitsCreatedCounterProvider],
 })
 export class MetricsModule {}

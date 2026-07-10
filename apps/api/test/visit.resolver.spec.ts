@@ -5,6 +5,7 @@ import { VisitService } from '../src/visit/visit.service';
 import { CareLogCategory, PrismaService, VisitStatus } from '@oasis/db';
 import { VisitTaskOutcome } from '../src/visit/dto/visit.dto';
 import { CarerAccessService } from '../src/carer/carer-access.service';
+import { AccessContextService, CanonicalAccessContext } from '../src/auth/access-context.service';
 
 describe('VisitResolver', () => {
   let resolver: VisitResolver;
@@ -33,6 +34,20 @@ describe('VisitResolver', () => {
           roles: ['admin'],
         },
         preferred_username: 'test.user',
+        accessContext: {
+          authenticated: true,
+          authSubject: 'user-123',
+          identityProvider: 'cognito',
+          organizationId: 'org-123',
+          membershipId: 'membership-admin',
+          membershipState: 'ACTIVE',
+          rawRole: 'admin',
+          effectiveRole: 'admin',
+          surface: 'ADMIN',
+          linkedIdentityState: 'NOT_REQUIRED',
+          onboardingState: 'READY',
+          domainIdentityId: null,
+        } satisfies CanonicalAccessContext,
       },
     },
   };
@@ -48,6 +63,20 @@ describe('VisitResolver', () => {
           roles: ['carer'],
         },
         preferred_username: 'jane.doe',
+        accessContext: {
+          authenticated: true,
+          authSubject: 'carer-123',
+          identityProvider: 'cognito',
+          organizationId: 'org-123',
+          membershipId: 'membership-carer',
+          membershipState: 'ACTIVE',
+          rawRole: 'carer',
+          effectiveRole: 'carer',
+          surface: 'STAFF',
+          linkedIdentityState: 'LINKED',
+          onboardingState: 'READY',
+          domainIdentityId: 'domain-carer-123',
+        } satisfies CanonicalAccessContext,
       },
     },
   };
@@ -62,6 +91,20 @@ describe('VisitResolver', () => {
           roles: ['client'],
         },
         preferred_username: 'john.smith',
+        accessContext: {
+          authenticated: true,
+          authSubject: 'client-123',
+          identityProvider: 'cognito',
+          organizationId: 'org-123',
+          membershipId: 'membership-client',
+          membershipState: 'ACTIVE',
+          rawRole: 'client',
+          effectiveRole: 'family',
+          surface: 'FAMILY',
+          linkedIdentityState: 'LINKED',
+          onboardingState: 'READY',
+          domainIdentityId: 'family-contact-123',
+        } satisfies CanonicalAccessContext,
       },
     },
   };
@@ -166,6 +209,13 @@ describe('VisitResolver', () => {
         {
           provide: PrismaService,
           useValue: {},
+        },
+        {
+          provide: AccessContextService,
+          useValue: {
+            resolve: jest.fn(),
+            requirePermitted: jest.fn(),
+          },
         },
         {
           provide: CarerAccessService,

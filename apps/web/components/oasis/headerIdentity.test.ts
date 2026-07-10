@@ -1,22 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  createClerkHeaderViewer,
-  createNextAuthHeaderViewer,
-  getHeaderAccessLabel,
-} from './headerIdentity';
+import { createHeaderViewer, getHeaderAccessLabel } from './headerIdentity';
 
-test('createClerkHeaderViewer uses Clerk organization admin claims for staff header access', () => {
-  const viewer = createClerkHeaderViewer({
+test('canonical admin roles produce staff header access independently of the identity provider', () => {
+  const viewer = createHeaderViewer({
     pathname: '/today',
-    isLoaded: true,
-    isSignedIn: true,
+    status: 'authenticated',
+    roles: ['admin'],
     userName: 'Ada Admin',
     userEmail: 'ada@example.test',
-    sessionClaims: {
-      org_role: 'org:admin',
-    },
   });
 
   assert.equal(viewer.accessContext.isExternal, false);
@@ -25,31 +18,30 @@ test('createClerkHeaderViewer uses Clerk organization admin claims for staff hea
   assert.equal(viewer.userEmail, 'ada@example.test');
 });
 
-test('createClerkHeaderViewer uses explicit family metadata as family access', () => {
-  const viewer = createClerkHeaderViewer({
+test('canonical family roles produce family header access', () => {
+  const viewer = createHeaderViewer({
     pathname: '/family',
-    isLoaded: true,
-    isSignedIn: true,
+    status: 'authenticated',
+    roles: ['user'],
     userName: 'Family Viewer',
     userEmail: 'family@example.test',
-    sessionClaims: {
-      public_metadata: { role: 'family' },
-    },
   });
 
   assert.equal(viewer.accessContext.isExternal, true);
   assert.equal(getHeaderAccessLabel(viewer), 'FAMILY ACCESS');
 });
 
-test('createNextAuthHeaderViewer preserves the existing loading fallback', () => {
-  const viewer = createNextAuthHeaderViewer({
+test('provider loading exposes no stale role or workspace', () => {
+  const viewer = createHeaderViewer({
     pathname: '/today',
     status: 'loading',
-    roles: [],
+    roles: ['admin'],
     userName: '',
     userEmail: '',
   });
 
   assert.equal(viewer.accessContext.isExternal, false);
-  assert.equal(getHeaderAccessLabel(viewer), 'ADMIN');
+  assert.equal(viewer.accessContext.workspace, 'none');
+  assert.equal(viewer.isAdmin, false);
+  assert.equal(getHeaderAccessLabel(viewer), '');
 });
