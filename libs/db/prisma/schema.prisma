@@ -25,12 +25,14 @@ model Carer {
   shifts             CarerShift[]
   care_logs          CareLog[]
   approved_summaries HealthSummary[]
+  organization_memberships OrganizationMembership[] @relation("CarerOrganizationMemberships")
   organization       Organization    @relation(fields: [organization_id], references: [id])
   created_at         DateTime        @default(now())
   updated_at         DateTime        @updatedAt
   deleted_at         DateTime?
 
   @@index([organization_id])
+  @@unique([organization_id, id])
   @@map("carer")
 }
 
@@ -887,11 +889,14 @@ model OrganizationMembership {
   external_membership_id   String?                      @db.VarChar(191)
   metadata                 Json?
   revoked_at               DateTime?
+  carer_id                 String?
   organization             Organization                 @relation(fields: [organization_id], references: [id])
+  carer                    Carer?                        @relation("CarerOrganizationMemberships", fields: [organization_id, carer_id], references: [organization_id, id], onDelete: Restrict, onUpdate: Restrict)
   created_at               DateTime                     @default(now())
   updated_at               DateTime                     @updatedAt
 
   @@index([organization_id])
+  @@index([organization_id, carer_id])
   @@index([identity_provider, auth_subject])
   @@index([status])
   @@unique([identity_provider, auth_subject, organization_id])
