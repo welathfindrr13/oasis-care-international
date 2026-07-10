@@ -440,6 +440,15 @@ describe("Carer invitation lifecycle database integration", () => {
       external_cleanup_error_code: "CLERK_INVITATION_ALREADY_ACCEPTED",
       external_cleanup_completed_at: null,
     });
+    await expect(
+      invitations.invite("accepted-race@example.test", adminPrincipal()),
+    ).rejects.toThrow("manual access review");
+    await expect(
+      prisma.organizationMembershipInvitation.count(),
+    ).resolves.toBe(1);
+    await expect(prisma.organizationProvisioningOutbox.count()).resolves.toBe(
+      1,
+    );
   });
 
   it("does not create a replacement until old external cleanup succeeds", async () => {

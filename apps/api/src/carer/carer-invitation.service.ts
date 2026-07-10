@@ -119,7 +119,10 @@ export class CarerInvitationService {
                   identity_provider: this.identityProvider(),
                   normalized_email: email,
                   intended_role: "carer",
-                  activated_membership_id: { not: null },
+                  OR: [
+                    { activated_membership_id: { not: null } },
+                    { external_cleanup_required: true },
+                  ],
                 },
                 select: { id: true },
               });
