@@ -369,7 +369,7 @@ model CompanyAccessRequest {
   created_at                DateTime                   @default(now())
   updated_at                DateTime                   @updatedAt
   organization              Organization?              @relation(fields: [organization_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  membership_invitation     OrganizationMembershipInvitation?
+  membership_invitations    OrganizationMembershipInvitation[]
   provisioning_outbox       OrganizationProvisioningOutbox?
 
   @@index([status, requested_at])
@@ -949,6 +949,7 @@ model OrganizationMembership {
   @@index([organization_id, carer_id])
   @@index([identity_provider, auth_subject])
   @@index([status])
+  @@unique([identity_provider, external_membership_id], map: "organization_membership_provider_external_membership_key")
   @@unique([organization_id, id, identity_provider, auth_subject, normalized_email, role], map: "organization_membership_activation_identity_key")
   @@unique([identity_provider, auth_subject, organization_id])
   @@map("organization_membership")
@@ -957,7 +958,7 @@ model OrganizationMembership {
 model OrganizationMembershipInvitation {
   id                      String                                  @id @default(uuid())
   organization_id         String
-  source_request_id       String?                                 @unique(map: "organization_membership_invitation_source_request_id_key")
+  source_request_id       String?
   activated_membership_id String?                                 @unique(map: "organization_membership_invitation_activated_membership_id_key")
   identity_provider       String                                  @db.VarChar(50)
   intended_email          String                                  @db.VarChar(320)
@@ -981,7 +982,7 @@ model OrganizationMembershipInvitation {
   @@index([organization_id, status, created_at], map: "organization_membership_invitation_org_status_created_idx")
   @@index([status, expires_at])
   @@index([normalized_email])
-  @@unique([source_request_id, organization_id, normalized_email], map: "organization_membership_invitation_source_identity_key")
+  @@index([source_request_id, organization_id, normalized_email], map: "organization_membership_invitation_source_identity_idx")
   @@unique([identity_provider, external_invitation_id], map: "organization_membership_invitation_provider_external_id_key")
   @@map("organization_membership_invitation")
 }

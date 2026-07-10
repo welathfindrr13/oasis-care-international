@@ -18,6 +18,7 @@ const schemaPath = join(prismaDir, "schema.prisma");
 const migrationsUnderTest = [
   "20260710160000_onboarding_lifecycle_foundation",
   "20260710180000_company_request_bootstrap",
+  "20260710203000_verified_invitation_activation",
 ];
 const { PrismaClient } = generatedClient;
 
@@ -532,9 +533,7 @@ test(
            "accepted_at" = CURRENT_TIMESTAMP
      WHERE "id" = 'invite-main'
   `);
-    await expectPostgresError(
-      () =>
-        prisma.$executeRawUnsafe(`
+    await prisma.$executeRawUnsafe(`
       INSERT INTO "organization_membership_invitation" (
         "id", "organization_id", "source_request_id", "identity_provider",
         "intended_email", "normalized_email", "intended_role", "status",
@@ -544,9 +543,18 @@ test(
         'admin@example.test', 'admin@example.test', 'admin', 'PENDING',
         CURRENT_TIMESTAMP + INTERVAL '7 days', CURRENT_TIMESTAMP
       )
-    `),
-      "23505",
-    );
+    `);
+
+    const sourceInvitationStates = await prisma.$queryRawUnsafe(`
+      SELECT "status"::text AS "status"
+        FROM "organization_membership_invitation"
+       WHERE "source_request_id" = 'request-main'
+       ORDER BY "status"
+    `);
+    assert.deepEqual(sourceInvitationStates, [
+      { status: "ACCEPTED" },
+      { status: "PENDING" },
+    ]);
 
     const [accepted] = await prisma.$queryRawUnsafe(`
     SELECT invitation."status"::text AS "invitation_status",

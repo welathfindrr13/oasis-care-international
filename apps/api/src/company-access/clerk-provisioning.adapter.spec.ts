@@ -44,6 +44,7 @@ describe("ClerkProvisioningAdapter", () => {
         email_address: "admin@example.test",
         role: "org:admin",
         status: "pending",
+        public_metadata: { oasis_invitation_id: "invite-internal" },
         private_metadata: { oasis_invitation_id: "invite-internal" },
       }),
     ];
@@ -75,8 +76,10 @@ describe("ClerkProvisioningAdapter", () => {
     expect(invitationBody).toMatchObject({
       email_address: "admin@example.test",
       role: "org:admin",
-      redirect_url: "https://care.example.org/admin/setup",
+      redirect_url:
+        "https://care.example.org/accept-invitation?oasis_invitation_id=invite-internal",
       expires_in_days: 7,
+      public_metadata: { oasis_invitation_id: "invite-internal" },
       private_metadata: { oasis_invitation_id: "invite-internal" },
     });
     expect(invitationBody).not.toHaveProperty("inviter_user_id");
@@ -108,6 +111,7 @@ describe("ClerkProvisioningAdapter", () => {
             email_address: "admin@example.test",
             role: "org:admin",
             status: "pending",
+            public_metadata: { oasis_invitation_id: "invite-internal" },
             private_metadata: { oasis_invitation_id: "invite-internal" },
           },
         ],

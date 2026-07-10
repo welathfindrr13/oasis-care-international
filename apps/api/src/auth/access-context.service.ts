@@ -103,6 +103,14 @@ export class AccessContextService {
 
     const identityProvider = configuredIdentityProvider();
     const tokenOrganizationId = nonEmpty(identity?.organizationId);
+    if (identityProvider === "clerk" && !tokenOrganizationId) {
+      return denied(
+        authSubject,
+        identityProvider,
+        "ORGANIZATION_MISMATCH",
+        "BLOCKED",
+      );
+    }
     const memberships = (await (
       this.prisma as any
     ).organizationMembership.findMany({

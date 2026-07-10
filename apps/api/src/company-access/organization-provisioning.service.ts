@@ -56,68 +56,159 @@ export class OrganizationProvisioningService {
     sourceRequestId: string,
     operatorSubject: string,
   ): Promise<void> {
-    const shouldDeliver = await this.prisma.$transaction(async (tx) => {
-      const outbox = await tx.organizationProvisioningOutbox.findUnique({
-        where: { source_request_id: sourceRequestId },
-      });
-      if (!outbox) {
-        throw new ConflictException("Provisioning has not been initialized");
-      }
-      if (outbox.status === "DELIVERED") return false;
-      if (outbox.status === "PENDING") return true;
+    const shouldDeliver = await this.withSerializableRetry(() =>
+      this.prisma.$transaction(
+        async (tx) => {
+          const outbox =
+            await tx.organizationProvisioningOutbox.findUnique({
+              where: { source_request_id: sourceRequestId },
+              include: { invitation: true },
+            });
+          if (!outbox) {
+            throw new ConflictException(
+              "Provisioning has not been initialized",
+            );
+          }
+          const now = new Date();
+          if (
+            outbox.status === "PROCESSING" &&
+            (!outbox.lease_expires_at || outbox.lease_expires_at > now)
+          ) {
+            return false;
+          }
 
-      const now = new Date();
-      if (
-        outbox.status === "PROCESSING" &&
-        (!outbox.lease_expires_at || outbox.lease_expires_at > now)
-      ) {
-        throw new ConflictException("Provisioning is already in progress");
-      }
+          const invitation = outbox.invitation;
+          const needsReplacement =
+            outbox.status === "DELIVERED" &&
+            (invitation.status === "EXPIRED" ||
+              (invitation.status === "PENDING" &&
+                invitation.expires_at <= now));
+          if (needsReplacement) {
+            const expired =
+              await tx.organizationMembershipInvitation.updateMany({
+                where: {
+                  id: invitation.id,
+                  status: invitation.status,
+                  activated_membership_id: null,
+                },
+                data: {
+                  status: "EXPIRED",
+                  expired_at: invitation.expired_at || now,
+                },
+              });
+            if (expired.count !== 1) {
+              throw this.concurrentRequeueError();
+            }
 
-      const compareAndSet: Prisma.OrganizationProvisioningOutboxWhereInput = {
-        id: outbox.id,
-        status: outbox.status,
-      };
-      if (outbox.status === "PROCESSING") {
-        compareAndSet.lease_token = outbox.lease_token;
-        compareAndSet.lease_expires_at = { lte: now };
-      }
-      const transitioned = await tx.organizationProvisioningOutbox.updateMany({
-        where: compareAndSet,
-        data: {
-          status: "PENDING",
-          available_at: now,
-          lease_token: null,
-          lease_expires_at: null,
-          last_error_code: null,
-          delivered_at: null,
-        },
-      });
-      if (transitioned.count !== 1) {
-        const latest =
-          await tx.organizationProvisioningOutbox.findUniqueOrThrow({
-            where: { id: outbox.id },
+            const replacementId = randomUUID();
+            await tx.organizationMembershipInvitation.create({
+              data: {
+                id: replacementId,
+                organization_id: invitation.organization_id,
+                source_request_id: sourceRequestId,
+                identity_provider: invitation.identity_provider,
+                intended_email: invitation.intended_email,
+                normalized_email: invitation.normalized_email,
+                intended_role: invitation.intended_role,
+                created_by_subject: operatorSubject,
+                expires_at: new Date(
+                  now.getTime() + 7 * 24 * 60 * 60 * 1000,
+                ),
+              },
+            });
+            const repointed =
+              await tx.organizationProvisioningOutbox.updateMany({
+                where: {
+                  id: outbox.id,
+                  status: outbox.status,
+                  invitation_id: invitation.id,
+                },
+                data: {
+                  invitation_id: replacementId,
+                  status: "PENDING",
+                  available_at: now,
+                  lease_token: null,
+                  lease_expires_at: null,
+                  last_error_code: null,
+                  delivered_at: null,
+                },
+              });
+            if (repointed.count !== 1) {
+              throw this.concurrentRequeueError();
+            }
+            await tx.auditLog.createMany({
+              data: [
+                {
+                  user_id: operatorSubject,
+                  organization_id: outbox.organization_id,
+                  action: "ORG_MEMBERSHIP_INVITATION_EXPIRED",
+                  resource_type: "OrganizationMembershipInvitation",
+                  resource_id: invitation.id,
+                  old_values: { status: invitation.status },
+                  new_values: { status: "EXPIRED" },
+                },
+                {
+                  user_id: operatorSubject,
+                  organization_id: outbox.organization_id,
+                  action: "ORG_MEMBERSHIP_INVITATION_REISSUED",
+                  resource_type: "OrganizationMembershipInvitation",
+                  resource_id: replacementId,
+                  old_values: {},
+                  new_values: { status: "PENDING" },
+                },
+              ],
+            });
+            return true;
+          }
+
+          if (outbox.status === "DELIVERED") return false;
+          if (invitation.status !== "PENDING") {
+            throw new ConflictException("Invitation cannot be provisioned");
+          }
+          if (outbox.status === "PENDING") return true;
+
+          const compareAndSet: Prisma.OrganizationProvisioningOutboxWhereInput =
+            {
+              id: outbox.id,
+              status: outbox.status,
+              invitation_id: invitation.id,
+            };
+          if (outbox.status === "PROCESSING") {
+            compareAndSet.lease_token = outbox.lease_token;
+            compareAndSet.lease_expires_at = { lte: now };
+          }
+          const transitioned =
+            await tx.organizationProvisioningOutbox.updateMany({
+              where: compareAndSet,
+              data: {
+                status: "PENDING",
+                available_at: now,
+                lease_token: null,
+                lease_expires_at: null,
+                last_error_code: null,
+                delivered_at: null,
+              },
+            });
+          if (transitioned.count !== 1) {
+            throw this.concurrentRequeueError();
+          }
+
+          await tx.auditLog.create({
+            data: {
+              user_id: operatorSubject,
+              organization_id: outbox.organization_id,
+              action: "CLERK_PROVISIONING_REQUEUED",
+              resource_type: "OrganizationProvisioningOutbox",
+              resource_id: outbox.id,
+              old_values: { status: outbox.status },
+              new_values: { status: "PENDING" },
+            },
           });
-        if (latest.status === "DELIVERED") return false;
-        if (latest.status === "PENDING") return true;
-        throw new ConflictException(
-          "Provisioning state changed; refresh and retry",
-        );
-      }
-
-      await tx.auditLog.create({
-        data: {
-          user_id: operatorSubject,
-          organization_id: outbox.organization_id,
-          action: "CLERK_PROVISIONING_REQUEUED",
-          resource_type: "OrganizationProvisioningOutbox",
-          resource_id: outbox.id,
-          old_values: { status: outbox.status },
-          new_values: { status: "PENDING" },
+          return true;
         },
-      });
-      return true;
-    });
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      ),
+    );
 
     if (shouldDeliver) {
       await this.deliverForRequest(sourceRequestId);
@@ -202,10 +293,22 @@ export class OrganizationProvisioningService {
           external_slug: result.externalOrganizationSlug,
         },
       });
-      await tx.organizationMembershipInvitation.update({
-        where: { id: outbox.invitation_id },
-        data: { external_invitation_id: result.externalInvitationId },
+      const deliveredAt = new Date();
+      const invitation = await tx.organizationMembershipInvitation.updateMany({
+        where: { id: outbox.invitation_id, status: "PENDING" },
+        data: {
+          external_invitation_id: result.externalInvitationId,
+          expires_at: new Date(
+            deliveredAt.getTime() + 7 * 24 * 60 * 60 * 1000,
+          ),
+        },
       });
+      if (invitation.count !== 1) {
+        throw new ClerkProvisioningError(
+          "CLERK_INVITATION_STATE_CHANGED",
+          false,
+        );
+      }
       await tx.organizationProvisioningOutbox.update({
         where: { id: outbox.id },
         data: {
@@ -213,7 +316,7 @@ export class OrganizationProvisioningService {
           lease_token: null,
           lease_expires_at: null,
           last_error_code: null,
-          delivered_at: new Date(),
+          delivered_at: deliveredAt,
         },
       });
       await tx.auditLog.create({
@@ -286,5 +389,31 @@ export class OrganizationProvisioningService {
       return { code: "PROVISIONING_BINDING_CONFLICT", retryable: false };
     }
     return { code: "PROVISIONING_INTERNAL_ERROR", retryable: true };
+  }
+
+  private async withSerializableRetry<T>(
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await operation();
+      } catch (error) {
+        const code = (error as { code?: string })?.code;
+        if (!["P2002", "P2034"].includes(code || "") || attempt === 2) {
+          throw error;
+        }
+      }
+    }
+    throw new ConflictException("Provisioning state changed; retry");
+  }
+
+  private concurrentRequeueError(): Prisma.PrismaClientKnownRequestError {
+    return new Prisma.PrismaClientKnownRequestError(
+      "Concurrent invitation reissue",
+      {
+        code: "P2034",
+        clientVersion: Prisma.prismaVersion.client,
+      },
+    );
   }
 }

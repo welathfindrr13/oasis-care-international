@@ -27,6 +27,7 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
 import { AuthAccessModule } from './auth/auth-access.module';
 import { getGraphQLSecurityOptions } from './security/api-hardening';
 import { CompanyAccessModule } from './company-access/company-access.module';
+import { InvitationLifecycleModule } from './invitation-lifecycle/invitation-lifecycle.module';
 
 // FIX: ClsModule must come before LoggerModule (RequestIdMiddleware depends on ClsService)
 @Module({
@@ -71,6 +72,7 @@ import { CompanyAccessModule } from './company-access/company-access.module';
     AiSummaryModule,
     CarebridgeModule,
     CompanyAccessModule,
+    InvitationLifecycleModule,
     // GDPR module (feature-flagged)
     ...(process.env.GDPR_ENABLED === 'true' ? [GdprModule] : []),
   ],

@@ -208,33 +208,6 @@ describe("canonical viewer access snapshot", () => {
         }),
       "INACTIVE",
     ],
-    [
-      "multiple active",
-      async () =>
-        Promise.all([
-          prisma.organizationMembership.create({
-            data: {
-              organization_id: organizationId,
-              identity_provider: "cognito",
-              auth_subject: subject,
-              normalized_email: "multiple@example.test",
-              role: "admin",
-              status: "ACTIVE",
-            },
-          }),
-          prisma.organizationMembership.create({
-            data: {
-              organization_id: otherOrganizationId,
-              identity_provider: "cognito",
-              auth_subject: subject,
-              normalized_email: "multiple@example.test",
-              role: "admin",
-              status: "ACTIVE",
-            },
-          }),
-        ]),
-      "AMBIGUOUS",
-    ],
   ])(
     "returns a safe non-permitted snapshot for %s membership state",
     async (_label, seed, membershipState) => {
@@ -255,4 +228,30 @@ describe("canonical viewer access snapshot", () => {
       expect(JSON.stringify(response.body)).not.toContain("Prisma");
     },
   );
+
+  it("prevents one authenticated subject from gaining two active organizations", async () => {
+    await prisma.organizationMembership.create({
+      data: {
+        organization_id: organizationId,
+        identity_provider: "cognito",
+        auth_subject: subject,
+        normalized_email: "multiple@example.test",
+        role: "admin",
+        status: "ACTIVE",
+      },
+    });
+
+    await expect(
+      prisma.organizationMembership.create({
+        data: {
+          organization_id: otherOrganizationId,
+          identity_provider: "cognito",
+          auth_subject: subject,
+          normalized_email: "multiple@example.test",
+          role: "admin",
+          status: "ACTIVE",
+        },
+      }),
+    ).rejects.toMatchObject({ code: "P2002" });
+  });
 });

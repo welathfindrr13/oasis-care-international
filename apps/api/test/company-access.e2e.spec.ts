@@ -310,7 +310,7 @@ describe("company access bootstrap", () => {
     expect(invitation.external_invitation_id).toBe("orginv_external");
   });
 
-  it("keeps approved internal state retryable when Clerk fails, then delivers without duplicates", async () => {
+  it("reconciles an overdue non-delivered invitation without changing its identity", async () => {
     clerk.ensureBootstrap.mockRejectedValueOnce(
       new ClerkProvisioningError("CLERK_HTTP_503", true),
     );
@@ -329,6 +329,12 @@ describe("company access bootstrap", () => {
       provisioningErrorCode: "CLERK_HTTP_503",
     });
     expect(await prisma.organizationMembership.count()).toBe(0);
+    await prisma.organizationMembershipInvitation.updateMany({
+      data: {
+        created_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+        expires_at: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      },
+    });
 
     const retry = await platformGraphql(
       `mutation Retry($id: String!) {
@@ -347,6 +353,78 @@ describe("company access bootstrap", () => {
     expect(await prisma.organizationMembershipInvitation.count()).toBe(1);
     expect(await prisma.organizationProvisioningOutbox.count()).toBe(1);
     expect(await prisma.organizationMembership.count()).toBe(0);
+    expect(clerk.ensureBootstrap).toHaveBeenCalledTimes(2);
+    expect(
+      (
+        await prisma.organizationMembershipInvitation.findFirstOrThrow()
+      ).expires_at.getTime(),
+    ).toBeGreaterThan(Date.now() + 6 * 24 * 60 * 60 * 1000);
+  });
+
+  it("reissues one delivered invitation only after the prior invitation expires", async () => {
+    await submitCompany("expired-admin@example.test").expect(202);
+    const id = await pendingRequestId();
+    await platformGraphql(approvalMutation, { id }, { action: true }).expect(
+      200,
+    );
+    const original =
+      await prisma.organizationMembershipInvitation.findFirstOrThrow();
+    const now = Date.now();
+    await prisma.organizationMembershipInvitation.update({
+      where: { id: original.id },
+      data: {
+        created_at: new Date(now - 8 * 24 * 60 * 60 * 1000),
+        expires_at: new Date(now - 24 * 60 * 60 * 1000),
+      },
+    });
+    clerk.ensureBootstrap.mockResolvedValueOnce({
+      externalOrganizationId: "org_external",
+      externalOrganizationSlug: "oasis-external",
+      externalInvitationId: "orginv_reissued",
+    });
+
+    const retryMutation = `mutation Retry($id: String!) {
+      retryCompanyProvisioning(id: $id) { provisioningStatus provisioningErrorCode }
+    }`;
+    const retries = await Promise.all([
+      platformGraphql(retryMutation, { id }, { action: true }),
+      platformGraphql(retryMutation, { id }, { action: true }),
+    ]);
+    for (const retry of retries) {
+      expect(retry.status).toBe(200);
+      expect(retry.body.errors).toBeUndefined();
+    }
+    const invitations =
+      await prisma.organizationMembershipInvitation.findMany({
+        orderBy: { created_at: "asc" },
+      });
+    expect(invitations).toHaveLength(2);
+    expect(invitations[0]).toMatchObject({
+      id: original.id,
+      source_request_id: id,
+      status: "EXPIRED",
+      external_invitation_id: "orginv_external",
+    });
+    expect(invitations[1]).toMatchObject({
+      source_request_id: id,
+      status: "PENDING",
+      external_invitation_id: "orginv_reissued",
+    });
+    expect(invitations[1].expires_at.getTime()).toBeGreaterThan(
+      Date.now() + 6 * 24 * 60 * 60 * 1000,
+    );
+    expect(
+      await prisma.auditLog.count({
+        where: {
+          action: {
+            in: [
+              "ORG_MEMBERSHIP_INVITATION_EXPIRED",
+              "ORG_MEMBERSHIP_INVITATION_REISSUED",
+            ],
+          },
+        },
+      }),
+    ).toBe(2);
     expect(clerk.ensureBootstrap).toHaveBeenCalledTimes(2);
   });
 
