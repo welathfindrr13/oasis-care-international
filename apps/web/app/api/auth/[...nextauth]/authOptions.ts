@@ -3,22 +3,6 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import Cognito from 'next-auth/providers/cognito';
 import { createLocalSessionUser } from '../../../../lib/auth/local-auth.server';
 import { isLocalAuthEnabled, resolveAuthMode } from '../../../../lib/auth/mode';
-import { extractRolesFromClaims, normalizeAppRoles } from '../../../../lib/auth/roles';
-
-function decodeJwtPayload(tokenValue: unknown): Record<string, any> | null {
-  if (typeof tokenValue !== 'string' || tokenValue.split('.').length < 2) {
-    return null;
-  }
-
-  try {
-    const payload = tokenValue.split('.')[1];
-    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const decoded = Buffer.from(normalized, 'base64').toString('utf8');
-    return JSON.parse(decoded);
-  } catch {
-    return null;
-  }
-}
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -109,13 +93,12 @@ export const authOptions: NextAuthOptions = {
     maxAge: 8 * 60 * 60, // 8 hours
   },
   callbacks: {
-    async jwt({ token, account, profile, user }) {
+    async jwt({ token, account, user }) {
       if (account?.provider === 'oasis-local' && user) {
         token.accessToken = (user as any).accessToken;
         token.idToken = (user as any).idToken;
         token.refreshToken = null;
         token.expiresAt = Math.floor(Date.now() / 1000) + 8 * 60 * 60;
-        token.roles = normalizeAppRoles((user as any).roles ?? (user as any).role);
         token.authMode = 'local';
         return token;
       }
@@ -129,23 +112,12 @@ export const authOptions: NextAuthOptions = {
         token.authMode = authMode;
       }
 
-      // Keep roles synced from token claims (not only initial profile payload).
-      const claimsFromAccessToken = decodeJwtPayload(token.accessToken);
-      const groupsFromAccessToken = extractRolesFromClaims(claimsFromAccessToken);
-      if (groupsFromAccessToken.length > 0) {
-        token.roles = groupsFromAccessToken;
-      } else {
-        const profileRoles = normalizeAppRoles((profile as any)?.['cognito:groups']);
-        token.roles = profileRoles.length > 0 ? profileRoles : normalizeAppRoles(token.roles);
-      }
-      
       return token;
     },
     async session({ session, token }) {
       // Expose access token to the client session
       (session as any).accessToken = token.accessToken;
       (session as any).idToken = token.idToken;
-      (session as any).roles = token.roles ?? [];
       (session as any).authMode = token.authMode ?? authMode;
       return session;
     },

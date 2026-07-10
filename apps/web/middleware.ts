@@ -2,13 +2,9 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import type { NextFetchEvent, NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { withAuth } from 'next-auth/middleware'
-import { resolveAuthenticatedRoute } from './lib/auth/access'
-import { extractClerkRolesFromClaims } from './lib/auth/clerk'
+import { resolveAuthoritativeRoute } from './lib/auth/access'
+import { fetchAuthoritativeAccessSnapshot, unavailableAccessSnapshot } from './lib/auth/access-snapshot'
 import { resolveAuthMode } from './lib/auth/mode'
-
-function getTokenRoles(token: Record<string, any> | null | undefined): unknown {
-  return token?.roles ?? token?.['cognito:groups'] ?? token?.realm_access?.roles
-}
 
 const isPublicRoute = createRouteMatcher([
   '/',
@@ -19,72 +15,58 @@ const isPublicRoute = createRouteMatcher([
   '/api/auth(.*)',
   '/api/health(.*)',
   '/api/graphql(.*)',
+  '/api/access-context(.*)',
   '/api/evidence-packs(.*)',
 ])
-
 const nextAuthMiddleware = withAuth(
-  function middleware(req) {
-    const path = req.nextUrl.pathname
+  async function middleware(req) {
+    if (isPublicRoute(req)) return NextResponse.next()
     const token = req.nextauth.token as Record<string, any> | null
-    const decision = resolveAuthenticatedRoute(path, getTokenRoles(token))
-
-    if (decision.action === 'redirect') {
-      return NextResponse.redirect(new URL(decision.destination, req.url))
-    }
-
-    return NextResponse.next()
+    const accessToken = String(token?.accessToken || token?.idToken || '')
+    const snapshot = accessToken
+      ? await fetchAuthoritativeAccessSnapshot(accessToken)
+      : unavailableAccessSnapshot()
+    const decision = resolveAuthoritativeRoute(req.nextUrl.pathname, snapshot)
+    return applyDecision(req, decision)
   },
   {
-    callbacks: {
-      authorized: ({ token }) => !!token,
-    },
-    pages: {
-      signIn: '/login',
-    },
+    callbacks: { authorized: ({ token, req }) => isPublicRoute(req as any) || !!token },
+    pages: { signIn: '/login' },
   },
 )
 
-const clerkAuthMiddleware = clerkMiddleware((auth, req) => {
-  if (isPublicRoute(req)) {
-    return NextResponse.next()
-  }
-
+const clerkAuthMiddleware = clerkMiddleware(async (auth, req) => {
+  if (isPublicRoute(req)) return NextResponse.next()
   const authObject = auth()
-  if (!authObject.userId) {
-    return authObject.redirectToSignIn()
+  if (!authObject.userId) return authObject.redirectToSignIn()
+  let accessToken: string | null = null
+  try {
+    accessToken = await authObject.getToken()
+  } catch {
+    accessToken = null
   }
-
-  const claims = (authObject as any).sessionClaims ?? null
-  const decision = resolveAuthenticatedRoute(req.nextUrl.pathname, extractClerkRolesFromClaims(claims))
-
-  if (decision.action === 'redirect') {
-    return NextResponse.redirect(new URL(decision.destination, req.url))
-  }
-
-  return NextResponse.next()
+  const snapshot = accessToken
+    ? await fetchAuthoritativeAccessSnapshot(accessToken)
+    : unavailableAccessSnapshot()
+  const decision = resolveAuthoritativeRoute(req.nextUrl.pathname, snapshot)
+  return applyDecision(req, decision)
 })
 
-export default function middleware(req: NextRequest, event: NextFetchEvent) {
-  if (resolveAuthMode(process.env) === 'clerk') {
-    return clerkAuthMiddleware(req, event)
+function applyDecision(req: NextRequest, decision: ReturnType<typeof resolveAuthoritativeRoute>) {
+  if (decision.action === 'redirect' && decision.destination !== req.nextUrl.pathname) {
+    return NextResponse.redirect(new URL(decision.destination, req.url))
   }
+  return NextResponse.next()
+}
 
-  return nextAuthMiddleware(req as any, event as any)
+export default function middleware(req: NextRequest, event: NextFetchEvent) {
+  return resolveAuthMode(process.env) === 'clerk'
+    ? clerkAuthMiddleware(req, event)
+    : nextAuthMiddleware(req as any, event as any)
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - api/auth (NextAuth routes)
-     * - api/health (health check)
-     * - login (login page)
-     * - _next/static (static files)
-     * - _next/image (image optimization)
-     * - favicon.ico
-     * - PWA files (manifest and service worker)
-     * - public assets
-     */
     "/((?!$|api/auth|api/health|login|offline|manifest\\.webmanifest|sw\\.js|_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.svg$).*)",
   ],
 }

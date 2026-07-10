@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
+import { useClientAccess } from '../../components/providers/ClientAccessProvider';
 import { Header } from '../../components/oasis/Header';
 import { Button } from '../../components/ui/Button';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
@@ -49,16 +49,7 @@ function formatDuration(clockInAt: string, clockOutAt?: string | null): string {
 }
 
 export default function ShiftPage() {
-  const { data: session } = useSession();
-  const role = useMemo(() => {
-    const roles = Array.isArray((session as any)?.roles)
-      ? (session as any).roles.map((r: unknown) => String(r).toLowerCase().trim())
-      : [];
-    return roles[0] || 'user';
-  }, [session]);
-
-  const isCarer = role === 'carer';
-  const isAdmin = role === 'admin';
+  const { isCarer, isAdmin } = useClientAccess();
 
   const [activeShift, setActiveShift] = useState<CarerShift | null>(null);
   const [recentShifts, setRecentShifts] = useState<CarerShift[]>([]);

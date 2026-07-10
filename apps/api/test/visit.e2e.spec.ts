@@ -35,6 +35,7 @@ import { ShiftRepository } from '../src/shift/shift.repository';
 import { MedicationResolver } from '../src/medication/medication.resolver';
 import { MedicationService } from '../src/medication/medication.service';
 import { MedicationRepository } from '../src/medication/medication.repository';
+import { AuthAccessModule } from '../src/auth/auth-access.module';
 
 describe('Visit E2E Tests', () => {
   let app: INestApplication;
@@ -97,6 +98,7 @@ describe('Visit E2E Tests', () => {
           secret: getTestJwtSecret(),
           signOptions: { expiresIn: '1h' },
         }),
+        AuthAccessModule,
       ],
       providers: [
         JwtStrategy,
@@ -307,7 +309,7 @@ describe('Visit E2E Tests', () => {
         .expect(200);
 
       expect(response.body.errors).toBeDefined();
-      expect(response.body.errors[0].message).toContain('Forbidden');
+      expect(response.body.errors[0].message).toBe('Access is unavailable for this account');
     });
 
     it('should prevent client from creating visits', async () => {
@@ -334,7 +336,7 @@ describe('Visit E2E Tests', () => {
         .expect(200);
 
       expect(response.body.errors).toBeDefined();
-      expect(response.body.errors[0].message).toContain('Forbidden');
+      expect(response.body.errors[0].message).toBe('Access is unavailable for this account');
     });
   });
 
@@ -795,9 +797,7 @@ describe('Visit E2E Tests', () => {
         .expect(200);
 
       expect(response.body.data.myActiveShift).toBeNull();
-      expect(response.body.errors?.[0]?.message).toBe(
-        'Active organization membership is required for tenant-scoped access',
-      );
+      expect(response.body.errors?.[0]?.message).toBe('Access is unavailable for this account');
     });
   });
 

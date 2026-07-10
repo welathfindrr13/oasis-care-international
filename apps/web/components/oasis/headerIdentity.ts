@@ -1,5 +1,4 @@
 import { getAccessContext, type AccessContext } from '../../lib/auth/access';
-import { extractClerkRolesFromClaims } from '../../lib/auth/clerk';
 import { normalizeAppRoles } from '../../lib/auth/roles';
 
 type HeaderAuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
@@ -21,15 +20,6 @@ interface HeaderViewerInput {
   roles: unknown;
   userName?: string | null;
   userEmail?: string | null;
-}
-
-interface ClerkHeaderViewerInput {
-  pathname: string;
-  isLoaded: boolean;
-  isSignedIn?: boolean;
-  userName?: string | null;
-  userEmail?: string | null;
-  sessionClaims?: Record<string, any> | null;
 }
 
 export function formatHeaderRoleLabel(role: string): string {
@@ -54,14 +44,6 @@ export function formatHeaderRoleLabel(role: string): string {
   }
 }
 
-function loadingFallbackRoles(pathname: string, status: HeaderAuthStatus, roles: string[]): string[] {
-  if (status !== 'loading' || roles.length > 0) {
-    return roles;
-  }
-
-  return pathname.startsWith('/family') ? ['user'] : ['admin'];
-}
-
 function hasRawRoles(roles: unknown): boolean {
   if (Array.isArray(roles)) return roles.length > 0;
   return typeof roles === 'string' && roles.trim().length > 0;
@@ -75,7 +57,7 @@ export function createHeaderViewer({
   userEmail,
 }: HeaderViewerInput): HeaderViewer {
   const normalizedRoles = hasRawRoles(roles) ? normalizeAppRoles(roles) : [];
-  const effectiveRoles = loadingFallbackRoles(pathname, status, normalizedRoles);
+  const effectiveRoles = status === 'authenticated' ? normalizedRoles : [];
   const accessContext = getAccessContext(effectiveRoles);
   const primaryRole = effectiveRoles[0];
   const email = userEmail || '';
@@ -92,29 +74,6 @@ export function createHeaderViewer({
     isAdmin: effectiveRoles.includes('admin'),
     status,
   };
-}
-
-export function createNextAuthHeaderViewer(input: HeaderViewerInput): HeaderViewer {
-  return createHeaderViewer(input);
-}
-
-export function createClerkHeaderViewer({
-  pathname,
-  isLoaded,
-  isSignedIn,
-  userName,
-  userEmail,
-  sessionClaims,
-}: ClerkHeaderViewerInput): HeaderViewer {
-  const status: HeaderAuthStatus = !isLoaded ? 'loading' : isSignedIn ? 'authenticated' : 'unauthenticated';
-
-  return createHeaderViewer({
-    pathname,
-    status,
-    roles: isLoaded ? extractClerkRolesFromClaims(sessionClaims) : [],
-    userName,
-    userEmail,
-  });
 }
 
 export function getHeaderAccessLabel(viewer: HeaderViewer): string {

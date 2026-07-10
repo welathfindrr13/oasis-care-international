@@ -16,9 +16,7 @@ export function AppAuthProviders({ children }: Props) {
   if (resolveAuthMode(process.env) === 'clerk') {
     return (
       <ClerkProvider>
-        <SessionProvider>
-          <ClerkClientAccessProvider>{children}</ClerkClientAccessProvider>
-        </SessionProvider>
+        <ClerkClientAccessProvider>{children}</ClerkClientAccessProvider>
       </ClerkProvider>
     );
   }

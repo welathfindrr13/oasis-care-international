@@ -10,7 +10,7 @@ import { isLocalAuthEnabled, resolveAuthMode } from '../../lib/auth/mode';
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/today';
+  const callbackUrl = searchParams.get('callbackUrl') || '/access';
   const error = searchParams.get('error');
   const localAuthEnabled = isLocalAuthEnabled({
     NODE_ENV: process.env.NODE_ENV,

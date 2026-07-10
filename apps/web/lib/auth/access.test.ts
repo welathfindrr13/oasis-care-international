@@ -3,9 +3,62 @@ import assert from 'node:assert/strict'
 
 import {
   getAccessContext,
+  resolveAuthoritativeRoute,
   resolveAuthenticatedRoute,
   resolveProtectedRoute,
 } from './access'
+import { AuthoritativeAccessSnapshot } from './access-snapshot'
+
+const ready = (surface: 'ADMIN' | 'STAFF' | 'FAMILY'): AuthoritativeAccessSnapshot => ({
+  authenticated: true,
+  organizationId: 'org-1',
+  effectiveRole: surface === 'ADMIN' ? 'admin' : surface === 'STAFF' ? 'carer' : 'family',
+  membershipState: 'ACTIVE',
+  surface,
+  linkedIdentityState: surface === 'ADMIN' ? 'NOT_REQUIRED' : 'LINKED',
+  onboardingState: 'READY',
+  resolution: 'READY',
+})
+
+test('unknown roles never become family or admin access', () => {
+  const context = getAccessContext([])
+  assert.equal(context.workspace, 'none')
+  assert.equal(context.isExternal, false)
+  assert.equal(context.isAdmin, false)
+})
+
+test('canonical snapshot routes admin, carer and family surfaces', () => {
+  assert.deepEqual(resolveAuthoritativeRoute('/access', ready('ADMIN')), { action: 'redirect', destination: '/today' })
+  assert.deepEqual(resolveAuthoritativeRoute('/management', ready('STAFF')), { action: 'redirect', destination: '/today' })
+  assert.deepEqual(resolveAuthoritativeRoute('/today', ready('FAMILY')), { action: 'redirect', destination: '/family' })
+})
+
+test('ready access redirects stale denial-state URLs back to the canonical workspace', () => {
+  assert.deepEqual(resolveAuthoritativeRoute('/access/disabled', ready('ADMIN')), {
+    action: 'redirect', destination: '/today',
+  })
+  assert.deepEqual(resolveAuthoritativeRoute('/access/no-membership', ready('FAMILY')), {
+    action: 'redirect', destination: '/family',
+  })
+})
+
+test('canonical denied states have explicit provider-neutral routes', () => {
+  const base: AuthoritativeAccessSnapshot = {
+    ...ready('ADMIN'),
+    effectiveRole: null,
+    surface: 'NONE',
+    resolution: 'DENIED',
+  }
+  assert.deepEqual(resolveAuthoritativeRoute('/today', { ...base, membershipState: 'MISSING', onboardingState: 'NOT_STARTED' }), {
+    action: 'redirect', destination: '/access/no-membership',
+  })
+  assert.deepEqual(resolveAuthoritativeRoute('/today', { ...base, membershipState: 'INACTIVE', onboardingState: 'BLOCKED' }), {
+    action: 'redirect', destination: '/access/disabled',
+  })
+  assert.deepEqual(resolveAuthoritativeRoute('/today', { ...base, membershipState: 'ACTIVE', onboardingState: 'PENDING_INVITATION' }), {
+    action: 'redirect', destination: '/access/pending',
+  })
+})
 
 test('treats generic authenticated users as external family users', () => {
   const context = getAccessContext(['user'])

@@ -9,11 +9,25 @@ const MEMBERSHIP_ID = '44444444-4444-4444-8444-444444444444';
 const VISIT_ID = '55555555-5555-4555-8555-555555555555';
 const UNASSIGNED_VISIT_ID = '55555555-5555-4555-8555-666666666666';
 const TASK_ID = '66666666-6666-4666-8666-666666666666';
-const subject = `local-${crypto
-  .createHash('sha256')
-  .update('carer:carer@local.dev:auto')
-  .digest('hex')
-  .slice(0, 16)}`;
+const ADMIN_MEMBERSHIP_ID = '77777777-7777-4777-8777-777777777777';
+const FAMILY_MEMBERSHIP_ID = '88888888-8888-4888-8888-888888888888';
+const FAMILY_CONTACT_ID = '99999999-9999-4999-8999-999999999999';
+const CARE_ROOM_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const CARE_ROOM_MEMBERSHIP_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+function localSubject(role, email) {
+  return `local-${crypto
+    .createHash('sha256')
+    .update(`${role}:${email}:auto`)
+    .digest('hex')
+    .slice(0, 16)}`;
+}
+
+// The provider claims deliberately conflict with the database roles in the
+// browser journey. Authorization must follow these server-side memberships.
+const carerSubject = localSubject('admin', 'carer@local.dev');
+const adminSubject = localSubject('user', 'admin@local.dev');
+const familySubject = localSubject('user', 'family@local.dev');
 
 const prisma = new PrismaClient();
 const scheduledStart = new Date(Date.now() + 60 * 60 * 1000);
@@ -23,6 +37,12 @@ try {
   await prisma.auditLog.deleteMany({ where: { organization_id: ORGANIZATION_ID } });
   await prisma.carerShift.deleteMany({ where: { organization_id: ORGANIZATION_ID } });
   await prisma.careLog.deleteMany({ where: { organization_id: ORGANIZATION_ID } });
+  await prisma.accessGrant.deleteMany({
+    where: { care_room_membership: { care_room: { organization_id: ORGANIZATION_ID } } },
+  });
+  await prisma.careRoomMembership.deleteMany({ where: { care_room: { organization_id: ORGANIZATION_ID } } });
+  await prisma.careRoom.deleteMany({ where: { organization_id: ORGANIZATION_ID } });
+  await prisma.familyContact.deleteMany({ where: { organization_id: ORGANIZATION_ID } });
   await prisma.visitTask.deleteMany({ where: { visit: { organization_id: ORGANIZATION_ID } } });
   await prisma.visit.deleteMany({ where: { organization_id: ORGANIZATION_ID } });
   await prisma.organizationMembership.deleteMany({ where: { organization_id: ORGANIZATION_ID } });
@@ -70,11 +90,65 @@ try {
       id: MEMBERSHIP_ID,
       organization_id: ORGANIZATION_ID,
       identity_provider: 'cognito',
-      auth_subject: subject,
+      auth_subject: carerSubject,
       normalized_email: 'carer@local.dev',
       role: 'carer',
       status: 'ACTIVE',
       carer_id: CARER_ID,
+    },
+  });
+  await prisma.organizationMembership.createMany({
+    data: [
+      {
+        id: ADMIN_MEMBERSHIP_ID,
+        organization_id: ORGANIZATION_ID,
+        identity_provider: 'cognito',
+        auth_subject: adminSubject,
+        normalized_email: 'admin@local.dev',
+        role: 'admin',
+        status: 'ACTIVE',
+      },
+      {
+        id: FAMILY_MEMBERSHIP_ID,
+        organization_id: ORGANIZATION_ID,
+        identity_provider: 'cognito',
+        auth_subject: familySubject,
+        normalized_email: 'family@local.dev',
+        role: 'family',
+        status: 'ACTIVE',
+      },
+    ],
+  });
+  await prisma.familyContact.create({
+    data: {
+      id: FAMILY_CONTACT_ID,
+      organization_id: ORGANIZATION_ID,
+      auth_subject: familySubject,
+      email: 'family@local.dev',
+      full_name: 'Browser Family',
+      relationship: 'Daughter',
+    },
+  });
+  await prisma.careRoom.create({
+    data: {
+      id: CARE_ROOM_ID,
+      organization_id: ORGANIZATION_ID,
+      client_id: CLIENT_ID,
+      status: 'ACTIVE',
+    },
+  });
+  await prisma.careRoomMembership.create({
+    data: {
+      id: CARE_ROOM_MEMBERSHIP_ID,
+      care_room_id: CARE_ROOM_ID,
+      family_contact_id: FAMILY_CONTACT_ID,
+      role: 'FAMILY_VIEWER',
+      status: 'ACTIVE',
+      access_basis: 'CLIENT_CONSENT',
+      accepted_at: new Date(),
+      access_grants: {
+        create: [{ scope: 'VIEW_UPDATES' }, { scope: 'VIEW_VISIT_TIMES' }],
+      },
     },
   });
   await prisma.visit.create({

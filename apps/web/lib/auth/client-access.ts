@@ -1,6 +1,10 @@
-import { getAccessContext, type AccessContext } from './access';
-import { extractClerkRolesFromClaims } from './clerk';
-import { normalizeAppRoles } from './roles';
+import { getAccessContextFromSnapshot, type AccessContext } from './access';
+import {
+  AuthoritativeAccessSnapshot,
+  rolesFromAccessSnapshot,
+  unauthenticatedAccessSnapshot,
+  unavailableAccessSnapshot,
+} from './access-snapshot';
 
 export type ClientAuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -8,62 +12,45 @@ export interface ClientAccessSnapshot {
   status: ClientAuthStatus;
   authenticated: boolean;
   roles: string[];
+  authoritativeSnapshot: AuthoritativeAccessSnapshot;
   accessContext: AccessContext;
   isAdmin: boolean;
   isCarer: boolean;
   isStaff: boolean;
 }
 
-interface ClerkClientAccessInput {
-  isLoaded: boolean;
-  isSignedIn?: boolean;
-  sessionClaims?: Record<string, any> | null;
-}
-
-interface NextAuthClientAccessInput {
-  status: ClientAuthStatus;
-  roles: unknown;
-}
-
 export function createClientAccessSnapshot(
   status: ClientAuthStatus,
-  rawRoles: unknown,
+  authoritativeSnapshot?: AuthoritativeAccessSnapshot | null,
 ): ClientAccessSnapshot {
-  const authenticated = status === 'authenticated';
-  const roles = authenticated ? normalizeAppRoles(rawRoles) : [];
-  const accessContext = getAccessContext(roles);
-
+  const snapshot =
+    status === 'unauthenticated'
+      ? unauthenticatedAccessSnapshot()
+      : authoritativeSnapshot || unavailableAccessSnapshot();
+  const resolvedStatus = status === 'loading' ? 'loading' : status;
+  const roles = resolvedStatus === 'authenticated' ? rolesFromAccessSnapshot(snapshot) : [];
+  const accessContext = getAccessContextFromSnapshot(
+    resolvedStatus === 'authenticated' ? snapshot : unauthenticatedAccessSnapshot(),
+  );
   return {
-    status,
-    authenticated,
+    status: resolvedStatus,
+    authenticated: resolvedStatus === 'authenticated' && snapshot.resolution === 'READY',
     roles,
+    authoritativeSnapshot: snapshot,
     accessContext,
-    isAdmin: authenticated && accessContext.isAdmin,
-    isCarer: authenticated && roles.includes('carer'),
-    isStaff: authenticated && accessContext.isStaff,
+    isAdmin: resolvedStatus === 'authenticated' && snapshot.surface === 'ADMIN' && snapshot.resolution === 'READY',
+    isCarer:
+      resolvedStatus === 'authenticated' &&
+      snapshot.surface === 'STAFF' &&
+      snapshot.effectiveRole === 'carer' &&
+      snapshot.resolution === 'READY',
+    isStaff:
+      resolvedStatus === 'authenticated' &&
+      ['ADMIN', 'STAFF'].includes(snapshot.surface) &&
+      snapshot.resolution === 'READY',
   };
 }
 
-export function createClerkClientAccessSnapshot({
-  isLoaded,
-  isSignedIn,
-  sessionClaims,
-}: ClerkClientAccessInput): ClientAccessSnapshot {
-  const status: ClientAuthStatus = !isLoaded
-    ? 'loading'
-    : isSignedIn
-      ? 'authenticated'
-      : 'unauthenticated';
-  const roles = status === 'authenticated'
-    ? extractClerkRolesFromClaims(sessionClaims)
-    : [];
-
-  return createClientAccessSnapshot(status, roles);
-}
-
-export function createNextAuthClientAccessSnapshot({
-  status,
-  roles,
-}: NextAuthClientAccessInput): ClientAccessSnapshot {
-  return createClientAccessSnapshot(status, roles);
+export function loadingClientAccessSnapshot(): ClientAccessSnapshot {
+  return createClientAccessSnapshot('loading', unavailableAccessSnapshot());
 }
