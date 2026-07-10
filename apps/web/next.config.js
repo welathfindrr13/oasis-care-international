@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
+const path = require('node:path')
+
 const isDevelopment = process.env.NODE_ENV === 'development'
+const useBrowserClerkStub =
+  isDevelopment && process.env.OASIS_BROWSER_CLERK_STUB === 'true'
 
 const unique = (values) => Array.from(new Set(values.filter(Boolean)))
 
@@ -69,6 +73,15 @@ const nextConfig = {
   poweredByHeader: false,
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
+  },
+  webpack(config) {
+    if (useBrowserClerkStub) {
+      config.resolve.alias['@clerk/nextjs$'] = path.resolve(
+        __dirname,
+        'lib/auth/clerk-browser-test-stub.tsx',
+      )
+    }
+    return config
   },
   async headers() {
     return [

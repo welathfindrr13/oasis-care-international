@@ -938,6 +938,9 @@ model OrganizationMembership {
   external_membership_id   String?                      @db.VarChar(191)
   metadata                 Json?
   revoked_at               DateTime?
+  external_cleanup_required     Boolean @default(false)
+  external_cleanup_error_code   String? @db.VarChar(100)
+  external_cleanup_completed_at DateTime?
   carer_id                 String?
   organization             Organization                 @relation(fields: [organization_id], references: [id])
   carer                    Carer?                        @relation("CarerOrganizationMemberships", fields: [organization_id, carer_id], references: [organization_id, id], onDelete: Restrict, onUpdate: Restrict)
@@ -972,6 +975,9 @@ model OrganizationMembershipInvitation {
   accepted_at             DateTime?
   expired_at              DateTime?
   revoked_at              DateTime?
+  external_cleanup_required     Boolean @default(false)
+  external_cleanup_error_code   String? @db.VarChar(100)
+  external_cleanup_completed_at DateTime?
   created_at              DateTime                                @default(now())
   updated_at              DateTime                                @updatedAt
   organization            Organization                            @relation(fields: [organization_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
@@ -984,6 +990,7 @@ model OrganizationMembershipInvitation {
   @@index([normalized_email])
   @@index([source_request_id, organization_id, normalized_email], map: "organization_membership_invitation_source_identity_idx")
   @@unique([identity_provider, external_invitation_id], map: "organization_membership_invitation_provider_external_id_key")
+  @@unique([id, organization_id], map: "organization_membership_invitation_id_org_key")
   @@map("organization_membership_invitation")
 }
 
@@ -1014,7 +1021,7 @@ enum OrganizationProvisioningOutboxStatus {
 model OrganizationProvisioningOutbox {
   id                 String                               @id @default(uuid())
   organization_id    String
-  source_request_id  String                               @unique(map: "organization_provisioning_outbox_source_request_id_key")
+  source_request_id  String?                              @unique(map: "organization_provisioning_outbox_source_request_id_key")
   invitation_id      String                               @unique(map: "organization_provisioning_outbox_invitation_id_key")
   status             OrganizationProvisioningOutboxStatus @default(PENDING)
   attempt_count      Int                                  @default(0)
@@ -1024,13 +1031,14 @@ model OrganizationProvisioningOutbox {
   last_error_code    String?                              @db.VarChar(100)
   delivered_at       DateTime?
   organization       Organization                         @relation(fields: [organization_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  source_request     CompanyAccessRequest                 @relation(fields: [source_request_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  invitation         OrganizationMembershipInvitation     @relation(fields: [invitation_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  source_request     CompanyAccessRequest?                @relation(fields: [source_request_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  invitation         OrganizationMembershipInvitation     @relation(fields: [invitation_id, organization_id], references: [id, organization_id], onDelete: Restrict, onUpdate: Restrict, map: "organization_provisioning_outbox_invitation_org_fkey")
   created_at         DateTime                             @default(now())
   updated_at         DateTime                             @updatedAt
 
   @@index([status, available_at], map: "organization_provisioning_outbox_status_available_idx")
   @@index([organization_id, created_at], map: "organization_provisioning_outbox_org_created_idx")
+  @@unique([invitation_id, organization_id], map: "organization_provisioning_outbox_invitation_org_key")
   @@map("organization_provisioning_outbox")
 }
 

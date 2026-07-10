@@ -291,6 +291,7 @@ export class InvitationLifecycleService {
           return {
             status: "ACTIVE" as const,
             externalOrganizationId: input.externalOrganizationId,
+            nextPath: this.activationNextPath(input.intendedRole),
           };
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -326,6 +327,7 @@ export class InvitationLifecycleService {
     return {
       status: "ACTIVE",
       externalOrganizationId: input.externalOrganizationId,
+      nextPath: this.activationNextPath(input.intendedRole),
     };
   }
 
@@ -393,6 +395,10 @@ export class InvitationLifecycleService {
       return "org:member";
     }
     this.deny();
+  }
+
+  private activationNextPath(intendedRole: string): string {
+    return intendedRole === "admin" ? "/admin/setup" : "/access/setup";
   }
 
   private async withSerializableRetry<T>(

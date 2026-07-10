@@ -4,10 +4,10 @@
 
 // TypeScript types based on the GraphQL schema
 export interface VisitStatus {
-  SCHEDULED: 'SCHEDULED';
-  IN_PROGRESS: 'IN_PROGRESS';  
-  COMPLETED: 'COMPLETED';
-  CANCELLED: 'CANCELLED';
+  SCHEDULED: "SCHEDULED";
+  IN_PROGRESS: "IN_PROGRESS";
+  COMPLETED: "COMPLETED";
+  CANCELLED: "CANCELLED";
 }
 
 export interface Carer {
@@ -139,14 +139,20 @@ export const DEFAULT_PAGE_SIZE = 25;
 /**
  * Calculate skip from page number (for Prisma pagination)
  */
-export function getSkipFromPage(page: number, pageSize: number = DEFAULT_PAGE_SIZE): number {
+export function getSkipFromPage(
+  page: number,
+  pageSize: number = DEFAULT_PAGE_SIZE,
+): number {
   return Math.max(0, (page - 1) * pageSize);
 }
 
 /**
  * Calculate total pages from total count
  */
-export function getTotalPages(totalCount: number, pageSize: number = DEFAULT_PAGE_SIZE): number {
+export function getTotalPages(
+  totalCount: number,
+  pageSize: number = DEFAULT_PAGE_SIZE,
+): number {
   return Math.ceil(totalCount / pageSize);
 }
 
@@ -280,7 +286,11 @@ export interface EvidencePackRecord {
   updatedAt: string;
 }
 
-export type OperationalEvidenceSourceType = 'VISIT' | 'CARE_LOG' | 'MEDICATION_ADMINISTRATION' | 'CONCERN';
+export type OperationalEvidenceSourceType =
+  | "VISIT"
+  | "CARE_LOG"
+  | "MEDICATION_ADMINISTRATION"
+  | "CONCERN";
 
 export interface EvidenceSourceCandidateRecord {
   id: string;
@@ -305,8 +315,12 @@ export interface CarePlanningQueryResponse {
 
 export interface CreateAssessmentInput {
   clientId: string;
-  status?: 'DRAFT' | 'IN_REVIEW' | 'COMPLETED' | 'ARCHIVED';
-  source?: 'MANUAL' | 'VISIT_REVIEW' | 'HOSPITAL_DISCHARGE' | 'REFERRAL_HANDOFF';
+  status?: "DRAFT" | "IN_REVIEW" | "COMPLETED" | "ARCHIVED";
+  source?:
+    | "MANUAL"
+    | "VISIT_REVIEW"
+    | "HOSPITAL_DISCHARGE"
+    | "REFERRAL_HANDOFF";
   title: string;
   summary?: string;
   findings: Record<string, unknown>;
@@ -319,7 +333,7 @@ export interface CreateAssessmentInput {
 export interface CreateCarePlanInput {
   clientId: string;
   assessmentId?: string;
-  status?: 'DRAFT' | 'ACTIVE' | 'SUPERSEDED' | 'ARCHIVED';
+  status?: "DRAFT" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
   version?: number;
   title: string;
   goals: Record<string, unknown>;
@@ -330,7 +344,14 @@ export interface CreateCarePlanInput {
 }
 
 export interface CreateEvidencePackItemInput {
-  sourceType: 'VISIT' | 'CARE_LOG' | 'MEDICATION_ADMINISTRATION' | 'ASSESSMENT' | 'CARE_PLAN' | 'CONCERN' | 'MANUAL_NOTE';
+  sourceType:
+    | "VISIT"
+    | "CARE_LOG"
+    | "MEDICATION_ADMINISTRATION"
+    | "ASSESSMENT"
+    | "CARE_PLAN"
+    | "CONCERN"
+    | "MANUAL_NOTE";
   sourceId?: string;
   occurredAt?: string;
   headline: string;
@@ -341,7 +362,7 @@ export interface CreateEvidencePackItemInput {
 export interface CreateEvidencePackInput {
   clientId: string;
   carePlanId?: string;
-  status?: 'DRAFT' | 'COMPILED' | 'PUBLISHED';
+  status?: "DRAFT" | "COMPILED" | "PUBLISHED";
   kind?: string;
   periodStart: string;
   periodEnd: string;
@@ -617,21 +638,21 @@ export const CREATE_VISIT_MUTATION = `
 `;
 
 export interface EligibleCarerMembership {
-  id: string
-  identityProvider: string
-  role: string
-  loginEmail?: string | null
+  id: string;
+  identityProvider: string;
+  role: string;
+  loginEmail?: string | null;
 }
 
 export interface EligibleCarerMembershipsQueryResponse {
-  eligibleCarerMemberships: EligibleCarerMembership[]
+  eligibleCarerMemberships: EligibleCarerMembership[];
 }
 
 export interface CreateAndLinkCarerMutationResponse {
   createAndLinkCarer: {
-    membershipId: string
-    carer: Carer
-  }
+    membershipId: string;
+    carer: Carer;
+  };
 }
 
 export const ELIGIBLE_CARER_MEMBERSHIPS_QUERY = `
@@ -660,6 +681,93 @@ export const CREATE_AND_LINK_CARER_MUTATION = `
   }
 `;
 
+export interface CarerAccessLifecycleItem {
+  lifecycleId: string;
+  invitationId?: string | null;
+  membershipId?: string | null;
+  carerId?: string | null;
+  emailAddress: string;
+  status: "PENDING" | "ACTIVE" | "EXPIRED" | "REVOKED";
+  readiness:
+    | "AWAITING_ACCEPTANCE"
+    | "LINK_REQUIRED"
+    | "READY"
+    | "BLOCKED"
+    | "DISABLED";
+  deliveryStatus:
+    | "PENDING"
+    | "PROCESSING"
+    | "RETRYABLE"
+    | "DELIVERED"
+    | "NEEDS_ATTENTION"
+    | "UNAVAILABLE";
+  cleanupStatus: "COMPLETE" | "PENDING" | "MANUAL_REVIEW";
+  expiresAt?: string | null;
+  canRevoke: boolean;
+  canReissue: boolean;
+  canRetryDelivery: boolean;
+  canLink: boolean;
+  canDeactivate: boolean;
+}
+
+export interface CarerAccessLifecycleQueryResponse {
+  carerAccessLifecycle: CarerAccessLifecycleItem[];
+}
+
+const CARER_LIFECYCLE_FIELDS = `
+  lifecycleId
+  invitationId
+  membershipId
+  carerId
+  emailAddress
+  status
+  readiness
+  deliveryStatus
+  cleanupStatus
+  expiresAt
+  canRevoke
+  canReissue
+  canRetryDelivery
+  canLink
+  canDeactivate
+`;
+
+export const CARER_ACCESS_LIFECYCLE_QUERY = `
+  query CarerAccessLifecycle {
+    carerAccessLifecycle { ${CARER_LIFECYCLE_FIELDS} }
+  }
+`;
+
+export const INVITE_CARER_MUTATION = `
+  mutation InviteCarer($input: InviteCarerInput!) {
+    inviteCarer(input: $input) { ${CARER_LIFECYCLE_FIELDS} }
+  }
+`;
+
+export const REVOKE_CARER_INVITATION_MUTATION = `
+  mutation RevokeCarerInvitation($input: CarerInvitationActionInput!) {
+    revokeCarerInvitation(input: $input) { ${CARER_LIFECYCLE_FIELDS} }
+  }
+`;
+
+export const REISSUE_CARER_INVITATION_MUTATION = `
+  mutation ReissueCarerInvitation($input: CarerInvitationActionInput!) {
+    reissueCarerInvitation(input: $input) { ${CARER_LIFECYCLE_FIELDS} }
+  }
+`;
+
+export const RETRY_CARER_INVITATION_DELIVERY_MUTATION = `
+  mutation RetryCarerInvitationDelivery($input: CarerInvitationActionInput!) {
+    retryCarerInvitationDelivery(input: $input) { ${CARER_LIFECYCLE_FIELDS} }
+  }
+`;
+
+export const DEACTIVATE_CARER_MEMBERSHIP_MUTATION = `
+  mutation DeactivateCarerMembership($input: CarerMembershipActionInput!) {
+    deactivateCarerMembership(input: $input) { ${CARER_LIFECYCLE_FIELDS} }
+  }
+`;
+
 export const DELETE_CLIENT_MUTATION = `
   mutation DeleteClient($id: String!) {
     deleteClient(id: $id) {
@@ -676,118 +784,118 @@ export const DELETE_CLIENT_MUTATION = `
 // ==================== CAREBRIDGE QUERIES ====================
 
 export interface CarebridgeFamilyContact {
-  id: string
-  fullName: string
-  email?: string | null
-  relationship?: string | null
+  id: string;
+  fullName: string;
+  email?: string | null;
+  relationship?: string | null;
 }
 
 export interface CarebridgeAccessGrant {
-  id: string
-  scope: string
-  grantedAt: string
-  revokedAt?: string | null
+  id: string;
+  scope: string;
+  grantedAt: string;
+  revokedAt?: string | null;
 }
 
 export interface CarebridgeMembership {
-  id: string
-  role: string
-  status: string
-  accessBasis: string
-  reviewDueAt?: string | null
-  familyContact: CarebridgeFamilyContact
-  accessGrants: CarebridgeAccessGrant[]
+  id: string;
+  role: string;
+  status: string;
+  accessBasis: string;
+  reviewDueAt?: string | null;
+  familyContact: CarebridgeFamilyContact;
+  accessGrants: CarebridgeAccessGrant[];
 }
 
 export interface CarebridgePolicy {
-  id: string
-  showVisitTimesDefault: boolean
-  showTaskSummaryDefault: boolean
-  showMedicationSupportDefault: boolean
-  requireApprovalForAllContent: boolean
-  familyCanRaiseConcerns: boolean
-  familyCanReplyToConcerns: boolean
-  familyCanSubmitPulse: boolean
+  id: string;
+  showVisitTimesDefault: boolean;
+  showTaskSummaryDefault: boolean;
+  showMedicationSupportDefault: boolean;
+  requireApprovalForAllContent: boolean;
+  familyCanRaiseConcerns: boolean;
+  familyCanReplyToConcerns: boolean;
+  familyCanSubmitPulse: boolean;
 }
 
 export interface CarebridgeRoom {
-  id: string
-  status: string
+  id: string;
+  status: string;
   client: {
-    id: string
-    fullName: string
-  }
-  memberships: CarebridgeMembership[]
-  policy?: CarebridgePolicy | null
-  createdAt: string
-  updatedAt: string
+    id: string;
+    fullName: string;
+  };
+  memberships: CarebridgeMembership[];
+  policy?: CarebridgePolicy | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface VerifiedVisitStory {
-  id: string
-  status: string
-  draftTitle: string
-  draftBody: string
-  approvedTitle?: string | null
-  approvedBody?: string | null
-  approvedAt?: string | null
-  rejectionReason?: string | null
-  rejectedAt?: string | null
-  sourceRefs: Array<Record<string, unknown>>
-  publishedAt?: string | null
+  id: string;
+  status: string;
+  draftTitle: string;
+  draftBody: string;
+  approvedTitle?: string | null;
+  approvedBody?: string | null;
+  approvedAt?: string | null;
+  rejectionReason?: string | null;
+  rejectedAt?: string | null;
+  sourceRefs: Array<Record<string, unknown>>;
+  publishedAt?: string | null;
 }
 
 export interface CareRoomsQueryResponse {
-  careRooms: CarebridgeRoom[]
+  careRooms: CarebridgeRoom[];
 }
 
 export interface CareRoomQueryResponse {
-  careRoom: CarebridgeRoom
+  careRoom: CarebridgeRoom;
 }
 
 export interface VerifiedVisitStoriesQueryResponse {
-  verifiedVisitStories: VerifiedVisitStory[]
+  verifiedVisitStories: VerifiedVisitStory[];
 }
 
 export interface VerifiedVisitStoryApprovalQueueQueryResponse {
-  verifiedVisitStoryApprovalQueue: VerifiedVisitStory[]
+  verifiedVisitStoryApprovalQueue: VerifiedVisitStory[];
 }
 
 export interface CarebridgeConcernMessage {
-  id: string
-  body: string
-  actorLabel: string
-  createdAt: string
+  id: string;
+  body: string;
+  actorLabel: string;
+  createdAt: string;
 }
 
 export interface CarebridgeConcernEvent {
-  id: string
-  eventType: string
-  createdAt: string
+  id: string;
+  eventType: string;
+  createdAt: string;
 }
 
 export interface CarebridgeConcern {
-  id: string
-  careRoomId: string
-  clientId: string
-  title: string
-  description?: string | null
-  severity: string
-  priority: string
-  category: string
-  status: string
-  outcome?: string | null
-  acknowledgementDueAt?: string | null
-  acknowledgedAt?: string | null
-  responseDueAt?: string | null
-  resolutionDueAt?: string | null
-  resolvedAt?: string | null
-  messages: CarebridgeConcernMessage[]
-  events: CarebridgeConcernEvent[]
+  id: string;
+  careRoomId: string;
+  clientId: string;
+  title: string;
+  description?: string | null;
+  severity: string;
+  priority: string;
+  category: string;
+  status: string;
+  outcome?: string | null;
+  acknowledgementDueAt?: string | null;
+  acknowledgedAt?: string | null;
+  responseDueAt?: string | null;
+  resolutionDueAt?: string | null;
+  resolvedAt?: string | null;
+  messages: CarebridgeConcernMessage[];
+  events: CarebridgeConcernEvent[];
 }
 
 export interface CarebridgeConcernInboxQueryResponse {
-  carebridgeConcernInbox: CarebridgeConcern[]
+  carebridgeConcernInbox: CarebridgeConcern[];
 }
 
 export const CAREBRIDGE_ROOMS_QUERY = `
@@ -832,7 +940,7 @@ export const CAREBRIDGE_ROOMS_QUERY = `
       updatedAt
     }
   }
-`
+`;
 
 export const CAREBRIDGE_ROOM_QUERY = `
   query CareRoom($id: String!) {
@@ -876,7 +984,7 @@ export const CAREBRIDGE_ROOM_QUERY = `
       updatedAt
     }
   }
-`
+`;
 
 export const VERIFIED_VISIT_STORIES_QUERY = `
   query VerifiedVisitStories($careRoomId: String!) {
@@ -894,7 +1002,7 @@ export const VERIFIED_VISIT_STORIES_QUERY = `
       publishedAt
     }
   }
-`
+`;
 
 export const VERIFIED_VISIT_STORY_APPROVAL_QUEUE_QUERY = `
   query VerifiedVisitStoryApprovalQueue($careRoomId: String) {
@@ -912,7 +1020,7 @@ export const VERIFIED_VISIT_STORY_APPROVAL_QUEUE_QUERY = `
       publishedAt
     }
   }
-`
+`;
 
 export const PUBLISH_VERIFIED_VISIT_STORY_MUTATION = `
   mutation PublishVerifiedVisitStory($storyId: String!) {
@@ -925,7 +1033,7 @@ export const PUBLISH_VERIFIED_VISIT_STORY_MUTATION = `
       publishedAt
     }
   }
-`
+`;
 
 export const REJECT_VERIFIED_VISIT_STORY_MUTATION = `
   mutation RejectVerifiedVisitStory($input: RejectVerifiedVisitStoryInput!) {
@@ -936,7 +1044,7 @@ export const REJECT_VERIFIED_VISIT_STORY_MUTATION = `
       rejectedAt
     }
   }
-`
+`;
 
 export const CAREBRIDGE_CONCERN_INBOX_QUERY = `
   query CarebridgeConcernInbox($status: String) {
@@ -969,7 +1077,7 @@ export const CAREBRIDGE_CONCERN_INBOX_QUERY = `
       }
     }
   }
-`
+`;
 
 export const UPDATE_CAREBRIDGE_CONCERN_MUTATION = `
   mutation UpdateCarebridgeConcern($input: UpdateConcernStatusInput!) {
@@ -992,7 +1100,7 @@ export const UPDATE_CAREBRIDGE_CONCERN_MUTATION = `
       }
     }
   }
-`
+`;
 
 export interface CarerListItem {
   id: string;
@@ -1018,7 +1126,7 @@ export const CARERS_QUERY = `
   }
 `;
 
-export type ShiftVerificationMethod = 'GPS' | 'QR' | 'NFC' | 'PHONE' | 'MANUAL';
+export type ShiftVerificationMethod = "GPS" | "QR" | "NFC" | "PHONE" | "MANUAL";
 
 export interface ShiftLocationProof {
   latitude?: number | null;

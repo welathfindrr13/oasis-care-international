@@ -97,10 +97,7 @@ test("guided setup is honest about synthetic canary data and excludes billing", 
 });
 
 test("Clerk invitations authenticate and activate before entering guided setup", () => {
-  assert.match(
-    acceptInvitationPage,
-    /forceRedirectUrl=\{activationUrl\}/,
-  );
+  assert.match(acceptInvitationPage, /forceRedirectUrl=\{activationUrl\}/);
   assert.match(
     acceptInvitationPage,
     /signUpForceRedirectUrl=\{activationUrl\}/,
@@ -113,9 +110,9 @@ test("Clerk invitations authenticate and activate before entering guided setup",
   assert.match(activationClient, /activateViewerOrganizationInvitation/);
   assert.match(activationClient, /oasis_invitation_id/);
   assert.match(activationClient, /clerk\.setActive/);
-  assert.match(activationClient, /router\.replace\("\/admin\/setup"\)/);
-  assert.doesNotMatch(
+  assert.match(
     activationClient,
-    /email|organizationId:\s*input/i,
+    /router\.replace\(data\.activateViewerOrganizationInvitation\.nextPath\)/,
   );
+  assert.doesNotMatch(activationClient, /email|organizationId:\s*input/i);
 });

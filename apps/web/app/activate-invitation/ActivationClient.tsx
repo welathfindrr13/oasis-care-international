@@ -10,6 +10,7 @@ const ACTIVATE_INVITATION = `
     activateViewerOrganizationInvitation(input: $input) {
       status
       externalOrganizationId
+      nextPath
     }
   }
 `;
@@ -31,6 +32,7 @@ export function ActivationClient() {
         activateViewerOrganizationInvitation: {
           status: "ACTIVE";
           externalOrganizationId: string;
+          nextPath: "/admin/setup" | "/access/setup";
         };
       }>(
         ACTIVATE_INVITATION,
@@ -41,7 +43,7 @@ export function ActivationClient() {
         organization:
           data.activateViewerOrganizationInvitation.externalOrganizationId,
       });
-      router.replace("/admin/setup");
+      router.replace(data.activateViewerOrganizationInvitation.nextPath);
       router.refresh();
     } catch {
       setError(

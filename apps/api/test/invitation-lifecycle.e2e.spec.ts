@@ -193,7 +193,7 @@ describe("verified organization invitation activation", () => {
       .set("Authorization", token)
       .send({
         query: `mutation Activate($input: InvitationActivationInputDTO!) {
-          activateViewerOrganizationInvitation(input: $input) { status externalOrganizationId }
+          activateViewerOrganizationInvitation(input: $input) { status externalOrganizationId nextPath }
         }`,
         variables: { input: { invitationId: requestedInvitationId } },
       });
@@ -220,6 +220,7 @@ describe("verified organization invitation activation", () => {
     expect(activated.body.data.activateViewerOrganizationInvitation).toEqual({
       status: "ACTIVE",
       externalOrganizationId,
+      nextPath: "/admin/setup",
     });
 
     const membership = await prisma.organizationMembership.findFirstOrThrow();
@@ -247,6 +248,60 @@ describe("verified organization invitation activation", () => {
       membershipState: "ACTIVE",
       surface: "ADMIN",
       onboardingState: "READY",
+    });
+  });
+
+  it("activates a verified Carer as setup-required and returns a non-admin destination", async () => {
+    await prisma.organizationProvisioningOutbox.deleteMany();
+    await prisma.organizationMembershipInvitation.deleteMany();
+    await prisma.organizationMembershipInvitation.create({
+      data: {
+        id: invitationId,
+        organization_id: organizationId,
+        source_request_id: null,
+        identity_provider: "clerk",
+        intended_email: "carer@example.test",
+        normalized_email: "carer@example.test",
+        intended_role: "carer",
+        status: "PENDING",
+        external_invitation_id: externalInvitationId,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+    clerk.listAcceptedInvitationsForUser.mockResolvedValue([
+      acceptedInvitation({
+        emailAddress: "carer@example.test",
+        role: "org:member",
+      }),
+    ]);
+    clerk.getOrganizationMembership.mockResolvedValue({
+      id: externalMembershipId,
+      organizationId: externalOrganizationId,
+      userId: subject,
+      role: "org:member",
+    });
+
+    const activated = await activate().expect(200);
+    expect(activated.body.errors).toBeUndefined();
+    expect(activated.body.data.activateViewerOrganizationInvitation).toEqual({
+      status: "ACTIVE",
+      externalOrganizationId,
+      nextPath: "/access/setup",
+    });
+    await expect(
+      prisma.organizationMembership.findFirstOrThrow({
+        where: { auth_subject: subject },
+      }),
+    ).resolves.toMatchObject({
+      role: "carer",
+      status: "ACTIVE",
+      carer_id: null,
+    });
+    const snapshot = await accessSnapshot(bearer(true)).expect(200);
+    expect(snapshot.body.data.viewerAccessSnapshot).toMatchObject({
+      membershipState: "ACTIVE",
+      surface: "NONE",
+      onboardingState: "SETUP_REQUIRED",
     });
   });
 

@@ -1,20 +1,26 @@
-import { Injectable, HttpStatus, Logger, Inject } from '@nestjs/common';
-import { VisitRepository } from './visit.repository';
-import { CreateVisitInput } from './dto/create-visit.input';
-import { UpdateVisitInput } from './dto/update-visit.input';
-import { VisitFilterArgs } from './dto/visit-filter.args';
-import { CareLog, CareLogCategory, Visit, VisitTask, VisitStatus } from '@oasis/db';
-import { ClsService } from 'nestjs-cls';
-import { BaseHttpException } from '../common/errors/base-http.exception';
-import { ErrorCode } from '../common/errors/error-codes';
-import { Counter } from 'prom-client';
-import { CareLogService } from '../care-log/care-log.service';
-import { RecordVisitTaskOutcomeInput } from './dto/record-visit-task-outcome.input';
-import { SubmitVisitCareNoteInput } from './dto/submit-visit-care-note.input';
-import { CompleteVisitInput } from './dto/complete-visit.input';
-import { CreateCareLogInput } from '../care-log/dto/create-care-log.input';
-import { VisitTaskOutcome } from './dto/visit.dto';
-import { VISIT_TASK_OUTCOME_PREFIX } from './visit.constants';
+import { Injectable, HttpStatus, Logger, Inject } from "@nestjs/common";
+import { VisitRepository } from "./visit.repository";
+import { CreateVisitInput } from "./dto/create-visit.input";
+import { UpdateVisitInput } from "./dto/update-visit.input";
+import { VisitFilterArgs } from "./dto/visit-filter.args";
+import {
+  CareLog,
+  CareLogCategory,
+  Visit,
+  VisitTask,
+  VisitStatus,
+} from "@oasis/db";
+import { ClsService } from "nestjs-cls";
+import { BaseHttpException } from "../common/errors/base-http.exception";
+import { ErrorCode } from "../common/errors/error-codes";
+import { Counter } from "prom-client";
+import { CareLogService } from "../care-log/care-log.service";
+import { RecordVisitTaskOutcomeInput } from "./dto/record-visit-task-outcome.input";
+import { SubmitVisitCareNoteInput } from "./dto/submit-visit-care-note.input";
+import { CompleteVisitInput } from "./dto/complete-visit.input";
+import { CreateCareLogInput } from "../care-log/dto/create-care-log.input";
+import { VisitTaskOutcome } from "./dto/visit.dto";
+import { VISIT_TASK_OUTCOME_PREFIX } from "./visit.constants";
 
 @Injectable()
 export class VisitService {
@@ -24,8 +30,8 @@ export class VisitService {
     private readonly visitRepository: VisitRepository,
     private readonly cls: ClsService,
     private readonly careLogService: CareLogService,
-    @Inject('visit_overlap_total') private readonly overlapCounter: Counter,
-    @Inject('visits_created_total') private readonly createCounter: Counter,
+    @Inject("visit_overlap_total") private readonly overlapCounter: Counter,
+    @Inject("visits_created_total") private readonly createCounter: Counter,
   ) {}
 
   async createVisit(
@@ -35,51 +41,50 @@ export class VisitService {
     organizationId?: string,
   ): Promise<Visit> {
     const orgId = await this.requireOrganizationId(organizationId);
-    const requestId = this.cls.get('requestId');
+    const requestId = this.cls.get("requestId");
     this.logger.log(`Creating visit for carer ${data.carerId}`, { requestId });
 
-    const [carerExistsInOrg, clientExistsInOrg] = await Promise.all([
-      this.visitRepository.findCarerInOrganization(data.carerId, orgId),
-      this.visitRepository.findClientInOrganization(data.clientId, orgId),
-    ]);
-    if (!carerExistsInOrg || !clientExistsInOrg) {
+    const scheduledStart = new Date(data.scheduledStart);
+    const scheduledEnd = new Date(data.scheduledEnd);
+    const created = await this.visitRepository.createIfAssignable(
+      {
+        organization: { connect: { id: orgId } },
+        carer: { connect: { id: data.carerId } },
+        client: { connect: { id: data.clientId } },
+        scheduled_start: scheduledStart,
+        scheduled_end: scheduledEnd,
+        status: data.status || VisitStatus.SCHEDULED,
+        notes: data.notes,
+      },
+      {
+        organizationId: orgId,
+        carerId: data.carerId,
+        clientId: data.clientId,
+        scheduledStart,
+        scheduledEnd,
+      },
+    );
+    if (created.status === "INVALID_TENANT_RESOURCE") {
       throw new BaseHttpException(
         ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
-        'Carer and client must belong to your organization',
+        "Carer and client must belong to your organization",
         HttpStatus.FORBIDDEN,
       );
     }
 
-    // Check for overlapping visits
-    const overlappingVisits = await this.visitRepository.findOverlappingVisits(
-      data.carerId,
-      new Date(data.scheduledStart),
-      new Date(data.scheduledEnd),
-      orgId,
-    );
-
-    if (overlappingVisits.length > 0) {
-      this.logger.warn(
-        `Overlapping visit found for carer ${data.carerId}`,
-        { requestId, overlappingVisits: overlappingVisits.map(v => v.id) }
-      );
+    if (created.status === "OVERLAP") {
+      this.logger.warn(`Overlapping visit found for carer ${data.carerId}`, {
+        requestId,
+      });
       this.overlapCounter.inc();
       throw new BaseHttpException(
         ErrorCode.VISIT_OVERLAP,
-        'Carer already has a visit scheduled during this time period',
-        HttpStatus.CONFLICT
+        "Carer already has a visit scheduled during this time period",
+        HttpStatus.CONFLICT,
       );
     }
 
-    const visit = await this.visitRepository.create({
-      organization: { connect: { id: orgId } },
-      carer: { connect: { id: data.carerId } },
-      client: { connect: { id: data.clientId } },
-      scheduled_start: new Date(data.scheduledStart),
-      scheduled_end: new Date(data.scheduledEnd),
-      status: data.status || VisitStatus.SCHEDULED,
-      notes: data.notes,
-    });
+    const visit = created.visit;
 
     // Create initial tasks if provided
     if (data.tasks && data.tasks.length > 0) {
@@ -107,49 +112,52 @@ export class VisitService {
     organizationId?: string,
   ): Promise<Visit> {
     const orgId = await this.requireOrganizationId(organizationId);
-    const requestId = this.cls.get('requestId');
+    const requestId = this.cls.get("requestId");
     const visit = await this.visitRepository.findById(id, orgId);
 
     if (!visit) {
       throw new BaseHttpException(
         ErrorCode.VISIT_NOT_FOUND,
-        'Visit not found',
-        HttpStatus.NOT_FOUND
+        "Visit not found",
+        HttpStatus.NOT_FOUND,
       );
     }
 
     // Check permissions
-    this.checkVisitAccess(visit, userId, userRole, 'update');
+    this.checkVisitAccess(visit, userId, userRole, "update");
 
     // If updating schedule, check for overlaps
     if (data.scheduledStart || data.scheduledEnd) {
-      const scheduledStart = data.scheduledStart 
-        ? new Date(data.scheduledStart) 
+      const scheduledStart = data.scheduledStart
+        ? new Date(data.scheduledStart)
         : visit.scheduled_start;
-      const scheduledEnd = data.scheduledEnd 
-        ? new Date(data.scheduledEnd) 
+      const scheduledEnd = data.scheduledEnd
+        ? new Date(data.scheduledEnd)
         : visit.scheduled_end;
 
-      const overlappingVisits = await this.visitRepository.findOverlappingVisits(
-        visit.carer_id,
-        scheduledStart,
-        scheduledEnd,
-        orgId,
-        visit.id
-      );
+      const overlappingVisits =
+        await this.visitRepository.findOverlappingVisits(
+          visit.carer_id,
+          scheduledStart,
+          scheduledEnd,
+          orgId,
+          visit.id,
+        );
 
       if (overlappingVisits.length > 0) {
         throw new BaseHttpException(
           ErrorCode.VISIT_OVERLAP,
-          'Carer already has a visit scheduled during this time period',
-          HttpStatus.CONFLICT
+          "Carer already has a visit scheduled during this time period",
+          HttpStatus.CONFLICT,
         );
       }
     }
 
     const updateData: any = {};
-    if (data.scheduledStart) updateData.scheduled_start = new Date(data.scheduledStart);
-    if (data.scheduledEnd) updateData.scheduled_end = new Date(data.scheduledEnd);
+    if (data.scheduledStart)
+      updateData.scheduled_start = new Date(data.scheduledStart);
+    if (data.scheduledEnd)
+      updateData.scheduled_end = new Date(data.scheduledEnd);
     if (data.actualStart) updateData.actual_start = new Date(data.actualStart);
     if (data.actualEnd) updateData.actual_end = new Date(data.actualEnd);
     if (data.status) updateData.status = data.status;
@@ -171,12 +179,12 @@ export class VisitService {
     if (!visit) {
       throw new BaseHttpException(
         ErrorCode.VISIT_NOT_FOUND,
-        'Visit not found',
-        HttpStatus.NOT_FOUND
+        "Visit not found",
+        HttpStatus.NOT_FOUND,
       );
     }
 
-    this.checkVisitAccess(visit, userId, userRole, 'read');
+    this.checkVisitAccess(visit, userId, userRole, "read");
     return visit;
   }
 
@@ -187,14 +195,14 @@ export class VisitService {
     organizationId?: string,
   ): Promise<{ items: Visit[]; total: number }> {
     const orgId = await this.requireOrganizationId(organizationId);
-    const requestId = this.cls.get('requestId');
+    const requestId = this.cls.get("requestId");
     const where: any = {};
 
     // Apply additional filters
     if (filter.carerId) where.carer_id = filter.carerId;
     if (filter.clientId) where.client_id = filter.clientId;
     if (filter.status) where.status = filter.status;
-    
+
     if (filter.scheduledStartFrom || filter.scheduledStartTo) {
       where.scheduled_start = {};
       if (filter.scheduledStartFrom) {
@@ -206,20 +214,23 @@ export class VisitService {
     }
 
     // Enforce role scoping last so request filters cannot override ownership constraints.
-    if (userRole === 'carer') {
+    if (userRole === "carer") {
       where.carer_id = userId;
-    } else if (userRole === 'client') {
+    } else if (userRole === "client") {
       where.client_id = userId;
     }
 
     this.logger.log(`Finding visits with filter`, { requestId, where });
 
-    return this.visitRepository.findMany({
-      where,
-      skip: filter.skip,
-      take: filter.take || 20,
-      orderBy: { scheduled_start: 'desc' },
-    }, orgId);
+    return this.visitRepository.findMany(
+      {
+        where,
+        skip: filter.skip,
+        take: filter.take || 20,
+        orderBy: { scheduled_start: "desc" },
+      },
+      orgId,
+    );
   }
 
   async deleteVisit(
@@ -234,14 +245,14 @@ export class VisitService {
     if (!visit) {
       throw new BaseHttpException(
         ErrorCode.VISIT_NOT_FOUND,
-        'Visit not found',
-        HttpStatus.NOT_FOUND
+        "Visit not found",
+        HttpStatus.NOT_FOUND,
       );
     }
 
-    this.checkVisitAccess(visit, userId, userRole, 'delete');
+    this.checkVisitAccess(visit, userId, userRole, "delete");
 
-    const requestId = this.cls.get('requestId');
+    const requestId = this.cls.get("requestId");
     this.logger.log(`Soft deleting visit ${id}`, { requestId });
 
     return this.visitRepository.delete(id, orgId);
@@ -255,14 +266,14 @@ export class VisitService {
     organizationId?: string,
   ): Promise<VisitTask> {
     const orgId = await this.requireOrganizationId(organizationId);
-    const requestId = this.cls.get('requestId');
+    const requestId = this.cls.get("requestId");
     const task = await this.visitRepository.findTaskById(taskId, orgId);
 
     if (!task) {
       throw new BaseHttpException(
         ErrorCode.TASK_NOT_FOUND,
-        'Task not found',
-        HttpStatus.NOT_FOUND
+        "Task not found",
+        HttpStatus.NOT_FOUND,
       );
     }
 
@@ -271,20 +282,24 @@ export class VisitService {
     if (!visit) {
       throw new BaseHttpException(
         ErrorCode.VISIT_NOT_FOUND,
-        'Visit not found',
-        HttpStatus.NOT_FOUND
+        "Visit not found",
+        HttpStatus.NOT_FOUND,
       );
     }
 
-    this.checkVisitAccess(visit, userId, userRole, 'update');
+    this.checkVisitAccess(visit, userId, userRole, "update");
 
     this.logger.log(`Completing task ${taskId}`, { requestId });
 
-    return this.visitRepository.updateTask(taskId, {
-      is_completed: true,
-      completed_at: new Date(),
-      notes: notes || task.notes,
-    }, orgId);
+    return this.visitRepository.updateTask(
+      taskId,
+      {
+        is_completed: true,
+        completed_at: new Date(),
+        notes: notes || task.notes,
+      },
+      orgId,
+    );
   }
 
   async startVisit(
@@ -298,17 +313,20 @@ export class VisitService {
     if (!visit) {
       throw new BaseHttpException(
         ErrorCode.VISIT_NOT_FOUND,
-        'Visit not found',
+        "Visit not found",
         HttpStatus.NOT_FOUND,
       );
     }
 
-    this.checkVisitAccess(visit, userId, userRole, 'update');
+    this.checkVisitAccess(visit, userId, userRole, "update");
 
-    if (visit.status === VisitStatus.CANCELLED || visit.status === VisitStatus.COMPLETED) {
+    if (
+      visit.status === VisitStatus.CANCELLED ||
+      visit.status === VisitStatus.COMPLETED
+    ) {
       throw new BaseHttpException(
         ErrorCode.VALIDATION_FAILED,
-        'Only scheduled or in-progress visits can be started',
+        "Only scheduled or in-progress visits can be started",
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -334,7 +352,7 @@ export class VisitService {
     if (!task) {
       throw new BaseHttpException(
         ErrorCode.TASK_NOT_FOUND,
-        'Task not found',
+        "Task not found",
         HttpStatus.NOT_FOUND,
       );
     }
@@ -343,12 +361,12 @@ export class VisitService {
     if (!visit) {
       throw new BaseHttpException(
         ErrorCode.VISIT_NOT_FOUND,
-        'Visit not found',
+        "Visit not found",
         HttpStatus.NOT_FOUND,
       );
     }
 
-    this.checkVisitAccess(visit, userId, userRole, 'update');
+    this.checkVisitAccess(visit, userId, userRole, "update");
 
     const recordedAt = new Date();
     const noteText = this.toNonEmpty(input.notes);
@@ -368,7 +386,8 @@ export class VisitService {
       task.id,
       {
         is_completed: input.outcome === VisitTaskOutcome.DONE,
-        completed_at: input.outcome === VisitTaskOutcome.DONE ? recordedAt : null,
+        completed_at:
+          input.outcome === VisitTaskOutcome.DONE ? recordedAt : null,
         notes: mergedNotes,
       },
       orgId,
@@ -386,12 +405,12 @@ export class VisitService {
     if (!visit) {
       throw new BaseHttpException(
         ErrorCode.VISIT_NOT_FOUND,
-        'Visit not found',
+        "Visit not found",
         HttpStatus.NOT_FOUND,
       );
     }
 
-    this.checkVisitAccess(visit, userId, userRole, 'update');
+    this.checkVisitAccess(visit, userId, userRole, "update");
 
     const createInput: CreateCareLogInput = {
       clientId: visit.client_id,
@@ -402,10 +421,15 @@ export class VisitService {
       notes: input.notes,
       escalated: input.escalated,
       escalatedTo: input.escalatedTo,
-      source: 'visit_workflow',
+      source: "visit_workflow",
     };
 
-    return this.careLogService.createCareLog(createInput, userId, userRole, orgId);
+    return this.careLogService.createCareLog(
+      createInput,
+      userId,
+      userRole,
+      orgId,
+    );
   }
 
   async completeVisit(
@@ -419,34 +443,35 @@ export class VisitService {
     if (!visit) {
       throw new BaseHttpException(
         ErrorCode.VISIT_NOT_FOUND,
-        'Visit not found',
+        "Visit not found",
         HttpStatus.NOT_FOUND,
       );
     }
 
-    this.checkVisitAccess(visit, userId, userRole, 'update');
+    this.checkVisitAccess(visit, userId, userRole, "update");
 
     const visitNote = this.toNonEmpty(input.notes);
     const existingVisitNotes = this.toNonEmpty(visit.notes);
 
-    const [taskOutcomeCount, careLogCount, medicationOutcomeCount] = await Promise.all([
-      this.visitRepository.countTaskOutcomeEntriesForVisit(visit.id, orgId),
-      this.visitRepository.countCareLogsForVisit(visit.id, orgId),
-      this.visitRepository.countMedicationOutcomesForVisit(visit.id, orgId),
-    ]);
+    const [taskOutcomeCount, careLogCount, medicationOutcomeCount] =
+      await Promise.all([
+        this.visitRepository.countTaskOutcomeEntriesForVisit(visit.id, orgId),
+        this.visitRepository.countCareLogsForVisit(visit.id, orgId),
+        this.visitRepository.countMedicationOutcomesForVisit(visit.id, orgId),
+      ]);
 
     const hasCompletionEvidence = Boolean(
       visitNote ||
-        existingVisitNotes ||
-        taskOutcomeCount > 0 ||
-        careLogCount > 0 ||
-        medicationOutcomeCount > 0,
+      existingVisitNotes ||
+      taskOutcomeCount > 0 ||
+      careLogCount > 0 ||
+      medicationOutcomeCount > 0,
     );
 
     if (!hasCompletionEvidence) {
       throw new BaseHttpException(
         ErrorCode.VALIDATION_FAILED,
-        'Complete visit requires task outcome, care log, medication outcome, or visit note',
+        "Complete visit requires task outcome, care log, medication outcome, or visit note",
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -462,7 +487,9 @@ export class VisitService {
     }
 
     if (visitNote) {
-      updateData.notes = existingVisitNotes ? `${existingVisitNotes}\n${visitNote}` : visitNote;
+      updateData.notes = existingVisitNotes
+        ? `${existingVisitNotes}\n${visitNote}`
+        : visitNote;
     }
 
     return this.visitRepository.update(visit.id, updateData, orgId);
@@ -472,59 +499,61 @@ export class VisitService {
     visit: Visit & { carer?: any; client?: any },
     userId: string,
     userRole: string,
-    action: 'read' | 'update' | 'delete'
+    action: "read" | "update" | "delete",
   ): void {
-    if (userRole === 'admin') {
+    if (userRole === "admin") {
       return; // Admin has full access
     }
 
-    if (userRole === 'carer') {
+    if (userRole === "carer") {
       if (visit.carer_id !== userId) {
         throw new BaseHttpException(
           ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
-          'You can only access your own visits',
-          HttpStatus.FORBIDDEN
+          "You can only access your own visits",
+          HttpStatus.FORBIDDEN,
         );
       }
-    } else if (userRole === 'client') {
+    } else if (userRole === "client") {
       if (visit.client_id !== userId) {
         throw new BaseHttpException(
           ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
-          'You can only view your own visits',
-          HttpStatus.FORBIDDEN
+          "You can only view your own visits",
+          HttpStatus.FORBIDDEN,
         );
       }
-      if (action !== 'read') {
+      if (action !== "read") {
         throw new BaseHttpException(
           ErrorCode.FORBIDDEN_READ_ONLY,
-          'Clients have read-only access to visits',
-          HttpStatus.FORBIDDEN
+          "Clients have read-only access to visits",
+          HttpStatus.FORBIDDEN,
         );
       }
     } else {
       throw new BaseHttpException(
         ErrorCode.INVALID_ROLE,
-        'Invalid user role',
-        HttpStatus.FORBIDDEN
+        "Invalid user role",
+        HttpStatus.FORBIDDEN,
       );
     }
   }
 
-  private async requireOrganizationId(organizationId?: string): Promise<string> {
-    const orgId = (organizationId || '').trim();
+  private async requireOrganizationId(
+    organizationId?: string,
+  ): Promise<string> {
+    const orgId = (organizationId || "").trim();
     if (orgId) {
       return orgId;
     }
 
     throw new BaseHttpException(
       ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
-      'Organization context is required for this request',
+      "Organization context is required for this request",
       HttpStatus.FORBIDDEN,
     );
   }
 
   private toNonEmpty(value?: string | null): string | null {
-    const trimmed = (value || '').trim();
+    const trimmed = (value || "").trim();
     return trimmed.length > 0 ? trimmed : null;
   }
 
@@ -533,16 +562,19 @@ export class VisitService {
     newFreeTextNote: string | null,
     metadataLine: string,
   ): string {
-    const priorNotes = (existingNotes || '')
-      .split('\n')
+    const priorNotes = (existingNotes || "")
+      .split("\n")
       .map((line) => line.trim())
-      .filter((line) => line.length > 0 && !line.startsWith(VISIT_TASK_OUTCOME_PREFIX));
+      .filter(
+        (line) =>
+          line.length > 0 && !line.startsWith(VISIT_TASK_OUTCOME_PREFIX),
+      );
 
     if (newFreeTextNote) {
       priorNotes.push(newFreeTextNote);
     }
 
     priorNotes.push(metadataLine);
-    return priorNotes.join('\n');
+    return priorNotes.join("\n");
   }
 }
