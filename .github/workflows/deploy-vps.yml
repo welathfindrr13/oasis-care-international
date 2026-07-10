@@ -2,100 +2,505 @@ name: Deploy VPS
 
 on:
   workflow_dispatch:
+    inputs:
+      operation:
+        description: One-time legacy bootstrap operation.
+        required: true
+        type: choice
+        options:
+          - bootstrap_deploy
+          - legacy_rollback
+      target_sha:
+        description: Exact reviewed lowercase 40-character target SHA.
+        required: true
+        type: string
+      production_code_approval:
+        description: Exact operation-specific production approval token.
+        required: true
+        type: string
 
 concurrency:
-  group: staging-vps-mutation
+  group: production-vps-mutation
   cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  deploy:
-    name: Deploy Deployment V2 VPS
+  legacy-bootstrap:
+    name: One-time legacy bootstrap or explicit rollback
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
     env:
-      OASIS_APP_URL: https://app.oasiscare.care
+      OASIS_PRODUCTION_APP_URL: ${{ vars.OASIS_PRODUCTION_APP_URL }}
+      OASIS_PRODUCTION_VPS_HOST: ${{ secrets.OASIS_PRODUCTION_VPS_HOST }}
+      OASIS_PRODUCTION_VPS_USER: ${{ secrets.OASIS_PRODUCTION_VPS_USER }}
+      OASIS_PRODUCTION_VPS_SSH_KEY: ${{ secrets.OASIS_PRODUCTION_VPS_SSH_KEY }}
+      OASIS_PRODUCTION_VPS_KNOWN_HOSTS: ${{ secrets.OASIS_PRODUCTION_VPS_KNOWN_HOSTS }}
+      OPERATION: ${{ inputs.operation }}
+      TARGET_SHA: ${{ inputs.target_sha }}
+      PRODUCTION_CODE_APPROVAL: ${{ inputs.production_code_approval }}
     steps:
-      - name: Validate deploy secrets
+      - name: Checkout reviewed workflow revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Validate branch, target, approval, and production transport
         shell: bash
-        env:
-          OASIS_VPS_HOST: ${{ secrets.OASIS_VPS_HOST }}
-          OASIS_VPS_USER: ${{ secrets.OASIS_VPS_USER }}
-          OASIS_VPS_SSH_KEY: ${{ secrets.OASIS_VPS_SSH_KEY }}
         run: |
           set -euo pipefail
-          test -n "$OASIS_VPS_HOST"
-          test -n "$OASIS_VPS_USER"
-          test -n "$OASIS_VPS_SSH_KEY"
 
-      - name: Configure SSH
+          fail_inputs() {
+            printf 'BOOTSTRAP_INPUTS_INVALID\n' >&2
+            exit 1
+          }
+
+          case "$OPERATION" in
+            bootstrap_deploy)
+              required_approval="APPROVE_ONE_TIME_LEGACY_BOOTSTRAP_${TARGET_SHA}"
+              ;;
+            legacy_rollback)
+              required_approval="APPROVE_EXPLICIT_LEGACY_ROLLBACK_${TARGET_SHA}"
+              ;;
+            *)
+              fail_inputs
+              ;;
+          esac
+
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || fail_inputs
+          [ "$GITHUB_REF" = "refs/heads/main" ] || fail_inputs
+          [ "$GITHUB_SHA" = "$TARGET_SHA" ] || {
+            if [ "$OPERATION" = "bootstrap_deploy" ]; then
+              fail_inputs
+            fi
+          }
+          [ "$PRODUCTION_CODE_APPROVAL" = "$required_approval" ] || fail_inputs
+          [ -n "$OASIS_PRODUCTION_VPS_HOST" ] || fail_inputs
+          [ -n "$OASIS_PRODUCTION_VPS_USER" ] || fail_inputs
+          [ -n "$OASIS_PRODUCTION_VPS_SSH_KEY" ] || fail_inputs
+          [ -n "$OASIS_PRODUCTION_VPS_KNOWN_HOSTS" ] || fail_inputs
+          [ -n "$OASIS_PRODUCTION_APP_URL" ] || fail_inputs
+          [[ "$OASIS_PRODUCTION_VPS_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$ ]] || fail_inputs
+          [[ "$OASIS_PRODUCTION_VPS_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]{0,31}$ ]] || fail_inputs
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]] || fail_inputs
+          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]] || fail_inputs
+          [[ "$GITHUB_REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || fail_inputs
+
+          if ! OASIS_PRODUCTION_APP_URL="$OASIS_PRODUCTION_APP_URL" node --input-type=module <<'NODE' >/dev/null 2>&1
+          import { normalizeBaseUrl } from './.github/workflows/revision-proof.mjs';
+          normalizeBaseUrl(process.env.OASIS_PRODUCTION_APP_URL);
+          NODE
+          then
+            fail_inputs
+          fi
+
+          printf 'BOOTSTRAP_INPUTS_VALID\n'
+
+      - name: Prove reviewed target against current origin main
         shell: bash
-        env:
-          OASIS_VPS_HOST: ${{ secrets.OASIS_VPS_HOST }}
-          OASIS_VPS_SSH_KEY: ${{ secrets.OASIS_VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          diagnostic_file="$(mktemp)"
+          chmod 600 "$diagnostic_file"
+          trap 'rm -f "$diagnostic_file"' EXIT
+
+          if ! git fetch --no-tags origin main >"$diagnostic_file" 2>&1; then
+            printf 'TARGET_PROOF_FAILED\n' >&2
+            exit 1
+          fi
+          origin_main="$(git rev-parse origin/main 2>/dev/null)" || {
+            printf 'TARGET_PROOF_FAILED\n' >&2
+            exit 1
+          }
+          if [ "$OPERATION" = "bootstrap_deploy" ]; then
+            [ "$origin_main" = "$TARGET_SHA" ] || {
+              printf 'TARGET_PROOF_FAILED\n' >&2
+              exit 1
+            }
+          else
+            git cat-file -e "${TARGET_SHA}^{commit}" 2>/dev/null || {
+              printf 'TARGET_PROOF_FAILED\n' >&2
+              exit 1
+            }
+            git merge-base --is-ancestor "$TARGET_SHA" origin/main >"$diagnostic_file" 2>&1 || {
+              printf 'TARGET_PROOF_FAILED\n' >&2
+              exit 1
+            }
+          fi
+          [ -z "$(git status --porcelain --untracked-files=all)" ] || {
+            printf 'TARGET_PROOF_FAILED\n' >&2
+            exit 1
+          }
+          printf 'TARGET_PROOF_VALID\n'
+
+      - name: Preflight legacy revision before transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ "$GITHUB_REF" = "refs/heads/main" ] || {
+            printf 'BOOTSTRAP_INPUTS_INVALID\n' >&2
+            exit 1
+          }
+          if [ "$OPERATION" = "bootstrap_deploy" ]; then
+            OASIS_PRODUCTION_APP_URL="$OASIS_PRODUCTION_APP_URL" TARGET_SHA="$TARGET_SHA" \
+              node .github/workflows/revision-proof.mjs bootstrap_legacy
+          fi
+
+      - name: Configure production transport
+        shell: bash
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$OASIS_VPS_SSH_KEY" > ~/.ssh/oasis_vps
-          chmod 600 ~/.ssh/oasis_vps
-          ssh-keyscan -H "$OASIS_VPS_HOST" >> ~/.ssh/known_hosts
+          key_file=~/.ssh/oasis_production_vps
+          printf '%s\n' "$OASIS_PRODUCTION_VPS_SSH_KEY" > "$key_file"
+          chmod 600 "$key_file"
+          printf '%s\n' "$OASIS_PRODUCTION_VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          [ -s ~/.ssh/known_hosts ] || {
+            printf 'PRODUCTION_TRANSPORT_FAILED\n' >&2
+            exit 1
+          }
+          printf 'PRODUCTION_TRANSPORT_READY\n'
 
-      - name: Deploy main to VPS
+      - name: Stage reviewed offline helpers without exposing transport details
         shell: bash
-        env:
-          OASIS_VPS_HOST: ${{ secrets.OASIS_VPS_HOST }}
-          OASIS_VPS_USER: ${{ secrets.OASIS_VPS_USER }}
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/oasis_vps -o BatchMode=yes "$OASIS_VPS_USER@$OASIS_VPS_HOST" 'bash -se' <<'REMOTE'
-          set -euo pipefail
-          target_class="$(tr -d '\r\n' < /etc/oasis/production-deploy-target-class 2>/dev/null || true)"
-          if [ "$target_class" = "production" ]; then
-            printf 'DEPLOY_TARGET_PRODUCTION\n'
-          elif [ -z "$target_class" ]; then
-            printf 'DEPLOY_TARGET_UNKNOWN\n' >&2
-            exit 1
-          else
-            printf 'DEPLOY_TARGET_NOT_PRODUCTION\n' >&2
+          marker_capture="$(mktemp)"
+          helper_dir_capture="$(mktemp)"
+          chmod 600 "$marker_capture" "$helper_dir_capture"
+          trap 'rm -f "$marker_capture" "$helper_dir_capture"' EXIT
+          set +e
+          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" \
+            'target_class="$(tr -d "\r\n" < /etc/oasis/production-deploy-target-class 2>/dev/null)"; [ "$target_class" = production ] && printf "DEPLOY_TARGET_PRODUCTION\n"' \
+            >"$marker_capture" 2>/dev/null
+          marker_status=$?
+          set -e
+          if [ "$marker_status" -ne 0 ] || [ "$(tr -d '\r\n' < "$marker_capture")" != "DEPLOY_TARGET_PRODUCTION" ]; then
+            printf 'DEPLOY_TARGET_PROOF_FAILED\n' >&2
             exit 1
           fi
-          cd /opt/oasis-care
-          git fetch origin main
-          git checkout main
-          git pull --ff-only origin main
-          node deploy/v2/scripts/preflight-env.mjs deploy/v2/.env
-          APP_COMMIT_SHA="$(git rev-parse HEAD)"
-          APP_VERSION="$(git rev-parse --short HEAD)"
-          export APP_COMMIT_SHA APP_VERSION
-          RUN_MIGRATIONS=false docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml up -d --build --wait --wait-timeout 180
-          docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml ps
-          REMOTE
+          printf 'DEPLOY_TARGET_PRODUCTION\n'
 
-      - name: Verify public HTTPS endpoints
+          if ! ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" \
+            'umask 077; mktemp -d /tmp/oasis-legacy-bootstrap.XXXXXXXX' \
+            >"$helper_dir_capture" 2>/dev/null; then
+            printf 'HELPER_TRANSFER_FAILED\n' >&2
+            exit 1
+          fi
+          remote_helper_dir="$(tr -d '\r\n' < "$helper_dir_capture")"
+          [[ "$remote_helper_dir" =~ ^/tmp/oasis-legacy-bootstrap\.[A-Za-z0-9]{8}$ ]] || {
+            printf 'HELPER_TRANSFER_FAILED\n' >&2
+            exit 1
+          }
+          printf 'REMOTE_HELPER_DIR=%s\n' "$remote_helper_dir" >> "$GITHUB_ENV"
+          remote_state_helper="$remote_helper_dir/legacy-bootstrap-state.mjs"
+          remote_revision_helper="$remote_helper_dir/revision-proof.mjs"
+          remote_preflight="$remote_helper_dir/preflight-env.mjs"
+
+          if ! scp -q -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            deploy/v2/scripts/legacy-bootstrap-state.mjs \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST:$remote_state_helper" \
+            >/dev/null 2>&1; then
+            printf 'HELPER_TRANSFER_FAILED\n' >&2
+            exit 1
+          fi
+          if ! scp -q -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            .github/workflows/revision-proof.mjs \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST:$remote_revision_helper" \
+            >/dev/null 2>&1; then
+            printf 'HELPER_TRANSFER_FAILED\n' >&2
+            exit 1
+          fi
+          if ! scp -q -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            deploy/v2/scripts/preflight-env.mjs \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST:$remote_preflight" \
+            >/dev/null 2>&1; then
+            printf 'HELPER_TRANSFER_FAILED\n' >&2
+            exit 1
+          fi
+          printf 'HELPERS_STAGED\n'
+
+      - name: Run approved bootstrap operation with allowlisted output only
         shell: bash
         run: |
           set -euo pipefail
+          remote_output="$(mktemp)"
+          chmod 600 "$remote_output"
+          trap 'rm -f "$remote_output"' EXIT
 
-          probe_public_endpoint() {
-            local label="$1"
-            local curl_args="$2"
-            local url="$3"
+          set +e
+          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" \
+            "OPERATION='$OPERATION' TARGET_SHA='$TARGET_SHA' APP_URL='$OASIS_PRODUCTION_APP_URL' REPOSITORY='$GITHUB_REPOSITORY' HELPER_DIR='$REMOTE_HELPER_DIR' bash -se" \
+            >"$remote_output" 2>&1 <<'REMOTE'
+          set -euo pipefail
+          umask 077
 
-            for attempt in {1..30}; do
-              if curl -fsS $curl_args "$url" >/dev/null; then
-                printf 'PASS: %s\n' "$label"
-                return 0
-              fi
-
-              printf 'WAIT: %s attempt %s/30\n' "$label" "$attempt"
-              sleep 5
-            done
-
-            printf 'FAIL: %s did not become ready\n' "$label" >&2
-            return 1
+          fail_remote() {
+            printf '%s\n' "$1"
+            exit 1
           }
 
-          probe_public_endpoint "health" "" "$OASIS_APP_URL/health"
-          probe_public_endpoint "ready" "" "$OASIS_APP_URL/ready"
-          probe_public_endpoint "service worker" "-I" "$OASIS_APP_URL/sw.js"
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || fail_remote BOOTSTRAP_INPUTS_INVALID
+          [[ "$REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || fail_remote BOOTSTRAP_INPUTS_INVALID
+          [[ "$HELPER_DIR" =~ ^/tmp/oasis-legacy-bootstrap\.[A-Za-z0-9]{8}$ ]] || fail_remote BOOTSTRAP_INPUTS_INVALID
+          [ -d "$HELPER_DIR" ] || fail_remote BOOTSTRAP_INPUTS_INVALID
+          case "$OPERATION" in
+            bootstrap_deploy|legacy_rollback) ;;
+            *) fail_remote BOOTSTRAP_INPUTS_INVALID ;;
+          esac
+
+          remote_state_helper="$HELPER_DIR/legacy-bootstrap-state.mjs"
+          remote_revision_helper="$HELPER_DIR/revision-proof.mjs"
+          remote_preflight="$HELPER_DIR/preflight-env.mjs"
+          diagnostic_file="$(mktemp)"
+          chmod 600 "$diagnostic_file"
+          export_file=""
+          override_file=""
+          trap 'rm -f "$diagnostic_file" "$remote_state_helper" "$remote_revision_helper" "$remote_preflight" ${export_file:+"$export_file"} ${override_file:+"$override_file"}; rmdir "$HELPER_DIR" 2>/dev/null' EXIT
+
+          target_class="$(tr -d '\r\n' < /etc/oasis/production-deploy-target-class 2>/dev/null)" || fail_remote DEPLOY_TARGET_UNKNOWN
+          [ "$target_class" = "production" ] || fail_remote DEPLOY_TARGET_NOT_PRODUCTION
+          printf 'DEPLOY_TARGET_PRODUCTION\n'
+
+          cd /opt/oasis-care || fail_remote REPOSITORY_STATE_UNSAFE
+          [ -d .git ] || fail_remote REPOSITORY_STATE_UNSAFE
+          [ -z "$(git status --porcelain --untracked-files=all 2>/dev/null)" ] || fail_remote REPOSITORY_STATE_UNSAFE
+          origin_url="$(git remote get-url origin 2>/dev/null)" || fail_remote REPOSITORY_STATE_UNSAFE
+          case "$origin_url" in
+            "https://github.com/${REPOSITORY}.git"|"git@github.com:${REPOSITORY}.git") ;;
+            *) fail_remote REPOSITORY_STATE_UNSAFE ;;
+          esac
+
+          remote_main_line="$(git ls-remote --exit-code origin refs/heads/main 2>/dev/null)" || fail_remote TARGET_PROOF_FAILED
+          remote_main="${remote_main_line%%[[:space:]]*}"
+          [[ "$remote_main" =~ ^[0-9a-f]{40}$ ]] || fail_remote TARGET_PROOF_FAILED
+          if [ "$OPERATION" = "bootstrap_deploy" ]; then
+            [ "$remote_main" = "$TARGET_SHA" ] || fail_remote TARGET_PROOF_FAILED
+            current_branch="$(git symbolic-ref --short HEAD 2>/dev/null)" || fail_remote REPOSITORY_STATE_UNSAFE
+            [ "$current_branch" = "main" ] || fail_remote REPOSITORY_STATE_UNSAFE
+          fi
+
+          git_common_raw="$(git rev-parse --git-common-dir 2>/dev/null)" || fail_remote REPOSITORY_STATE_UNSAFE
+          git_common="$(cd "$git_common_raw" 2>/dev/null && pwd -P)" || fail_remote REPOSITORY_STATE_UNSAFE
+          state_root="$git_common/oasis-deploy/legacy-bootstrap-v1"
+          state_dir="$state_root/state"
+          tool_dir="$state_root/tools"
+          install -m 700 -d "$git_common/oasis-deploy" "$state_root" "$tool_dir" || fail_remote STATE_IO_UNCERTAIN
+          exec 9>"$git_common/oasis-deploy/production-vps-mutation.lock"
+          flock -n 9 || fail_remote PRODUCTION_MUTATION_LOCKED
+          locked_target_class="$(tr -d '\r\n' < /etc/oasis/production-deploy-target-class 2>/dev/null)" || fail_remote DEPLOY_TARGET_UNKNOWN
+          [ "$locked_target_class" = "production" ] || fail_remote DEPLOY_TARGET_NOT_PRODUCTION
+          printf 'DEPLOY_TARGET_PRODUCTION\n'
+
+          if [ "$OPERATION" = "bootstrap_deploy" ]; then
+            [ ! -e "$state_dir/reservation" ] || fail_remote STATE_ALREADY_CONSUMED
+            install -m 700 "$remote_state_helper" "$tool_dir/legacy-bootstrap-state.mjs" || fail_remote STATE_IO_UNCERTAIN
+          else
+            [ -f "$tool_dir/legacy-bootstrap-state.mjs" ] || fail_remote STATE_INVALID
+          fi
+          state_helper="$tool_dir/legacy-bootstrap-state.mjs"
+          revision_helper="$remote_revision_helper"
+
+          if [ "$OPERATION" = "bootstrap_deploy" ]; then
+            if ! OASIS_PRODUCTION_APP_URL="$APP_URL" TARGET_SHA="$TARGET_SHA" \
+              node "$revision_helper" bootstrap_legacy; then
+              fail_remote REVISION_UNSAFE
+            fi
+            if ! node "$remote_preflight" deploy/v2/.env >"$diagnostic_file" 2>&1; then
+              fail_remote BOOTSTRAP_PREFLIGHT_FAILED
+            fi
+
+            compose=(docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml)
+            declare -A image_ids
+            for service in caddy web api; do
+              container_id="$("${compose[@]}" ps -q "$service" 2>/dev/null)" || fail_remote CURRENT_CONTAINERS_UNSAFE
+              [[ "$container_id" =~ ^[0-9a-f]{64}$ ]] || fail_remote CURRENT_CONTAINERS_UNSAFE
+              health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null)" || fail_remote CURRENT_CONTAINERS_UNSAFE
+              [ "$health_status" = "healthy" ] || fail_remote CURRENT_CONTAINERS_UNSAFE
+              image_id="$(docker inspect --format '{{.Image}}' "$container_id" 2>/dev/null)" || fail_remote CURRENT_CONTAINERS_UNSAFE
+              [[ "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || fail_remote CURRENT_CONTAINERS_UNSAFE
+              image_ids["$service"]="$image_id"
+            done
+            postgres_container="$("${compose[@]}" ps -q postgres 2>/dev/null)" || fail_remote CURRENT_CONTAINERS_UNSAFE
+            [[ "$postgres_container" =~ ^[0-9a-f]{64}$ ]] || fail_remote CURRENT_CONTAINERS_UNSAFE
+            postgres_health="$(docker inspect --format '{{.State.Health.Status}}' "$postgres_container" 2>/dev/null)" || fail_remote CURRENT_CONTAINERS_UNSAFE
+            [ "$postgres_health" = "healthy" ] || fail_remote CURRENT_CONTAINERS_UNSAFE
+
+            attempt_id="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(16).toString("hex"))' 2>/dev/null)" || fail_remote STATE_IO_UNCERTAIN
+            [[ "$attempt_id" =~ ^[0-9a-f]{32}$ ]] || fail_remote STATE_IO_UNCERTAIN
+            for service in caddy web api; do
+              alias="oasis-legacy-bootstrap-${service}:${attempt_id}"
+              if ! docker image tag "${image_ids[$service]}" "$alias" >"$diagnostic_file" 2>&1; then
+                fail_remote IMAGE_PRESERVATION_FAILED
+              fi
+              alias_id="$(docker image inspect --format '{{.Id}}' "$alias" 2>/dev/null)" || fail_remote IMAGE_PRESERVATION_FAILED
+              [ "$alias_id" = "${image_ids[$service]}" ] || fail_remote IMAGE_PRESERVATION_FAILED
+            done
+
+            LEGACY_STATE_DIR="$state_dir" TARGET_SHA="$TARGET_SHA" ATTEMPT_ID="$attempt_id" \
+              API_IMAGE_ID="${image_ids[api]}" WEB_IMAGE_ID="${image_ids[web]}" CADDY_IMAGE_ID="${image_ids[caddy]}" \
+              node "$state_helper" prepare || exit 1
+
+            if ! git fetch --no-tags origin main >"$diagnostic_file" 2>&1; then
+              fail_remote BOOTSTRAP_ABORTED_PRE_MUTATION
+            fi
+            fetched_main="$(git rev-parse origin/main 2>/dev/null)" || fail_remote BOOTSTRAP_ABORTED_PRE_MUTATION
+            [ "$fetched_main" = "$TARGET_SHA" ] || fail_remote BOOTSTRAP_ABORTED_PRE_MUTATION
+            if ! git checkout --detach "$TARGET_SHA" >"$diagnostic_file" 2>&1; then
+              fail_remote BOOTSTRAP_ABORTED_PRE_MUTATION
+            fi
+            if ! node deploy/v2/scripts/preflight-env.mjs deploy/v2/.env >"$diagnostic_file" 2>&1; then
+              fail_remote BOOTSTRAP_ABORTED_PRE_MUTATION
+            fi
+            compose=(docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml)
+            mark_rollback_required() {
+              if LEGACY_STATE_DIR="$state_dir" TARGET_SHA="$TARGET_SHA" NEXT_STATE=ROLLBACK_REQUIRED \
+                node "$state_helper" transition >/dev/null 2>&1; then
+                printf 'STATE_ROLLBACK_REQUIRED\n'
+              else
+                printf 'STATE_IO_UNCERTAIN\n'
+              fi
+              printf 'ROLLBACK_REQUIRED\n'
+              exit 1
+            }
+
+            LEGACY_STATE_DIR="$state_dir" TARGET_SHA="$TARGET_SHA" NEXT_STATE=MUTATION_STARTED \
+              node "$state_helper" transition || exit 1
+            if ! RUN_MIGRATIONS=false APP_COMMIT_SHA="$TARGET_SHA" APP_VERSION="${TARGET_SHA:0:12}" \
+              "${compose[@]}" build web api >"$diagnostic_file" 2>&1; then
+              mark_rollback_required
+            fi
+
+            if ! RUN_MIGRATIONS=false APP_COMMIT_SHA="$TARGET_SHA" APP_VERSION="${TARGET_SHA:0:12}" \
+              "${compose[@]}" up -d --no-deps --no-build --pull never --wait --wait-timeout 180 api web caddy \
+              >"$diagnostic_file" 2>&1; then
+              mark_rollback_required
+            fi
+            for service in caddy web api; do
+              container_id="$("${compose[@]}" ps -q "$service" 2>/dev/null)" || mark_rollback_required
+              health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null)" || mark_rollback_required
+              [ "$health_status" = "healthy" ] || mark_rollback_required
+            done
+            if ! OASIS_PRODUCTION_APP_URL="$APP_URL" TARGET_SHA="$TARGET_SHA" \
+              node "$revision_helper" target_exact; then
+              mark_rollback_required
+            fi
+            if ! LEGACY_STATE_DIR="$state_dir" TARGET_SHA="$TARGET_SHA" NEXT_STATE=REVISION_AWARE_COMPLETE \
+              node "$state_helper" transition; then
+              printf 'ROLLBACK_REQUIRED\n'
+              exit 1
+            fi
+            printf 'BOOTSTRAP_DEPLOY_COMPLETE\n'
+            exit 0
+          fi
+
+          export_file="$state_dir/.export-${TARGET_SHA}"
+          LEGACY_STATE_DIR="$state_dir" TARGET_SHA="$TARGET_SHA" LEGACY_STATE_EXPORT_PATH="$export_file" \
+            node "$state_helper" export || exit 1
+          declare -A state_values
+          while IFS='=' read -r key value; do
+            case "$key" in
+              TARGET_SHA|ATTEMPT_ID|STATUS|API_IMAGE_ID|API_IMAGE_ALIAS|WEB_IMAGE_ID|WEB_IMAGE_ALIAS|CADDY_IMAGE_ID|CADDY_IMAGE_ALIAS)
+                [ -z "${state_values[$key]+x}" ] || fail_remote STATE_INVALID
+                state_values["$key"]="$value"
+                ;;
+              *) fail_remote STATE_INVALID ;;
+            esac
+          done < "$export_file"
+          [ "${#state_values[@]}" -eq 9 ] || fail_remote STATE_INVALID
+          [ "${state_values[TARGET_SHA]}" = "$TARGET_SHA" ] || fail_remote STATE_INVALID
+          [[ "${state_values[ATTEMPT_ID]}" =~ ^[0-9a-f]{32}$ ]] || fail_remote STATE_INVALID
+          case "${state_values[STATUS]}" in
+            MUTATION_STARTED|REVISION_AWARE_COMPLETE|ROLLBACK_REQUIRED) ;;
+            *) fail_remote STATE_INVALID ;;
+          esac
+          for service in API WEB CADDY; do
+            image_id_key="${service}_IMAGE_ID"
+            alias_key="${service}_IMAGE_ALIAS"
+            [[ "${state_values[$image_id_key]}" =~ ^sha256:[0-9a-f]{64}$ ]] || fail_remote STATE_INVALID
+            expected_alias="oasis-legacy-bootstrap-${service,,}:${state_values[ATTEMPT_ID]}"
+            [ "${state_values[$alias_key]}" = "$expected_alias" ] || fail_remote STATE_INVALID
+            alias_id="$(docker image inspect --format '{{.Id}}' "${state_values[$alias_key]}" 2>/dev/null)" || fail_remote ROLLBACK_IMAGES_UNAVAILABLE
+            [ "$alias_id" = "${state_values[$image_id_key]}" ] || fail_remote ROLLBACK_IMAGES_UNAVAILABLE
+          done
+
+          if ! git fetch --no-tags origin main >"$diagnostic_file" 2>&1; then
+            fail_remote TARGET_PROOF_FAILED
+          fi
+          git cat-file -e "${TARGET_SHA}^{commit}" 2>/dev/null || fail_remote TARGET_PROOF_FAILED
+          git merge-base --is-ancestor "$TARGET_SHA" origin/main >"$diagnostic_file" 2>&1 || fail_remote TARGET_PROOF_FAILED
+          if ! git checkout --detach "$TARGET_SHA" >"$diagnostic_file" 2>&1; then
+            fail_remote ROLLBACK_FAILED
+          fi
+          if ! node deploy/v2/scripts/preflight-env.mjs deploy/v2/.env >"$diagnostic_file" 2>&1; then
+            fail_remote ROLLBACK_FAILED
+          fi
+
+          override_file="$state_dir/.rollback-${TARGET_SHA}.yml"
+          {
+            printf 'services:\n'
+            printf '  api:\n    image: %s\n' "${state_values[API_IMAGE_ALIAS]}"
+            printf '  web:\n    image: %s\n' "${state_values[WEB_IMAGE_ALIAS]}"
+            printf '  caddy:\n    image: %s\n' "${state_values[CADDY_IMAGE_ALIAS]}"
+          } > "$override_file"
+          chmod 600 "$override_file"
+
+          if [ "${state_values[STATUS]}" != "ROLLBACK_REQUIRED" ]; then
+            LEGACY_STATE_DIR="$state_dir" TARGET_SHA="$TARGET_SHA" NEXT_STATE=ROLLBACK_REQUIRED \
+              node "$state_helper" transition || fail_remote STATE_IO_UNCERTAIN
+          fi
+          compose=(docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml -f "$override_file")
+          if ! RUN_MIGRATIONS=false APP_COMMIT_SHA=unknown APP_VERSION=unknown \
+            "${compose[@]}" up -d --no-deps --no-build --pull never --wait --wait-timeout 180 api web caddy \
+            >"$diagnostic_file" 2>&1; then
+            fail_remote ROLLBACK_FAILED
+          fi
+          for service in api web caddy; do
+            container_id="$("${compose[@]}" ps -q "$service" 2>/dev/null)" || fail_remote ROLLBACK_FAILED
+            running_image="$(docker inspect --format '{{.Image}}' "$container_id" 2>/dev/null)" || fail_remote ROLLBACK_FAILED
+            image_id_key="${service^^}_IMAGE_ID"
+            [ "$running_image" = "${state_values[$image_id_key]}" ] || fail_remote ROLLBACK_FAILED
+            health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null)" || fail_remote ROLLBACK_FAILED
+            [ "$health_status" = "healthy" ] || fail_remote ROLLBACK_FAILED
+          done
+          if ! OASIS_PRODUCTION_APP_URL="$APP_URL" TARGET_SHA="$TARGET_SHA" \
+            node "$revision_helper" rollback_legacy; then
+            fail_remote ROLLBACK_FAILED
+          fi
+          if ! LEGACY_STATE_DIR="$state_dir" TARGET_SHA="$TARGET_SHA" NEXT_STATE=LEGACY_ROLLED_BACK \
+            node "$state_helper" transition; then
+            fail_remote ROLLBACK_FAILED
+          fi
+          printf 'LEGACY_ROLLBACK_COMPLETE\n'
+          REMOTE
+          remote_status=$?
+          set -e
+
+          unsafe_output=0
+          while IFS= read -r line || [ -n "$line" ]; do
+            case "$line" in
+              BOOTSTRAP_INPUTS_INVALID|DEPLOY_TARGET_PRODUCTION|DEPLOY_TARGET_UNKNOWN|DEPLOY_TARGET_NOT_PRODUCTION|REPOSITORY_STATE_UNSAFE|TARGET_PROOF_FAILED|PRODUCTION_MUTATION_LOCKED|REVISION_AWARE_EXACT|LEGACY_UNKNOWN|REVISION_UNSAFE|BOOTSTRAP_PREFLIGHT_FAILED|CURRENT_CONTAINERS_UNSAFE|IMAGE_PRESERVATION_FAILED|BOOTSTRAP_ABORTED_PRE_MUTATION|ROLLBACK_REQUIRED|ROLLBACK_FAILED|ROLLBACK_IMAGES_UNAVAILABLE|BOOTSTRAP_DEPLOY_COMPLETE|LEGACY_ROLLBACK_COMPLETE|STATE_PREPARED|STATE_MUTATION_STARTED|STATE_REVISION_AWARE_COMPLETE|STATE_ROLLBACK_REQUIRED|STATE_LEGACY_ROLLED_BACK|STATE_EXPORT_READY|STATE_ALREADY_CONSUMED|STATE_LOCKED|STATE_INVALID|STATE_IO_UNCERTAIN)
+                printf '%s\n' "$line"
+                ;;
+              *)
+                unsafe_output=1
+                ;;
+            esac
+          done < "$remote_output"
+
+          if [ "$unsafe_output" -ne 0 ]; then
+            printf 'REMOTE_OUTPUT_UNSAFE\n' >&2
+            exit 1
+          fi
+          if [ "$remote_status" -ne 0 ]; then
+            printf 'REMOTE_OPERATION_FAILED\n' >&2
+            exit 1
+          fi

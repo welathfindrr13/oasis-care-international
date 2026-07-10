@@ -137,6 +137,97 @@ The deployment is not healthy until CareBridge checks prove:
 - concern cases remain scoped to the correct Care Room/contact;
 - evidence exports remain staff-only unless a family-safe export is deliberately built later.
 
+## One-Time Legacy Bootstrap (Design-Gated Only)
+
+The currently running deployment predates revision-aware health proof and is classified only as
+`LEGACY_UNKNOWN`. The `Deploy VPS` workflow therefore exposes two narrowly scoped operations:
+
+- `bootstrap_deploy` — one code-only transition from `LEGACY_UNKNOWN` to an exact reviewed SHA;
+- `legacy_rollback` — an explicit image-based return to the preserved legacy containers.
+
+This workflow is not a general deployment lane. No deploy SHA is approved by this documentation,
+by the workflow implementation, or by merging its pull request. Execution needs a separate explicit
+approval after every prerequisite below has been proven.
+
+### Required operator inputs
+
+- `target_sha`: the exact lowercase 40-character reviewed commit;
+- `production_code_approval`:
+  - `APPROVE_ONE_TIME_LEGACY_BOOTSTRAP_<target_sha>` for `bootstrap_deploy`;
+  - `APPROVE_EXPLICIT_LEGACY_ROLLBACK_<target_sha>` for `legacy_rollback`.
+
+Bootstrap requires the target to equal both the workflow revision and the then-current `origin/main`
+tip. Rollback requires the stored target to remain a commit on `origin/main`; it never treats a Git
+commit as proof of the legacy container revision.
+
+### Permanent state and recovery contract
+
+The only allowed state transitions are:
+
+```text
+ABSENT -> PREPARED -> MUTATION_STARTED -> REVISION_AWARE_COMPLETE
+                         |                         |
+                         +-> ROLLBACK_REQUIRED <---+
+                                   |
+                                   +-> LEGACY_ROLLED_BACK
+```
+
+`PREPARED` contains a permanent reservation plus the three validated running image IDs and derived
+rollback aliases for API, web, and Caddy. The recorded legacy revision is always
+`LEGACY_UNKNOWN`; there is no legacy rollback SHA. State is stored beneath Git common metadata with
+restrictive permissions, exclusive transition locks, atomic same-directory writes, file and directory
+sync, and fail-closed crash handling.
+
+Before any Git checkout, image build, or running-service change, the workflow must:
+
+1. reclassify API `/health`, web `/api/health`, and `/ready` as `LEGACY_UNKNOWN` with a healthy database;
+2. prove the production target marker and acquire the host-local production mutation lock;
+3. prove clean repository state and the reviewed `origin/main` target without printing repository details;
+4. require exactly one healthy Compose-managed API, web, Caddy, and Postgres container;
+5. preserve and re-inspect API, web, and Caddy image aliases;
+6. durably commit `PREPARED`.
+
+The workflow then checks out the exact target detached, runs configuration preflight, and sets
+`MUTATION_STARTED` before building only API and web. A partial build therefore enters the explicit
+`ROLLBACK_REQUIRED` path even though running containers have not yet changed. Runtime mutation recreates only API, web, and Caddy with
+`--no-deps`, `--no-build`, `--pull never`, and `RUN_MIGRATIONS=false`. It never invokes a migration,
+backfill, database restore, or database service mutation.
+
+Completion requires all of the following without printing response bodies or diagnostics:
+
+- API `/health` reports the exact target SHA;
+- web `/api/health` reports the exact target SHA;
+- `/ready` reports the exact target SHA, `ready`, and database `ok`;
+- `REVISION_AWARE_COMPLETE` and the permanent completion marker are durably stored.
+
+The reservation is never removed. Once created, future `LEGACY_UNKNOWN` bootstrap attempts fail closed.
+If any failure occurs after `MUTATION_STARTED`, the workflow records `ROLLBACK_REQUIRED` and stops. It
+never rolls back automatically.
+
+`legacy_rollback` requires its distinct approval token, matching stored target, intact aliases, and
+explicit operator dispatch. It recreates only API, web, and Caddy from the preserved images with
+`--no-build`, `--pull never`, `--no-deps`, `RUN_MIGRATIONS=false`, and revision values explicitly set to
+`unknown`. Success requires the running image IDs to match the preserved IDs, public health to classify
+as `LEGACY_UNKNOWN`, database readiness to remain healthy, and state to become `LEGACY_ROLLED_BACK`.
+The permanent reservation and any completion marker remain. Forward recovery after rollback requires a
+new design and explicit approval; the exception cannot be reused.
+
+### External execution blockers
+
+These controls cannot be solved or truthfully proven by repository code:
+
+- a protected production environment must exist with main-only policy and required human approval;
+- old repository-scoped deploy credentials must be removed or invalidated outside this workflow;
+- production transport values must exist only in the protected production environment;
+- remote Git cleanliness, required CLI capabilities, durable storage, disk capacity, healthy containers,
+  and preserved-image compatibility must pass sanitized execution-time checks;
+- current public health must still be exactly `LEGACY_UNKNOWN` immediately before mutation;
+- backup and restore evidence, migration status, UX proof, named staffing, and the complete fake-data
+  smoke matrix remain unresolved Phase 7 gates.
+
+If any prerequisite cannot be proven without exposing values, the result remains `NO-GO`. Merging this
+workflow does not authorize dispatch, approve a target SHA, or make the application deploy-ready.
+
 ## Backup Flow
 
 Create a timestamped local backup:
