@@ -43,18 +43,20 @@ export class CarePlanningService {
     const organizationId = this.requireOrganizationId(viewer.organizationId);
     this.assertReadAccess(viewer.role);
 
-    const records = await this.withSchemaGuard(() =>
-      this.repository.listAssessments(organizationId, clientId, take),
-    );
+    const records = await this.withSchemaGuard(() => this.repository.listAssessments(organizationId, clientId, take));
     return records.map((record) => this.mapAssessment(record));
   }
 
   async createAssessment(input: CreateAssessmentInput, viewer: CarePlanningViewer): Promise<AssessmentDTO> {
     const organizationId = this.requireOrganizationId(viewer.organizationId);
     this.assertWriteAccess(viewer.role);
+    const actorId = this.requireActorId(viewer.userId);
 
     const record = await this.withSchemaGuard(() =>
-      this.repository.createAssessment(organizationId, input),
+      this.repository.createAssessment(organizationId, {
+        ...input,
+        assessorId: actorId,
+      }),
     );
     return this.mapAssessment(record);
   }
@@ -63,15 +65,9 @@ export class CarePlanningService {
     const organizationId = this.requireOrganizationId(viewer.organizationId);
     this.assertReadAccess(viewer.role);
 
-    const record = await this.withSchemaGuard(() =>
-      this.repository.getAssessment(organizationId, id),
-    );
+    const record = await this.withSchemaGuard(() => this.repository.getAssessment(organizationId, id));
     if (!record) {
-      throw new BaseHttpException(
-        ErrorCode.VALIDATION_FAILED,
-        'Assessment not found',
-        HttpStatus.NOT_FOUND,
-      );
+      throw new BaseHttpException(ErrorCode.VALIDATION_FAILED, 'Assessment not found', HttpStatus.NOT_FOUND);
     }
 
     return this.mapAssessment(record);
@@ -80,19 +76,16 @@ export class CarePlanningService {
   async completeAssessment(input: CompleteAssessmentInput, viewer: CarePlanningViewer): Promise<AssessmentDTO> {
     const organizationId = this.requireOrganizationId(viewer.organizationId);
     this.assertWriteAccess(viewer.role);
+    const actorId = this.requireActorId(viewer.userId);
 
     const record = await this.withSchemaGuard(() =>
       this.repository.completeAssessment(organizationId, {
         ...input,
-        assessorId: input.assessorId ?? viewer.userId ?? undefined,
+        assessorId: actorId,
       }),
     );
     if (!record) {
-      throw new BaseHttpException(
-        ErrorCode.VALIDATION_FAILED,
-        'Assessment not found',
-        HttpStatus.NOT_FOUND,
-      );
+      throw new BaseHttpException(ErrorCode.VALIDATION_FAILED, 'Assessment not found', HttpStatus.NOT_FOUND);
     }
 
     return this.mapAssessment(record);
@@ -102,18 +95,22 @@ export class CarePlanningService {
     const organizationId = this.requireOrganizationId(viewer.organizationId);
     this.assertReadAccess(viewer.role);
 
-    const records = await this.withSchemaGuard(() =>
-      this.repository.listCarePlans(organizationId, clientId, take),
-    );
+    const records = await this.withSchemaGuard(() => this.repository.listCarePlans(organizationId, clientId, take));
     return records.map((record) => this.mapCarePlan(record));
   }
 
   async createCarePlan(input: CreateCarePlanInput, viewer: CarePlanningViewer): Promise<CarePlanDTO> {
     const organizationId = this.requireOrganizationId(viewer.organizationId);
     this.assertWriteAccess(viewer.role);
+    const actorId = this.requireActorId(viewer.userId);
 
     const record = await this.withSchemaGuard(() =>
-      this.repository.createCarePlan(organizationId, input),
+      this.repository.createCarePlan(organizationId, {
+        ...input,
+        authoredById: actorId,
+        approvedById: undefined,
+        approvedAt: undefined,
+      }),
     );
     return this.mapCarePlan(record);
   }
@@ -122,15 +119,9 @@ export class CarePlanningService {
     const organizationId = this.requireOrganizationId(viewer.organizationId);
     this.assertReadAccess(viewer.role);
 
-    const record = await this.withSchemaGuard(() =>
-      this.repository.getCarePlan(organizationId, id),
-    );
+    const record = await this.withSchemaGuard(() => this.repository.getCarePlan(organizationId, id));
     if (!record) {
-      throw new BaseHttpException(
-        ErrorCode.VALIDATION_FAILED,
-        'Care plan not found',
-        HttpStatus.NOT_FOUND,
-      );
+      throw new BaseHttpException(ErrorCode.VALIDATION_FAILED, 'Care plan not found', HttpStatus.NOT_FOUND);
     }
 
     return this.mapCarePlan(record);
@@ -139,19 +130,16 @@ export class CarePlanningService {
   async approveCarePlan(input: ApproveCarePlanInput, viewer: CarePlanningViewer): Promise<CarePlanDTO> {
     const organizationId = this.requireOrganizationId(viewer.organizationId);
     this.assertWriteAccess(viewer.role);
+    const actorId = this.requireActorId(viewer.userId);
 
     const record = await this.withSchemaGuard(() =>
       this.repository.approveCarePlan(organizationId, {
         ...input,
-        approvedById: input.approvedById ?? viewer.userId ?? undefined,
+        approvedById: actorId,
       }),
     );
     if (!record) {
-      throw new BaseHttpException(
-        ErrorCode.VALIDATION_FAILED,
-        'Care plan not found',
-        HttpStatus.NOT_FOUND,
-      );
+      throw new BaseHttpException(ErrorCode.VALIDATION_FAILED, 'Care plan not found', HttpStatus.NOT_FOUND);
     }
 
     return this.mapCarePlan(record);
@@ -161,15 +149,9 @@ export class CarePlanningService {
     const organizationId = this.requireOrganizationId(viewer.organizationId);
     this.assertWriteAccess(viewer.role);
 
-    const record = await this.withSchemaGuard(() =>
-      this.repository.archiveCarePlan(organizationId, input),
-    );
+    const record = await this.withSchemaGuard(() => this.repository.archiveCarePlan(organizationId, input));
     if (!record) {
-      throw new BaseHttpException(
-        ErrorCode.VALIDATION_FAILED,
-        'Care plan not found',
-        HttpStatus.NOT_FOUND,
-      );
+      throw new BaseHttpException(ErrorCode.VALIDATION_FAILED, 'Care plan not found', HttpStatus.NOT_FOUND);
     }
 
     return this.mapCarePlan(record);
@@ -179,9 +161,7 @@ export class CarePlanningService {
     const organizationId = this.requireOrganizationId(viewer.organizationId);
     this.assertReadAccess(viewer.role);
 
-    const records = await this.withSchemaGuard(() =>
-      this.repository.listEvidencePacks(organizationId, clientId, take),
-    );
+    const records = await this.withSchemaGuard(() => this.repository.listEvidencePacks(organizationId, clientId, take));
     return records.map((record) => this.mapEvidencePack(record));
   }
 
@@ -217,9 +197,13 @@ export class CarePlanningService {
   async createEvidencePack(input: CreateEvidencePackInput, viewer: CarePlanningViewer): Promise<EvidencePackDTO> {
     const organizationId = this.requireOrganizationId(viewer.organizationId);
     this.assertWriteAccess(viewer.role);
+    const actorId = this.requireActorId(viewer.userId);
 
     const record = await this.withSchemaGuard(() =>
-      this.repository.createEvidencePack(organizationId, input),
+      this.repository.createEvidencePack(organizationId, {
+        ...input,
+        generatedBy: actorId,
+      }),
     );
     return this.mapEvidencePack(record);
   }
@@ -228,15 +212,9 @@ export class CarePlanningService {
     const organizationId = this.requireOrganizationId(viewer.organizationId);
     this.assertReadAccess(viewer.role);
 
-    const record = await this.withSchemaGuard(() =>
-      this.repository.getEvidencePack(organizationId, id),
-    );
+    const record = await this.withSchemaGuard(() => this.repository.getEvidencePack(organizationId, id));
     if (!record) {
-      throw new BaseHttpException(
-        ErrorCode.VALIDATION_FAILED,
-        'Evidence pack not found',
-        HttpStatus.NOT_FOUND,
-      );
+      throw new BaseHttpException(ErrorCode.VALIDATION_FAILED, 'Evidence pack not found', HttpStatus.NOT_FOUND);
     }
 
     return this.mapEvidencePack(record);
@@ -250,11 +228,7 @@ export class CarePlanningService {
       this.repository.recordEvidencePackExport(organizationId, id, viewer.userId ?? undefined),
     );
     if (!record) {
-      throw new BaseHttpException(
-        ErrorCode.VALIDATION_FAILED,
-        'Evidence pack not found',
-        HttpStatus.NOT_FOUND,
-      );
+      throw new BaseHttpException(ErrorCode.VALIDATION_FAILED, 'Evidence pack not found', HttpStatus.NOT_FOUND);
     }
 
     return this.mapEvidencePack(record);
@@ -305,9 +279,7 @@ export class CarePlanningService {
   }
 
   private mapEvidencePack(record: any): EvidencePackDTO {
-    const items = Array.isArray(record.items)
-      ? record.items.map((item: any) => this.mapEvidenceItem(item))
-      : [];
+    const items = Array.isArray(record.items) ? record.items.map((item: any) => this.mapEvidenceItem(item)) : [];
 
     return {
       id: record.id,
@@ -371,10 +343,10 @@ export class CarePlanningService {
 
   private assertReadAccess(role: string): void {
     const normalizedRole = this.normalizeRole(role);
-    if (!['admin', 'carer'].includes(normalizedRole)) {
+    if (normalizedRole !== 'admin') {
       throw new BaseHttpException(
         ErrorCode.FORBIDDEN_ROLE_REQUIRED,
-        'Clinical staff access required',
+        'Administrator access required',
         HttpStatus.FORBIDDEN,
       );
     }
@@ -382,10 +354,10 @@ export class CarePlanningService {
 
   private assertWriteAccess(role: string): void {
     const normalizedRole = this.normalizeRole(role);
-    if (!['admin', 'carer'].includes(normalizedRole)) {
+    if (normalizedRole !== 'admin') {
       throw new BaseHttpException(
         ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
-        'Only clinical staff can update assessment-led care planning records',
+        'Only administrators can update assessment-led care planning records',
         HttpStatus.FORBIDDEN,
       );
     }
@@ -403,6 +375,18 @@ export class CarePlanningService {
     throw new BaseHttpException(
       ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
       'Organization context is required for care-planning operations',
+      HttpStatus.FORBIDDEN,
+    );
+  }
+
+  private requireActorId(userId?: string | null): string {
+    const actorId = (userId || '').trim();
+    if (actorId) {
+      return actorId;
+    }
+    throw new BaseHttpException(
+      ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
+      'Verified actor identity is required for care-planning operations',
       HttpStatus.FORBIDDEN,
     );
   }

@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   HttpException,
   Injectable,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '@oasis/db';
 import { randomUUID } from 'node:crypto';
@@ -39,12 +40,11 @@ type TransactionClient = {
 export class CarerMembershipService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listEligibleMemberships(
-    principal: VerifiedAdminPrincipal,
-  ): Promise<EligibleCarerMembershipDTO[]> {
+  async listEligibleMemberships(principal: VerifiedAdminPrincipal): Promise<EligibleCarerMembershipDTO[]> {
     const organizationId = this.requirePrincipalValue(principal.organizationId);
     const adminMembershipId = this.requirePrincipalValue(principal.organizationMembershipId);
     const actorSubject = this.requirePrincipalValue(principal.authSubject);
+    const identityProvider = this.configuredIdentityProvider();
 
     await this.requireVerifiedAdmin(this.prisma as unknown as TransactionClient, {
       organizationId,
@@ -55,50 +55,69 @@ export class CarerMembershipService {
     const memberships = await (this.prisma as any).organizationMembership.findMany({
       where: {
         organization_id: organizationId,
+        identity_provider: identityProvider,
+        auth_subject: { not: '' },
         status: 'ACTIVE',
+        revoked_at: null,
         role: { in: [...ALLOWED_WORKFORCE_ROLES] },
         carer_id: null,
+        normalized_email: { not: null },
       },
       select: {
         id: true,
         identity_provider: true,
+        auth_subject: true,
         role: true,
         normalized_email: true,
       },
       orderBy: [{ normalized_email: 'asc' }, { created_at: 'asc' }],
     });
 
-    return memberships.map((membership: any) => ({
-      id: membership.id,
-      identityProvider: membership.identity_provider,
-      role: membership.role,
-      loginEmail: membership.normalized_email,
-    }));
+    return memberships
+      .filter(
+        (membership: any) =>
+          this.hasStableIdentity(membership.auth_subject) && this.hasStableIdentity(membership.normalized_email),
+      )
+      .map((membership: any) => ({
+        id: membership.id,
+        identityProvider: membership.identity_provider,
+        role: membership.role,
+        loginEmail: membership.normalized_email,
+      }));
   }
 
-  async createAndLinkCarer(
-    input: CreateLinkedCarerInput,
-    principal: VerifiedAdminPrincipal,
-  ): Promise<LinkedCarerDTO> {
+  async createAndLinkCarer(input: CreateLinkedCarerInput, principal: VerifiedAdminPrincipal): Promise<LinkedCarerDTO> {
     const organizationId = this.requirePrincipalValue(principal.organizationId);
     const adminMembershipId = this.requirePrincipalValue(principal.organizationMembershipId);
     const actorSubject = this.requirePrincipalValue(principal.authSubject);
     const membershipId = this.requireInputValue(input.membershipId);
     const profile = this.normalizeProfile(input);
+    const identityProvider = this.configuredIdentityProvider();
 
     try {
       return await (this.prisma as any).$transaction(async (tx: TransactionClient) => {
-        await this.requireVerifiedAdmin(tx, { organizationId, adminMembershipId, actorSubject });
+        await this.requireVerifiedAdmin(tx, {
+          organizationId,
+          adminMembershipId,
+          actorSubject,
+        });
 
         const membership = await tx.organizationMembership.findFirst({
           where: {
             id: membershipId,
             organization_id: organizationId,
+            identity_provider: identityProvider,
+            auth_subject: { not: '' },
+            revoked_at: null,
           },
           select: {
             id: true,
             role: true,
             status: true,
+            identity_provider: true,
+            auth_subject: true,
+            normalized_email: true,
+            revoked_at: true,
             carer_id: true,
           },
         });
@@ -112,13 +131,14 @@ export class CarerMembershipService {
         }
 
         const carerId = randomUUID();
+        const profileEmail = this.requireMembershipProfileEmail(membership.normalized_email);
         const carer = await tx.carer.create({
           data: {
             id: carerId,
             organization_id: organizationId,
             first_name: profile.firstName,
             last_name: profile.lastName,
-            email: profile.email,
+            email: profileEmail,
             phone: profile.phone,
             is_active: true,
           },
@@ -128,7 +148,10 @@ export class CarerMembershipService {
           where: {
             id: membershipId,
             organization_id: organizationId,
+            identity_provider: identityProvider,
+            auth_subject: membership.auth_subject,
             status: 'ACTIVE',
+            revoked_at: null,
             role: { in: [...ALLOWED_WORKFORCE_ROLES] },
             carer_id: null,
           },
@@ -164,22 +187,28 @@ export class CarerMembershipService {
         throw error;
       }
       if ((error as { code?: string })?.code === 'P2002') {
-        throw new ConflictException('A carer profile with these details already exists');
+        throw new ConflictException('Selected workforce membership could not be linked');
       }
-      throw error;
+      throw new InternalServerErrorException('Unable to create and link the Carer profile');
     }
   }
 
   private async requireVerifiedAdmin(
     tx: TransactionClient,
-    input: { organizationId: string; adminMembershipId: string; actorSubject: string },
+    input: {
+      organizationId: string;
+      adminMembershipId: string;
+      actorSubject: string;
+    },
   ): Promise<void> {
     const adminMembership = await tx.organizationMembership.findFirst({
       where: {
         id: input.adminMembershipId,
         organization_id: input.organizationId,
         auth_subject: input.actorSubject,
+        identity_provider: this.configuredIdentityProvider(),
         status: 'ACTIVE',
+        revoked_at: null,
         role: 'admin',
       },
       select: { id: true },
@@ -193,11 +222,19 @@ export class CarerMembershipService {
   private isEligibleMembership(membership: {
     role?: string | null;
     status?: string | null;
+    identity_provider?: string | null;
+    auth_subject?: string | null;
+    normalized_email?: string | null;
+    revoked_at?: Date | null;
     carer_id?: string | null;
   }): boolean {
     const role = (membership.role || '').trim().toLowerCase();
     return (
       membership.status === 'ACTIVE' &&
+      membership.revoked_at == null &&
+      membership.identity_provider === this.configuredIdentityProvider() &&
+      this.hasStableIdentity(membership.auth_subject) &&
+      this.hasStableIdentity(membership.normalized_email) &&
       ALLOWED_WORKFORCE_ROLES.includes(role as (typeof ALLOWED_WORKFORCE_ROLES)[number]) &&
       !membership.carer_id
     );
@@ -206,14 +243,13 @@ export class CarerMembershipService {
   private normalizeProfile(input: CreateLinkedCarerInput) {
     const firstName = this.requireInputValue(input.firstName);
     const lastName = this.requireInputValue(input.lastName);
-    const email = this.requireInputValue(input.email).toLowerCase();
     const phone = (input.phone || '').trim() || null;
 
-    if (firstName.length > 100 || lastName.length > 100 || email.length > 200 || (phone && phone.length > 50)) {
+    if (firstName.length > 100 || lastName.length > 100 || (phone && phone.length > 50)) {
       throw new BadRequestException('Carer profile fields are invalid');
     }
 
-    return { firstName, lastName, email, phone };
+    return { firstName, lastName, phone };
   }
 
   private mapCarer(carer: any): CarerDTO {
@@ -240,5 +276,21 @@ export class CarerMembershipService {
       throw new BadRequestException('Required carer profile fields are missing');
     }
     return normalized;
+  }
+
+  private configuredIdentityProvider(): string {
+    return (process.env.AUTH_IDENTITY_PROVIDER || 'cognito').trim().toLowerCase();
+  }
+
+  private hasStableIdentity(value?: string | null): boolean {
+    return Boolean((value || '').trim());
+  }
+
+  private requireMembershipProfileEmail(value?: string | null): string {
+    const email = (value || '').trim().toLowerCase();
+    if (!email || email.length > 200 || !email.includes('@')) {
+      throw new ConflictException(MEMBERSHIP_NOT_ELIGIBLE);
+    }
+    return email;
   }
 }

@@ -6,6 +6,7 @@ import { MedicationRepository } from './medication.repository';
 import { PrismaService } from '@oasis/db';
 import { MetricsModule } from '../metrics/metrics.module';
 import { Counter, register } from 'prom-client';
+import { CarerModule } from '../carer/carer.module';
 
 const medicationAdministrationsTotal = new Counter({
   name: 'medication_administrations_total',
@@ -21,7 +22,7 @@ register.registerMetric(medicationAdministrationsTotal);
 register.registerMetric(medicationOverlapsTotal);
 
 @Module({
-  imports: [ClsModule, MetricsModule],
+  imports: [ClsModule, MetricsModule, CarerModule],
   providers: [
     MedicationService,
     MedicationResolver,

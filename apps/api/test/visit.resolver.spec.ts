@@ -4,6 +4,7 @@ import { VisitResolver } from '../src/visit/visit.resolver';
 import { VisitService } from '../src/visit/visit.service';
 import { CareLogCategory, PrismaService, VisitStatus } from '@oasis/db';
 import { VisitTaskOutcome } from '../src/visit/dto/visit.dto';
+import { CarerAccessService } from '../src/carer/carer-access.service';
 
 describe('VisitResolver', () => {
   let resolver: VisitResolver;
@@ -26,6 +27,8 @@ describe('VisitResolver', () => {
     req: {
       user: {
         sub: 'user-123',
+        organizationId: 'org-123',
+        organizationMembershipRole: 'admin',
         realm_access: {
           roles: ['admin'],
         },
@@ -38,6 +41,9 @@ describe('VisitResolver', () => {
     req: {
       user: {
         sub: 'carer-123',
+        organizationId: 'org-123',
+        organizationMembershipRole: 'carer',
+        carerId: 'domain-carer-123',
         realm_access: {
           roles: ['carer'],
         },
@@ -50,6 +56,8 @@ describe('VisitResolver', () => {
     req: {
       user: {
         sub: 'client-123',
+        organizationId: 'org-123',
+        organizationMembershipRole: 'client',
         realm_access: {
           roles: ['client'],
         },
@@ -160,6 +168,12 @@ describe('VisitResolver', () => {
           useValue: {},
         },
         {
+          provide: CarerAccessService,
+          useValue: {
+            requireCarerIdentity: jest.fn(),
+          },
+        },
+        {
           provide: VisitService,
           useValue: mockVisitService,
         },
@@ -178,12 +192,7 @@ describe('VisitResolver', () => {
 
       const result = await resolver.visit('visit-123', mockContext);
 
-      expect(service.findVisitById).toHaveBeenCalledWith(
-        'visit-123',
-        'user-123',
-        'admin',
-        undefined,
-      );
+      expect(service.findVisitById).toHaveBeenCalledWith('visit-123', 'user-123', 'admin', 'org-123');
       expect(result.id).toBe('visit-123');
       expect(result.carer).toBeDefined();
       expect(result.client).toBeDefined();
@@ -207,12 +216,7 @@ describe('VisitResolver', () => {
 
       const result = await resolver.visits(filter, mockContext);
 
-      expect(service.findVisits).toHaveBeenCalledWith(
-        filter,
-        'user-123',
-        'admin',
-        undefined,
-      );
+      expect(service.findVisits).toHaveBeenCalledWith(filter, 'user-123', 'admin', 'org-123');
       expect(result.items).toHaveLength(1);
       expect(result.total).toBe(1);
     });
@@ -227,12 +231,7 @@ describe('VisitResolver', () => {
 
       await resolver.visits(filter, mockCarerContext);
 
-      expect(service.findVisits).toHaveBeenCalledWith(
-        filter,
-        'carer-123',
-        'carer',
-        undefined,
-      );
+      expect(service.findVisits).toHaveBeenCalledWith(filter, 'domain-carer-123', 'carer', 'org-123');
     });
   });
 
@@ -243,9 +242,7 @@ describe('VisitResolver', () => {
       scheduledStart: '2024-01-01T09:00:00Z',
       scheduledEnd: '2024-01-01T10:00:00Z',
       notes: 'Test visit',
-      tasks: [
-        { taskName: 'Medication', description: 'Give medication' },
-      ],
+      tasks: [{ taskName: 'Medication', description: 'Give medication' }],
     };
 
     it('should create a visit successfully', async () => {
@@ -253,12 +250,7 @@ describe('VisitResolver', () => {
 
       const result = await resolver.createVisit(createInput, mockContext);
 
-      expect(service.createVisit).toHaveBeenCalledWith(
-        createInput,
-        'user-123',
-        'admin',
-        undefined,
-      );
+      expect(service.createVisit).toHaveBeenCalledWith(createInput, 'user-123', 'admin', 'org-123');
       expect(result.id).toBe('visit-123');
     });
 
@@ -267,12 +259,7 @@ describe('VisitResolver', () => {
 
       await resolver.createVisit(createInput, mockCarerContext);
 
-      expect(service.createVisit).toHaveBeenCalledWith(
-        createInput,
-        'carer-123',
-        'carer',
-        undefined,
-      );
+      expect(service.createVisit).toHaveBeenCalledWith(createInput, 'domain-carer-123', 'carer', 'org-123');
     });
   });
 
@@ -292,13 +279,7 @@ describe('VisitResolver', () => {
 
       const result = await resolver.updateVisit(updateInput, mockContext);
 
-      expect(service.updateVisit).toHaveBeenCalledWith(
-        'visit-123',
-        updateInput,
-        'user-123',
-        'admin',
-        undefined,
-      );
+      expect(service.updateVisit).toHaveBeenCalledWith('visit-123', updateInput, 'user-123', 'admin', 'org-123');
       expect(result.status).toBe(VisitStatus.IN_PROGRESS);
     });
   });
@@ -312,12 +293,7 @@ describe('VisitResolver', () => {
 
       const result = await resolver.deleteVisit('visit-123', mockContext);
 
-      expect(service.deleteVisit).toHaveBeenCalledWith(
-        'visit-123',
-        'user-123',
-        'admin',
-        undefined,
-      );
+      expect(service.deleteVisit).toHaveBeenCalledWith('visit-123', 'user-123', 'admin', 'org-123');
       expect(result.id).toBe('visit-123');
     });
   });
@@ -338,18 +314,14 @@ describe('VisitResolver', () => {
     it('should complete a task successfully', async () => {
       mockVisitService.completeTask.mockResolvedValue(completedTask);
 
-      const result = await resolver.completeVisitTask(
-        'task-1',
-        'Completed successfully',
-        mockContext
-      );
+      const result = await resolver.completeVisitTask('task-1', 'Completed successfully', mockContext);
 
       expect(service.completeTask).toHaveBeenCalledWith(
         'task-1',
         'Completed successfully',
         'user-123',
         'admin',
-        undefined,
+        'org-123',
       );
       expect(result.isCompleted).toBe(true);
       expect(result.completedAt).toBeDefined();
@@ -364,13 +336,7 @@ describe('VisitResolver', () => {
 
       await resolver.completeVisitTask('task-1', undefined, mockCarerContext);
 
-      expect(service.completeTask).toHaveBeenCalledWith(
-        'task-1',
-        undefined,
-        'carer-123',
-        'carer',
-        undefined,
-      );
+      expect(service.completeTask).toHaveBeenCalledWith('task-1', undefined, 'domain-carer-123', 'carer', 'org-123');
     });
   });
 
@@ -384,12 +350,7 @@ describe('VisitResolver', () => {
 
       const result = await resolver.startVisit('visit-123', mockCarerContext);
 
-      expect(service.startVisit).toHaveBeenCalledWith(
-        'visit-123',
-        'carer-123',
-        'carer',
-        undefined,
-      );
+      expect(service.startVisit).toHaveBeenCalledWith('visit-123', 'domain-carer-123', 'carer', 'org-123');
       expect(result.status).toBe(VisitStatus.IN_PROGRESS);
     });
   });
@@ -405,12 +366,7 @@ describe('VisitResolver', () => {
 
       const result = await resolver.recordVisitTaskOutcome(input, mockCarerContext);
 
-      expect(service.recordVisitTaskOutcome).toHaveBeenCalledWith(
-        input,
-        'carer-123',
-        'carer',
-        undefined,
-      );
+      expect(service.recordVisitTaskOutcome).toHaveBeenCalledWith(input, 'domain-carer-123', 'carer', 'org-123');
       expect(result.id).toBe('task-1');
       expect(result.isCompleted).toBe(true);
       expect(result.notes).toContain('VISIT_TASK_OUTCOME::');
@@ -428,12 +384,7 @@ describe('VisitResolver', () => {
 
       const result = await resolver.submitVisitCareNote(input, mockCarerContext);
 
-      expect(service.submitVisitCareNote).toHaveBeenCalledWith(
-        input,
-        'carer-123',
-        'carer',
-        undefined,
-      );
+      expect(service.submitVisitCareNote).toHaveBeenCalledWith(input, 'domain-carer-123', 'carer', 'org-123');
       expect(result.id).toBe('care-log-1');
       expect(result.clientId).toBe('client-123');
       expect(result.carerId).toBe('carer-123');
@@ -456,12 +407,7 @@ describe('VisitResolver', () => {
 
       const result = await resolver.completeVisit(input, mockCarerContext);
 
-      expect(service.completeVisit).toHaveBeenCalledWith(
-        input,
-        'carer-123',
-        'carer',
-        undefined,
-      );
+      expect(service.completeVisit).toHaveBeenCalledWith(input, 'domain-carer-123', 'carer', 'org-123');
       expect(result.status).toBe(VisitStatus.COMPLETED);
       expect(result.actualEnd).toBeDefined();
     });

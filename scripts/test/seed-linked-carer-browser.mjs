@@ -1,0 +1,113 @@
+import crypto from 'node:crypto';
+import { PrismaClient, VisitStatus } from '../../libs/db/src/generated/client/index.js';
+
+const ORGANIZATION_ID = 'org-browser-linked-carer';
+const CARER_ID = '33333333-3333-4333-8333-333333333333';
+const OTHER_CARER_ID = '33333333-3333-4333-8333-444444444444';
+const CLIENT_ID = 'client-browser-linked-carer';
+const MEMBERSHIP_ID = '44444444-4444-4444-8444-444444444444';
+const VISIT_ID = '55555555-5555-4555-8555-555555555555';
+const UNASSIGNED_VISIT_ID = '55555555-5555-4555-8555-666666666666';
+const TASK_ID = '66666666-6666-4666-8666-666666666666';
+const subject = `local-${crypto
+  .createHash('sha256')
+  .update('carer:carer@local.dev:auto')
+  .digest('hex')
+  .slice(0, 16)}`;
+
+const prisma = new PrismaClient();
+const scheduledStart = new Date(Date.now() + 60 * 60 * 1000);
+const scheduledEnd = new Date(scheduledStart.getTime() + 60 * 60 * 1000);
+
+try {
+  await prisma.auditLog.deleteMany({ where: { organization_id: ORGANIZATION_ID } });
+  await prisma.carerShift.deleteMany({ where: { organization_id: ORGANIZATION_ID } });
+  await prisma.careLog.deleteMany({ where: { organization_id: ORGANIZATION_ID } });
+  await prisma.visitTask.deleteMany({ where: { visit: { organization_id: ORGANIZATION_ID } } });
+  await prisma.visit.deleteMany({ where: { organization_id: ORGANIZATION_ID } });
+  await prisma.organizationMembership.deleteMany({ where: { organization_id: ORGANIZATION_ID } });
+  await prisma.carer.deleteMany({ where: { organization_id: ORGANIZATION_ID } });
+  await prisma.client.deleteMany({ where: { organization_id: ORGANIZATION_ID } });
+  await prisma.organization.deleteMany({ where: { id: ORGANIZATION_ID } });
+
+  await prisma.organization.create({
+    data: { id: ORGANIZATION_ID, name: 'Linked Carer Browser Proof' },
+  });
+  await prisma.carer.create({
+    data: {
+      id: CARER_ID,
+      organization_id: ORGANIZATION_ID,
+      first_name: 'Browser',
+      last_name: 'Carer',
+      email: 'linked-browser-carer@example.test',
+      phone: '07000000000',
+      is_active: true,
+    },
+  });
+  await prisma.carer.create({
+    data: {
+      id: OTHER_CARER_ID,
+      organization_id: ORGANIZATION_ID,
+      first_name: 'Other',
+      last_name: 'Carer',
+      email: 'other-browser-carer@example.test',
+      phone: '07000000001',
+      is_active: true,
+    },
+  });
+  await prisma.client.create({
+    data: {
+      id: CLIENT_ID,
+      organization_id: ORGANIZATION_ID,
+      full_name: 'Assigned Fake Client',
+      address_line1: '10 Canary Street',
+      city: 'London',
+      postcode: 'SW1A 1AA',
+    },
+  });
+  await prisma.organizationMembership.create({
+    data: {
+      id: MEMBERSHIP_ID,
+      organization_id: ORGANIZATION_ID,
+      identity_provider: 'cognito',
+      auth_subject: subject,
+      normalized_email: 'carer@local.dev',
+      role: 'carer',
+      status: 'ACTIVE',
+      carer_id: CARER_ID,
+    },
+  });
+  await prisma.visit.create({
+    data: {
+      id: VISIT_ID,
+      organization_id: ORGANIZATION_ID,
+      carer_id: CARER_ID,
+      client_id: CLIENT_ID,
+      scheduled_start: scheduledStart,
+      scheduled_end: scheduledEnd,
+      status: VisitStatus.SCHEDULED,
+      notes: 'Synthetic linked-carer browser proof',
+      tasks: {
+        create: {
+          id: TASK_ID,
+          task_name: 'Confirm assigned visit',
+          description: 'Fake-data browser proof task',
+        },
+      },
+    },
+  });
+  await prisma.visit.create({
+    data: {
+      id: UNASSIGNED_VISIT_ID,
+      organization_id: ORGANIZATION_ID,
+      carer_id: OTHER_CARER_ID,
+      client_id: CLIENT_ID,
+      scheduled_start: scheduledStart,
+      scheduled_end: scheduledEnd,
+      status: VisitStatus.SCHEDULED,
+      notes: 'Synthetic unassigned visit exclusion proof',
+    },
+  });
+} finally {
+  await prisma.$disconnect();
+}

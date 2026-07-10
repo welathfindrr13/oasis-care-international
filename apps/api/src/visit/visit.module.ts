@@ -5,14 +5,10 @@ import { VisitResolver } from './visit.resolver';
 import { VisitRepository } from './visit.repository';
 import { PrismaService } from '@oasis/db';
 import { CareLogModule } from '../care-log/care-log.module';
+import { CarerModule } from '../carer/carer.module';
 @Module({
-  imports: [ClsModule, CareLogModule],
-  providers: [
-    VisitService,
-    VisitResolver,
-    VisitRepository,
-    PrismaService,
-  ],
+  imports: [ClsModule, CareLogModule, CarerModule],
+  providers: [VisitService, VisitResolver, VisitRepository, PrismaService],
   exports: [VisitService],
 })
 export class VisitModule {}

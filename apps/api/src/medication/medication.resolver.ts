@@ -10,9 +10,9 @@ import { MedicationDto, MedicationListDto } from './dto/medication.dto';
 import { PrescriptionDto } from './dto/prescription.dto';
 import { MedicationAdministrationDto } from './dto/medication-administration.dto';
 import { LegacyOperationalSurface } from '../auth/legacy-operational-access';
+import { requireOperationalActor } from '../carer/carer-access.service';
 
-export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => 
-  SetMetadata('roles', roles);
+export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => SetMetadata('roles', roles);
 
 @Resolver()
 @UseGuards(GqlRolesGuard)
@@ -20,12 +20,13 @@ export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
 export class MedicationResolver {
   constructor(private readonly medicationService: MedicationService) {}
 
-  private getUserContext(req: any): { userId: string; userRole: string; organizationId?: string } {
-    const user = req?.user ?? {};
-    const userId = user.id || user.sub;
-    const userRole = user.role || user.realm_access?.roles?.[0] || 'user';
-    const organizationId = user.organizationId;
-    return { userId, userRole, organizationId };
+  private getUserContext(req: any): {
+    userId: string;
+    userRole: string;
+    organizationId?: string;
+    authSubject: string;
+  } {
+    return requireOperationalActor(req?.user);
   }
 
   @Mutation(() => MedicationDto)
@@ -35,12 +36,7 @@ export class MedicationResolver {
     @Context('req') req: any,
   ): Promise<MedicationDto> {
     const { userId, userRole, organizationId } = this.getUserContext(req);
-    const medication = await this.medicationService.createMedication(
-      input,
-      userId,
-      userRole,
-      organizationId,
-    );
+    const medication = await this.medicationService.createMedication(input, userId, userRole, organizationId);
     return new MedicationDto(medication);
   }
 
@@ -51,12 +47,7 @@ export class MedicationResolver {
     @Context('req') req: any,
   ): Promise<PrescriptionDto> {
     const { userId, userRole, organizationId } = this.getUserContext(req);
-    const prescription = await this.medicationService.createPrescription(
-      input,
-      userId,
-      userRole,
-      organizationId,
-    );
+    const prescription = await this.medicationService.createPrescription(input, userId, userRole, organizationId);
     return new PrescriptionDto(prescription);
   }
 
@@ -67,13 +58,8 @@ export class MedicationResolver {
     @Context('req') req: any,
   ): Promise<MedicationAdministrationDto[]> {
     const { userId, userRole, organizationId } = this.getUserContext(req);
-    const administrations = await this.medicationService.listDueMeds(
-      visitId,
-      userId,
-      userRole,
-      organizationId,
-    );
-    return administrations.map(admin => new MedicationAdministrationDto(admin));
+    const administrations = await this.medicationService.listDueMeds(visitId, userId, userRole, organizationId);
+    return administrations.map((admin) => new MedicationAdministrationDto(admin));
   }
 
   @Mutation(() => MedicationAdministrationDto)
@@ -82,12 +68,13 @@ export class MedicationResolver {
     @Args('input') input: RecordAdministrationInput,
     @Context('req') req: any,
   ): Promise<MedicationAdministrationDto> {
-    const { userId, userRole, organizationId } = this.getUserContext(req);
+    const { userId, userRole, organizationId, authSubject } = this.getUserContext(req);
     const administration = await this.medicationService.recordAdministration(
       input,
       userId,
       userRole,
       organizationId,
+      authSubject,
     );
     return new MedicationAdministrationDto(administration);
   }
@@ -105,22 +92,14 @@ export class MedicationResolver {
       userRole,
       organizationId,
     );
-    return administrations.map(admin => new MedicationAdministrationDto(admin));
+    return administrations.map((admin) => new MedicationAdministrationDto(admin));
   }
 
   @Query(() => MedicationListDto)
   @Roles('admin', 'carer')
-  async medications(
-    @Args() filter: MedicationFilterArgs,
-    @Context('req') req: any,
-  ): Promise<MedicationListDto> {
+  async medications(@Args() filter: MedicationFilterArgs, @Context('req') req: any): Promise<MedicationListDto> {
     const { userId, userRole, organizationId } = this.getUserContext(req);
-    const result = await this.medicationService.findMedications(
-      filter,
-      userId,
-      userRole,
-      organizationId,
-    );
+    const result = await this.medicationService.findMedications(filter, userId, userRole, organizationId);
     return new MedicationListDto(result.items, result.total);
   }
 }

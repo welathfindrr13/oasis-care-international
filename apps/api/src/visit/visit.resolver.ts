@@ -11,9 +11,9 @@ import { CompleteVisitInput } from './dto/complete-visit.input';
 import { GqlRolesGuard } from '../auth/gql-roles.guard';
 import { LegacyOperationalSurface } from '../auth/legacy-operational-access';
 import { CareLogDTO } from '../care-log/dto/care-log.dto';
+import { requireOperationalActor } from '../carer/carer-access.service';
 
-export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => 
-  SetMetadata('roles', roles);
+export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => SetMetadata('roles', roles);
 
 @Resolver(() => VisitDTO)
 @UseGuards(GqlRolesGuard)
@@ -23,12 +23,8 @@ export class VisitResolver {
 
   @Query(() => VisitDTO)
   @Roles('admin', 'carer')
-  async visit(
-    @Args('id') id: string,
-    @Context() ctx: any
-  ): Promise<VisitDTO> {
-    const { sub: userId, realm_access, organizationId } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'user';
+  async visit(@Args('id') id: string, @Context() ctx: any): Promise<VisitDTO> {
+    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
 
     const visit = await this.visitService.findVisitById(id, userId, userRole, organizationId);
     return this.mapVisitToDTO(visit);
@@ -36,29 +32,21 @@ export class VisitResolver {
 
   @Query(() => VisitPaginatedResponse)
   @Roles('admin', 'carer')
-  async visits(
-    @Args() filter: VisitFilterArgs,
-    @Context() ctx: any
-  ): Promise<VisitPaginatedResponse> {
-    const { sub: userId, realm_access, organizationId } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'user';
+  async visits(@Args() filter: VisitFilterArgs, @Context() ctx: any): Promise<VisitPaginatedResponse> {
+    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
 
     const result = await this.visitService.findVisits(filter, userId, userRole, organizationId);
-    
+
     return {
-      items: result.items.map(v => this.mapVisitToDTO(v)),
+      items: result.items.map((v) => this.mapVisitToDTO(v)),
       total: result.total,
     };
   }
 
   @Mutation(() => VisitDTO)
   @Roles('admin')
-  async createVisit(
-    @Args('input') input: CreateVisitInput,
-    @Context() ctx: any
-  ): Promise<VisitDTO> {
-    const { sub: userId, realm_access, organizationId } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'carer';
+  async createVisit(@Args('input') input: CreateVisitInput, @Context() ctx: any): Promise<VisitDTO> {
+    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
 
     const visit = await this.visitService.createVisit(input, userId, userRole, organizationId);
     return this.mapVisitToDTO(visit);
@@ -66,31 +54,17 @@ export class VisitResolver {
 
   @Mutation(() => VisitDTO)
   @Roles('admin')
-  async updateVisit(
-    @Args('input') input: UpdateVisitInput,
-    @Context() ctx: any
-  ): Promise<VisitDTO> {
-    const { sub: userId, realm_access, organizationId } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'carer';
+  async updateVisit(@Args('input') input: UpdateVisitInput, @Context() ctx: any): Promise<VisitDTO> {
+    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
 
-    const visit = await this.visitService.updateVisit(
-      input.id,
-      input,
-      userId,
-      userRole,
-      organizationId,
-    );
+    const visit = await this.visitService.updateVisit(input.id, input, userId, userRole, organizationId);
     return this.mapVisitToDTO(visit);
   }
 
   @Mutation(() => VisitDTO)
   @Roles('admin')
-  async deleteVisit(
-    @Args('id') id: string,
-    @Context() ctx: any
-  ): Promise<VisitDTO> {
-    const { sub: userId, realm_access, organizationId } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'admin';
+  async deleteVisit(@Args('id') id: string, @Context() ctx: any): Promise<VisitDTO> {
+    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
 
     const visit = await this.visitService.deleteVisit(id, userId, userRole, organizationId);
     return this.mapVisitToDTO(visit);
@@ -100,31 +74,21 @@ export class VisitResolver {
   @Roles('admin', 'carer')
   async completeVisitTask(
     @Args('taskId') taskId: string,
-    @Args('notes', { nullable: true, type: () => String }) notes: string | undefined,
-    @Context() ctx: any
+    @Args('notes', { nullable: true, type: () => String })
+    notes: string | undefined,
+    @Context() ctx: any,
   ): Promise<VisitTaskDTO> {
-    const { sub: userId, realm_access, organizationId } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'carer';
+    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
 
-    const task = await this.visitService.completeTask(
-      taskId,
-      notes,
-      userId,
-      userRole,
-      organizationId,
-    );
+    const task = await this.visitService.completeTask(taskId, notes, userId, userRole, organizationId);
 
     return this.mapVisitTaskToDTO(task);
   }
 
   @Mutation(() => VisitDTO)
   @Roles('admin', 'carer')
-  async startVisit(
-    @Args('visitId') visitId: string,
-    @Context() ctx: any,
-  ): Promise<VisitDTO> {
-    const { sub: userId, realm_access, organizationId } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'carer';
+  async startVisit(@Args('visitId') visitId: string, @Context() ctx: any): Promise<VisitDTO> {
+    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
 
     const visit = await this.visitService.startVisit(visitId, userId, userRole, organizationId);
     return this.mapVisitToDTO(visit);
@@ -136,8 +100,7 @@ export class VisitResolver {
     @Args('input') input: RecordVisitTaskOutcomeInput,
     @Context() ctx: any,
   ): Promise<VisitTaskDTO> {
-    const { sub: userId, realm_access, organizationId } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'carer';
+    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
 
     const task = await this.visitService.recordVisitTaskOutcome(input, userId, userRole, organizationId);
     return this.mapVisitTaskToDTO(task);
@@ -145,12 +108,8 @@ export class VisitResolver {
 
   @Mutation(() => CareLogDTO)
   @Roles('admin', 'carer')
-  async submitVisitCareNote(
-    @Args('input') input: SubmitVisitCareNoteInput,
-    @Context() ctx: any,
-  ): Promise<CareLogDTO> {
-    const { sub: userId, realm_access, organizationId } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'carer';
+  async submitVisitCareNote(@Args('input') input: SubmitVisitCareNoteInput, @Context() ctx: any): Promise<CareLogDTO> {
+    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
 
     const careLog = await this.visitService.submitVisitCareNote(input, userId, userRole, organizationId);
     return this.mapCareLogToDTO(careLog);
@@ -158,12 +117,8 @@ export class VisitResolver {
 
   @Mutation(() => VisitDTO)
   @Roles('admin', 'carer')
-  async completeVisit(
-    @Args('input') input: CompleteVisitInput,
-    @Context() ctx: any,
-  ): Promise<VisitDTO> {
-    const { sub: userId, realm_access, organizationId } = ctx.req.user;
-    const userRole = realm_access?.roles?.[0] || 'carer';
+  async completeVisit(@Args('input') input: CompleteVisitInput, @Context() ctx: any): Promise<VisitDTO> {
+    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
 
     const visit = await this.visitService.completeVisit(input, userId, userRole, organizationId);
     return this.mapVisitToDTO(visit);
@@ -180,21 +135,25 @@ export class VisitResolver {
       actualEnd: visit.actual_end,
       status: visit.status,
       notes: visit.notes,
-      carer: visit.carer ? {
-        id: visit.carer.id,
-        firstName: visit.carer.first_name,
-        lastName: visit.carer.last_name,
-        email: visit.carer.email,
-        phone: visit.carer.phone,
-      } : null,
-      client: visit.client ? {
-        id: visit.client.id,
-        fullName: visit.client.full_name,
-        addressLine1: visit.client.address_line1,
-        addressLine2: visit.client.address_line2,
-        city: visit.client.city,
-        postcode: visit.client.postcode,
-      } : null,
+      carer: visit.carer
+        ? {
+            id: visit.carer.id,
+            firstName: visit.carer.first_name,
+            lastName: visit.carer.last_name,
+            email: visit.carer.email,
+            phone: visit.carer.phone,
+          }
+        : null,
+      client: visit.client
+        ? {
+            id: visit.client.id,
+            fullName: visit.client.full_name,
+            addressLine1: visit.client.address_line1,
+            addressLine2: visit.client.address_line2,
+            city: visit.client.city,
+            postcode: visit.client.postcode,
+          }
+        : null,
       tasks: visit.tasks?.map((task: any) => this.mapVisitTaskToDTO(task)) || [],
       createdAt: visit.created_at,
       updatedAt: visit.updated_at,

@@ -6,9 +6,10 @@ import { CarebridgeResolver } from './carebridge.resolver';
 import { CarebridgeAccessService } from './access/carebridge-access.service';
 import { CarebridgeFeedService } from './feed/carebridge-feed.service';
 import { CarebridgeConcernService } from './concern/carebridge-concern.service';
+import { CarerModule } from '../carer/carer.module';
 
 @Module({
-  imports: [DbModule],
+  imports: [DbModule, CarerModule],
   providers: [
     PrismaService,
     CarebridgeRepository,
@@ -18,11 +19,6 @@ import { CarebridgeConcernService } from './concern/carebridge-concern.service';
     CarebridgeFeedService,
     CarebridgeConcernService,
   ],
-  exports: [
-    CarebridgeService,
-    CarebridgeAccessService,
-    CarebridgeFeedService,
-    CarebridgeConcernService,
-  ],
+  exports: [CarebridgeService, CarebridgeAccessService, CarebridgeFeedService, CarebridgeConcernService],
 })
 export class CarebridgeModule {}

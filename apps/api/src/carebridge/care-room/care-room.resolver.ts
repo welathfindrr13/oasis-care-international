@@ -16,7 +16,7 @@ export class CareRoomResolver {
   constructor(private readonly careRoomService: CareRoomService) {}
 
   @Mutation(() => CareRoomDTO)
-  @CarebridgeRoles('admin', 'carer')
+  @CarebridgeRoles('admin')
   async createCareRoom(@Args('input') input: CreateCareRoomInput, @Context() ctx: any) {
     const actor = getCarebridgeActor(ctx);
     const room = await this.careRoomService.createCareRoom(input, actor.userId, actor.organizationId);
@@ -24,7 +24,7 @@ export class CareRoomResolver {
   }
 
   @Mutation(() => CareRoomMembershipDTO)
-  @CarebridgeRoles('admin', 'carer')
+  @CarebridgeRoles('admin')
   async grantCareRoomAccess(@Args('input') input: GrantCareRoomAccessInput, @Context() ctx: any) {
     const actor = getCarebridgeActor(ctx);
     const membership = await this.careRoomService.grantFamilyAccess(input, actor.userId, actor.organizationId);
@@ -32,7 +32,7 @@ export class CareRoomResolver {
   }
 
   @Mutation(() => CareBridgePolicyDTO)
-  @CarebridgeRoles('admin', 'carer')
+  @CarebridgeRoles('admin')
   async upsertCareBridgePolicy(@Args('input') input: UpsertCarebridgePolicyInput, @Context() ctx: any) {
     const actor = getCarebridgeActor(ctx);
     const policy = await this.careRoomService.upsertPolicy(input, actor.userId, actor.organizationId);

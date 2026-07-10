@@ -1,5 +1,5 @@
 import { Field, ID, InputType } from '@nestjs/graphql';
-import { IsEmail, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
 
 @InputType()
 export class CreateLinkedCarerInput {
@@ -18,11 +18,6 @@ export class CreateLinkedCarerInput {
   @Matches(/\S/)
   @MaxLength(100)
   lastName!: string;
-
-  @Field()
-  @IsEmail()
-  @MaxLength(200)
-  email!: string;
 
   @Field(() => String, { nullable: true })
   @IsOptional()

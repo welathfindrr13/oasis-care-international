@@ -616,18 +616,6 @@ export const CREATE_VISIT_MUTATION = `
   }
 `;
 
-export const UPSERT_CARER_MUTATION = `
-  mutation UpsertCarer($input: UpsertCarerInput!) {
-    upsertCarer(input: $input) {
-      id
-      firstName
-      lastName
-      email
-      phone
-    }
-  }
-`;
-
 export interface EligibleCarerMembership {
   id: string
   identityProvider: string

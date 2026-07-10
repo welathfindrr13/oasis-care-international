@@ -245,13 +245,13 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
                               ) : (
                                 <span className="text-xs text-slate-500 px-2">No client</span>
                               )}
+                              <Button asChild variant="ghost" size="sm">
+                                <Link href={`/schedule/${visit.id}`}>
+                                  View
+                                </Link>
+                              </Button>
                               {isAdmin && (
                                 <>
-                                  <Button asChild variant="ghost" size="sm">
-                                    <Link href={`/schedule/${visit.id}`}>
-                                      View
-                                    </Link>
-                                  </Button>
                                   {visit.clientId && (
                                     <Button asChild variant="ghost" size="sm">
                                       <Link href={`/schedule/new?clientId=${visit.clientId}`}>

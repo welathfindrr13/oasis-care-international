@@ -11,7 +11,8 @@ test('admin linking UI uses explicit membership selection without auth subject i
   assert.match(component, /if \(!authenticated \|\| !isAdmin\)/)
   assert.match(component, /membershipId: form\.membershipId/)
   assert.doesNotMatch(component, /authSubject/)
-  assert.match(component, /Profile email is not used for matching/)
+  assert.match(component, /never used for authorization/)
+  assert.doesNotMatch(component, /email: form\.email/)
 })
 
 test('successful linking removes the selected candidate and refreshes the server Carer list', () => {

@@ -21,7 +21,6 @@ type FormState = {
   membershipId: string
   firstName: string
   lastName: string
-  email: string
   phone: string
 }
 
@@ -29,7 +28,6 @@ const EMPTY_FORM: FormState = {
   membershipId: '',
   firstName: '',
   lastName: '',
-  email: '',
   phone: '',
 }
 
@@ -79,7 +77,6 @@ export function CarerMembershipLinkForm({ initialMemberships, initialError }: Pr
             membershipId: form.membershipId,
             firstName: form.firstName,
             lastName: form.lastName,
-            email: form.email,
             phone: form.phone.trim() || undefined,
           },
         },
@@ -164,7 +161,8 @@ export function CarerMembershipLinkForm({ initialMemberships, initialError }: Pr
                 ))}
               </select>
               <p className="mt-1 text-xs text-slate-500">
-                This explicit selection creates the login-to-Carer link. Profile email is not used for matching.
+                This explicit selection creates the login-to-Carer link. Its verified login email is copied as
+                contact data and is never used for authorization.
               </p>
             </div>
 
@@ -185,14 +183,6 @@ export function CarerMembershipLinkForm({ initialMemberships, initialError }: Pr
               />
             </div>
 
-            <TextField
-              id="email"
-              label="Profile email"
-              type="email"
-              value={form.email}
-              onChange={(value) => updateField('email', value)}
-              maxLength={200}
-            />
             <TextField
               id="phone"
               label="Phone (optional)"
