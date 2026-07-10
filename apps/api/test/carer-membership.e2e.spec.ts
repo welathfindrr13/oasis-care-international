@@ -135,18 +135,15 @@ describe('Carer membership database integration', () => {
     ).rejects.toEqual(new ForbiddenException('Active carer membership link is required'));
   });
 
-  it('fails closed when one subject has active memberships in multiple tenants', async () => {
-    const first = await createLinkedPrincipal();
-    await createLinkedPrincipal({
-      membershipOrganizationId: otherOrganizationId,
-      carerOrganizationId: otherOrganizationId,
-      subject: workerSubject,
-    });
-
-    const accessContext = await canonicalAccessService.resolve(first.principal);
-    await expect(accessService.requireCarerIdentity({ accessContext })).rejects.toEqual(
-      new ForbiddenException('Active carer membership link is required'),
-    );
+  it('prevents one subject from receiving active memberships in multiple tenants', async () => {
+    await createLinkedPrincipal();
+    await expect(
+      createLinkedPrincipal({
+        membershipOrganizationId: otherOrganizationId,
+        carerOrganizationId: otherOrganizationId,
+        subject: workerSubject,
+      }),
+    ).rejects.toMatchObject({ code: 'P2002' });
   });
 
   it('atomically links exactly one Carer under concurrent duplicate submissions', async () => {

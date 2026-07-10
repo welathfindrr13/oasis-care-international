@@ -77,3 +77,28 @@ test('company intake is public while the platform surface still requires provide
   assert.ok(signedOutIndex >= 0)
   assert.ok(platformIndex > signedOutIndex)
 })
+
+test('invitation acceptance is public but activation requires a signed-in Clerk user', () => {
+  assert.match(middlewareSource, /'\/accept-invitation\(\.\*\)'/)
+  assert.match(
+    middlewareSource,
+    /const isInvitationActivationRoute = createRouteMatcher\(\['\/activate-invitation\(\.\*\)'\]\)/,
+  )
+  const clerkBlock = middlewareSource.slice(
+    middlewareSource.indexOf('const clerkAuthMiddleware'),
+    middlewareSource.indexOf('export default function middleware'),
+  )
+  const signedOutIndex = clerkBlock.indexOf('if (!authObject.userId)')
+  const activationIndex = clerkBlock.indexOf('if (isInvitationActivationRoute(req))')
+  const snapshotIndex = clerkBlock.indexOf('fetchAuthoritativeAccessSnapshot')
+  assert.ok(signedOutIndex >= 0)
+  assert.ok(activationIndex > signedOutIndex)
+  assert.ok(snapshotIndex > activationIndex)
+  assert.doesNotMatch(
+    middlewareSource.slice(
+      middlewareSource.indexOf('const isPublicRoute'),
+      middlewareSource.indexOf('const isPlatformRoute'),
+    ),
+    /admin\/setup/,
+  )
+})

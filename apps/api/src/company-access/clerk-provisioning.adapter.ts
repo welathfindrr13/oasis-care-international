@@ -17,6 +17,7 @@ interface ClerkOrganizationInvitation {
   email_address: string;
   role: string;
   status: string;
+  public_metadata?: ClerkMetadata;
   private_metadata?: ClerkMetadata;
 }
 
@@ -235,8 +236,9 @@ export class ClerkProvisioningAdapter {
         body: JSON.stringify({
           email_address: input.emailAddress,
           role: "org:admin",
-          redirect_url: `${siteUrl}/admin/setup`,
+          redirect_url: `${siteUrl}/accept-invitation?oasis_invitation_id=${encodeURIComponent(input.invitationId)}`,
           expires_in_days: 7,
+          public_metadata: { oasis_invitation_id: input.invitationId },
           private_metadata: { oasis_invitation_id: input.invitationId },
         }),
       },
@@ -256,6 +258,7 @@ export class ClerkProvisioningAdapter {
       invitation.email_address.trim().toLowerCase() !==
         input.emailAddress.trim().toLowerCase() ||
       invitation.role !== "org:admin" ||
+      invitation.public_metadata?.oasis_invitation_id !== input.invitationId ||
       invitation.private_metadata?.oasis_invitation_id !== input.invitationId
     ) {
       throw new ClerkProvisioningError("CLERK_INVITATION_MISMATCH", false);

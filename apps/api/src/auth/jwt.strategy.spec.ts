@@ -150,7 +150,7 @@ describe('JwtStrategy local auth gating', () => {
     });
   });
 
-  it('rejects Clerk tokens without an organization claim', async () => {
+  it('authenticates a subject-only Clerk token for the invitation activation boundary', async () => {
     process.env.NODE_ENV = 'test';
     process.env.AUTH_IDENTITY_PROVIDER = 'clerk';
     process.env.CLERK_ISSUER = 'https://clerk.example.org';
@@ -165,7 +165,11 @@ describe('JwtStrategy local auth gating', () => {
         exp: Math.floor(Date.now() / 1000) + 3600,
         iat: Math.floor(Date.now() / 1000),
       }),
-    ).rejects.toThrow('Clerk token is missing organization claim');
+    ).resolves.toMatchObject({
+      id: 'user_123',
+      organizationId: null,
+      authMode: 'clerk',
+    });
   });
 
   it('uses a neutral token role when Clerk role claims are unsupported so membership stays authoritative', async () => {

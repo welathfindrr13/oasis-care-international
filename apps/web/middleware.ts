@@ -19,12 +19,15 @@ const isPublicRoute = createRouteMatcher([
   '/api/evidence-packs(.*)',
   '/request-access(.*)',
   '/api/company-access-requests(.*)',
+  '/accept-invitation(.*)',
 ])
 const isPlatformRoute = createRouteMatcher(['/platform(.*)'])
+const isInvitationActivationRoute = createRouteMatcher(['/activate-invitation(.*)'])
 const nextAuthMiddleware = withAuth(
   async function middleware(req) {
     if (isPublicRoute(req)) return NextResponse.next()
     if (isPlatformRoute(req)) return NextResponse.next()
+    if (isInvitationActivationRoute(req)) return NextResponse.next()
     const token = req.nextauth.token as Record<string, any> | null
     const accessToken = String(token?.accessToken || token?.idToken || '')
     const snapshot = accessToken
@@ -44,6 +47,7 @@ const clerkAuthMiddleware = clerkMiddleware(async (auth, req) => {
   const authObject = auth()
   if (!authObject.userId) return authObject.redirectToSignIn()
   if (isPlatformRoute(req)) return NextResponse.next()
+  if (isInvitationActivationRoute(req)) return NextResponse.next()
   let accessToken: string | null = null
   try {
     accessToken = await authObject.getToken()

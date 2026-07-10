@@ -12,6 +12,10 @@ const operatorPage = read(
 );
 const operatorServerPage = read("./platform/company-requests/page.tsx");
 const setupPage = read("./admin/setup/page.tsx");
+const acceptInvitationPage = read(
+  "./accept-invitation/AcceptInvitationClient.tsx",
+);
+const activationClient = read("./activate-invitation/ActivationClient.tsx");
 
 test("public intake collects only minimal business contact details", () => {
   for (const field of [
@@ -90,4 +94,28 @@ test("guided setup is honest about synthetic canary data and excludes billing", 
   assert.match(setupPage, /Billing is not part of this setup/);
   assert.match(setupPage, /viewerOrganizationSetupDetails/);
   assert.match(setupPage, /Internal organization ID/);
+});
+
+test("Clerk invitations authenticate and activate before entering guided setup", () => {
+  assert.match(
+    acceptInvitationPage,
+    /forceRedirectUrl=\{activationUrl\}/,
+  );
+  assert.match(
+    acceptInvitationPage,
+    /signUpForceRedirectUrl=\{activationUrl\}/,
+  );
+  assert.match(acceptInvitationPage, /__clerk_ticket/);
+  assert.match(acceptInvitationPage, /__clerk_status/);
+  assert.match(acceptInvitationPage, /invalid or incomplete/i);
+  assert.match(acceptInvitationPage, /Sign out and continue/);
+  assert.match(acceptInvitationPage, /clerk\.signOut/);
+  assert.match(activationClient, /activateViewerOrganizationInvitation/);
+  assert.match(activationClient, /oasis_invitation_id/);
+  assert.match(activationClient, /clerk\.setActive/);
+  assert.match(activationClient, /router\.replace\("\/admin\/setup"\)/);
+  assert.doesNotMatch(
+    activationClient,
+    /email|organizationId:\s*input/i,
+  );
 });

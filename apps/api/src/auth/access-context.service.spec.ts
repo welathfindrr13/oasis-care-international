@@ -136,6 +136,18 @@ describe("AccessContextService", () => {
     });
   });
 
+  it("never grants normal Clerk tenant access from a subject-only token", async () => {
+    const { prisma, service } = harness();
+    process.env.AUTH_IDENTITY_PROVIDER = "clerk";
+
+    await expect(service.resolve({ id: "subject-1" })).resolves.toMatchObject({
+      membershipState: "ORGANIZATION_MISMATCH",
+      surface: "NONE",
+      onboardingState: "BLOCKED",
+    });
+    expect(prisma.organizationMembership.findMany).not.toHaveBeenCalled();
+  });
+
   it.each(["carer", "staff"])(
     "uses the linked domain Carer for an active raw %s role",
     async (role) => {

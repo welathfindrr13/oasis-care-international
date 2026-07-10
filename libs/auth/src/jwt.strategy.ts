@@ -325,10 +325,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new Error('Clerk token authorized party is invalid');
     }
 
-    if (!JwtStrategy.extractOrganizationClaim(payload, 'clerk')) {
-      throw new Error('Clerk token is missing organization claim');
-    }
-
   }
 
   private static extractOrganizationClaim(payload: JwtPayload, provider: string): string | null {
