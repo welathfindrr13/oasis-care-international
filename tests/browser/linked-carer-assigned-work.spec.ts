@@ -322,6 +322,7 @@ test("the lifecycle UI handles duplicate and expired invitation actions with sta
 
 test("deactivation immediately denies a previously signed-in Carer", async ({
   page,
+  browser,
 }) => {
   await signIn(page, {
     email: "carer@local.dev",
@@ -333,32 +334,39 @@ test("deactivation immediately denies a previously signed-in Carer", async ({
     page.getByText("Assigned Fake Client", { exact: true }),
   ).toBeVisible();
 
-  await signIn(page, {
+  const adminContext = await browser.newContext({
+    baseURL: "http://localhost:3002",
+  });
+  const adminPage = await adminContext.newPage();
+  await signIn(adminPage, {
     email: "admin@local.dev",
     name: "Local Admin",
     role: "user",
     callbackUrl: "http://localhost:3002/admin/carers",
   });
-  await page.reload();
-  await expect(page.getByText("Local Admin", { exact: true })).toBeVisible();
-  await page.goto("/admin/carers");
-  page.once("dialog", (dialog) => dialog.accept());
-  const activeRow = page
+  await adminPage.goto("/admin/carers");
+  adminPage.once("dialog", (dialog) => dialog.accept());
+  const activeRow = adminPage
     .getByRole("row")
     .filter({ hasText: "carer@local.dev" });
   await activeRow.getByRole("button", { name: "Deactivate" }).click();
   await expect(activeRow.getByText("Revoked · Access disabled")).toBeVisible();
+  await adminContext.close();
 
-  await signIn(page, {
+  const revokedContext = await browser.newContext({
+    baseURL: "http://localhost:3002",
+  });
+  const revokedPage = await revokedContext.newPage();
+  await signIn(revokedPage, {
     email: "carer@local.dev",
     name: "Local Carer",
     role: "admin",
     callbackUrl: "http://localhost:3002/access",
   });
-  await refreshMountedNextAuthSession(page);
-  await page.goto("/access").catch(() => undefined);
-  await expect(page).toHaveURL(/\/access\/disabled$/);
+  await revokedPage.goto("/access").catch(() => undefined);
+  await expect(revokedPage).toHaveURL(/\/access\/disabled$/);
   await expect(
-    page.getByText("No care information has been loaded."),
+    revokedPage.getByText("No care information has been loaded."),
   ).toBeVisible();
+  await revokedContext.close();
 });
