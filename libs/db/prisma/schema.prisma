@@ -315,6 +315,8 @@ model Organization {
   ai_summary_enabled Boolean  @default(false)
   identities         OrganizationIdentity[]
   memberships        OrganizationMembership[]
+  company_access_requests CompanyAccessRequest[]
+  membership_invitations OrganizationMembershipInvitation[]
   carers             Carer[]
   clients            Client[]
   visits             Visit[]
@@ -335,6 +337,43 @@ model Organization {
   updated_at         DateTime @updatedAt
 
   @@map("organization")
+}
+
+enum CompanyAccessRequestStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  EXPIRED
+  DISABLED
+}
+
+model CompanyAccessRequest {
+  id                        String                     @id @default(uuid())
+  company_name              String                     @db.VarChar(200)
+  contact_name              String                     @db.VarChar(200)
+  business_email            String                     @db.VarChar(320)
+  normalized_business_email String                     @db.VarChar(320)
+  phone                     String?                    @db.VarChar(50)
+  operational_note          String?                    @db.VarChar(1000)
+  status                    CompanyAccessRequestStatus @default(PENDING_APPROVAL)
+  organization_id           String?
+  reviewed_at               DateTime?
+  reviewed_by_subject       String?                    @db.VarChar(191)
+  approved_at               DateTime?
+  rejected_at               DateTime?
+  expired_at                DateTime?
+  disabled_at               DateTime?
+  requested_at              DateTime                   @default(now())
+  created_at                DateTime                   @default(now())
+  updated_at                DateTime                   @updatedAt
+  organization              Organization?              @relation(fields: [organization_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  membership_invitation     OrganizationMembershipInvitation?
+
+  @@index([status, requested_at])
+  @@index([normalized_business_email])
+  @@index([organization_id])
+  @@unique([id, organization_id, normalized_business_email], map: "company_access_request_bootstrap_identity_key")
+  @@map("company_access_request")
 }
 
 enum FamilyAccessBasis {
@@ -877,6 +916,13 @@ enum OrganizationMembershipStatus {
   REVOKED
 }
 
+enum OrganizationMembershipInvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
 model OrganizationMembership {
   id                       String                       @id @default(uuid())
   organization_id          String
@@ -892,6 +938,7 @@ model OrganizationMembership {
   carer_id                 String?
   organization             Organization                 @relation(fields: [organization_id], references: [id])
   carer                    Carer?                        @relation("CarerOrganizationMemberships", fields: [organization_id, carer_id], references: [organization_id, id], onDelete: Restrict, onUpdate: Restrict)
+  activated_invitations    OrganizationMembershipInvitation[] @relation("ActivatedOrganizationMembershipInvitation")
   created_at               DateTime                     @default(now())
   updated_at               DateTime                     @updatedAt
 
@@ -899,8 +946,40 @@ model OrganizationMembership {
   @@index([organization_id, carer_id])
   @@index([identity_provider, auth_subject])
   @@index([status])
+  @@unique([organization_id, id, identity_provider, auth_subject, normalized_email, role], map: "organization_membership_activation_identity_key")
   @@unique([identity_provider, auth_subject, organization_id])
   @@map("organization_membership")
+}
+
+model OrganizationMembershipInvitation {
+  id                      String                                  @id @default(uuid())
+  organization_id         String
+  source_request_id       String?                                 @unique(map: "organization_membership_invitation_source_request_id_key")
+  activated_membership_id String?                                 @unique(map: "organization_membership_invitation_activated_membership_id_key")
+  identity_provider       String                                  @db.VarChar(50)
+  intended_email          String                                  @db.VarChar(320)
+  normalized_email        String                                  @db.VarChar(320)
+  intended_role           String                                  @db.VarChar(50)
+  status                  OrganizationMembershipInvitationStatus @default(PENDING)
+  external_invitation_id  String?                                 @db.VarChar(191)
+  created_by_subject      String?                                 @db.VarChar(191)
+  bound_auth_subject      String?                                 @db.VarChar(191)
+  expires_at              DateTime
+  accepted_at             DateTime?
+  expired_at              DateTime?
+  revoked_at              DateTime?
+  created_at              DateTime                                @default(now())
+  updated_at              DateTime                                @updatedAt
+  organization            Organization                            @relation(fields: [organization_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  source_request          CompanyAccessRequest?                   @relation(fields: [source_request_id, organization_id, normalized_email], references: [id, organization_id, normalized_business_email], onDelete: Restrict, onUpdate: Restrict, map: "organization_membership_invitation_source_request_fkey")
+  activated_membership    OrganizationMembership?                 @relation("ActivatedOrganizationMembershipInvitation", fields: [organization_id, activated_membership_id, identity_provider, bound_auth_subject, normalized_email, intended_role], references: [organization_id, id, identity_provider, auth_subject, normalized_email, role], onDelete: Restrict, onUpdate: Restrict, map: "organization_membership_invitation_activated_membership_fkey")
+
+  @@index([organization_id, status, created_at], map: "organization_membership_invitation_org_status_created_idx")
+  @@index([status, expires_at])
+  @@index([normalized_email])
+  @@unique([source_request_id, organization_id, normalized_email], map: "organization_membership_invitation_source_identity_key")
+  @@unique([identity_provider, external_invitation_id], map: "organization_membership_invitation_provider_external_id_key")
+  @@map("organization_membership_invitation")
 }
 
 model CareLog {
