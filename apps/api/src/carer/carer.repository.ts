@@ -1,16 +1,35 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
-import { PrismaService } from '@oasis/db';
-import { assertTenantIdForSensitiveWrite } from '../common/tenant/tenant-ownership';
+import { ForbiddenException, Injectable } from "@nestjs/common";
+import { PrismaService } from "@oasis/db";
+import { assertTenantIdForSensitiveWrite } from "../common/tenant/tenant-ownership";
 
 @Injectable()
 export class CarerRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findMany(organizationId: string) {
-    return this.prisma.carer.findMany({
-      where: this.prisma.whereNotDeleted({ is_active: true, organization_id: organizationId }),
-      orderBy: [{ first_name: 'asc' }, { last_name: 'asc' }],
+  async findMany(organizationId: string): Promise<any[]> {
+    return (this.prisma as any).carer.findMany({
+      where: this.prisma.whereNotDeleted({
+        is_active: true,
+        organization_id: organizationId,
+        organization_memberships: {
+          some: {
+            organization_id: organizationId,
+            identity_provider: this.identityProvider(),
+            auth_subject: { not: "" },
+            role: { in: ["carer", "staff"] },
+            status: "ACTIVE",
+            revoked_at: null,
+          },
+        },
+      }),
+      orderBy: [{ first_name: "asc" }, { last_name: "asc" }],
     });
+  }
+
+  private identityProvider(): string {
+    return String(process.env.AUTH_IDENTITY_PROVIDER || "cognito")
+      .trim()
+      .toLowerCase();
   }
 
   async upsertById(input: {
@@ -22,7 +41,10 @@ export class CarerRepository {
     phone?: string | null;
     is_active: boolean;
   }) {
-    const organizationId = assertTenantIdForSensitiveWrite('Carer', input.organization_id);
+    const organizationId = assertTenantIdForSensitiveWrite(
+      "Carer",
+      input.organization_id,
+    );
     // `id` is the Cognito sub.
     const existing = await this.prisma.carer.findUnique({
       where: { id: input.id },
@@ -30,7 +52,9 @@ export class CarerRepository {
     });
 
     if (existing && existing.organization_id !== organizationId) {
-      throw new ForbiddenException('Carer profile already belongs to another organization');
+      throw new ForbiddenException(
+        "Carer profile already belongs to another organization",
+      );
     }
 
     const data = {

@@ -1,34 +1,38 @@
-import Link from 'next/link'
-import { Header } from '../../../components/oasis/Header'
-import { Button } from '../../../components/ui/Button'
-import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
-import { query } from '../../../lib/graphql/client'
+import Link from "next/link";
+import { Header } from "../../../components/oasis/Header";
+import { Button } from "../../../components/ui/Button";
+import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
+import { query } from "../../../lib/graphql/client";
 import {
   CARERS_QUERY,
+  CARER_ACCESS_LIFECYCLE_QUERY,
   ELIGIBLE_CARER_MEMBERSHIPS_QUERY,
   SHIFT_ANALYTICS_QUERY,
   type CarersQueryResponse,
+  type CarerAccessLifecycleQueryResponse,
   type EligibleCarerMembershipsQueryResponse,
   type ShiftAnalyticsQueryResponse,
-} from '../../../lib/graphql/queries'
-import { CarerMembershipLinkForm } from './CarerMembershipLinkForm'
+} from "../../../lib/graphql/queries";
+import { CarerMembershipLinkForm } from "./CarerMembershipLinkForm";
+import { CarerLifecycleClient } from "./CarerLifecycleClient";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 async function getCarers() {
   try {
-    const response = await query<CarersQueryResponse>(CARERS_QUERY)
-    return { carers: response.carers, error: null as string | null }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to load carers'
-    return { carers: [], error: message }
+    const response = await query<CarersQueryResponse>(CARERS_QUERY);
+    return { carers: response.carers, error: null as string | null };
+  } catch {
+    return { carers: [], error: true };
   }
 }
 
 async function getShiftAnalytics() {
   try {
-    const response = await query<ShiftAnalyticsQueryResponse>(SHIFT_ANALYTICS_QUERY)
-    return response.shiftAnalytics
+    const response = await query<ShiftAnalyticsQueryResponse>(
+      SHIFT_ANALYTICS_QUERY,
+    );
+    return response.shiftAnalytics;
   } catch {
     return {
       activeCarersNow: 0,
@@ -38,7 +42,7 @@ async function getShiftAnalytics() {
       averageShiftMinutes: 0,
       clockInMethods: { gps: 0, qr: 0, nfc: 0, phone: 0, manual: 0 },
       clockOutMethods: { gps: 0, qr: 0, nfc: 0, phone: 0, manual: 0 },
-    }
+    };
   }
 }
 
@@ -46,20 +50,39 @@ async function getEligibleMemberships() {
   try {
     const response = await query<EligibleCarerMembershipsQueryResponse>(
       ELIGIBLE_CARER_MEMBERSHIPS_QUERY,
-    )
-    return { memberships: response.eligibleCarerMemberships, error: null as string | null }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to load workforce logins'
-    return { memberships: [], error: message }
+    );
+    return {
+      memberships: response.eligibleCarerMemberships,
+      error: null as string | null,
+    };
+  } catch {
+    return {
+      memberships: [],
+      error: "Eligible workforce logins could not be loaded.",
+    };
+  }
+}
+
+async function getLifecycle() {
+  try {
+    const response = await query<CarerAccessLifecycleQueryResponse>(
+      CARER_ACCESS_LIFECYCLE_QUERY,
+    );
+    return { items: response.carerAccessLifecycle, error: false };
+  } catch {
+    return { items: [], error: true };
   }
 }
 
 export default async function AdminCarersPage() {
-  const [{ carers, error }, analytics, eligible] = await Promise.all([
-    getCarers(),
-    getShiftAnalytics(),
-    getEligibleMemberships(),
-  ])
+  const [{ carers, error }, analytics, eligible, lifecycle] = await Promise.all(
+    [
+      getCarers(),
+      getShiftAnalytics(),
+      getEligibleMemberships(),
+      getLifecycle(),
+    ],
+  );
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -71,7 +94,8 @@ export default async function AdminCarersPage() {
               Carer Directory
             </h1>
             <p className="text-slate-500 mt-1">
-              Create trusted workforce records and explicitly link them to authenticated staff logins.
+              Create trusted workforce records and explicitly link them to
+              authenticated staff logins.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -85,10 +109,18 @@ export default async function AdminCarersPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <MetricCard label="Active carers now" value={analytics.activeCarersNow} />
+          <MetricCard
+            label="Active carers now"
+            value={analytics.activeCarersNow}
+          />
           <MetricCard label="Open shifts" value={analytics.openShiftCount} />
           <MetricCard label="Carers in directory" value={carers.length} />
         </div>
+
+        <CarerLifecycleClient
+          initialItems={lifecycle.items}
+          initialError={lifecycle.error}
+        />
 
         <CarerMembershipLinkForm
           initialMemberships={eligible.memberships}
@@ -103,12 +135,14 @@ export default async function AdminCarersPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-slate-600">
             <p>
-              Carer identities must stay aligned with authenticated workforce accounts so visit assignment,
-              RBAC, and shift history remain trustworthy.
+              Carer identities must stay aligned with authenticated workforce
+              accounts so visit assignment, RBAC, and shift history remain
+              trustworthy.
             </p>
             <p>
-              Only active, unlinked carer or staff memberships appear in the linking form. Login identity is
-              selected explicitly; profile email is never used to choose or match an account.
+              Only active, unlinked carer or staff memberships appear in the
+              linking form. Login identity is selected explicitly; profile email
+              is never used to choose or match an account.
             </p>
           </CardContent>
         </Card>
@@ -117,7 +151,9 @@ export default async function AdminCarersPage() {
           <CardHeader>
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900 font-heading">Carers</h2>
+                <h2 className="text-xl font-semibold text-slate-900 font-heading">
+                  Carers
+                </h2>
                 <p className="text-sm text-slate-500">
                   Live records available to scheduling and shift workflows.
                 </p>
@@ -126,8 +162,12 @@ export default async function AdminCarersPage() {
           </CardHeader>
           <CardContent>
             {error ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                {error}
+              <div
+                className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+                role="alert"
+              >
+                The assignable Carer directory could not be loaded. Refresh and
+                try again.
               </div>
             ) : carers.length === 0 ? (
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
@@ -136,25 +176,45 @@ export default async function AdminCarersPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
+                  <caption className="sr-only">
+                    Carers ready for visit assignment
+                  </caption>
                   <thead>
                     <tr className="border-b border-slate-200 text-left text-sm text-slate-500">
-                      <th className="py-3 pr-4 font-medium">Carer</th>
-                      <th className="py-3 pr-4 font-medium">Email</th>
-                      <th className="py-3 pr-4 font-medium">Phone</th>
-                      <th className="py-3 font-medium">Identity reference</th>
+                      <th scope="col" className="py-3 pr-4 font-medium">
+                        Carer
+                      </th>
+                      <th scope="col" className="py-3 pr-4 font-medium">
+                        Email
+                      </th>
+                      <th scope="col" className="py-3 pr-4 font-medium">
+                        Phone
+                      </th>
+                      <th scope="col" className="py-3 font-medium">
+                        Identity reference
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {carers.map((carer) => (
-                      <tr key={carer.id} className="border-b border-slate-100 align-top">
+                      <tr
+                        key={carer.id}
+                        className="border-b border-slate-100 align-top"
+                      >
                         <td className="py-4 pr-4">
                           <div className="font-medium text-slate-900">
                             {carer.firstName} {carer.lastName}
                           </div>
                         </td>
-                        <td className="py-4 pr-4 text-sm text-slate-600">{carer.email}</td>
-                        <td className="py-4 pr-4 text-sm text-slate-600">{carer.phone || '—'}</td>
-                        <td className="py-4 text-sm text-slate-500 font-mono">{carer.id}</td>
+                        <td className="py-4 pr-4 text-sm text-slate-600">
+                          {carer.email}
+                        </td>
+                        <td className="py-4 pr-4 text-sm text-slate-600">
+                          {carer.phone || "—"}
+                        </td>
+                        <td className="py-4 text-sm text-slate-500 font-mono">
+                          {carer.id}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -165,7 +225,7 @@ export default async function AdminCarersPage() {
         </Card>
       </main>
     </div>
-  )
+  );
 }
 
 function MetricCard({ label, value }: { label: string; value: number }) {
@@ -175,8 +235,10 @@ function MetricCard({ label, value }: { label: string; value: number }) {
         <p className="text-sm text-slate-500">{label}</p>
       </CardHeader>
       <CardContent>
-        <p className="text-3xl font-bold text-slate-900 tabular-nums">{value}</p>
+        <p className="text-3xl font-bold text-slate-900 tabular-nums">
+          {value}
+        </p>
       </CardContent>
     </Card>
-  )
+  );
 }

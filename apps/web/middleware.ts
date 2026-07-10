@@ -69,6 +69,12 @@ function applyDecision(req: NextRequest, decision: ReturnType<typeof resolveAuth
 }
 
 export default function middleware(req: NextRequest, event: NextFetchEvent) {
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.OASIS_BROWSER_CLERK_STUB === 'true'
+  ) {
+    return NextResponse.next()
+  }
   return resolveAuthMode(process.env) === 'clerk'
     ? clerkAuthMiddleware(req, event)
     : nextAuthMiddleware(req as any, event as any)

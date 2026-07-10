@@ -21,11 +21,12 @@ export default function ActivateInvitationPage() {
           O
         </div>
         <h1 className="mt-6 font-heading text-3xl font-black text-slate-950">
-          Finish secure organization setup
+          Finish secure invitation activation
         </h1>
         <p className="mb-7 mt-3 text-sm leading-6 text-slate-600">
           Oasis will verify the accepted Clerk invitation before creating any
-          internal access. No care information is loaded during this step.
+          internal access. Your administrator may still need to finish linking
+          your profile. No care information is loaded during this step.
         </p>
         <ActivationClient />
       </section>

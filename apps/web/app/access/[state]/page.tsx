@@ -16,7 +16,7 @@ const messages = {
   },
   setup: {
     title: "Setup required",
-    body: "Your account needs one final organization setup step before a workspace can be opened.",
+    body: "Your sign-in is accepted. An organization administrator must finish linking the account profile before care information can be opened.",
   },
   unavailable: {
     title: "Access is temporarily unavailable",

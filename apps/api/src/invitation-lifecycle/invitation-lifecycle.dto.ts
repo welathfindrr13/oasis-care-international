@@ -15,4 +15,7 @@ export class InvitationActivationResultDTO {
 
   @Field()
   externalOrganizationId!: string;
+
+  @Field()
+  nextPath!: string;
 }
