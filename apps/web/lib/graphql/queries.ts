@@ -628,6 +628,50 @@ export const UPSERT_CARER_MUTATION = `
   }
 `;
 
+export interface EligibleCarerMembership {
+  id: string
+  identityProvider: string
+  role: string
+  loginEmail?: string | null
+}
+
+export interface EligibleCarerMembershipsQueryResponse {
+  eligibleCarerMemberships: EligibleCarerMembership[]
+}
+
+export interface CreateAndLinkCarerMutationResponse {
+  createAndLinkCarer: {
+    membershipId: string
+    carer: Carer
+  }
+}
+
+export const ELIGIBLE_CARER_MEMBERSHIPS_QUERY = `
+  query EligibleCarerMemberships {
+    eligibleCarerMemberships {
+      id
+      identityProvider
+      role
+      loginEmail
+    }
+  }
+`;
+
+export const CREATE_AND_LINK_CARER_MUTATION = `
+  mutation CreateAndLinkCarer($input: CreateLinkedCarerInput!) {
+    createAndLinkCarer(input: $input) {
+      membershipId
+      carer {
+        id
+        firstName
+        lastName
+        email
+        phone
+      }
+    }
+  }
+`;
+
 export const DELETE_CLIENT_MUTATION = `
   mutation DeleteClient($id: String!) {
     deleteClient(id: $id) {
