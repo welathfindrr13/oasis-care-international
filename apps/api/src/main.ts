@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
-import { PrismaService } from '@oasis/db';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import {
   applyApiHardening,
@@ -33,8 +32,7 @@ async function bootstrap() {
   app.useGlobalPipes(createApiValidationPipe());
 
   // Global audit logging interceptor (with PII masking)
-  const prismaService = app.get(PrismaService);
-  app.useGlobalInterceptors(new AuditLogInterceptor(prismaService));
+  app.useGlobalInterceptors(app.get(AuditLogInterceptor));
 
   const configService = app.get(ConfigService);
   const configuredPort = configService.get<number>('PORT');

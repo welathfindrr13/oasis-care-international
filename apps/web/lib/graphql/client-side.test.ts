@@ -66,6 +66,18 @@ test('clientQuery preserves caller-provided Authorization over Clerk token', asy
   assert.equal(getAuthorizationHeader(requests[0].init), 'Bearer caller.jwt');
 });
 
+test('clientQuery preserves the explicit platform-action confirmation header', async () => {
+  const requests = installFetchMock({ data: { approveCompanyAccessRequest: { id: 'request-1' } } });
+  (globalThis as any).window = {};
+
+  await clientQuery('mutation { approveCompanyAccessRequest(id: "request-1") { id } }', undefined, {
+    headers: { 'X-Oasis-Platform-Action': '1' },
+  });
+
+  const headers = requests[0].init?.headers as Record<string, string>;
+  assert.equal(headers['X-Oasis-Platform-Action'], '1');
+});
+
 test('clientQuery keeps cookie-only behavior when Clerk is absent or has no token', async () => {
   const requests = installFetchMock({ data: { careRooms: [] } });
   (globalThis as any).window = {};

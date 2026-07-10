@@ -47,6 +47,10 @@ export async function POST(request: NextRequest) {
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;
     }
+    const platformAction = request.headers.get('x-oasis-platform-action');
+    if (platformAction === '1') {
+      headers['X-Oasis-Platform-Action'] = '1';
+    }
     
     // Forward the GraphQL request to the backend (with a timeout to avoid hanging the UI).
     const controller = new AbortController();

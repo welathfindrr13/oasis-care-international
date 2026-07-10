@@ -9,7 +9,10 @@ const localAuthSecret = 'local-browser-proof-secret-32-characters';
 
 export default defineConfig({
   testDir: './tests/browser',
-  testMatch: 'linked-carer-assigned-work.spec.ts',
+  testMatch: [
+    'linked-carer-assigned-work.spec.ts',
+    'request-access.spec.ts',
+  ],
   timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

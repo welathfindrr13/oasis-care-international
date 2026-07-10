@@ -35,6 +35,8 @@ const CLERK_REQUIRED = [
   'CLERK_JWKS_URL',
   'CLERK_SECRET_KEY',
   'CLERK_AUTHORIZED_PARTIES',
+  'PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID',
+  'PLATFORM_OPERATOR_CLERK_SUBJECTS',
   'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
   'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
   'NEXT_PUBLIC_CLERK_SIGN_UP_URL',
@@ -203,6 +205,24 @@ function validate(values) {
     }
     if (!String(values.CLERK_AUDIENCE || '').trim() && !String(values.CLERK_AUTHORIZED_PARTIES || '').trim()) {
       add(errors, 'CLERK_AUDIENCE or CLERK_AUTHORIZED_PARTIES is required when AUTH_IDENTITY_PROVIDER=clerk');
+    }
+
+    const operatorOrganizationId = String(values.PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID || '').trim();
+    if (operatorOrganizationId && !/^org_[A-Za-z0-9_-]{3,187}$/.test(operatorOrganizationId)) {
+      add(errors, 'PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID must be one exact Clerk organization ID');
+    }
+    const operatorSubjects = splitCsv(values.PLATFORM_OPERATOR_CLERK_SUBJECTS);
+    if (operatorSubjects.length > 25) {
+      add(errors, 'PLATFORM_OPERATOR_CLERK_SUBJECTS must contain at most 25 exact subject IDs');
+    }
+    if (new Set(operatorSubjects).size !== operatorSubjects.length) {
+      add(errors, 'PLATFORM_OPERATOR_CLERK_SUBJECTS must not contain duplicates');
+    }
+    for (const subject of operatorSubjects) {
+      if (!/^user_[A-Za-z0-9_-]{3,186}$/.test(subject)) {
+        add(errors, 'PLATFORM_OPERATOR_CLERK_SUBJECTS entries must be exact Clerk user IDs');
+        break;
+      }
     }
   }
 

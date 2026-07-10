@@ -62,3 +62,18 @@ test('authenticated route decisions happen before Next.js renders protected cont
   assert.ok(applyIndex >= 0)
   assert.ok(routeDecisionIndex < applyIndex)
 })
+
+test('company intake is public while the platform surface still requires provider authentication', () => {
+  assert.match(middlewareSource, /'\/request-access\(\.\*\)'/)
+  assert.match(middlewareSource, /'\/api\/company-access-requests\(\.\*\)'/)
+  assert.match(middlewareSource, /const isPlatformRoute = createRouteMatcher\(\['\/platform\(\.\*\)'\]\)/)
+
+  const clerkBlock = middlewareSource.slice(
+    middlewareSource.indexOf('const clerkAuthMiddleware'),
+    middlewareSource.indexOf('export default function middleware'),
+  )
+  const signedOutIndex = clerkBlock.indexOf('if (!authObject.userId)')
+  const platformIndex = clerkBlock.indexOf('if (isPlatformRoute(req))')
+  assert.ok(signedOutIndex >= 0)
+  assert.ok(platformIndex > signedOutIndex)
+})

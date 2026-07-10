@@ -124,3 +124,34 @@ test('account switching clears stale capabilities and follows each database memb
   await expect(page.getByRole('link', { name: 'Management' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Schedule' })).toHaveCount(0);
 });
+
+test('an administrator sees the real organization in the guided synthetic setup', async ({ page }) => {
+  await signIn(page, {
+    email: 'admin@local.dev',
+    name: 'Local Admin',
+    role: 'user',
+    callbackUrl: 'http://localhost:3002/admin/setup',
+  });
+
+  await page.goto('/admin/setup');
+
+  await expect(page).toHaveURL('/admin/setup');
+  await expect(
+    page.getByRole('heading', { name: 'Prepare your Oasis workspace' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Linked Carer Browser Proof', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('org-browser-linked-carer', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Billing is not part of this setup.', { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Add synthetic person →' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Schedule visit →' }),
+  ).toBeVisible();
+});

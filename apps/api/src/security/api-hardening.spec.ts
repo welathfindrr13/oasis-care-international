@@ -7,6 +7,7 @@ import request from 'supertest';
 import {
   applyApiHardening,
   createApiValidationPipe,
+  createCompanyAccessRequestRateLimiter,
   getGraphQLSecurityOptions,
 } from './api-hardening';
 
@@ -213,6 +214,48 @@ describe('API hardening', () => {
       .get('/hardening-test')
       .set('X-Forwarded-For', '198.51.100.10')
       .expect(429);
+
+    await app.close();
+  });
+
+  it('applies a stricter independent limiter to public company requests', async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [HardeningTestModule],
+    }).compile();
+    const app = moduleFixture.createNestApplication<NestExpressApplication>({
+      bodyParser: false,
+    });
+
+    app.set('trust proxy', 1);
+    app.use(
+      '/company-access-requests',
+      createCompanyAccessRequestRateLimiter({
+        COMPANY_ACCESS_REQUEST_RATE_LIMIT_WINDOW_MS: '60000',
+        COMPANY_ACCESS_REQUEST_RATE_LIMIT_MAX: '2',
+      }),
+    );
+    applyApiHardening(app, {
+      rateLimit: { windowMs: 60_000, max: 100 },
+    });
+    await app.init();
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await request(app.getHttpServer())
+        .post('/company-access-requests')
+        .set('X-Forwarded-For', '198.51.100.10')
+        .send({})
+        .expect(404);
+    }
+    await request(app.getHttpServer())
+      .post('/company-access-requests')
+      .set('X-Forwarded-For', '198.51.100.10')
+      .send({})
+      .expect(429);
+    await request(app.getHttpServer())
+      .post('/company-access-requests')
+      .set('X-Forwarded-For', '203.0.113.20')
+      .send({})
+      .expect(404);
 
     await app.close();
   });

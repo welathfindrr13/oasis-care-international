@@ -268,4 +268,27 @@ describe('AuditLogInterceptor', () => {
 
     errorSpy.mockRestore();
   });
+
+  it('does not inspect or persist request arguments for manually audited handlers', async () => {
+    const prisma = { auditLog: { create: jest.fn() } };
+    const reflector = { getAllAndOverride: jest.fn().mockReturnValue(true) };
+    const interceptor = new AuditLogInterceptor(prisma as any, reflector as any);
+    const next = { handle: jest.fn(() => of({ accepted: true })) };
+    const context = {
+      getHandler: () => function handler() {},
+      getClass: () => class Controller {},
+      getType: () => 'http',
+      switchToHttp: () => ({
+        getRequest: () => {
+          throw new Error('manual audit should bypass request body access');
+        },
+      }),
+    };
+
+    await expect(
+      lastValueFrom(interceptor.intercept(context as any, next as any)),
+    ).resolves.toEqual({ accepted: true });
+    expect(next.handle).toHaveBeenCalledTimes(1);
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
+  });
 });

@@ -15,7 +15,10 @@ const require = createRequire(import.meta.url);
 const prismaCli = require.resolve("prisma/build/index.js");
 const prismaDir = dirname(fileURLToPath(import.meta.url));
 const schemaPath = join(prismaDir, "schema.prisma");
-const migrationName = "20260710160000_onboarding_lifecycle_foundation";
+const migrationsUnderTest = [
+  "20260710160000_onboarding_lifecycle_foundation",
+  "20260710180000_company_request_bootstrap",
+];
 const { PrismaClient } = generatedClient;
 
 async function deployMigrations(schema, databaseUrl) {
@@ -54,10 +57,12 @@ test(
     );
     const legacyPrismaDir = join(fixtureRoot, "prisma");
     await cp(prismaDir, legacyPrismaDir, { recursive: true });
-    await rm(join(legacyPrismaDir, "migrations", migrationName), {
-      recursive: true,
-      force: true,
-    });
+    for (const migrationName of migrationsUnderTest) {
+      await rm(join(legacyPrismaDir, "migrations", migrationName), {
+        recursive: true,
+        force: true,
+      });
+    }
 
     const container = await new GenericContainer("pgvector/pgvector:pg16")
       .withEnvironment({
@@ -179,6 +184,70 @@ test(
       CURRENT_TIMESTAMP + INTERVAL '7 days', CURRENT_TIMESTAMP
     )
   `);
+
+    await prisma.$executeRawUnsafe(`
+    INSERT INTO "organization_provisioning_outbox" (
+      "id", "organization_id", "source_request_id", "invitation_id", "updated_at"
+    ) VALUES (
+      'outbox-main', 'org-a', 'request-main', 'invite-main', CURRENT_TIMESTAMP
+    )
+  `);
+    const [bootstrapState] = await prisma.$queryRawUnsafe(`
+    SELECT request."status"::text AS "request_status",
+           invitation."status"::text AS "invitation_status",
+           outbox."status"::text AS "outbox_status",
+           COUNT(membership."id")::int AS "active_memberships"
+      FROM "company_access_request" request
+      JOIN "organization_membership_invitation" invitation
+        ON invitation."source_request_id" = request."id"
+      JOIN "organization_provisioning_outbox" outbox
+        ON outbox."source_request_id" = request."id"
+      LEFT JOIN "organization_membership" membership
+        ON membership."organization_id" = request."organization_id"
+       AND membership."auth_subject" = 'admin@example.test'
+     WHERE request."id" = 'request-main'
+     GROUP BY request."status", invitation."status", outbox."status"
+  `);
+    assert.deepEqual(bootstrapState, {
+      request_status: "APPROVED",
+      invitation_status: "PENDING",
+      outbox_status: "PENDING",
+      active_memberships: 0,
+    });
+
+    await expectPostgresError(
+      () =>
+        prisma.$executeRawUnsafe(`
+      UPDATE "organization_provisioning_outbox"
+         SET "status" = 'DELIVERED',
+             "delivered_at" = NULL
+       WHERE "id" = 'outbox-main'
+    `),
+      "23514",
+    );
+
+    await prisma.$executeRawUnsafe(`
+    INSERT INTO "organization_provider_binding" (
+      "id", "organization_id", "identity_provider", "external_organization_id",
+      "external_slug", "updated_at"
+    ) VALUES (
+      'binding-main', 'org-a', 'clerk', 'org_external_main',
+      'oasis-org-a', CURRENT_TIMESTAMP
+    )
+  `);
+    await expectPostgresError(
+      () =>
+        prisma.$executeRawUnsafe(`
+      INSERT INTO "organization_provider_binding" (
+        "id", "organization_id", "identity_provider", "external_organization_id",
+        "external_slug", "updated_at"
+      ) VALUES (
+        'binding-duplicate', 'org-a', 'clerk', 'org_external_other',
+        'oasis-org-a-other', CURRENT_TIMESTAMP
+      )
+    `),
+      "23505",
+    );
     await expectPostgresError(
       () =>
         prisma.$executeRawUnsafe(`

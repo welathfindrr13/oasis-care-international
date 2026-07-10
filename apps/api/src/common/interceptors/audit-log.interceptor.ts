@@ -2,8 +2,10 @@ import { Injectable, NestInterceptor, ExecutionContext, CallHandler, Inject, Opt
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { GqlExecutionContext } from '@nestjs/graphql';
+import { Reflector } from '@nestjs/core';
 import { PrismaService } from '@oasis/db';
 import { Masker } from '../utils/masker';
+import { MANUAL_AUDIT_KEY } from '../decorators/manual-audit.decorator';
 
 // PII patterns to detect and mask
 const PII_PATTERNS = {
@@ -51,9 +53,19 @@ const AUDIT_FIELD_LIMITS = {
 export class AuditLogInterceptor implements NestInterceptor {
   constructor(
     @Optional() @Inject(PrismaService) private readonly prisma?: PrismaService,
+    @Optional() @Inject(Reflector) private readonly reflector?: Reflector,
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    if (
+      this.reflector?.getAllAndOverride<boolean>(MANUAL_AUDIT_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ])
+    ) {
+      return next.handle();
+    }
+
     const contextType = context.getType<'http' | 'graphql'>();
     let auditInfo: AuditLogEntry;
 

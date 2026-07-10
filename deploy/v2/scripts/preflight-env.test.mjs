@@ -32,6 +32,8 @@ function validEnv(overrides = {}) {
     CLERK_AUDIENCE: 'oasis-production-api',
     CLERK_AUTHORIZED_PARTIES: 'https://care.example.org',
     CLERK_SECRET_KEY: `${strongSecret}clerk`,
+    PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID: 'org_oasis_platform_ops',
+    PLATFORM_OPERATOR_CLERK_SUBJECTS: 'user_oasis_platform_operator',
     NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: 'clerk',
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_Y2FyZS5leGFtcGxlLm9yZyQ=',
     NEXT_PUBLIC_CLERK_SIGN_IN_URL: 'https://care.example.org/sign-in',
@@ -99,6 +101,17 @@ test('Clerk authorized parties and redirect URLs must match the public web origi
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_SIGN_UP_URL origin must match')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL origin must match')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL origin must match')));
+});
+
+test('platform operators require one dedicated Clerk org and a bounded unique subject allowlist', () => {
+  const malformed = validate(validEnv({
+    PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID: 'customer-org',
+    PLATFORM_OPERATOR_CLERK_SUBJECTS: 'user_operator,user_operator,not-a-clerk-user',
+  }));
+
+  assert(malformed.errors.some((error) => error.includes('PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID')));
+  assert(malformed.errors.some((error) => error.includes('must not contain duplicates')));
+  assert(malformed.errors.some((error) => error.includes('entries must be exact Clerk user IDs')));
 });
 
 test('local auth and demo mode are forbidden in production-like env', () => {
@@ -256,6 +269,8 @@ test('Clerk production env requires issuer, JWKS, public key, sign-in URL, and a
     CLERK_ISSUER: '',
     CLERK_JWKS_URL: '',
     CLERK_SECRET_KEY: '',
+    PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID: '',
+    PLATFORM_OPERATOR_CLERK_SUBJECTS: '',
     CLERK_AUDIENCE: '',
     CLERK_AUTHORIZED_PARTIES: '',
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: '',
@@ -268,6 +283,8 @@ test('Clerk production env requires issuer, JWKS, public key, sign-in URL, and a
   assert(result.errors.some((error) => error.includes('CLERK_ISSUER')));
   assert(result.errors.some((error) => error.includes('CLERK_JWKS_URL')));
   assert(result.errors.some((error) => error.includes('CLERK_SECRET_KEY')));
+  assert(result.errors.some((error) => error.includes('PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID')));
+  assert(result.errors.some((error) => error.includes('PLATFORM_OPERATOR_CLERK_SUBJECTS')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_SIGN_IN_URL')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_SIGN_UP_URL')));

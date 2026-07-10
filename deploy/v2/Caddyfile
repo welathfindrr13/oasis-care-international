@@ -33,6 +33,11 @@
 		reverse_proxy api:4000
 	}
 
+	handle /api/company-access-requests {
+		uri strip_prefix /api
+		reverse_proxy api:4000
+	}
+
 	# CareBridge access boundaries are validated by deployment smoke tests, not by
 	# Caddy routing. Family-safe projections must stay enforced in app/API auth.
 	handle {

@@ -1,0 +1,93 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+const form = read("./request-access/RequestAccessForm.tsx");
+const requestPage = read("./request-access/page.tsx");
+const publicProxy = read("./api/company-access-requests/route.ts");
+const graphqlProxy = read("./api/graphql/route.ts");
+const operatorPage = read(
+  "./platform/company-requests/PlatformCompanyRequestsClient.tsx",
+);
+const operatorServerPage = read("./platform/company-requests/page.tsx");
+const setupPage = read("./admin/setup/page.tsx");
+
+test("public intake collects only minimal business contact details", () => {
+  for (const field of [
+    "companyName",
+    "contactName",
+    "businessEmail",
+    "operationalNote",
+  ]) {
+    assert.match(form, new RegExp(`name="${field}"`));
+  }
+  assert.doesNotMatch(
+    form,
+    /name="(?:phone|client|patient|medical|clinical|careRecord)/i,
+  );
+  assert.match(form, /maxLength=\{500\}/);
+  assert.match(
+    requestPage,
+    /No client,[\s\S]*care-record information is[\s\S]*needed/,
+  );
+});
+
+test("new and duplicate submissions share one non-enumerating confirmation", () => {
+  assert.match(form, /If your request is eligible/);
+  assert.match(
+    form,
+    /does not create[\s\S]*active Oasis[\s\S]*organization or user account/,
+  );
+  assert.doesNotMatch(
+    form,
+    /requestId|request ID|already exists|duplicate request/i,
+  );
+  assert.match(
+    publicProxy,
+    /return NextResponse\.json\(\{ accepted: true \}, \{ status: 202 \}\)/,
+  );
+});
+
+test("platform mutations carry one explicitly allowlisted confirmation header", () => {
+  assert.match(operatorPage, /["']X-Oasis-Platform-Action["']:\s*["']1["']/);
+  assert.match(operatorPage, /router\.refresh\(\)/);
+  assert.match(operatorPage, /setItems\(initialItems\)/);
+  assert.match(
+    graphqlProxy,
+    /request\.headers\.get\('x-oasis-platform-action'\)/,
+  );
+  assert.match(graphqlProxy, /headers\['X-Oasis-Platform-Action'\] = '1'/);
+  assert.doesNotMatch(
+    graphqlProxy,
+    /Object\.fromEntries\(request\.headers|headers:\s*request\.headers/,
+  );
+});
+
+test("platform operators can inspect every request status with bounded pagination", () => {
+  for (const status of [
+    "PENDING_APPROVAL",
+    "APPROVED",
+    "REJECTED",
+    "EXPIRED",
+    "DISABLED",
+  ]) {
+    assert.match(operatorServerPage, new RegExp(`['\"]${status}['\"]`));
+  }
+  assert.match(operatorServerPage, /\$status:[\s\S]*\$offset:[\s\S]*\$limit:/);
+  assert.match(operatorServerPage, /const PAGE_SIZE = 50/);
+  assert.match(operatorServerPage, /10_000/);
+  assert.match(operatorServerPage, /Previous/);
+  assert.match(operatorServerPage, /Next/);
+  assert.match(operatorServerPage, /key=\{`\$\{status\}:\$\{page\.offset\}`\}/);
+});
+
+test("guided setup is honest about synthetic canary data and excludes billing", () => {
+  assert.match(setupPage, /use clearly synthetic details/i);
+  assert.match(setupPage, /workforce/i);
+  assert.match(setupPage, /synthetic visit/i);
+  assert.match(setupPage, /family-safe workspace/i);
+  assert.match(setupPage, /Billing is not part of this setup/);
+  assert.match(setupPage, /viewerOrganizationSetupDetails/);
+  assert.match(setupPage, /Internal organization ID/);
+});

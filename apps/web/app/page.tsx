@@ -62,8 +62,14 @@ export default function Home() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href="/today"
+                href="/request-access"
                 className="rounded-full bg-teal-700 px-6 py-3 text-sm font-bold text-white shadow-xl shadow-teal-900/20 hover:bg-teal-800"
+              >
+                Request company access
+              </Link>
+              <Link
+                href="/today"
+                className="rounded-full border border-slate-300 bg-white/80 px-6 py-3 text-sm font-bold text-slate-800 shadow-sm backdrop-blur hover:border-teal-500 hover:text-teal-800"
               >
                 Open Today Command Centre
               </Link>
