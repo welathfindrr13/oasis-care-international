@@ -43,7 +43,7 @@ ALTER TABLE "verified_visit_story"
     )
   );
 
-CREATE UNIQUE INDEX "care_room_membership_invitation_id_key"
+CREATE INDEX "care_room_membership_invitation_id_idx"
   ON "care_room_membership"("organization_membership_invitation_id");
 
 CREATE UNIQUE INDEX "care_room_membership_room_contact_key"

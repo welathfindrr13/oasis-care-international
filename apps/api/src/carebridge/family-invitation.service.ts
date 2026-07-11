@@ -80,9 +80,9 @@ export class FamilyInvitationService {
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       ),
     );
-    let invitationId: string;
+    let result: { membershipId: string; invitationId: string; deliveryRequired: boolean };
     try {
-      invitationId = await this.withSerializableRetry(() =>
+      result = await this.withSerializableRetry(() =>
         this.prisma.$transaction(
           async (tx: any) => {
             await this.requireVerifiedAdmin(tx, actor);
@@ -111,18 +111,180 @@ export class FamilyInvitationService {
               },
               select: { id: true },
             });
-            const historicalContact = await tx.familyContact.findFirst({
+            const contacts = await tx.familyContact.findMany({
               where: { organization_id: actor.organizationId, email },
-              select: { id: true },
+              select: {
+                id: true,
+                auth_subject: true,
+                disabled_at: true,
+              },
+              take: 2,
             });
-            const existingAccount = await tx.organizationMembership.findFirst({
+            const existingAccounts = await tx.organizationMembership.findMany({
               where: {
+                organization_id: actor.organizationId,
                 identity_provider: this.identityProvider(),
                 normalized_email: email,
               },
+              select: { id: true, auth_subject: true, role: true, status: true },
+              take: 2,
+            });
+            if (pending || contacts.length > 1 || existingAccounts.length > 1) {
+              throw new ConflictException(
+                'This account needs manual family-access review before it can be invited',
+              );
+            }
+
+            const contact = contacts[0] ?? null;
+            const trustedInvitation = contact?.auth_subject && !contact.disabled_at
+              ? await tx.organizationMembershipInvitation.findFirst({
+                  where: {
+                    organization_id: actor.organizationId,
+                    identity_provider: this.identityProvider(),
+                    normalized_email: email,
+                    intended_role: 'family',
+                    status: 'ACCEPTED',
+                    bound_auth_subject: contact.auth_subject,
+                    activated_membership: {
+                      organization_id: actor.organizationId,
+                      identity_provider: this.identityProvider(),
+                      auth_subject: contact.auth_subject,
+                      normalized_email: email,
+                      role: 'family',
+                      status: 'ACTIVE',
+                      revoked_at: null,
+                    },
+                  },
+                  orderBy: { accepted_at: 'desc' },
+                  select: {
+                    id: true,
+                    activated_membership_id: true,
+                  },
+                })
+              : null;
+
+            if (trustedInvitation) {
+              if (
+                existingAccounts.length !== 1 ||
+                existingAccounts[0].id !== trustedInvitation.activated_membership_id
+              ) {
+                throw new ConflictException(
+                  'This account needs manual family-access review before it can be invited',
+                );
+              }
+              const existingRoomMembership = await tx.careRoomMembership.findFirst({
+                where: {
+                  care_room_id: room.id,
+                  family_contact_id: contact!.id,
+                },
+                include: { access_grants: true },
+              });
+              if (
+                existingRoomMembership?.status === CareRoomMembershipStatus.ACTIVE &&
+                existingRoomMembership.revoked_at === null
+              ) {
+                throw new ConflictException('This family member already has access to this CareRoom');
+              }
+              if (
+                existingRoomMembership &&
+                ![CareRoomMembershipStatus.REVOKED, CareRoomMembershipStatus.EXPIRED].includes(
+                  existingRoomMembership.status,
+                )
+              ) {
+                throw new ConflictException(
+                  'This account needs manual family-access review before it can be invited',
+                );
+              }
+              if (existingRoomMembership) {
+                await tx.accessGrant.updateMany({
+                  where: {
+                    care_room_membership_id: existingRoomMembership.id,
+                    revoked_at: null,
+                  },
+                  data: { revoked_at: now },
+                });
+              }
+              const membership = existingRoomMembership
+                ? await tx.careRoomMembership.update({
+                    where: { id: existingRoomMembership.id },
+                    data: {
+                      organization_membership_invitation_id: trustedInvitation.id,
+                      role: input.role,
+                      access_basis: input.accessBasis,
+                      status: CareRoomMembershipStatus.ACTIVE,
+                      invited_by_user_id: actor.authSubject,
+                      approved_by_user_id: null,
+                      revoked_by_user_id: null,
+                      invited_at: now,
+                      accepted_at: now,
+                      revoked_at: null,
+                    },
+                  })
+                : await tx.careRoomMembership.create({
+                    data: {
+                      care_room_id: room.id,
+                      family_contact_id: contact!.id,
+                      organization_membership_invitation_id: trustedInvitation.id,
+                      role: input.role,
+                      access_basis: input.accessBasis,
+                      status: CareRoomMembershipStatus.ACTIVE,
+                      invited_by_user_id: actor.authSubject,
+                      accepted_at: now,
+                    },
+                  });
+              await tx.auditLog.create({
+                data: {
+                  organization_id: actor.organizationId,
+                  user_id: actor.authSubject,
+                  action: existingRoomMembership ? 'FAMILY_ACCESS_RESTORED' : 'FAMILY_ACCESS_ADDED',
+                  resource_type: 'CareRoomMembership',
+                  resource_id: membership.id,
+                  old_values: existingRoomMembership
+                    ? { status: existingRoomMembership.status }
+                    : {},
+                  new_values: {
+                    invitationId: trustedInvitation.id,
+                    careRoomId: room.id,
+                    status: 'ACTIVE',
+                    grantCount: 0,
+                  },
+                },
+              });
+              return {
+                membershipId: membership.id,
+                invitationId: trustedInvitation.id,
+                deliveryRequired: false,
+              };
+            }
+
+            if (
+              existingAccounts.length > 0 ||
+              (contact && (contact.auth_subject !== null || contact.disabled_at !== null))
+            ) {
+              throw new ConflictException(
+                'This account needs manual family-access review before it can be invited',
+              );
+            }
+
+            const unresolvedHistory = await tx.organizationMembershipInvitation.findFirst({
+              where: {
+                organization_id: actor.organizationId,
+                identity_provider: this.identityProvider(),
+                normalized_email: email,
+                intended_role: 'family',
+                source_request_id: null,
+                OR: [
+                  { external_cleanup_required: true },
+                  {
+                    provisioning_outbox: {
+                      status: { in: ['PROCESSING', 'RETRYABLE', 'NEEDS_ATTENTION'] },
+                    },
+                  },
+                ],
+              },
               select: { id: true },
             });
-            if (pending || historicalContact || existingAccount) {
+            if (unresolvedHistory) {
               throw new ConflictException(
                 'This account needs manual family-access review before it can be invited',
               );
@@ -141,26 +303,76 @@ export class FamilyInvitationService {
                 expires_at: new Date(now.getTime() + INVITATION_DAYS * 24 * 60 * 60 * 1000),
               },
             });
-            const contact = await tx.familyContact.create({
-              data: {
-                organization_id: actor.organizationId,
-                full_name: fullName,
-                email,
-                relationship,
-                identity_type: this.identityProvider(),
-              },
-            });
-            const membership = await tx.careRoomMembership.create({
-              data: {
+            const invitationContact = contact
+              ? await tx.familyContact.update({
+                  where: { id: contact.id },
+                  data: {
+                    full_name: fullName,
+                    relationship,
+                    identity_type: this.identityProvider(),
+                  },
+                })
+              : await tx.familyContact.create({
+                  data: {
+                    organization_id: actor.organizationId,
+                    full_name: fullName,
+                    email,
+                    relationship,
+                    identity_type: this.identityProvider(),
+                  },
+                });
+            const previousRoomMembership = await tx.careRoomMembership.findFirst({
+              where: {
                 care_room_id: room.id,
-                family_contact_id: contact.id,
-                organization_membership_invitation_id: id,
-                role: input.role,
-                access_basis: input.accessBasis,
-                status: CareRoomMembershipStatus.INVITED,
-                invited_by_user_id: actor.authSubject,
+                family_contact_id: invitationContact.id,
               },
             });
+            if (
+              previousRoomMembership &&
+              ![CareRoomMembershipStatus.REVOKED, CareRoomMembershipStatus.EXPIRED].includes(
+                previousRoomMembership.status,
+              )
+            ) {
+              throw new ConflictException(
+                'This account needs manual family-access review before it can be invited',
+              );
+            }
+            if (previousRoomMembership) {
+              await tx.accessGrant.updateMany({
+                where: {
+                  care_room_membership_id: previousRoomMembership.id,
+                  revoked_at: null,
+                },
+                data: { revoked_at: now },
+              });
+            }
+            const membership = previousRoomMembership
+              ? await tx.careRoomMembership.update({
+                  where: { id: previousRoomMembership.id },
+                  data: {
+                    organization_membership_invitation_id: id,
+                    role: input.role,
+                    access_basis: input.accessBasis,
+                    status: CareRoomMembershipStatus.INVITED,
+                    invited_by_user_id: actor.authSubject,
+                    approved_by_user_id: null,
+                    revoked_by_user_id: null,
+                    invited_at: now,
+                    accepted_at: null,
+                    revoked_at: null,
+                  },
+                })
+              : await tx.careRoomMembership.create({
+                  data: {
+                    care_room_id: room.id,
+                    family_contact_id: invitationContact.id,
+                    organization_membership_invitation_id: id,
+                    role: input.role,
+                    access_basis: input.accessBasis,
+                    status: CareRoomMembershipStatus.INVITED,
+                    invited_by_user_id: actor.authSubject,
+                  },
+                });
             await tx.organizationProvisioningOutbox.create({
               data: {
                 id: randomUUID(),
@@ -186,7 +398,11 @@ export class FamilyInvitationService {
                 },
               },
             });
-            return id;
+            return {
+              membershipId: membership.id,
+              invitationId: id,
+              deliveryRequired: true,
+            };
           },
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
         ),
@@ -201,8 +417,10 @@ export class FamilyInvitationService {
       throw error;
     }
 
-    await this.deliver(invitationId, actor);
-    return this.findMembershipByInvitation(invitationId, actor.organizationId);
+    if (result.deliveryRequired) {
+      await this.deliver(result.invitationId, actor);
+    }
+    return this.findMembership(result.membershipId, actor.organizationId);
   }
 
   async setGrants(
@@ -349,12 +567,12 @@ export class FamilyInvitationService {
           activated_membership_id: null,
           status: { in: ['PENDING', 'REVOKED'] },
         },
-        include: { care_room_membership: true },
+        include: { care_room_memberships: true },
       });
-      if (!invitation?.care_room_membership) {
+      if (!invitation || invitation.care_room_memberships.length !== 1) {
         throw new ConflictException('Family invitation can no longer be revoked');
       }
-      membershipId = invitation.care_room_membership.id;
+      membershipId = invitation.care_room_memberships[0].id;
       if (invitation.status === 'PENDING') {
         const now = new Date();
         const changed = await tx.organizationMembershipInvitation.updateMany({
@@ -477,11 +695,13 @@ export class FamilyInvitationService {
       },
       select: {
         id: true,
-        care_room_membership: { select: { id: true, status: true } },
+        care_room_memberships: { select: { id: true, status: true } },
       },
     });
 
     for (const invitation of overdue) {
+      if (invitation.care_room_memberships.length !== 1) continue;
+      const familyTarget = invitation.care_room_memberships[0];
       const transitioned = await tx.organizationMembershipInvitation.updateMany({
         where: {
           id: invitation.id,
@@ -492,10 +712,10 @@ export class FamilyInvitationService {
       });
       if (transitioned.count !== 1) continue;
 
-      if (invitation.care_room_membership?.status === 'INVITED') {
+      if (familyTarget.status === 'INVITED') {
         await tx.careRoomMembership.updateMany({
           where: {
-            id: invitation.care_room_membership.id,
+            id: familyTarget.id,
             status: 'INVITED',
             accepted_at: null,
             revoked_at: null,

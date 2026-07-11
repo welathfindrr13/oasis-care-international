@@ -638,7 +638,11 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
       inviteMutation,
       { input },
     ).expect(200);
-    expect(overdueRetry.body.errors).toHaveLength(1);
+    expect(overdueRetry.body.errors).toBeUndefined();
+    expect(overdueRetry.body.data.inviteFamilyContact).toMatchObject({
+      id: first.body.data.inviteFamilyContact.id,
+    });
+    expect(overdueRetry.body.data.inviteFamilyContact.invitationId).not.toBe(invitationId);
     await expect(
       prisma.organizationMembershipInvitation.findUniqueOrThrow({
         where: { id: invitationId },
@@ -648,7 +652,17 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
       prisma.careRoomMembership.findUniqueOrThrow({
         where: { id: first.body.data.inviteFamilyContact.id },
       }),
-    ).resolves.toMatchObject({ status: 'EXPIRED' });
+    ).resolves.toMatchObject({
+      status: 'INVITED',
+      organization_membership_invitation_id:
+        overdueRetry.body.data.inviteFamilyContact.invitationId,
+    });
+    expect(await prisma.familyContact.count({ where: { email: input.email } })).toBe(1);
+    expect(
+      await prisma.careRoomMembership.count({
+        where: { family_contact: { email: input.email } },
+      }),
+    ).toBe(1);
 
     const wrongRoom = await gql(bearer(adminSubject), inviteMutation, {
       input: { ...input, email: 'sentinel-family@example.test', careRoomId: otherRoomId },
@@ -670,6 +684,141 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     ).expect(200);
     expect(medicationGrant.body.errors).toHaveLength(1);
     expect(await prisma.accessGrant.count()).toBe(0);
+  });
+
+  it('adds an already verified family member to a second CareRoom with zero grants', async () => {
+    const email = 'verified-multi-room-family@example.test';
+    const organizationMembership = await prisma.organizationMembership.create({
+      data: {
+        organization_id: organizationId,
+        identity_provider: 'clerk',
+        auth_subject: familySubject,
+        normalized_email: email,
+        role: 'family',
+        status: 'ACTIVE',
+        external_organization_id: externalOrganizationId,
+        external_membership_id: 'orgmem_verified_multi_room_family',
+      },
+    });
+    const acceptedInvitationId = 'accepted_verified_multi_room_family';
+    await prisma.organizationMembershipInvitation.create({
+      data: {
+        id: acceptedInvitationId,
+        organization_id: organizationId,
+        activated_membership_id: organizationMembership.id,
+        identity_provider: 'clerk',
+        intended_email: email,
+        normalized_email: email,
+        intended_role: 'family',
+        status: 'ACCEPTED',
+        external_invitation_id: 'external_verified_multi_room_family',
+        created_by_subject: adminSubject,
+        bound_auth_subject: familySubject,
+        created_at: new Date('2026-07-11T09:00:00Z'),
+        accepted_at: new Date('2026-07-11T09:01:00Z'),
+        expires_at: new Date('2026-07-18T09:00:00Z'),
+      },
+    });
+    await prisma.organizationProvisioningOutbox.create({
+      data: {
+        id: 'outbox_verified_multi_room_family',
+        organization_id: organizationId,
+        invitation_id: acceptedInvitationId,
+        status: 'DELIVERED',
+        delivered_at: new Date('2026-07-11T09:00:30Z'),
+      },
+    });
+    const contact = await prisma.familyContact.create({
+      data: {
+        organization_id: organizationId,
+        full_name: 'Verified Relative',
+        email,
+        identity_type: 'clerk',
+        auth_subject: familySubject,
+      },
+    });
+    await prisma.careRoomMembership.create({
+      data: {
+        care_room_id: roomId,
+        family_contact_id: contact.id,
+        organization_membership_invitation_id: acceptedInvitationId,
+        role: 'FAMILY_VIEWER',
+        access_basis: 'CLIENT_CONSENT',
+        status: 'ACTIVE',
+        invited_by_user_id: adminSubject,
+        accepted_at: new Date('2026-07-11T09:01:00Z'),
+      },
+    });
+    const secondClient = await prisma.client.create({
+      data: {
+        organization_id: organizationId,
+        full_name: 'Synthetic George',
+        address_line1: '3 Test Street',
+        city: 'Leeds',
+        postcode: 'LS2 2AA',
+      },
+    });
+    const secondRoom = await prisma.careRoom.create({
+      data: { organization_id: organizationId, client_id: secondClient.id },
+    });
+    adminClerk.ensureOrganizationInvitation.mockClear();
+
+    const added = await gql(
+      bearer(adminSubject),
+      `mutation Invite($input: InviteFamilyContactInput!) {
+        inviteFamilyContact(input: $input) {
+          id invitationId status invitationStatus deliveryStatus accessGrants { scope }
+        }
+      }`,
+      {
+        input: {
+          careRoomId: secondRoom.id,
+          fullName: 'Verified Relative',
+          email,
+          role: 'FAMILY_VIEWER',
+          accessBasis: 'CLIENT_CONSENT',
+        },
+      },
+    ).expect(200);
+
+    expect(added.body.errors).toBeUndefined();
+    expect(added.body.data.inviteFamilyContact).toMatchObject({
+      invitationId: acceptedInvitationId,
+      status: 'ACTIVE',
+      invitationStatus: 'ACCEPTED',
+      deliveryStatus: 'DELIVERED',
+      accessGrants: [],
+    });
+    expect(adminClerk.ensureOrganizationInvitation).not.toHaveBeenCalled();
+    expect(
+      await prisma.careRoomMembership.count({
+        where: {
+          family_contact_id: contact.id,
+          organization_membership_invitation_id: acceptedInvitationId,
+        },
+      }),
+    ).toBe(2);
+
+    await gql(
+      bearer(adminSubject),
+      `mutation Grant($input: UpdateFamilyAccessGrantsInput!) {
+        updateFamilyAccessGrants(input: $input) { id }
+      }`,
+      {
+        input: {
+          careRoomMembershipId: added.body.data.inviteFamilyContact.id,
+          scopes: ['VIEW_UPDATES'],
+        },
+      },
+    ).expect(200);
+    const rooms = await gql(
+      bearer(familySubject),
+      `{ familyCareRooms { id clientDisplayName } }`,
+    ).expect(200);
+    expect(rooms.body.errors).toBeUndefined();
+    expect(rooms.body.data.familyCareRooms).toEqual([
+      { id: secondRoom.id, clientDisplayName: 'Synthetic George' },
+    ]);
   });
 
   it('never binds the wrong account and expires the linked pending room membership', async () => {
@@ -876,6 +1025,46 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
       emailAddress: 'retry-family@example.test',
       intendedRole: 'family',
     });
+
+    adminClerk.ensureOrganizationInvitation.mockImplementation(
+      async ({ invitationId: replacementId }: { invitationId: string }) => ({
+        externalInvitationId: `external_${replacementId}`,
+      }),
+    );
+    const reissued = await gql(
+      bearer(adminSubject),
+      `mutation Invite($input: InviteFamilyContactInput!) {
+        inviteFamilyContact(input: $input) { id invitationId status deliveryStatus }
+      }`,
+      {
+        input: {
+          careRoomId: roomId,
+          fullName: 'Retry Relative',
+          email: 'retry-family@example.test',
+          role: 'FAMILY_VIEWER',
+          accessBasis: 'CLIENT_CONSENT',
+        },
+      },
+    ).expect(200);
+    expect(reissued.body.errors).toBeUndefined();
+    expect(reissued.body.data.inviteFamilyContact).toMatchObject({
+      id: invited.body.data.inviteFamilyContact.id,
+      status: 'INVITED',
+      deliveryStatus: 'DELIVERED',
+    });
+    expect(reissued.body.data.inviteFamilyContact.invitationId).not.toBe(
+      invitationId,
+    );
+    expect(
+      await prisma.familyContact.count({
+        where: { email: 'retry-family@example.test' },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.careRoomMembership.count({
+        where: { family_contact: { email: 'retry-family@example.test' } },
+      }),
+    ).toBe(1);
   });
 
   it('retries a committed invitation before delivery and after an expired lease', async () => {

@@ -198,7 +198,7 @@ export class InvitationLifecycleService {
               include: {
                 source_request: { select: { status: true } },
                 provisioning_outbox: { select: { status: true } },
-                care_room_membership: {
+                care_room_memberships: {
                   include: {
                     care_room: true,
                     family_contact: true,
@@ -236,7 +236,9 @@ export class InvitationLifecycleService {
             return this.acceptedResult(tx, input);
           }
 
-          const familyTarget = invitation.care_room_membership;
+          const familyTarget = invitation.care_room_memberships.length === 1
+            ? invitation.care_room_memberships[0]
+            : null;
           if (input.intendedRole === 'family') {
             const validFamilyTarget =
               familyTarget &&
@@ -251,7 +253,7 @@ export class InvitationLifecycleService {
               familyTarget.family_contact.disabled_at === null &&
               familyTarget.access_grants.length === 0;
             if (!validFamilyTarget) this.deny();
-          } else if (familyTarget) {
+          } else if (invitation.care_room_memberships.length > 0) {
             this.deny();
           }
 
@@ -383,26 +385,28 @@ export class InvitationLifecycleService {
       },
       include: {
         activated_membership: true,
-        care_room_membership: {
+        care_room_memberships: {
           include: { family_contact: true, care_room: true },
         },
       },
     });
     if (!accepted) this.deny();
     if (input.intendedRole === 'family') {
-      const familyMembership = accepted.care_room_membership;
+      const familyMembership = accepted.care_room_memberships.find(
+        (membership) =>
+          membership.status === 'ACTIVE' &&
+          membership.revoked_at === null &&
+          membership.family_contact.auth_subject === input.subject &&
+          membership.family_contact.disabled_at === null &&
+          membership.care_room.organization_id === input.organizationId &&
+          membership.care_room.status === 'ACTIVE',
+      );
       if (
-        !familyMembership ||
-        familyMembership.status !== 'ACTIVE' ||
-        familyMembership.revoked_at !== null ||
-        familyMembership.family_contact.auth_subject !== input.subject ||
-        familyMembership.family_contact.disabled_at !== null ||
-        familyMembership.care_room.organization_id !== input.organizationId ||
-        familyMembership.care_room.status !== 'ACTIVE'
+        !familyMembership
       ) {
         this.deny();
       }
-    } else if (accepted.care_room_membership) {
+    } else if (accepted.care_room_memberships.length > 0) {
       this.deny();
     }
     return {
@@ -438,15 +442,27 @@ export class InvitationLifecycleService {
         select: {
           id: true,
           organization_id: true,
+          intended_role: true,
           source_request_id: true,
           provisioning_outbox: { select: { status: true } },
-          care_room_membership: { select: { id: true, status: true } },
+          care_room_memberships: { select: { id: true, status: true } },
         },
       });
       if (!invitation) return;
       if (
         invitation.source_request_id &&
         invitation.provisioning_outbox?.status !== "DELIVERED"
+      ) {
+        return;
+      }
+      const familyTarget = invitation.intended_role === 'family'
+        ? invitation.care_room_memberships.length === 1
+          ? invitation.care_room_memberships[0]
+          : null
+        : null;
+      if (
+        (invitation.intended_role === 'family' && !familyTarget) ||
+        (invitation.intended_role !== 'family' && invitation.care_room_memberships.length > 0)
       ) {
         return;
       }
@@ -458,11 +474,11 @@ export class InvitationLifecycleService {
       );
       if (transitioned.count !== 1) return;
       if (
-        invitation.care_room_membership?.status === 'INVITED'
+        familyTarget?.status === 'INVITED'
       ) {
         await tx.careRoomMembership.updateMany({
           where: {
-            id: invitation.care_room_membership.id,
+            id: familyTarget.id,
             status: 'INVITED',
             accepted_at: null,
             revoked_at: null,

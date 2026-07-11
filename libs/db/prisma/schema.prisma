@@ -575,7 +575,7 @@ model CareRoomMembership {
   id                  String                    @id @default(uuid())
   care_room_id        String
   family_contact_id   String
-  organization_membership_invitation_id String? @unique(map: "care_room_membership_invitation_id_key")
+  organization_membership_invitation_id String?
   role                CareRoomRole
   status              CareRoomMembershipStatus  @default(INVITED)
   access_basis        FamilyAccessBasis
@@ -597,6 +597,7 @@ model CareRoomMembership {
 
   @@index([care_room_id])
   @@index([family_contact_id])
+  @@index([organization_membership_invitation_id], map: "care_room_membership_invitation_id_idx")
   @@unique([care_room_id, family_contact_id], map: "care_room_membership_room_contact_key")
   @@map("care_room_membership")
 }
@@ -990,7 +991,7 @@ model OrganizationMembershipInvitation {
   organization            Organization                            @relation(fields: [organization_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
   source_request          CompanyAccessRequest?                   @relation(fields: [source_request_id, organization_id, normalized_email], references: [id, organization_id, normalized_business_email], onDelete: Restrict, onUpdate: Restrict, map: "organization_membership_invitation_source_request_fkey")
   activated_membership    OrganizationMembership?                 @relation("ActivatedOrganizationMembershipInvitation", fields: [organization_id, activated_membership_id, identity_provider, bound_auth_subject, normalized_email, intended_role], references: [organization_id, id, identity_provider, auth_subject, normalized_email, role], onDelete: Restrict, onUpdate: Restrict, map: "organization_membership_invitation_activated_membership_fkey")
-  care_room_membership    CareRoomMembership?
+  care_room_memberships   CareRoomMembership[]
   provisioning_outbox     OrganizationProvisioningOutbox?
 
   @@index([organization_id, status, created_at], map: "organization_membership_invitation_org_status_created_idx")

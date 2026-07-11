@@ -11,12 +11,12 @@ const migration = readFileSync(
 );
 const schema = readFileSync(new URL('./schema.prisma', import.meta.url), 'utf8');
 
-test('family invitations bind one exact pending room membership', () => {
+test('pending family invitations target one room and accepted proof can cover more rooms', () => {
   assert.match(migration, /organization_membership_invitation_id/);
-  assert.match(migration, /care_room_membership_invitation_id_key/);
+  assert.match(migration, /care_room_membership_invitation_id_idx/);
   assert.match(migration, /care_room_membership_room_contact_key/);
   assert.match(schema, /organization_membership_invitation\s+OrganizationMembershipInvitation\?/);
-  assert.match(schema, /care_room_membership\s+CareRoomMembership\?/);
+  assert.match(schema, /care_room_memberships\s+CareRoomMembership\[\]/);
 });
 
 test('explicit family grants are unique and the migration creates no automatic scopes', () => {
