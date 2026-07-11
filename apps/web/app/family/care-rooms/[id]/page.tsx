@@ -42,14 +42,23 @@ async function getRoomSafe(id: string): Promise<RoomResult> {
 
 async function getRoomStoriesSafe(
   careRoomId: string,
-): Promise<{ stories: FamilyVerifiedVisitStory[]; unavailable: boolean }> {
+): Promise<{
+  stories: FamilyVerifiedVisitStory[]
+  unavailable: boolean
+  notGranted: boolean
+}> {
   try {
     const data = await query<FamilyVerifiedVisitStoriesQueryResponse>(FAMILY_VERIFIED_VISIT_STORIES_QUERY, {
       careRoomId,
     })
-    return { stories: data.familyVerifiedVisitStories || [], unavailable: false }
-  } catch {
-    return { stories: [], unavailable: true }
+    return { stories: data.familyVerifiedVisitStories || [], unavailable: false, notGranted: false }
+  } catch (error) {
+    const notGranted = error instanceof Error && error.message.includes(
+      'You do not have access to this CareBridge room.',
+    )
+    return notGranted
+      ? { stories: [], unavailable: false, notGranted: true }
+      : { stories: [], unavailable: true, notGranted: false }
   }
 }
 
@@ -81,7 +90,11 @@ export default async function FamilyCareRoomPage({ params }: { params: { id: str
   }
 
   const room = roomResult.room
-  const { stories, unavailable: storiesUnavailable } = await getRoomStoriesSafe(room.id)
+  const {
+    stories,
+    unavailable: storiesUnavailable,
+    notGranted: storiesNotGranted,
+  } = await getRoomStoriesSafe(room.id)
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -122,10 +135,19 @@ export default async function FamilyCareRoomPage({ params }: { params: { id: str
         <section className="mt-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-heading text-xl font-semibold text-slate-900">Approved updates</h2>
-            {!storiesUnavailable ? <p className="text-sm text-slate-500">{stories.length} updates</p> : null}
+            {!storiesUnavailable && !storiesNotGranted ? (
+              <p className="text-sm text-slate-500">{stories.length} updates</p>
+            ) : null}
           </div>
 
-          {storiesUnavailable ? (
+          {storiesNotGranted ? (
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-sm text-slate-600">
+                Approved updates are not included in your current family access. Contact your care provider if you
+                think this should change.
+              </p>
+            </article>
+          ) : storiesUnavailable ? (
             <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <p className="text-sm text-slate-600">Approved updates are temporarily unavailable. Please try again.</p>
               <Link

@@ -47,6 +47,9 @@ test('family pages distinguish unavailable data and expose an accessible breadcr
   assert.match(roomPage, /accessDenied/);
   assert.match(roomPage, /Room temporarily unavailable/);
   assert.match(roomPage, /!storiesUnavailable/);
+  assert.match(roomPage, /storiesNotGranted/);
+  assert.match(roomPage, /Approved updates are not included in your current family access/);
+  assert.match(roomPage, /storiesNotGranted \?/);
 });
 
 test('staff approval shows and approves the exact versioned family preview', () => {
