@@ -602,6 +602,31 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
       }),
     ).toBe(1);
 
+    const invitationId = first.body.data.inviteFamilyContact.invitationId;
+    await prisma.organizationMembershipInvitation.update({
+      where: { id: invitationId },
+      data: {
+        created_at: new Date(Date.now() - 120_000),
+        expires_at: new Date(Date.now() - 60_000),
+      },
+    });
+    const overdueRetry = await gql(
+      bearer(adminSubject),
+      inviteMutation,
+      { input },
+    ).expect(200);
+    expect(overdueRetry.body.errors).toHaveLength(1);
+    await expect(
+      prisma.organizationMembershipInvitation.findUniqueOrThrow({
+        where: { id: invitationId },
+      }),
+    ).resolves.toMatchObject({ status: 'EXPIRED', expired_at: expect.any(Date) });
+    await expect(
+      prisma.careRoomMembership.findUniqueOrThrow({
+        where: { id: first.body.data.inviteFamilyContact.id },
+      }),
+    ).resolves.toMatchObject({ status: 'EXPIRED' });
+
     const wrongRoom = await gql(bearer(adminSubject), inviteMutation, {
       input: { ...input, email: 'sentinel-family@example.test', careRoomId: otherRoomId },
     }).expect(200);

@@ -65,6 +65,21 @@ export class FamilyInvitationService {
     }
 
     await this.requireVerifiedAdmin(this.prisma, actor);
+    await this.withSerializableRetry(() =>
+      this.prisma.$transaction(
+        async (tx: any) => {
+          await this.requireVerifiedAdmin(tx, actor);
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`family-invitation:${actor.organizationId}:${email}`}, 0))`;
+          await this.expireOverdueInvitations(
+            tx,
+            actor,
+            email,
+            new Date(),
+          );
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      ),
+    );
     let invitationId: string;
     try {
       invitationId = await this.withSerializableRetry(() =>
@@ -72,6 +87,7 @@ export class FamilyInvitationService {
           async (tx: any) => {
             await this.requireVerifiedAdmin(tx, actor);
             await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`family-invitation:${actor.organizationId}:${email}`}, 0))`;
+            const now = new Date();
 
             const room = await tx.careRoom.findFirst({
               where: {
@@ -91,6 +107,7 @@ export class FamilyInvitationService {
                 identity_provider: this.identityProvider(),
                 normalized_email: email,
                 status: 'PENDING',
+                expires_at: { gt: now },
               },
               select: { id: true },
             });
@@ -112,7 +129,6 @@ export class FamilyInvitationService {
             }
 
             const id = randomUUID();
-            const now = new Date();
             await tx.organizationMembershipInvitation.create({
               data: {
                 id,
@@ -435,6 +451,64 @@ export class FamilyInvitationService {
       throw new ConflictException(FAMILY_ACCESS_UNAVAILABLE);
     }
     return membership;
+  }
+
+  private async expireOverdueInvitations(
+    tx: any,
+    actor: ReturnType<FamilyInvitationService['requirePrincipal']>,
+    email: string,
+    now: Date,
+  ) {
+    const overdue = await tx.organizationMembershipInvitation.findMany({
+      where: {
+        organization_id: actor.organizationId,
+        identity_provider: this.identityProvider(),
+        normalized_email: email,
+        intended_role: 'family',
+        source_request_id: null,
+        status: 'PENDING',
+        expires_at: { lte: now },
+      },
+      select: {
+        id: true,
+        care_room_membership: { select: { id: true, status: true } },
+      },
+    });
+
+    for (const invitation of overdue) {
+      const transitioned = await tx.organizationMembershipInvitation.updateMany({
+        where: {
+          id: invitation.id,
+          status: 'PENDING',
+          expires_at: { lte: now },
+        },
+        data: { status: 'EXPIRED', expired_at: now },
+      });
+      if (transitioned.count !== 1) continue;
+
+      if (invitation.care_room_membership?.status === 'INVITED') {
+        await tx.careRoomMembership.updateMany({
+          where: {
+            id: invitation.care_room_membership.id,
+            status: 'INVITED',
+            accepted_at: null,
+            revoked_at: null,
+          },
+          data: { status: 'EXPIRED' },
+        });
+      }
+      await tx.auditLog.create({
+        data: {
+          organization_id: actor.organizationId,
+          user_id: actor.authSubject,
+          action: 'FAMILY_INVITATION_EXPIRED',
+          resource_type: 'OrganizationMembershipInvitation',
+          resource_id: invitation.id,
+          old_values: { status: 'PENDING' },
+          new_values: { status: 'EXPIRED' },
+        },
+      });
+    }
   }
 
   private async deliver(invitationId: string, actor: ReturnType<FamilyInvitationService['requirePrincipal']>) {
