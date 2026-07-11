@@ -77,7 +77,9 @@ test("a linked fake carer follows the database role despite an admin token claim
   await page.goto("/visits");
 
   await expect(page).toHaveURL("/visits");
-  await expect(page.getByRole("link", { name: "Management" })).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "Workforce", exact: true }),
+  ).toHaveCount(0);
 
   const assignedVisit = page.locator(`a[href="/schedule/${VISIT_ID}"]`);
   await expect(assignedVisit).toHaveCount(1);
@@ -105,23 +107,30 @@ test("a linked fake carer follows the database role despite an admin token claim
 test("account switching clears stale capabilities and follows each database membership", async ({
   page,
 }) => {
-  let releaseOldSnapshot!: () => void;
-  let markOldSnapshotStarted!: () => void;
-  const oldSnapshotStarted = new Promise<void>((resolve) => {
-    markOldSnapshotStarted = resolve;
-  });
-  const holdOldSnapshot = new Promise<void>((resolve) => {
-    releaseOldSnapshot = resolve;
-  });
-  let holdNextSnapshot = true;
+  let releaseHeldSnapshot: (() => void) | null = null;
+  let markHeldSnapshotStarted: (() => void) | null = null;
+  let heldSnapshotStarted: Promise<void> | null = null;
+  let heldSnapshot: Promise<void> | null = null;
+  let holdNextSnapshot = false;
+
+  function holdNextAccessSnapshot() {
+    holdNextSnapshot = true;
+    heldSnapshotStarted = new Promise<void>((resolve) => {
+      markHeldSnapshotStarted = resolve;
+    });
+    heldSnapshot = new Promise<void>((resolve) => {
+      releaseHeldSnapshot = resolve;
+    });
+  }
+
   await page.route("**/api/access-context", async (route) => {
     if (!holdNextSnapshot) {
       await route.continue();
       return;
     }
     holdNextSnapshot = false;
-    markOldSnapshotStarted();
-    await holdOldSnapshot;
+    markHeldSnapshotStarted?.();
+    await heldSnapshot;
     await route.continue().catch(() => undefined);
   });
 
@@ -131,22 +140,29 @@ test("account switching clears stale capabilities and follows each database memb
     role: "admin",
   });
   await page.goto("/visits");
-  await oldSnapshotStarted;
   await expect(
     page.getByText("Assigned Fake Client", { exact: true }),
   ).toBeVisible();
 
+  holdNextAccessSnapshot();
   await signIn(page, {
     email: "admin@local.dev",
     name: "Local Admin",
     role: "user",
   });
   await refreshMountedNextAuthSession(page);
-  await expect(page).toHaveURL("/today");
-  releaseOldSnapshot();
-  await expect(page.getByRole("link", { name: "Management" })).toBeVisible();
+  await heldSnapshotStarted;
   await expect(
-    page.getByRole("link", { name: "Family Assurance" }),
+    page.getByText("Assigned Fake Client", { exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByLabel("Switching account")).toBeVisible();
+  releaseHeldSnapshot?.();
+  await expect(page).toHaveURL("/today");
+  await expect(
+    page.getByRole("link", { name: "Workforce", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Home", exact: true }),
   ).toHaveCount(0);
 
   await signIn(page, {
@@ -157,9 +173,11 @@ test("account switching clears stale capabilities and follows each database memb
   await refreshMountedNextAuthSession(page);
   await expect(page).toHaveURL("/family");
   await expect(
-    page.getByRole("link", { name: "Family Assurance", exact: true }),
+    page.getByRole("link", { name: "Home", exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "Management" })).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "Workforce", exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Schedule" })).toHaveCount(0);
 });
 
@@ -208,7 +226,7 @@ test("an administrator sees lifecycle readiness and only identity-valid Carers a
 
   await page.goto("/admin/carers");
   await expect(
-    page.getByRole("heading", { name: "Carer access lifecycle" }),
+    page.getByRole("heading", { name: "Invite and manage access" }),
   ).toBeVisible();
   await expect(
     page.getByText("carer@local.dev", { exact: true }),
@@ -216,13 +234,20 @@ test("an administrator sees lifecycle readiness and only identity-valid Carers a
   await expect(
     page.getByText("pending-carer@example.test", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Expired", { exact: true })).toBeVisible();
+  const expiredLifecycleRow = page
+    .getByRole("row")
+    .filter({ hasText: "expired-carer@example.test" });
+  await expect(expiredLifecycleRow).toBeVisible();
+  await expect(expiredLifecycleRow).toContainText("Expired");
   await expect(
     page.getByText("revoked-carer@example.test", { exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByText("Active · Ready for assignment", { exact: true }),
-  ).toBeVisible();
+  const activeLifecycleRow = page
+    .getByRole("row")
+    .filter({ hasText: "carer@local.dev" });
+  await expect(activeLifecycleRow).toContainText(
+    "Active — ready for assignment",
+  );
   await expect(page.getByText("Browser Carer", { exact: true })).toBeVisible();
   await expect(page.getByText("Other Carer", { exact: true })).toHaveCount(0);
 
@@ -238,6 +263,83 @@ test("an administrator sees lifecycle readiness and only identity-valid Carers a
   await expect(page.locator("option", { hasText: "Other Carer" })).toHaveCount(
     0,
   );
+});
+
+test("the workforce surface remains accessible at phone, tablet, and desktop sizes", async ({
+  page,
+}) => {
+  await signIn(page, {
+    email: "admin@local.dev",
+    name: "Local Admin",
+    role: "user",
+    callbackUrl: "http://localhost:3002/admin/carers",
+  });
+
+  const viewports = [
+    { name: "phone", width: 390, height: 844 },
+    { name: "tablet", width: 768, height: 1024 },
+    { name: "desktop", width: 1440, height: 900 },
+  ] as const;
+
+  for (const viewport of viewports) {
+    await test.step(viewport.name, async () => {
+      await page.setViewportSize(viewport);
+      await page.goto("/admin/carers");
+
+      await expect(
+        page.getByRole("heading", { name: "Carers and access" }),
+      ).toBeVisible();
+      const overflow = await page.evaluate(() => ({
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth,
+        offenders: Array.from(document.querySelectorAll<HTMLElement>("body *"))
+          .map((element) => {
+            const bounds = element.getBoundingClientRect();
+            return {
+              className: element.className,
+              left: Math.round(bounds.left),
+              right: Math.round(bounds.right),
+              tagName: element.tagName,
+              text: element.textContent?.trim().slice(0, 80),
+            };
+          })
+          .filter(
+            ({ left, right }) => left < -1 || right > window.innerWidth + 1,
+          )
+          .slice(0, 20),
+      }));
+      expect(
+        overflow.documentWidth,
+        JSON.stringify(overflow.offenders, null, 2),
+      ).toBeLessThanOrEqual(overflow.viewportWidth);
+
+      if (viewport.width < 1280) {
+        const navigationTrigger = page.getByRole("button", {
+          name: "Open navigation",
+        });
+        await expect(navigationTrigger).toBeVisible();
+        await navigationTrigger.click();
+        const mobileNavigation = page.locator("#oasis-mobile-navigation");
+        await expect(mobileNavigation).toBeVisible();
+        await expect(
+          mobileNavigation.getByRole("link", {
+            name: "Workforce",
+            exact: true,
+          }),
+        ).toBeVisible();
+      } else {
+        await expect(
+          page.getByRole("button", { name: "Open navigation" }),
+        ).toHaveCount(0);
+        await expect(
+          page.getByRole("link", { name: "Workforce", exact: true }),
+        ).toBeVisible();
+      }
+
+      const accessibility = await new AxeBuilder({ page }).analyze();
+      expect(accessibility.violations).toEqual([]);
+    });
+  }
 });
 
 test("the lifecycle UI handles duplicate and expired invitation actions with stable IDs", async ({
@@ -324,12 +426,14 @@ test("the lifecycle UI handles duplicate and expired invitation actions with sta
     .getByRole("row")
     .filter({ hasText: "expired-carer@example.test" });
   await expiredRow.getByRole("button", { name: "Send new invitation" }).click();
-  await expect(page.getByText("Carer access was updated.")).toBeVisible();
+  await expect(
+    page.getByText("A new secure Carer invitation was sent."),
+  ).toBeVisible();
 
   await page.getByLabel("Carer email").fill("pending-carer@example.test");
   await page.getByRole("button", { name: "Invite Carer" }).click();
   await expect(
-    page.getByText("The secure Carer invitation is ready."),
+    page.getByText("The secure Carer invitation was sent."),
   ).toBeVisible();
   await expect(
     page.getByText("pending-carer@example.test", { exact: true }),
@@ -361,12 +465,16 @@ test("deactivation immediately denies a previously signed-in Carer", async ({
     callbackUrl: "http://localhost:3002/admin/carers",
   });
   await adminPage.goto("/admin/carers");
-  adminPage.once("dialog", (dialog) => dialog.accept());
   const activeRow = adminPage
     .getByRole("row")
     .filter({ hasText: "carer@local.dev" });
   await activeRow.getByRole("button", { name: "Deactivate" }).click();
-  await expect(activeRow.getByText("Revoked · Access disabled")).toBeVisible();
+  const confirmation = adminPage.getByRole("dialog", {
+    name: "Deactivate Carer access?",
+  });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole("button", { name: "Deactivate access" }).click();
+  await expect(activeRow).toContainText("Revoked — access disabled");
   await adminContext.close();
 
   const revokedContext = await browser.newContext({

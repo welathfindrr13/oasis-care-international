@@ -3,8 +3,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useClientAccess } from "../../../components/providers/ClientAccessProvider";
+import { Alert } from "../../../components/ui/Alert";
 import { Button } from "../../../components/ui/Button";
 import { Card, CardContent, CardHeader } from "../../../components/ui/Card";
+import { FieldError } from "../../../components/ui/FieldError";
+import { StatePanel } from "../../../components/ui/StatePanel";
 import { clientQuery } from "../../../lib/graphql/client-side";
 import {
   CREATE_AND_LINK_CARER_MUTATION,
@@ -41,6 +44,7 @@ export function CarerMembershipLinkForm({
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(initialError);
+  const [membershipError, setMembershipError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -51,6 +55,7 @@ export function CarerMembershipLinkForm({
 
   function updateField(field: keyof FormState, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
+    if (field === "membershipId") setMembershipError(null);
     setError(null);
     setSuccess(null);
   }
@@ -65,15 +70,17 @@ export function CarerMembershipLinkForm({
       );
       return;
     }
-
     if (!form.membershipId) {
-      setError("Select an eligible workforce login before creating the Carer.");
+      setMembershipError(
+        "Select an eligible workforce login before creating the Carer.",
+      );
+      setError(null);
       return;
     }
 
     setSubmitting(true);
+    setMembershipError(null);
     setError(null);
-
     try {
       const result = await clientQuery<CreateAndLinkCarerMutationResponse>(
         CREATE_AND_LINK_CARER_MUTATION,
@@ -107,11 +114,16 @@ export function CarerMembershipLinkForm({
 
   if (status === "loading") {
     return (
-      <Card>
+      <Card aria-labelledby="link-carer-title">
+        <CardHeader>
+          <h2 id="link-carer-title" className="text-xl font-semibold">
+            Link a Carer profile
+          </h2>
+        </CardHeader>
         <CardContent>
-          <p className="text-sm text-slate-600" role="status">
-            Checking administrator access…
-          </p>
+          <StatePanel kind="loading" title="Checking administrator access">
+            This form will be available after access is verified.
+          </StatePanel>
         </CardContent>
       </Card>
     );
@@ -119,72 +131,88 @@ export function CarerMembershipLinkForm({
 
   if (!authenticated || !isAdmin) {
     return (
-      <Card>
+      <Card aria-labelledby="link-carer-title">
+        <CardHeader>
+          <h2 id="link-carer-title" className="text-xl font-semibold">
+            Link a Carer profile
+          </h2>
+        </CardHeader>
         <CardContent>
-          <div
-            className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
-            role="alert"
-          >
+          <StatePanel kind="forbidden" title="Administrator access required">
             {authenticated
-              ? "Admin access is required."
-              : "Sign in is required."}
-          </div>
+              ? "Your current role cannot link workforce profiles."
+              : "Sign in with an administrator account to continue."}
+          </StatePanel>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card
+      id="link-carer-profile"
+      className="scroll-mt-24"
+      aria-labelledby="link-carer-title"
+    >
       <CardHeader>
-        <h2 className="text-xl font-semibold text-slate-900 font-heading">
-          Create and link a Carer
+        <h2
+          id="link-carer-title"
+          className="text-xl font-semibold text-oasis-ink"
+        >
+          Link a Carer profile
         </h2>
-        <p className="text-sm text-slate-500">
-          Select an existing workforce login, then create the domain Carer
-          profile it will use.
+        <p className="mt-1 text-sm leading-6 text-oasis-muted">
+          Choose an accepted workforce login, then add the profile used for care
+          assignments.
         </p>
       </CardHeader>
       <CardContent>
         {loadError ? (
-          <div className="space-y-3">
-            <div
-              className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
-              role="alert"
-            >
-              Eligible workforce logins could not be loaded. No Carer has been
-              created.
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.refresh()}
-            >
-              Retry
-            </Button>
-          </div>
+          <StatePanel
+            kind="unavailable"
+            title="Eligible logins unavailable"
+            action={
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => router.refresh()}
+              >
+                Try again
+              </Button>
+            }
+          >
+            Eligible workforce logins could not be loaded. The Carer was not
+            created or linked.
+          </StatePanel>
         ) : memberships.length === 0 ? (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+          <StatePanel title="No login ready to link">
             No eligible unlinked carer or staff logins are available in this
-            organization.
-          </div>
+            organisation. Invite a Carer and wait for acceptance first.
+          </StatePanel>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label
                 htmlFor="membershipId"
-                className="block text-sm font-medium text-slate-700 mb-1"
+                className="block text-sm font-semibold text-oasis-ink"
               >
-                Workforce login <span className="text-red-500">*</span>
+                Workforce login{" "}
+                <span className="font-normal text-oasis-muted">(required)</span>
               </label>
               <select
                 id="membershipId"
-                required
+                className="mt-1"
+                aria-required="true"
                 value={form.membershipId}
                 onChange={(event) =>
                   updateField("membershipId", event.target.value)
                 }
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                aria-invalid={membershipError ? true : undefined}
+                aria-describedby={
+                  membershipError
+                    ? "membershipId-help membershipId-error"
+                    : "membershipId-help"
+                }
               >
                 <option value="">Select an unlinked workforce login</option>
                 {memberships.map((membership) => (
@@ -195,14 +223,22 @@ export function CarerMembershipLinkForm({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-slate-500">
-                This explicit selection creates the login-to-Carer link. Its
-                verified login email is copied as contact data and is never used
-                for authorization.
+              <p
+                id="membershipId-help"
+                className="mt-1 text-xs leading-5 text-oasis-muted"
+              >
+                This explicit selection creates the login-to-Carer link. The
+                verified email is copied as contact data and never used for
+                authorization.
               </p>
+              {membershipError && (
+                <FieldError id="membershipId-error">
+                  {membershipError}
+                </FieldError>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <TextField
                 id="firstName"
                 label="First name"
@@ -218,10 +254,9 @@ export function CarerMembershipLinkForm({
                 maxLength={100}
               />
             </div>
-
             <TextField
               id="phone"
-              label="Phone (optional)"
+              label="Phone"
               type="tel"
               required={false}
               value={form.phone}
@@ -230,24 +265,21 @@ export function CarerMembershipLinkForm({
             />
 
             {error && (
-              <div
-                className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                role="alert"
-              >
+              <Alert tone="danger" live>
                 {error}
-              </div>
+              </Alert>
             )}
             {success && (
-              <div
-                className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
-                role="status"
-                aria-live="polite"
-              >
+              <Alert tone="success" live>
                 {success}
-              </div>
+              </Alert>
             )}
 
-            <Button type="submit" disabled={submitting}>
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="w-full sm:w-auto"
+            >
               {submitting ? "Creating and linking…" : "Create and link Carer"}
             </Button>
           </form>
@@ -278,18 +310,21 @@ function TextField({
     <div>
       <label
         htmlFor={id}
-        className="block text-sm font-medium text-slate-700 mb-1"
+        className="block text-sm font-semibold text-oasis-ink"
       >
-        {label} {required && <span className="text-red-500">*</span>}
+        {label}{" "}
+        <span className="font-normal text-oasis-muted">
+          ({required ? "required" : "optional"})
+        </span>
       </label>
       <input
         id={id}
+        className="mt-1"
         type={type}
         required={required}
         maxLength={maxLength}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
       />
     </div>
   );
@@ -298,21 +333,13 @@ function TextField({
 function toUserMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : "";
   const normalized = message.toLowerCase();
-
-  if (normalized.includes("forbidden") || normalized.includes("admin")) {
+  if (normalized.includes("forbidden") || normalized.includes("admin"))
     return "Admin access is required. No Carer has been created.";
-  }
-  if (normalized.includes("no longer eligible")) {
+  if (normalized.includes("no longer eligible"))
     return "That workforce login is no longer eligible or has already been linked. Refresh and choose again.";
-  }
-  if (
-    normalized.includes("already exists") ||
-    normalized.includes("conflict")
-  ) {
+  if (normalized.includes("already exists") || normalized.includes("conflict"))
     return "A Carer with those profile details already exists. No login was linked.";
-  }
-  if (normalized.includes("invalid") || normalized.includes("required")) {
+  if (normalized.includes("invalid") || normalized.includes("required"))
     return "Check the required profile fields and try again.";
-  }
   return "The Carer was not created or linked. Try again.";
 }

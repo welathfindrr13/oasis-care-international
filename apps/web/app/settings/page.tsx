@@ -114,18 +114,27 @@ function SettingsContent({ userName, userEmail }: { userName: string; userEmail:
                 <Button asChild variant="ghost">
                   <Link href="/today">Open Today</Link>
                 </Button>
-                <Button asChild variant="ghost">
-                  <Link href="/schedule">Open Schedule</Link>
-                </Button>
-                <Button asChild variant="ghost">
-                  <Link href="/people">Open People</Link>
-                </Button>
-                <Button asChild variant="ghost">
-                  <Link href="/family-updates">Open Family Updates</Link>
-                </Button>
-                <Button asChild variant="ghost">
-                  <Link href="/medication">Open Medication Round</Link>
-                </Button>
+                {isAdmin && (
+                  <>
+                    <Button asChild variant="ghost">
+                      <Link href="/schedule">Open Schedule</Link>
+                    </Button>
+                    <Button asChild variant="ghost">
+                      <Link href="/people">Open People</Link>
+                    </Button>
+                    <Button asChild variant="ghost">
+                      <Link href="/family-updates">Open Family Updates</Link>
+                    </Button>
+                    <Button asChild variant="ghost">
+                      <Link href="/medication">Open Medication Round</Link>
+                    </Button>
+                  </>
+                )}
+                {isCarer && (
+                  <Button asChild variant="ghost">
+                    <Link href="/visits">Open my visits</Link>
+                  </Button>
+                )}
                 {(isCarer || isAdmin) && (
                   <Button asChild variant="ghost">
                     <Link href="/shift">{isCarer ? 'Open shift clock' : 'Open shift overview'}</Link>
