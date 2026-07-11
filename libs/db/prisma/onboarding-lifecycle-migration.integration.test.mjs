@@ -19,6 +19,8 @@ const migrationsUnderTest = [
   "20260710160000_onboarding_lifecycle_foundation",
   "20260710180000_company_request_bootstrap",
   "20260710203000_verified_invitation_activation",
+  "20260710223000_carer_invitation_lifecycle",
+  "20260711003000_family_invitation_grants",
 ];
 const { PrismaClient } = generatedClient;
 
@@ -102,6 +104,91 @@ test(
       ('legacy-revoked', 'org-a', 'clerk', 'legacy-revoked-subject',
        'legacy-revoked@example.test', 'carer', 'REVOKED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
   `);
+    await prisma.$executeRawUnsafe(`
+    INSERT INTO "client" (
+      "id", "full_name", "address_line1", "city", "postcode",
+      "organization_id", "created_at", "updated_at"
+    ) VALUES (
+      'legacy-family-client', 'Synthetic Family Client', '1 Test Street',
+      'London', 'SW1A 1AA', 'org-a', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    )
+  `);
+    await prisma.$executeRawUnsafe(`
+    INSERT INTO "care_room" (
+      "id", "organization_id", "client_id", "created_at", "updated_at"
+    ) VALUES (
+      'legacy-family-room', 'org-a', 'legacy-family-client',
+      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    )
+  `);
+    await prisma.$executeRawUnsafe(`
+    INSERT INTO "family_contact" (
+      "id", "organization_id", "email", "full_name", "created_at", "updated_at"
+    ) VALUES (
+      'legacy-family-contact', 'org-a', 'family@example.test', 'Synthetic Family',
+      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    )
+  `);
+    await prisma.$executeRawUnsafe(`
+    INSERT INTO "care_room_membership" (
+      "id", "care_room_id", "family_contact_id", "role", "status",
+      "access_basis", "accepted_at", "created_at", "updated_at"
+    ) VALUES
+      (
+        'legacy-family-membership-a', 'legacy-family-room', 'legacy-family-contact',
+        'FAMILY_VIEWER', 'ACTIVE', 'CLIENT_CONSENT', CURRENT_TIMESTAMP - INTERVAL '2 days',
+        CURRENT_TIMESTAMP - INTERVAL '2 days', CURRENT_TIMESTAMP - INTERVAL '2 days'
+      ),
+      (
+        'legacy-family-membership-b', 'legacy-family-room', 'legacy-family-contact',
+        'FAMILY_VIEWER', 'ACTIVE', 'CLIENT_CONSENT', CURRENT_TIMESTAMP - INTERVAL '1 day',
+        CURRENT_TIMESTAMP - INTERVAL '1 day', CURRENT_TIMESTAMP - INTERVAL '1 day'
+      )
+  `);
+    await prisma.$executeRawUnsafe(`
+    INSERT INTO "access_grant" (
+      "id", "care_room_membership_id", "scope", "granted_at", "created_at", "updated_at"
+    ) VALUES
+      (
+        'legacy-family-grant-a-updates', 'legacy-family-membership-a', 'VIEW_UPDATES',
+        CURRENT_TIMESTAMP - INTERVAL '2 days', CURRENT_TIMESTAMP - INTERVAL '2 days',
+        CURRENT_TIMESTAMP - INTERVAL '2 days'
+      ),
+      (
+        'legacy-family-grant-b-updates', 'legacy-family-membership-b', 'VIEW_UPDATES',
+        CURRENT_TIMESTAMP - INTERVAL '1 day', CURRENT_TIMESTAMP - INTERVAL '1 day',
+        CURRENT_TIMESTAMP - INTERVAL '1 day'
+      ),
+      (
+        'legacy-family-grant-b-concerns', 'legacy-family-membership-b', 'RAISE_CONCERNS',
+        CURRENT_TIMESTAMP - INTERVAL '1 day', CURRENT_TIMESTAMP - INTERVAL '1 day',
+        CURRENT_TIMESTAMP - INTERVAL '1 day'
+      )
+  `);
+    await prisma.$executeRawUnsafe(`
+    INSERT INTO "family_pulse" (
+      "id", "organization_id", "care_room_id", "care_room_membership_id",
+      "sentiment", "created_at", "updated_at"
+    ) VALUES
+      (
+        'legacy-family-pulse-a', 'org-a', 'legacy-family-room',
+        'legacy-family-membership-a', 'CONFIDENT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      ),
+      (
+        'legacy-family-pulse-b', 'org-a', 'legacy-family-room',
+        'legacy-family-membership-b', 'UNSURE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      )
+  `);
+    await prisma.$executeRawUnsafe(`
+    INSERT INTO "concern" (
+      "id", "organization_id", "care_room_id", "client_id", "title",
+      "category", "raised_by_membership_id", "created_at", "updated_at"
+    ) VALUES (
+      'legacy-family-concern', 'org-a', 'legacy-family-room',
+      'legacy-family-client', 'Synthetic historical concern', 'COMMUNICATION',
+      'legacy-family-membership-b', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    )
+  `);
     const legacyRowsBefore = await prisma.$queryRawUnsafe(`
     SELECT "id", "organization_id", "identity_provider", "auth_subject",
            "normalized_email", "role", "status"::text AS "status"
@@ -122,6 +209,123 @@ test(
      ORDER BY "id"
   `);
     assert.deepEqual(legacyRowsAfter, legacyRowsBefore);
+
+    const consolidatedMemberships = await prisma.$queryRawUnsafe(`
+    SELECT "id", "status"::text AS "status", "revoked_at" IS NOT NULL AS "revoked"
+      FROM "care_room_membership"
+     WHERE "care_room_id" = 'legacy-family-room'
+       AND "family_contact_id" = 'legacy-family-contact'
+     ORDER BY "id"
+  `);
+    assert.deepEqual(consolidatedMemberships, [
+      {
+        id: "legacy-family-membership-a",
+        status: "REVOKED",
+        revoked: true,
+      },
+    ]);
+
+    const consolidatedGrants = await prisma.$queryRawUnsafe(`
+    SELECT "care_room_membership_id", "scope"::text AS "scope",
+           "revoked_at" IS NOT NULL AS "revoked"
+      FROM "access_grant"
+     WHERE "care_room_membership_id" = 'legacy-family-membership-a'
+     ORDER BY "scope"
+  `);
+    assert.deepEqual(consolidatedGrants, [
+      {
+        care_room_membership_id: "legacy-family-membership-a",
+        scope: "RAISE_CONCERNS",
+        revoked: true,
+      },
+      {
+        care_room_membership_id: "legacy-family-membership-a",
+        scope: "VIEW_UPDATES",
+        revoked: true,
+      },
+    ]);
+
+    const remappedPulses = await prisma.$queryRawUnsafe(`
+    SELECT "id", "care_room_membership_id"
+      FROM "family_pulse"
+     WHERE "care_room_id" = 'legacy-family-room'
+     ORDER BY "id"
+  `);
+    assert.deepEqual(remappedPulses, [
+      {
+        id: "legacy-family-pulse-a",
+        care_room_membership_id: "legacy-family-membership-a",
+      },
+      {
+        id: "legacy-family-pulse-b",
+        care_room_membership_id: "legacy-family-membership-a",
+      },
+    ]);
+
+    const [remappedConcern] = await prisma.$queryRawUnsafe(`
+    SELECT "id", "raised_by_membership_id"
+      FROM "concern"
+     WHERE "id" = 'legacy-family-concern'
+  `);
+    assert.deepEqual(remappedConcern, {
+      id: "legacy-family-concern",
+      raised_by_membership_id: "legacy-family-membership-a",
+    });
+
+    const quarantineAudits = await prisma.$queryRawUnsafe(`
+    SELECT "action", "resource_id", "old_values", "new_values"
+      FROM "audit_log"
+     WHERE "action" IN (
+       'FAMILY_MEMBERSHIP_DUPLICATE_QUARANTINED',
+       'ACCESS_GRANT_DUPLICATE_QUARANTINED'
+     )
+     ORDER BY "action"
+  `);
+    assert.equal(quarantineAudits.length, 2);
+    const grantAudit = quarantineAudits[0];
+    const membershipAudit = quarantineAudits[1];
+    assert.equal(grantAudit.action, "ACCESS_GRANT_DUPLICATE_QUARANTINED");
+    assert.equal(grantAudit.old_values.grants.length, 2);
+    assert.equal(grantAudit.new_values.status, "REVOKED");
+    assert.equal(
+      membershipAudit.action,
+      "FAMILY_MEMBERSHIP_DUPLICATE_QUARANTINED",
+    );
+    assert.equal(membershipAudit.resource_id, "legacy-family-membership-a");
+    assert.equal(membershipAudit.old_values.memberships.length, 2);
+    assert.equal(membershipAudit.old_values.access_grants.length, 3);
+    assert.equal(membershipAudit.old_values.family_pulse_ids.length, 2);
+    assert.deepEqual(membershipAudit.old_values.concern_ids, [
+      "legacy-family-concern",
+    ]);
+    assert.equal(membershipAudit.new_values.status, "REVOKED");
+
+    await expectPostgresError(
+      () =>
+        prisma.$executeRawUnsafe(`
+      INSERT INTO "care_room_membership" (
+        "id", "care_room_id", "family_contact_id", "role", "status",
+        "access_basis", "updated_at"
+      ) VALUES (
+        'legacy-family-membership-duplicate-after', 'legacy-family-room',
+        'legacy-family-contact', 'FAMILY_VIEWER', 'INVITED',
+        'CLIENT_CONSENT', CURRENT_TIMESTAMP
+      )
+    `),
+      "23505",
+    );
+    await expectPostgresError(
+      () =>
+        prisma.$executeRawUnsafe(`
+      INSERT INTO "access_grant" (
+        "id", "care_room_membership_id", "scope", "updated_at"
+      ) VALUES (
+        'legacy-family-grant-duplicate-after', 'legacy-family-membership-a',
+        'VIEW_UPDATES', CURRENT_TIMESTAMP
+      )
+    `),
+      "23505",
+    );
 
     await prisma.$executeRawUnsafe(`
     INSERT INTO "organization_membership" (

@@ -30,22 +30,32 @@ describe('CarebridgeService', () => {
       disabled_at: null,
     },
     access_grants: [],
+    organization_membership_invitation: {
+      organization_id: 'org-1',
+      intended_role: 'family',
+      status: 'ACCEPTED',
+      bound_auth_subject: identity.authSubject ?? null,
+      activated_membership: {
+        organization_id: 'org-1',
+        auth_subject: identity.authSubject ?? null,
+        role: 'family',
+        status: 'ACTIVE',
+        revoked_at: null,
+      },
+    },
   });
 
   const mockRepository = {
     ensureClientInOrganization: jest.fn(),
     createCareRoom: jest.fn(),
     ensurePolicyForRoom: jest.fn(),
-    upsertFamilyContact: jest.fn(),
-    createMembershipWithDefaultScopes: jest.fn(),
     updatePolicy: jest.fn(),
     listRoomsForOrganization: jest.fn(),
     listRoomsForFamilyAccess: jest.fn(),
-    listRoomsForFamilyEmail: jest.fn(),
     findRoomByIdForOrganization: jest.fn(),
     findRoomByIdForFamilyAccess: jest.fn(),
-    findRoomByIdForFamilyEmail: jest.fn(),
     listVerifiedVisitStoriesByRoomId: jest.fn(),
+    listFamilySafePublishedStoriesByRoomId: jest.fn(),
     listVerifiedVisitStoryApprovalQueue: jest.fn(),
     findVisitForStory: jest.fn(),
     createVerifiedVisitStory: jest.fn(),
@@ -141,46 +151,6 @@ describe('CarebridgeService', () => {
     });
   });
 
-  it('tenant-stamps family invitation audits from the authorized room', async () => {
-    repository.findRoomByIdForOrganization.mockResolvedValue({
-      id: 'room-1',
-      organization_id: 'org-1',
-    } as any);
-    repository.upsertFamilyContact.mockResolvedValue({ id: 'contact-1' } as any);
-    repository.createMembershipWithDefaultScopes.mockResolvedValue({
-      ...familyMembership({ email: 'daughter@example.com' }),
-      role: 'FAMILY',
-      access_basis: 'CLIENT_CONSENT',
-    } as any);
-
-    await service.inviteFamilyContact(
-      {
-        careRoomId: 'room-1',
-        fullName: 'Authorized Relative',
-        email: 'daughter@example.com',
-        relationship: 'Daughter',
-        role: 'FAMILY' as any,
-        accessBasis: 'CLIENT_CONSENT' as any,
-      },
-      'admin-1',
-      'admin',
-      'org-1',
-    );
-
-    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        organization_id: 'org-1',
-        user_id: 'admin-1',
-        action: 'CAREBRIDGE_FAMILY_INVITED',
-        new_values: {
-          careRoomId: 'room-1',
-          familyContactId: 'contact-1',
-          accessBasis: 'CLIENT_CONSENT',
-        },
-      }),
-    });
-  });
-
   it('tenant-stamps policy audits from the authorized room', async () => {
     repository.findRoomByIdForOrganization.mockResolvedValue({
       id: 'room-1',
@@ -214,47 +184,7 @@ describe('CarebridgeService', () => {
     });
   });
 
-  it('lists care rooms for a family user by same-tenant email fallback', async () => {
-    repository.listRoomsForFamilyAccess.mockResolvedValue([
-      {
-        id: 'room-1',
-        organization_id: 'org-1',
-        client_id: 'client-1',
-        status: 'ACTIVE',
-        created_at: new Date('2026-04-21T09:00:00Z'),
-        updated_at: new Date('2026-04-21T09:00:00Z'),
-        client: {
-          id: 'client-1',
-          full_name: 'Mary Smith',
-        },
-        memberships: [familyMembership({ email: 'daughter@example.com' })],
-      },
-    ] as any);
-
-    const result = await service.listCareRooms({
-      role: 'user',
-      organizationId: 'org-1',
-      email: 'daughter@example.com',
-    });
-
-    expect(repository.listRoomsForFamilyAccess).toHaveBeenCalledWith({
-      organizationId: 'org-1',
-      authSubject: undefined,
-      email: 'daughter@example.com',
-    });
-    expect(accessService.requireFamilyScopes).toHaveBeenCalledWith({
-      membershipId: 'membership-1',
-      careRoomId: 'room-1',
-      organizationId: 'org-1',
-      authSubject: undefined,
-      email: 'daughter@example.com',
-      requiredScopes: [AccessGrantScope.VIEW_UPDATES],
-    });
-    expect(result).toHaveLength(1);
-    expect(result[0].client?.fullName).toBe('Mary Smith');
-  });
-
-  it('lists care rooms for a family user by verified auth subject when email is absent', async () => {
+  it('lists family-safe care rooms by verified auth subject only', async () => {
     repository.listRoomsForFamilyAccess.mockResolvedValue([
       {
         id: 'room-1',
@@ -271,7 +201,7 @@ describe('CarebridgeService', () => {
       },
     ] as any);
 
-    const result = await service.listCareRooms({
+    const result = await service.listFamilyCareRooms({
       role: 'user',
       organizationId: 'org-1',
       userId: 'clerk-family-subject',
@@ -281,10 +211,9 @@ describe('CarebridgeService', () => {
     expect(repository.listRoomsForFamilyAccess).toHaveBeenCalledWith({
       organizationId: 'org-1',
       authSubject: 'clerk-family-subject',
-      email: undefined,
     });
     expect(result).toHaveLength(1);
-    expect(result[0].client?.fullName).toBe('Mary Smith');
+    expect(result[0]).toEqual({ id: 'room-1', clientDisplayName: 'Mary Smith' });
   });
 
   it('treats client-scoped external viewers as family access rather than staff access', async () => {
@@ -300,30 +229,29 @@ describe('CarebridgeService', () => {
           id: 'client-1',
           full_name: 'Mary Smith',
         },
-        memberships: [familyMembership({ email: 'daughter@example.com' })],
+        memberships: [familyMembership({ authSubject: 'family-subject' })],
       },
     ] as any);
 
-    const result = await service.listCareRooms({
+    const result = await service.listFamilyCareRooms({
       role: 'client',
       organizationId: 'org-1',
-      email: 'daughter@example.com',
+      authSubject: 'family-subject',
     });
 
     expect(repository.listRoomsForFamilyAccess).toHaveBeenCalledWith({
       organizationId: 'org-1',
-      authSubject: undefined,
-      email: 'daughter@example.com',
+      authSubject: 'family-subject',
     });
     expect(result).toHaveLength(1);
   });
 
   it('denies a family viewer with no tenant before any family repository access', async () => {
-    const viewer = { role: 'user', email: 'daughter@example.com' };
+    const viewer = { role: 'user', authSubject: 'family-subject' };
     const actions = [
-      () => service.listCareRooms(viewer),
-      () => service.getCareRoom('room-1', viewer),
-      () => service.listVerifiedVisitStories('room-1', viewer),
+      () => service.listFamilyCareRooms(viewer),
+      () => service.getFamilyCareRoom('room-1', viewer),
+      () => service.listFamilyVerifiedVisitStories('room-1', viewer),
       () => service.raiseConcern({
         careRoomId: 'room-1',
         title: 'Concern',
@@ -348,7 +276,7 @@ describe('CarebridgeService', () => {
 
     expect(repository.listRoomsForFamilyAccess).not.toHaveBeenCalled();
     expect(repository.findRoomByIdForFamilyAccess).not.toHaveBeenCalled();
-    expect(repository.listVerifiedVisitStoriesByRoomId).not.toHaveBeenCalled();
+    expect(repository.listFamilySafePublishedStoriesByRoomId).not.toHaveBeenCalled();
     expect(repository.createConcern).not.toHaveBeenCalled();
     expect(accessService.requireFamilyScopes).not.toHaveBeenCalled();
   });
@@ -356,9 +284,9 @@ describe('CarebridgeService', () => {
   it('denies a family viewer with no identity before any family repository access', async () => {
     const viewer = { role: 'user', organizationId: 'org-1' };
     const actions = [
-      () => service.listCareRooms(viewer),
-      () => service.getCareRoom('room-1', viewer),
-      () => service.listVerifiedVisitStories('room-1', viewer),
+      () => service.listFamilyCareRooms(viewer),
+      () => service.getFamilyCareRoom('room-1', viewer),
+      () => service.listFamilyVerifiedVisitStories('room-1', viewer),
       () => service.raiseConcern({
         careRoomId: 'room-1',
         title: 'Concern',
@@ -383,12 +311,12 @@ describe('CarebridgeService', () => {
 
     expect(repository.listRoomsForFamilyAccess).not.toHaveBeenCalled();
     expect(repository.findRoomByIdForFamilyAccess).not.toHaveBeenCalled();
-    expect(repository.listVerifiedVisitStoriesByRoomId).not.toHaveBeenCalled();
+    expect(repository.listFamilySafePublishedStoriesByRoomId).not.toHaveBeenCalled();
     expect(repository.createConcern).not.toHaveBeenCalled();
     expect(accessService.requireFamilyScopes).not.toHaveBeenCalled();
   });
 
-  it('returns only the matching family membership and its grants', async () => {
+  it('does not expose memberships, grants, contact email, or policy in the family room shape', async () => {
     repository.listRoomsForFamilyAccess.mockResolvedValue([
       {
         id: 'room-1',
@@ -416,6 +344,17 @@ describe('CarebridgeService', () => {
             access_grants: [
               { id: 'grant-authorized', scope: 'VIEW_UPDATES', granted_at: new Date(), revoked_at: null },
             ],
+            organization_membership_invitation: {
+              organization_id: 'org-1',
+              intended_role: 'family',
+              status: 'ACCEPTED',
+              bound_auth_subject: 'family-subject',
+              activated_membership: {
+                auth_subject: 'family-subject',
+                status: 'ACTIVE',
+                revoked_at: null,
+              },
+            },
           },
           {
             id: 'membership-other',
@@ -487,19 +426,15 @@ describe('CarebridgeService', () => {
       },
     ] as any);
 
-    const result = await service.listCareRooms({
+    const result = await service.listFamilyCareRooms({
       role: 'user',
       organizationId: 'org-1',
       authSubject: 'family-subject',
-      email: 'daughter@example.com',
     });
 
-    expect(result[0].memberships).toHaveLength(1);
-    expect(result[0].memberships[0].id).toBe('membership-authorized');
-    expect(result[0].memberships[0].familyContact.id).toBe('contact-authorized');
-    expect(result[0].memberships[0].accessGrants).toEqual([
-      expect.objectContaining({ id: 'grant-authorized' }),
-    ]);
+    expect(result[0]).toEqual({ id: 'room-1', clientDisplayName: 'Mary Smith' });
+    expect(result[0]).not.toHaveProperty('memberships');
+    expect(result[0]).not.toHaveProperty('policy');
   });
 
   it('keeps staff room listing on the organization path', async () => {
@@ -538,7 +473,7 @@ describe('CarebridgeService', () => {
       memberships: [familyMembership({ authSubject: 'family-subject' })],
     } as any);
 
-    await service.getCareRoom('room-1', {
+    await service.getFamilyCareRoom('room-1', {
       role: 'user',
       organizationId: 'org-1',
       authSubject: 'family-subject',
@@ -554,34 +489,15 @@ describe('CarebridgeService', () => {
     );
   });
 
-  it('fails closed when same-tenant email fallback is ambiguous', async () => {
-    repository.listRoomsForFamilyAccess.mockResolvedValue([
-      {
-        id: 'room-1',
-        organization_id: 'org-1',
-        client_id: 'client-1',
-        status: 'ACTIVE',
-        memberships: [
-          familyMembership({ email: 'shared@example.com' }),
-          {
-            ...familyMembership({ email: 'shared@example.com' }),
-            id: 'membership-2',
-            family_contact: {
-              ...familyMembership({ email: 'shared@example.com' }).family_contact,
-              id: 'contact-2',
-            },
-          },
-        ],
-      },
-    ] as any);
-
-    const result = await service.listCareRooms({
-      role: 'user',
-      organizationId: 'org-1',
-      email: 'shared@example.com',
-    });
-
-    expect(result).toEqual([]);
+  it('denies an email-only family identity before repository access', async () => {
+    await expect(
+      service.listFamilyCareRooms({
+        role: 'user',
+        organizationId: 'org-1',
+        email: 'shared@example.com',
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(repository.listRoomsForFamilyAccess).not.toHaveBeenCalled();
   });
 
   it('creates a verified visit story with source references', async () => {
@@ -616,6 +532,9 @@ describe('CarebridgeService', () => {
         organization_id: 'org-1',
         visit_id: 'visit-1',
         status: 'DRAFT',
+        family_safe_version: 1,
+        family_safe_title: 'Care visit update',
+        family_safe_body: 'The scheduled care visit was completed. One care task was recorded as completed. 1 care task needs follow-up.',
         source_refs: expect.arrayContaining([{ type: 'Visit', id: 'visit-1' }]),
       })
     );
@@ -630,9 +549,28 @@ describe('CarebridgeService', () => {
     });
   });
 
+  it('refuses to generate family proof for a visit that is not completed', async () => {
+    repository.findVisitForStory.mockResolvedValue({
+      id: 'visit-scheduled',
+      organization_id: 'org-1',
+      client_id: 'client-1',
+      status: 'SCHEDULED',
+      client: { id: 'client-1', full_name: 'Mary Smith' },
+      tasks: [],
+    } as any);
+
+    await expect(
+      service.generateVerifiedVisitStory('visit-scheduled', 'admin-1', 'org-1'),
+    ).rejects.toMatchObject({
+      response: { code: ErrorCode.VALIDATION_FAILED },
+    });
+    expect(repository.createVerifiedVisitStory).not.toHaveBeenCalled();
+  });
+
   it('refuses to publish a verified visit story without source references', async () => {
     repository.findVerifiedVisitStoryById.mockResolvedValue({
       id: 'story-1',
+      status: 'DRAFT',
       source_refs: [],
     } as any);
 
@@ -641,12 +579,78 @@ describe('CarebridgeService', () => {
     ).rejects.toThrow(BaseHttpException);
   });
 
+  it('refuses to publish a legacy story without versioned family-safe content', async () => {
+    repository.findVerifiedVisitStoryById.mockResolvedValue({
+      id: 'story-legacy',
+      organization_id: 'org-1',
+      status: 'DRAFT',
+      source_refs: [{ type: 'Visit', id: 'visit-1' }],
+      draft_title: 'Medication visit',
+      draft_body: 'Raw medication notes that must not reach family.',
+      family_safe_version: null,
+      family_safe_title: null,
+      family_safe_body: null,
+    } as any);
+
+    await expect(
+      service.publishVerifiedVisitStory('story-legacy', 'admin-1', 'org-1'),
+    ).rejects.toMatchObject({
+      response: { code: ErrorCode.VALIDATION_FAILED },
+    });
+    expect(repository.publishVerifiedVisitStory).not.toHaveBeenCalled();
+  });
+
+  it('refuses to publish family proof when the linked visit is not completed', async () => {
+    repository.findVerifiedVisitStoryById.mockResolvedValue({
+      id: 'story-scheduled',
+      organization_id: 'org-1',
+      status: 'DRAFT',
+      source_refs: [{ type: 'Visit', id: 'visit-scheduled' }],
+      family_safe_version: 1,
+      family_safe_title: 'Care visit update',
+      family_safe_body: 'A scheduled care visit update is available.',
+      visit: { status: 'SCHEDULED' },
+    } as any);
+
+    await expect(
+      service.publishVerifiedVisitStory('story-scheduled', 'admin-1', 'org-1'),
+    ).rejects.toMatchObject({
+      response: { code: ErrorCode.VALIDATION_FAILED },
+    });
+    expect(repository.publishVerifiedVisitStory).not.toHaveBeenCalled();
+  });
+
+  it('refuses to publish a rejected story', async () => {
+    repository.findVerifiedVisitStoryById.mockResolvedValue({
+      id: 'story-rejected',
+      organization_id: 'org-1',
+      status: 'REJECTED',
+      source_refs: [{ type: 'Visit', id: 'visit-1' }],
+      family_safe_version: 1,
+      family_safe_title: 'Care visit update',
+      family_safe_body: 'A scheduled care visit update is available.',
+      visit: { status: 'COMPLETED', deleted_at: null },
+    } as any);
+
+    await expect(
+      service.publishVerifiedVisitStory('story-rejected', 'admin-1', 'org-1'),
+    ).rejects.toMatchObject({
+      status: 409,
+      response: { code: ErrorCode.VALIDATION_FAILED },
+    });
+    expect(repository.publishVerifiedVisitStory).not.toHaveBeenCalled();
+  });
+
   it('requires an actor user id when publishing a verified visit story', async () => {
     repository.findVerifiedVisitStoryById.mockResolvedValue({
       id: 'story-1',
       source_refs: [{ type: 'Visit', id: 'visit-1' }],
       draft_title: 'Visit recorded',
       draft_body: 'Draft body',
+      family_safe_version: 1,
+      family_safe_title: 'Care visit update',
+      family_safe_body: 'A scheduled care visit update is available.',
+      visit: { status: 'COMPLETED' },
     } as any);
 
     await expect(
@@ -660,9 +664,14 @@ describe('CarebridgeService', () => {
     repository.findVerifiedVisitStoryById.mockResolvedValue({
       id: 'story-1',
       organization_id: 'org-1',
+      status: 'DRAFT',
       source_refs: [{ type: 'Visit', id: 'visit-1' }],
       draft_title: 'Visit recorded',
       draft_body: 'Draft body',
+      family_safe_version: 1,
+      family_safe_title: 'Care visit update',
+      family_safe_body: 'A scheduled care visit update is available.',
+      visit: { status: 'COMPLETED' },
     } as any);
     repository.publishVerifiedVisitStory.mockResolvedValue({
       id: 'story-1',
@@ -674,12 +683,22 @@ describe('CarebridgeService', () => {
 
     await service.publishVerifiedVisitStory('story-1', 'admin-1', 'org-1');
 
+    expect(repository.publishVerifiedVisitStory).toHaveBeenCalledWith(
+      'story-1',
+      'Care visit update',
+      'A scheduled care visit update is available.',
+      'admin-1',
+    );
+
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         organization_id: 'org-1',
         user_id: 'admin-1',
         action: 'CAREBRIDGE_VISIT_STORY_PUBLISHED',
-        new_values: {},
+        new_values: {
+          familySafeVersion: 1,
+          familySafeDigest: expect.stringMatching(/^[a-f0-9]{64}$/),
+        },
       }),
     });
   });
@@ -775,42 +794,39 @@ describe('CarebridgeService', () => {
       id: 'room-1',
       organization_id: 'org-1',
       client_id: 'client-1',
-      memberships: [familyMembership({ email: 'daughter@example.com' })],
+      memberships: [familyMembership({ authSubject: 'family-subject' })],
     } as any);
-    repository.listVerifiedVisitStoriesByRoomId.mockResolvedValue([
+    repository.listFamilySafePublishedStoriesByRoomId.mockResolvedValue([
       {
-        id: 'story-1',
-        status: 'PUBLISHED',
-        draft_title: 'Internal draft title',
-        draft_body: 'Internal draft contains staff-only notes.',
-        approved_title: 'Wellbeing visit completed',
-        approved_body: 'Mary had a calm visit and completed her usual routine.',
-        source_refs: [{ type: 'Visit', id: 'visit-1' }],
+        family_safe_title: 'Care visit update',
+        family_safe_body: 'The visit was completed and two care tasks were recorded.',
         published_at: new Date('2026-04-22T09:00:00Z'),
       },
     ] as any);
 
-    const result = await service.listVerifiedVisitStories('room-1', {
+    const result = await service.listFamilyVerifiedVisitStories('room-1', {
       role: 'user',
       organizationId: 'org-1',
-      email: 'daughter@example.com',
+      authSubject: 'family-subject',
     });
 
-    expect(repository.listVerifiedVisitStoriesByRoomId).toHaveBeenCalledWith('room-1', 'PUBLISHED');
+    expect(repository.listFamilySafePublishedStoriesByRoomId).toHaveBeenCalledWith('room-1');
     expect(accessService.requireFamilyScopes).toHaveBeenCalledWith(
       expect.objectContaining({
         requiredScopes: [
           AccessGrantScope.VIEW_UPDATES,
-          AccessGrantScope.VIEW_VISIT_TIMES,
           AccessGrantScope.VIEW_TASK_SUMMARY,
-          AccessGrantScope.VIEW_MEDICATION_SUPPORT_STATUS,
         ],
       }),
     );
     expect(result).toHaveLength(1);
-    expect(result[0].draftTitle).toBe('Wellbeing visit completed');
-    expect(result[0].draftBody).toBe('Mary had a calm visit and completed her usual routine.');
-    expect(result[0].draftBody).not.toContain('staff-only');
+    expect(result[0]).toEqual({
+      title: 'Care visit update',
+      body: 'The visit was completed and two care tasks were recorded.',
+      publishedAt: new Date('2026-04-22T09:00:00Z'),
+    });
+    expect(result[0]).not.toHaveProperty('sourceRefs');
+    expect(result[0]).not.toHaveProperty('draftBody');
   });
 
   it('does not read published stories when any required scope is denied', async () => {
@@ -818,7 +834,7 @@ describe('CarebridgeService', () => {
       id: 'room-1',
       organization_id: 'org-1',
       client_id: 'client-1',
-      memberships: [familyMembership({ email: 'daughter@example.com' })],
+      memberships: [familyMembership({ authSubject: 'family-subject' })],
     } as any);
     accessService.requireFamilyScopes.mockRejectedValue(
       new BaseHttpException(
@@ -829,14 +845,14 @@ describe('CarebridgeService', () => {
     );
 
     await expect(
-      service.listVerifiedVisitStories('room-1', {
+      service.listFamilyVerifiedVisitStories('room-1', {
         role: 'user',
         organizationId: 'org-1',
-        email: 'daughter@example.com',
+        authSubject: 'family-subject',
       }),
     ).rejects.toMatchObject({ status: 403 });
 
-    expect(repository.listVerifiedVisitStoriesByRoomId).not.toHaveBeenCalled();
+    expect(repository.listFamilySafePublishedStoriesByRoomId).not.toHaveBeenCalled();
   });
 
   it('raises a concern with SLA timestamps and an initial event', async () => {
@@ -926,7 +942,7 @@ describe('CarebridgeService', () => {
       id: 'room-1',
       organization_id: 'org-1',
       client_id: 'client-1',
-      memberships: [familyMembership({ email: 'daughter@example.com' })],
+      memberships: [familyMembership({ authSubject: 'family-subject' })],
     } as any);
     repository.createFamilyPulse.mockResolvedValue({
       id: 'pulse-1',
@@ -941,7 +957,7 @@ describe('CarebridgeService', () => {
         careRoomId: 'room-1',
         sentiment: FamilyPulseSentiment.CONFIDENT,
       },
-      { role: 'user', organizationId: 'org-1', email: 'daughter@example.com' },
+      { role: 'user', organizationId: 'org-1', authSubject: 'family-subject' },
     );
 
     expect(accessService.requireFamilyScopes).toHaveBeenCalledWith(
@@ -954,7 +970,7 @@ describe('CarebridgeService', () => {
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         organization_id: 'org-1',
-        user_id: 'contact-1',
+        user_id: 'family-subject',
         action: 'CAREBRIDGE_PULSE_SUBMITTED',
         new_values: { sentiment: FamilyPulseSentiment.CONFIDENT },
       }),
@@ -966,7 +982,7 @@ describe('CarebridgeService', () => {
       id: 'room-1',
       organization_id: 'org-1',
       client_id: 'client-1',
-      memberships: [familyMembership({ email: 'daughter@example.com' })],
+      memberships: [familyMembership({ authSubject: 'family-subject' })],
     } as any);
     repository.createFamilyPulse.mockResolvedValue({
       id: 'pulse-1',
@@ -983,7 +999,7 @@ describe('CarebridgeService', () => {
         sentiment: FamilyPulseSentiment.CONCERNED,
         note: 'Please call me.',
       },
-      { role: 'user', organizationId: 'org-1', email: 'daughter@example.com' },
+      { role: 'user', organizationId: 'org-1', authSubject: 'family-subject' },
     );
 
     expect(accessService.requireFamilyScopes).toHaveBeenCalledTimes(1);
@@ -1008,7 +1024,7 @@ describe('CarebridgeService', () => {
     expect(mockPrisma.auditLog.create).toHaveBeenNthCalledWith(1, {
       data: expect.objectContaining({
         organization_id: 'org-1',
-        user_id: 'contact-1',
+        user_id: 'family-subject',
         action: 'CAREBRIDGE_PULSE_SUBMITTED',
         new_values: { sentiment: FamilyPulseSentiment.CONCERNED },
       }),
@@ -1016,7 +1032,7 @@ describe('CarebridgeService', () => {
     expect(mockPrisma.auditLog.create).toHaveBeenNthCalledWith(2, {
       data: expect.objectContaining({
         organization_id: 'org-1',
-        user_id: 'contact-1',
+        user_id: 'family-subject',
         action: 'CAREBRIDGE_CONCERN_RAISED',
         new_values: { careRoomId: 'room-1' },
       }),
@@ -1028,7 +1044,7 @@ describe('CarebridgeService', () => {
       id: 'room-1',
       organization_id: 'org-1',
       client_id: 'client-1',
-      memberships: [familyMembership({ email: 'daughter@example.com' })],
+      memberships: [familyMembership({ authSubject: 'family-subject' })],
     } as any);
     accessService.requireFamilyScopes.mockRejectedValue(
       new BaseHttpException(
@@ -1045,7 +1061,7 @@ describe('CarebridgeService', () => {
           sentiment: FamilyPulseSentiment.NEED_CALL,
           note: 'Please call me.',
         },
-        { role: 'user', organizationId: 'org-1', email: 'daughter@example.com' },
+        { role: 'user', organizationId: 'org-1', authSubject: 'family-subject' },
       ),
     ).rejects.toMatchObject({ status: 403 });
 

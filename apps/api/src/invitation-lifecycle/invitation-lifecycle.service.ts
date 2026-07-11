@@ -198,6 +198,16 @@ export class InvitationLifecycleService {
               include: {
                 source_request: { select: { status: true } },
                 provisioning_outbox: { select: { status: true } },
+                care_room_memberships: {
+                  include: {
+                    care_room: true,
+                    family_contact: true,
+                    access_grants: {
+                      where: { revoked_at: null },
+                      select: { id: true },
+                    },
+                  },
+                },
               },
             });
           if (!invitation) this.deny();
@@ -228,6 +238,28 @@ export class InvitationLifecycleService {
           if (invitation.status === "ACCEPTED") {
             return this.acceptedResult(tx, input);
           }
+
+          const familyTarget = invitation.care_room_memberships.length === 1
+            ? invitation.care_room_memberships[0]
+            : null;
+          if (input.intendedRole === 'family') {
+            const validFamilyTarget =
+              familyTarget &&
+              familyTarget.organization_membership_invitation_id === invitation.id &&
+              familyTarget.status === 'INVITED' &&
+              familyTarget.accepted_at === null &&
+              familyTarget.revoked_at === null &&
+              familyTarget.care_room.organization_id === invitation.organization_id &&
+              familyTarget.care_room.status === 'ACTIVE' &&
+              familyTarget.family_contact.organization_id === invitation.organization_id &&
+              familyTarget.family_contact.auth_subject === null &&
+              familyTarget.family_contact.disabled_at === null &&
+              familyTarget.access_grants.length === 0;
+            if (!validFamilyTarget) this.deny();
+          } else if (invitation.care_room_memberships.length > 0) {
+            this.deny();
+          }
+
           if (
             invitation.status !== "PENDING" ||
             invitation.expires_at <= new Date()
@@ -258,6 +290,39 @@ export class InvitationLifecycleService {
             },
           });
           const acceptedAt = new Date();
+          if (input.intendedRole === 'family') {
+            const contactBound = await tx.familyContact.updateMany({
+              where: {
+                id: familyTarget!.family_contact_id,
+                organization_id: invitation.organization_id,
+                auth_subject: null,
+                disabled_at: null,
+              },
+              data: { auth_subject: input.subject },
+            });
+            const roomActivated = await tx.careRoomMembership.updateMany({
+              where: {
+                id: familyTarget!.id,
+                organization_membership_invitation_id: invitation.id,
+                status: 'INVITED',
+                accepted_at: null,
+                revoked_at: null,
+              },
+              data: {
+                status: 'ACTIVE',
+                accepted_at: acceptedAt,
+              },
+            });
+            if (contactBound.count !== 1 || roomActivated.count !== 1) {
+              throw new Prisma.PrismaClientKnownRequestError(
+                'Concurrent family invitation activation',
+                {
+                  code: 'P2034',
+                  clientVersion: Prisma.prismaVersion.client,
+                },
+              );
+            }
+          }
           const transitioned =
             await tx.organizationMembershipInvitation.updateMany({
               where: { id: invitation.id, status: "PENDING" },
@@ -321,9 +386,32 @@ export class InvitationLifecycleService {
           external_membership_id: input.externalMembershipId,
         },
       },
-      include: { activated_membership: true },
+      include: {
+        activated_membership: true,
+        care_room_memberships: {
+          include: { family_contact: true, care_room: true },
+        },
+      },
     });
     if (!accepted) this.deny();
+    if (input.intendedRole === 'family') {
+      const familyMembership = accepted.care_room_memberships.find(
+        (membership) =>
+          membership.status === 'ACTIVE' &&
+          membership.revoked_at === null &&
+          membership.family_contact.auth_subject === input.subject &&
+          membership.family_contact.disabled_at === null &&
+          membership.care_room.organization_id === input.organizationId &&
+          membership.care_room.status === 'ACTIVE',
+      );
+      if (
+        !familyMembership
+      ) {
+        this.deny();
+      }
+    } else if (accepted.care_room_memberships.length > 0) {
+      this.deny();
+    }
     return {
       status: "ACTIVE",
       externalOrganizationId: input.externalOrganizationId,
@@ -357,14 +445,27 @@ export class InvitationLifecycleService {
         select: {
           id: true,
           organization_id: true,
+          intended_role: true,
           source_request_id: true,
           provisioning_outbox: { select: { status: true } },
+          care_room_memberships: { select: { id: true, status: true } },
         },
       });
       if (!invitation) return;
       if (
         invitation.source_request_id &&
         invitation.provisioning_outbox?.status !== "DELIVERED"
+      ) {
+        return;
+      }
+      const familyTarget = invitation.intended_role === 'family'
+        ? invitation.care_room_memberships.length === 1
+          ? invitation.care_room_memberships[0]
+          : null
+        : null;
+      if (
+        (invitation.intended_role === 'family' && !familyTarget) ||
+        (invitation.intended_role !== 'family' && invitation.care_room_memberships.length > 0)
       ) {
         return;
       }
@@ -375,6 +476,19 @@ export class InvitationLifecycleService {
         },
       );
       if (transitioned.count !== 1) return;
+      if (
+        familyTarget?.status === 'INVITED'
+      ) {
+        await tx.careRoomMembership.updateMany({
+          where: {
+            id: familyTarget.id,
+            status: 'INVITED',
+            accepted_at: null,
+            revoked_at: null,
+          },
+          data: { status: 'EXPIRED' },
+        });
+      }
       await tx.auditLog.create({
         data: {
           user_id: "system:invitation-lifecycle",
@@ -398,7 +512,9 @@ export class InvitationLifecycleService {
   }
 
   private activationNextPath(intendedRole: string): string {
-    return intendedRole === "admin" ? "/admin/setup" : "/access/setup";
+    if (intendedRole === 'admin') return '/admin/setup';
+    if (intendedRole === 'family') return '/family';
+    return '/access/setup';
   }
 
   private async withSerializableRetry<T>(

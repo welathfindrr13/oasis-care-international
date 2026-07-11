@@ -7,9 +7,11 @@ import { CarebridgeAccessService } from './access/carebridge-access.service';
 import { CarebridgeFeedService } from './feed/carebridge-feed.service';
 import { CarebridgeConcernService } from './concern/carebridge-concern.service';
 import { CarerModule } from '../carer/carer.module';
+import { InvitationLifecycleModule } from '../invitation-lifecycle/invitation-lifecycle.module';
+import { FamilyInvitationService } from './family-invitation.service';
 
 @Module({
-  imports: [DbModule, CarerModule],
+  imports: [DbModule, CarerModule, InvitationLifecycleModule],
   providers: [
     PrismaService,
     CarebridgeRepository,
@@ -18,7 +20,8 @@ import { CarerModule } from '../carer/carer.module';
     CarebridgeAccessService,
     CarebridgeFeedService,
     CarebridgeConcernService,
+    FamilyInvitationService,
   ],
-  exports: [CarebridgeService, CarebridgeAccessService, CarebridgeFeedService, CarebridgeConcernService],
+  exports: [CarebridgeService, CarebridgeAccessService, CarebridgeFeedService, CarebridgeConcernService, FamilyInvitationService],
 })
 export class CarebridgeModule {}

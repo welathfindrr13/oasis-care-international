@@ -21,12 +21,29 @@ export function ApprovalQueueItem({
 }: ApprovalQueueItemProps) {
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [rejectionReason, setRejectionReason] = useState(story.rejectionReason || '')
+  const hasFamilyPreview = Boolean(story.familySafeTitle && story.familySafeBody && story.familySafeVersion === 1)
 
   return (
     <VerifiedVisitStoryCard
       story={story}
       footer={
         <div className="space-y-4">
+          <section className="rounded-2xl border border-sky-200 bg-sky-50 p-4" aria-label="Family preview">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+              Exact family preview
+            </p>
+            {hasFamilyPreview ? (
+              <div className="mt-2 text-sm leading-6 text-slate-700">
+                <h4 className="font-semibold text-slate-900">{story.familySafeTitle}</h4>
+                <p className="mt-1">{story.familySafeBody}</p>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-slate-700">
+                This older draft has no family-safe preview and cannot be approved.
+              </p>
+            )}
+          </section>
+
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               Source references
@@ -71,8 +88,8 @@ export function ApprovalQueueItem({
           ) : null}
 
           <div className="flex flex-wrap gap-3">
-            <Button type="button" disabled={busy} onClick={() => onApprove(story.id)}>
-              Approve for family
+            <Button type="button" disabled={busy || !hasFamilyPreview} onClick={() => onApprove(story.id)}>
+              Approve exact family preview
             </Button>
             <Button
               type="button"

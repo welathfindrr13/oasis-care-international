@@ -1,21 +1,24 @@
 import Link from 'next/link'
 import { Header } from '../../components/oasis/Header'
 import { query } from '../../lib/graphql/client'
-import { CAREBRIDGE_ROOMS_QUERY, type CareRoomsQueryResponse } from '../../lib/graphql/queries'
+import {
+  FAMILY_CAREBRIDGE_ROOMS_QUERY,
+  type FamilyCareRoomsQueryResponse,
+} from '../../lib/graphql/queries'
 
 export const dynamic = 'force-dynamic'
 
 async function getFamilyCareRoomsSafe() {
   try {
-    const data = await query<CareRoomsQueryResponse>(CAREBRIDGE_ROOMS_QUERY)
-    return Array.isArray(data.careRooms) ? data.careRooms : []
+    const data = await query<FamilyCareRoomsQueryResponse>(FAMILY_CAREBRIDGE_ROOMS_QUERY)
+    return { rooms: Array.isArray(data.familyCareRooms) ? data.familyCareRooms : [], unavailable: false }
   } catch {
-    return []
+    return { rooms: [], unavailable: true }
   }
 }
 
 export default async function FamilyPage() {
-  const rooms = await getFamilyCareRoomsSafe()
+  const { rooms, unavailable } = await getFamilyCareRoomsSafe()
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -40,7 +43,14 @@ export default async function FamilyPage() {
         <section className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
           <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="font-heading text-xl font-semibold text-slate-900">Your care rooms</h2>
-            {rooms.length === 0 ? (
+            {unavailable ? (
+              <div className="mt-3 text-sm leading-6 text-slate-600">
+                <p>Your care rooms are temporarily unavailable. Please try again.</p>
+                <Link href="/family" className="mt-2 inline-flex font-medium text-sky-700 hover:text-sky-800">
+                  Try again
+                </Link>
+              </div>
+            ) : rooms.length === 0 ? (
               <p className="mt-3 text-sm leading-6 text-slate-600">
                 You do not have an active care room yet. Your agency can invite you when updates are ready.
               </p>
@@ -52,7 +62,7 @@ export default async function FamilyPage() {
                       href={`/family/care-rooms/${room.id}`}
                       className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm hover:bg-slate-50"
                     >
-                      <span className="font-medium text-slate-900">{room.client.fullName}</span>
+                      <span className="font-medium text-slate-900">{room.clientDisplayName}</span>
                       <span className="text-xs uppercase tracking-[0.12em] text-slate-500">Open updates</span>
                     </Link>
                   </li>

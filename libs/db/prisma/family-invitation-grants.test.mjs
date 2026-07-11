@@ -1,0 +1,47 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+
+const migration = readFileSync(
+  new URL(
+    './migrations/20260711003000_family_invitation_grants/migration.sql',
+    import.meta.url,
+  ),
+  'utf8',
+);
+const schema = readFileSync(new URL('./schema.prisma', import.meta.url), 'utf8');
+
+test('pending family invitations target one room and accepted proof can cover more rooms', () => {
+  assert.match(migration, /organization_membership_invitation_id/);
+  assert.match(migration, /care_room_membership_invitation_id_idx/);
+  assert.match(migration, /care_room_membership_room_contact_key/);
+  assert.match(schema, /organization_membership_invitation\s+OrganizationMembershipInvitation\?/);
+  assert.match(schema, /care_room_memberships\s+CareRoomMembership\[\]/);
+});
+
+test('explicit family grants are unique and the migration creates no automatic scopes', () => {
+  assert.match(migration, /access_grant_membership_scope_key/);
+  assert.match(schema, /@@unique\(\[care_room_membership_id, scope\]/);
+  assert.doesNotMatch(migration, /INSERT INTO "access_grant"/);
+});
+
+test('historical duplicate family access is audited and quarantined before consolidation', () => {
+  assert.match(migration, /^BEGIN;/);
+  assert.match(migration, /COMMIT;\s*$/);
+  assert.match(migration, /FAMILY_MEMBERSHIP_DUPLICATE_QUARANTINED/);
+  assert.match(migration, /ACCESS_GRANT_DUPLICATE_QUARANTINED/);
+  assert.match(migration, /UPDATE "family_pulse"/);
+  assert.match(migration, /UPDATE "concern"/);
+  assert.match(migration, /UPDATE "access_grant"/);
+  assert.match(migration, /"status" = 'REVOKED'/);
+  assert.match(migration, /unresolved duplicate care room memberships/);
+  assert.match(migration, /unresolved duplicate access grants/);
+  assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|TRUNCATE/);
+});
+
+test('legacy published stories remain hidden until versioned family-safe content exists', () => {
+  assert.match(migration, /family_safe_version/);
+  assert.match(migration, /verified_visit_story_family_safe_content_check/);
+  assert.match(schema, /family_safe_version\s+Int\?/);
+  assert.doesNotMatch(migration, /UPDATE "verified_visit_story"/);
+});

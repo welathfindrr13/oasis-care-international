@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --test components/oasis/headerIdentity.test.ts lib/auth/access.test.ts lib/auth/access-snapshot.test.ts lib/auth/client-access.test.ts lib/graphql/client-side.test.ts lib/graphql/proxy-auth.test.ts && node --test app/clinical-client-auth.test.mjs app/company-request-bootstrap.test.mjs app/admin/carers/admin-carer-linking.test.mjs lib/auth/access-policy.test.js middleware.test.js"
+    "test": "tsx --test components/oasis/headerIdentity.test.ts lib/auth/access.test.ts lib/auth/access-snapshot.test.ts lib/auth/client-access.test.ts lib/graphql/client-side.test.ts lib/graphql/proxy-auth.test.ts && node --test app/clinical-client-auth.test.mjs app/company-request-bootstrap.test.mjs app/admin/carers/admin-carer-linking.test.mjs app/family/family-safe-graphql.test.mjs lib/auth/access-policy.test.js middleware.test.js"
   },
   "dependencies": {
     "@clerk/nextjs": "^5.7.5",

@@ -197,6 +197,223 @@ describe("ClerkInvitationAdministrationAdapter", () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps cleanup unresolved for an unmatched pending invitation with the same email", async () => {
+    global.fetch = jest.fn(async () =>
+      response({
+        data: [
+          {
+            id: "orginv_ambiguous",
+            email_address: "carer@example.test",
+            role: "org:member",
+            status: "pending",
+            public_metadata: {},
+            private_metadata: {},
+          },
+        ],
+      }),
+    ) as typeof fetch;
+
+    await expect(
+      new ClerkInvitationAdministrationAdapter().revokeOrganizationInvitationByInternalId(
+        input,
+      ),
+    ).rejects.toMatchObject<Partial<ClerkProvisioningError>>({
+      code: "CLERK_INVITATION_AMBIGUOUS",
+      retryable: false,
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps cleanup unresolved when exact terminal history coexists with an unmatched pending invitation", async () => {
+    global.fetch = jest.fn(async () =>
+      response({
+        data: [
+          {
+            id: "orginv_exact_terminal",
+            email_address: "carer@example.test",
+            role: "org:member",
+            status: "expired",
+            public_metadata: { oasis_invitation_id: input.invitationId },
+            private_metadata: { oasis_invitation_id: input.invitationId },
+          },
+          {
+            id: "orginv_unmatched_pending",
+            email_address: "carer@example.test",
+            role: "org:member",
+            status: "pending",
+            public_metadata: {},
+            private_metadata: {},
+          },
+        ],
+      }),
+    ) as typeof fetch;
+
+    await expect(
+      new ClerkInvitationAdministrationAdapter().revokeOrganizationInvitationByInternalId(
+        input,
+      ),
+    ).rejects.toMatchObject<Partial<ClerkProvisioningError>>({
+      code: "CLERK_INVITATION_AMBIGUOUS",
+      retryable: false,
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps cleanup unresolved when the Clerk invitation page is incomplete", async () => {
+    const exact = {
+      id: "orginv_exact_terminal",
+      email_address: "carer@example.test",
+      role: "org:member",
+      status: "expired",
+      public_metadata: { oasis_invitation_id: input.invitationId },
+      private_metadata: { oasis_invitation_id: input.invitationId },
+    };
+    const filler = Array.from({ length: 499 }, (_, index) => ({
+      id: `orginv_filler_${index}`,
+      email_address: `other-${index}@example.test`,
+      role: "org:member",
+      status: "expired",
+      public_metadata: {},
+      private_metadata: {},
+    }));
+    const bodies = [
+      response({
+        total_count: 501,
+        data: [exact, ...filler],
+      }),
+      response({ total_count: 501, data: [] }),
+    ];
+    global.fetch = jest.fn(
+      async () => bodies.shift() as Response,
+    ) as typeof fetch;
+
+    await expect(
+      new ClerkInvitationAdministrationAdapter().revokeOrganizationInvitationByInternalId(
+        input,
+      ),
+    ).rejects.toMatchObject<Partial<ClerkProvisioningError>>({
+      code: "CLERK_INVITATION_PAGE_INCOMPLETE",
+      retryable: false,
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("paginates the full invitation list before revoking an exact match", async () => {
+    const exact = {
+      id: "orginv_exact_pending",
+      email_address: "carer@example.test",
+      role: "org:member",
+      status: "pending",
+      public_metadata: { oasis_invitation_id: input.invitationId },
+      private_metadata: { oasis_invitation_id: input.invitationId },
+    };
+    const filler = Array.from({ length: 499 }, (_, index) => ({
+      id: `orginv_filler_${index}`,
+      email_address: `other-${index}@example.test`,
+      role: "org:member",
+      status: "expired",
+      public_metadata: {},
+      private_metadata: {},
+    }));
+    const bodies = [
+      response({ total_count: 501, data: [exact, ...filler] }),
+      response({
+        total_count: 501,
+        data: [
+          {
+            id: "orginv_last",
+            email_address: "last@example.test",
+            role: "org:member",
+            status: "expired",
+            public_metadata: {},
+            private_metadata: {},
+          },
+        ],
+      }),
+      response({ status: "revoked" }),
+    ];
+    global.fetch = jest.fn(
+      async () => bodies.shift() as Response,
+    ) as typeof fetch;
+
+    await new ClerkInvitationAdministrationAdapter().revokeOrganizationInvitationByInternalId(
+      input,
+    );
+
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+    expect(String((global.fetch as jest.Mock).mock.calls[0][0])).toContain(
+      "offset=0",
+    );
+    expect(String((global.fetch as jest.Mock).mock.calls[1][0])).toContain(
+      "offset=500",
+    );
+    expect(String((global.fetch as jest.Mock).mock.calls[2][0])).toContain(
+      "/invitations/orginv_exact_pending/revoke",
+    );
+  });
+
+  it("fails closed when the total changes between invitation pages", async () => {
+    const exact = {
+      id: "orginv_exact_terminal",
+      email_address: "carer@example.test",
+      role: "org:member",
+      status: "expired",
+      public_metadata: { oasis_invitation_id: input.invitationId },
+      private_metadata: { oasis_invitation_id: input.invitationId },
+    };
+    const bodies = [
+      response({ total_count: 2, data: [exact] }),
+      response({
+        total_count: 1,
+        data: [
+          {
+            id: "orginv_other",
+            email_address: "other@example.test",
+            role: "org:member",
+            status: "expired",
+            public_metadata: {},
+            private_metadata: {},
+          },
+        ],
+      }),
+    ];
+    global.fetch = jest.fn(
+      async () => bodies.shift() as Response,
+    ) as typeof fetch;
+
+    await expect(
+      new ClerkInvitationAdministrationAdapter().revokeOrganizationInvitationByInternalId(
+        input,
+      ),
+    ).rejects.toMatchObject({ code: "CLERK_INVITATION_PAGE_INCOMPLETE" });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails closed when invitation pages overlap", async () => {
+    const exact = {
+      id: "orginv_exact_terminal",
+      email_address: "carer@example.test",
+      role: "org:member",
+      status: "expired",
+      public_metadata: { oasis_invitation_id: input.invitationId },
+      private_metadata: { oasis_invitation_id: input.invitationId },
+    };
+    const bodies = [
+      response({ total_count: 2, data: [exact] }),
+      response({ total_count: 2, data: [exact] }),
+    ];
+    global.fetch = jest.fn(
+      async () => bodies.shift() as Response,
+    ) as typeof fetch;
+
+    await expect(
+      new ClerkInvitationAdministrationAdapter().revokeOrganizationInvitationByInternalId(
+        input,
+      ),
+    ).rejects.toMatchObject({ code: "CLERK_INVITATION_PAGE_INCOMPLETE" });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
   it("revokes an exact invitation and removes membership by user subject", async () => {
     const calls: Array<{ url: string; method?: string }> = [];
     global.fetch = jest.fn(async (url: string | URL, init?: RequestInit) => {
