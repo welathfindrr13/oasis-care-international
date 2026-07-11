@@ -214,6 +214,26 @@ test("an administrator sees the real organization in the guided synthetic setup"
   ).toBeVisible();
 });
 
+test("pre-workspace invitation activation renders before membership resolution", async ({
+  page,
+}) => {
+  await signIn(page, {
+    email: "unlinked-invite@local.dev",
+    name: "Unlinked Invite",
+    role: "user",
+    callbackUrl: "http://localhost:3002/activate-invitation",
+  });
+
+  await page.goto("/activate-invitation");
+
+  await expect(page).toHaveURL("/activate-invitation");
+  await expect(
+    page.getByText(
+      "Secure invitation activation is not available in this environment. No care information has been loaded.",
+    ),
+  ).toBeVisible();
+});
+
 test("an administrator sees lifecycle readiness and only identity-valid Carers are assignable", async ({
   page,
 }) => {

@@ -23,7 +23,10 @@ import {
   unauthenticatedAccessSnapshot,
   unavailableAccessSnapshot,
 } from "../../lib/auth/access-snapshot";
-import { resolveAuthoritativeRoute } from "../../lib/auth/access";
+import {
+  resolveAuthoritativeRoute,
+  shouldBypassAuthoritativeRoute,
+} from "../../lib/auth/access";
 
 export type GetBearerToken = () => Promise<string | null | undefined>;
 export interface ClientAccessValue extends ClientAccessSnapshot {
@@ -136,8 +139,9 @@ function useAuthoritativeRouteBoundary(
   snapshot: ClientAccessSnapshot,
 ): boolean {
   const pathname = usePathname();
+  const bypassAuthoritativeRoute = shouldBypassAuthoritativeRoute(pathname);
   const decision =
-    snapshot.status === "authenticated"
+    snapshot.status === "authenticated" && !bypassAuthoritativeRoute
       ? resolveAuthoritativeRoute(pathname, snapshot.authoritativeSnapshot)
       : { action: "allow" as const };
   const destination =
@@ -149,7 +153,10 @@ function useAuthoritativeRouteBoundary(
     if (destination) window.location.replace(destination);
   }, [destination]);
 
-  return snapshot.status === "loading" || destination !== null;
+  return (
+    !bypassAuthoritativeRoute &&
+    (snapshot.status === "loading" || destination !== null)
+  );
 }
 
 function useAuthoritativeBrowserSnapshot(

@@ -44,6 +44,17 @@ const ADMIN_ONLY_PATHS = [
 ]
 const FAMILY_PATH = /^\/family(?:\/|$)/
 const ACCESS_STATE_PATH = /^\/access\/(?:no-membership|disabled|pending|setup|unavailable)$/
+const AUTHORITATIVE_ROUTE_BYPASS_PATHS = [
+  /^\/accept-invitation(?:\/|$)/,
+  /^\/activate-invitation(?:\/|$)/,
+  /^\/platform(?:\/|$)/,
+]
+
+export function shouldBypassAuthoritativeRoute(pathname: string): boolean {
+  return AUTHORITATIVE_ROUTE_BYPASS_PATHS.some((pattern) =>
+    pattern.test(pathname),
+  )
+}
 
 export function resolveProtectedRoute(
   pathname: string,

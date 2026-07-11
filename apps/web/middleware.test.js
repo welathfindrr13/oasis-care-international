@@ -66,30 +66,33 @@ test('authenticated route decisions happen before Next.js renders protected cont
 test('company intake is public while the platform surface still requires provider authentication', () => {
   assert.match(middlewareSource, /'\/request-access\(\.\*\)'/)
   assert.match(middlewareSource, /'\/api\/company-access-requests\(\.\*\)'/)
-  assert.match(middlewareSource, /const isPlatformRoute = createRouteMatcher\(\['\/platform\(\.\*\)'\]\)/)
+  assert.match(
+    middlewareSource,
+    /shouldBypassAuthoritativeRoute\(req\.nextUrl\.pathname\)/,
+  )
 
   const clerkBlock = middlewareSource.slice(
     middlewareSource.indexOf('const clerkAuthMiddleware'),
     middlewareSource.indexOf('export default function middleware'),
   )
   const signedOutIndex = clerkBlock.indexOf('if (!authObject.userId)')
-  const platformIndex = clerkBlock.indexOf('if (isPlatformRoute(req))')
+  const platformIndex = clerkBlock.indexOf(
+    'if (shouldBypassAuthoritativeRoute(req.nextUrl.pathname))',
+  )
   assert.ok(signedOutIndex >= 0)
   assert.ok(platformIndex > signedOutIndex)
 })
 
 test('invitation acceptance is public but activation requires a signed-in Clerk user', () => {
   assert.match(middlewareSource, /'\/accept-invitation\(\.\*\)'/)
-  assert.match(
-    middlewareSource,
-    /const isInvitationActivationRoute = createRouteMatcher\(\['\/activate-invitation\(\.\*\)'\]\)/,
-  )
   const clerkBlock = middlewareSource.slice(
     middlewareSource.indexOf('const clerkAuthMiddleware'),
     middlewareSource.indexOf('export default function middleware'),
   )
   const signedOutIndex = clerkBlock.indexOf('if (!authObject.userId)')
-  const activationIndex = clerkBlock.indexOf('if (isInvitationActivationRoute(req))')
+  const activationIndex = clerkBlock.indexOf(
+    'if (shouldBypassAuthoritativeRoute(req.nextUrl.pathname))',
+  )
   const snapshotIndex = clerkBlock.indexOf('fetchAuthoritativeAccessSnapshot')
   assert.ok(signedOutIndex >= 0)
   assert.ok(activationIndex > signedOutIndex)

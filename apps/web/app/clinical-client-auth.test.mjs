@@ -81,6 +81,14 @@ test("provider identity changes fail closed before the next canonical snapshot r
     clientAccessProviderSource,
     /resolveAuthoritativeRoute\(pathname/,
   );
+  assert.match(
+    clientAccessProviderSource,
+    /const bypassAuthoritativeRoute = shouldBypassAuthoritativeRoute\(pathname\)/,
+  );
+  assert.match(
+    clientAccessProviderSource,
+    /!bypassAuthoritativeRoute &&[\s\S]*snapshot\.status === "loading"/,
+  );
   assert.doesNotMatch(clientAccessProviderSource, /sessionClaims|token\.roles/);
   assert.doesNotMatch(
     nextAuthOptionsSource,

@@ -6,6 +6,7 @@ import {
   resolveAuthoritativeRoute,
   resolveAuthenticatedRoute,
   resolveProtectedRoute,
+  shouldBypassAuthoritativeRoute,
 } from './access'
 import { AuthoritativeAccessSnapshot } from './access-snapshot'
 
@@ -25,6 +26,22 @@ test('unknown roles never become family or admin access', () => {
   assert.equal(context.workspace, 'none')
   assert.equal(context.isExternal, false)
   assert.equal(context.isAdmin, false)
+})
+
+test('pre-workspace onboarding routes bypass authoritative workspace redirects', () => {
+  for (const pathname of [
+    '/accept-invitation',
+    '/accept-invitation/complete',
+    '/activate-invitation',
+    '/activate-invitation/complete',
+    '/platform',
+    '/platform/company-requests',
+  ]) {
+    assert.equal(shouldBypassAuthoritativeRoute(pathname), true, pathname)
+  }
+  for (const pathname of ['/today', '/access', '/admin/setup']) {
+    assert.equal(shouldBypassAuthoritativeRoute(pathname), false, pathname)
+  }
 })
 
 test('canonical snapshot routes admin, carer and family surfaces', () => {
