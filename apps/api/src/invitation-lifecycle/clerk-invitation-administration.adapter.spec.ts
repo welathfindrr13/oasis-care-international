@@ -224,6 +224,68 @@ describe("ClerkInvitationAdministrationAdapter", () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps cleanup unresolved when exact terminal history coexists with an unmatched pending invitation", async () => {
+    global.fetch = jest.fn(async () =>
+      response({
+        data: [
+          {
+            id: "orginv_exact_terminal",
+            email_address: "carer@example.test",
+            role: "org:member",
+            status: "expired",
+            public_metadata: { oasis_invitation_id: input.invitationId },
+            private_metadata: { oasis_invitation_id: input.invitationId },
+          },
+          {
+            id: "orginv_unmatched_pending",
+            email_address: "carer@example.test",
+            role: "org:member",
+            status: "pending",
+            public_metadata: {},
+            private_metadata: {},
+          },
+        ],
+      }),
+    ) as typeof fetch;
+
+    await expect(
+      new ClerkInvitationAdministrationAdapter().revokeOrganizationInvitationByInternalId(
+        input,
+      ),
+    ).rejects.toMatchObject<Partial<ClerkProvisioningError>>({
+      code: "CLERK_INVITATION_AMBIGUOUS",
+      retryable: false,
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps cleanup unresolved when the Clerk invitation page is incomplete", async () => {
+    global.fetch = jest.fn(async () =>
+      response({
+        total_count: 501,
+        data: [
+          {
+            id: "orginv_exact_terminal",
+            email_address: "carer@example.test",
+            role: "org:member",
+            status: "expired",
+            public_metadata: { oasis_invitation_id: input.invitationId },
+            private_metadata: { oasis_invitation_id: input.invitationId },
+          },
+        ],
+      }),
+    ) as typeof fetch;
+
+    await expect(
+      new ClerkInvitationAdministrationAdapter().revokeOrganizationInvitationByInternalId(
+        input,
+      ),
+    ).rejects.toMatchObject<Partial<ClerkProvisioningError>>({
+      code: "CLERK_INVITATION_PAGE_INCOMPLETE",
+      retryable: false,
+    });
+  });
+
   it("revokes an exact invitation and removes membership by user subject", async () => {
     const calls: Array<{ url: string; method?: string }> = [];
     global.fetch = jest.fn(async (url: string | URL, init?: RequestInit) => {

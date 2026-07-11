@@ -147,29 +147,28 @@ export class ClerkInvitationAdministrationAdapter {
     if (exact.length > 1) {
       throw new ClerkProvisioningError("CLERK_INVITATION_AMBIGUOUS", false);
     }
-    if (exact.length === 0) {
-      if (
-        typeof response.total_count === "number" &&
-        response.total_count > invitations.length
-      ) {
-        throw new ClerkProvisioningError(
-          "CLERK_INVITATION_PAGE_INCOMPLETE",
-          false,
-        );
-      }
-      const email = this.normalizeEmail(input.emailAddress);
-      if (
-        invitations.some(
-          (item) =>
-            item.status.toLowerCase() === "pending" &&
-            this.normalizeEmail(item.email_address) === email,
-        )
-      ) {
-        throw new ClerkProvisioningError("CLERK_INVITATION_AMBIGUOUS", false);
-      }
-      return;
+    if (
+      typeof response.total_count === "number" &&
+      response.total_count > invitations.length
+    ) {
+      throw new ClerkProvisioningError(
+        "CLERK_INVITATION_PAGE_INCOMPLETE",
+        false,
+      );
     }
     const invitation = exact[0];
+    const email = this.normalizeEmail(input.emailAddress);
+    if (
+      invitations.some(
+        (item) =>
+          item.id !== invitation?.id &&
+          item.status.toLowerCase() === "pending" &&
+          this.normalizeEmail(item.email_address) === email,
+      )
+    ) {
+      throw new ClerkProvisioningError("CLERK_INVITATION_AMBIGUOUS", false);
+    }
+    if (!invitation) return;
     this.validateInvitationIdentity(invitation, input);
     const status = invitation.status.toLowerCase();
     if (status === "accepted") {
