@@ -10,8 +10,7 @@ import {
 
 interface FamilyAccessLookup {
   organizationId: string;
-  authSubject?: string;
-  email?: string;
+  authSubject: string;
 }
 
 @Injectable()
@@ -20,18 +19,11 @@ export class CarebridgeRepository {
 
   private familyContactWhere(input: FamilyAccessLookup): Prisma.FamilyContactWhereInput {
     const authSubject = (input.authSubject || '').trim();
-    const email = (input.email || '').trim().toLowerCase();
-    const identity = authSubject
-      ? { auth_subject: authSubject }
-      : email
-        ? { email }
-        : null;
-
-    if (identity) {
+    if (authSubject) {
       return {
         organization_id: input.organizationId,
         disabled_at: null,
-        ...identity,
+        auth_subject: authSubject,
       };
     }
 
@@ -43,9 +35,24 @@ export class CarebridgeRepository {
   }
 
   private familyMembershipWhere(input: FamilyAccessLookup): Prisma.CareRoomMembershipWhereInput {
+    const authSubject = (input.authSubject || '').trim();
     return {
       status: CareRoomMembershipStatus.ACTIVE,
+      revoked_at: null,
       family_contact: this.familyContactWhere(input),
+      organization_membership_invitation: {
+        status: 'ACCEPTED',
+        organization_id: input.organizationId,
+        intended_role: 'family',
+        bound_auth_subject: authSubject,
+        activated_membership: {
+          organization_id: input.organizationId,
+          auth_subject: authSubject,
+          role: 'family',
+          status: 'ACTIVE',
+          revoked_at: null,
+        },
+      },
     };
   }
 
@@ -103,74 +110,12 @@ export class CarebridgeRepository {
     });
   }
 
-  async upsertFamilyContact(input: {
-    organization_id: string;
-    full_name: string;
-    email: string;
-    relationship?: string;
-  }) {
-    const existing = await this.prisma.familyContact.findFirst({
-      where: {
-        organization_id: input.organization_id,
-        email: input.email,
-      },
-    });
-
-    if (existing) {
-      return this.prisma.familyContact.update({
-        where: { id: existing.id },
-        data: {
-          full_name: input.full_name,
-          relationship: input.relationship ?? existing.relationship,
-        },
-      });
-    }
-
-    return this.prisma.familyContact.create({ data: input });
-  }
-
-  async createMembershipWithDefaultScopes(input: {
-    care_room_id: string;
-    family_contact_id: string;
-    role: string;
-    access_basis: string;
-  }) {
-    return this.prisma.careRoomMembership.create({
-      data: {
-        ...input,
-        role: input.role as any,
-        access_basis: input.access_basis as any,
-        status: CareRoomMembershipStatus.ACTIVE,
-        accepted_at: new Date(),
-        access_grants: {
-          create: [
-            { scope: AccessGrantScope.VIEW_UPDATES },
-            { scope: AccessGrantScope.VIEW_VISIT_TIMES },
-            { scope: AccessGrantScope.VIEW_TASK_SUMMARY },
-            { scope: AccessGrantScope.VIEW_WEEKLY_SUMMARIES },
-            { scope: AccessGrantScope.RAISE_CONCERNS },
-            { scope: AccessGrantScope.REPLY_TO_CONCERNS },
-            { scope: AccessGrantScope.SUBMIT_PULSE },
-          ],
-        },
-      },
-      include: {
-        family_contact: true,
-        access_grants: true,
-      },
-    });
-  }
-
   async listRoomsForOrganization(organizationId: string) {
     return this.prisma.careRoom.findMany({
       where: { organization_id: organizationId },
       orderBy: { updated_at: 'desc' },
       include: this.roomInclude(),
     });
-  }
-
-  async listRoomsForFamilyEmail(email: string, organizationId: string) {
-    return this.listRoomsForFamilyAccess({ email, organizationId });
   }
 
   async listRoomsForFamilyAccess(input: FamilyAccessLookup) {
@@ -192,10 +137,6 @@ export class CarebridgeRepository {
       where: { id, organization_id: organizationId },
       include: this.roomInclude(),
     });
-  }
-
-  async findRoomByIdForFamilyEmail(id: string, email: string, organizationId: string) {
-    return this.findRoomByIdForFamilyAccess(id, { email, organizationId });
   }
 
   async findRoomByIdForFamilyAccess(id: string, input: FamilyAccessLookup) {
@@ -252,6 +193,29 @@ export class CarebridgeRepository {
     });
   }
 
+  async listFamilySafePublishedStoriesByRoomId(careRoomId: string) {
+    return this.prisma.verifiedVisitStory.findMany({
+      where: {
+        care_room_id: careRoomId,
+        status: CarebridgeContentStatus.PUBLISHED,
+        family_safe_version: 1,
+        family_safe_title: { not: null },
+        family_safe_body: { not: null },
+        published_at: { not: null },
+        visit: {
+          status: 'COMPLETED',
+          deleted_at: null,
+        },
+      },
+      orderBy: { created_at: 'desc' },
+      select: {
+        family_safe_title: true,
+        family_safe_body: true,
+        published_at: true,
+      },
+    });
+  }
+
   async listVerifiedVisitStoryApprovalQueue(organizationId: string, careRoomId?: string) {
     return this.prisma.verifiedVisitStory.findMany({
       where: {
@@ -269,12 +233,24 @@ export class CarebridgeRepository {
         id,
         organization_id: organizationId,
       },
+      include: {
+        visit: {
+          select: { status: true, deleted_at: true },
+        },
+      },
     });
   }
 
   async publishVerifiedVisitStory(id: string, approvedTitle: string, approvedBody: string, approvedById: string) {
-    return this.prisma.verifiedVisitStory.update({
-      where: { id },
+    const changed = await this.prisma.verifiedVisitStory.updateMany({
+      where: {
+        id,
+        status: CarebridgeContentStatus.DRAFT,
+        family_safe_version: 1,
+        family_safe_title: approvedTitle,
+        family_safe_body: approvedBody,
+        visit: { status: 'COMPLETED', deleted_at: null },
+      },
       data: {
         status: CarebridgeContentStatus.PUBLISHED,
         approved_title: approvedTitle,
@@ -286,11 +262,13 @@ export class CarebridgeRepository {
         rejection_reason: null,
       },
     });
+    if (changed.count !== 1) return null;
+    return this.prisma.verifiedVisitStory.findUnique({ where: { id } });
   }
 
   async rejectVerifiedVisitStory(id: string, rejectionReason: string) {
-    return this.prisma.verifiedVisitStory.update({
-      where: { id },
+    const changed = await this.prisma.verifiedVisitStory.updateMany({
+      where: { id, status: CarebridgeContentStatus.DRAFT },
       data: {
         status: CarebridgeContentStatus.REJECTED,
         rejection_reason: rejectionReason,
@@ -302,6 +280,8 @@ export class CarebridgeRepository {
         published_at: null,
       },
     });
+    if (changed.count !== 1) return null;
+    return this.prisma.verifiedVisitStory.findUnique({ where: { id } });
   }
 
   async createConcern(data: Prisma.ConcernUncheckedCreateInput) {
@@ -359,6 +339,9 @@ export class CarebridgeRepository {
       memberships: {
         include: {
           family_contact: true,
+          organization_membership_invitation: {
+            include: { provisioning_outbox: true },
+          },
           access_grants: {
             where: { revoked_at: null },
           },
@@ -379,10 +362,26 @@ export class CarebridgeRepository {
               id: true,
               organization_id: true,
               auth_subject: true,
-              email: true,
               full_name: true,
               relationship: true,
               disabled_at: true,
+            },
+          },
+          organization_membership_invitation: {
+            select: {
+              organization_id: true,
+              intended_role: true,
+              status: true,
+              bound_auth_subject: true,
+              activated_membership: {
+                select: {
+                  organization_id: true,
+                  auth_subject: true,
+                  role: true,
+                  status: true,
+                  revoked_at: true,
+                },
+              },
             },
           },
           access_grants: {

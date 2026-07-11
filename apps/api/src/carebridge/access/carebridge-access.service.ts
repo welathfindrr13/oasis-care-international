@@ -11,8 +11,7 @@ interface RequireFamilyScopeInput {
   membershipId?: string;
   careRoomId: string;
   organizationId: string;
-  authSubject?: string;
-  email?: string;
+  authSubject: string;
   requiredScopes: AccessGrantScope[];
 }
 
@@ -25,13 +24,12 @@ export class CarebridgeAccessService {
     const careRoomId = (input.careRoomId || '').trim();
     const organizationId = (input.organizationId || '').trim();
     const authSubject = (input.authSubject || '').trim();
-    const email = (input.email || '').trim().toLowerCase();
     const requiredScopes = [...new Set(input.requiredScopes ?? [])];
 
     if (
       !careRoomId ||
       !organizationId ||
-      (!authSubject && !email) ||
+      !authSubject ||
       requiredScopes.length === 0
     ) {
       throw this.forbidden();
@@ -42,6 +40,7 @@ export class CarebridgeAccessService {
         ...(membershipId ? { id: membershipId } : {}),
         care_room_id: careRoomId,
         status: CareRoomMembershipStatus.ACTIVE,
+        revoked_at: null,
         care_room: {
           status: 'ACTIVE',
           organization_id: organizationId,
@@ -49,7 +48,20 @@ export class CarebridgeAccessService {
         family_contact: {
           organization_id: organizationId,
           disabled_at: null,
-          ...(authSubject ? { auth_subject: authSubject } : { email }),
+          auth_subject: authSubject,
+        },
+        organization_membership_invitation: {
+          status: 'ACCEPTED',
+          organization_id: organizationId,
+          intended_role: 'family',
+          bound_auth_subject: authSubject,
+          activated_membership: {
+            organization_id: organizationId,
+            auth_subject: authSubject,
+            role: 'family',
+            status: 'ACTIVE',
+            revoked_at: null,
+          },
         },
       },
       include: {

@@ -13,7 +13,6 @@ describe('CarebridgeRepository', () => {
     await repository.listRoomsForFamilyAccess({
       organizationId: 'org-1',
       authSubject: 'clerk-family-subject',
-      email: 'Relative@Example.com',
     });
 
     expect(prisma.careRoom.findMany).toHaveBeenCalledWith(
@@ -24,11 +23,18 @@ describe('CarebridgeRepository', () => {
           memberships: {
             some: {
               status: CareRoomMembershipStatus.ACTIVE,
+              revoked_at: null,
               family_contact: {
                 organization_id: 'org-1',
                 disabled_at: null,
                 auth_subject: 'clerk-family-subject',
               },
+              organization_membership_invitation: expect.objectContaining({
+                organization_id: 'org-1',
+                intended_role: 'family',
+                status: 'ACCEPTED',
+                bound_auth_subject: 'clerk-family-subject',
+              }),
             },
           },
         },
@@ -36,11 +42,18 @@ describe('CarebridgeRepository', () => {
           memberships: expect.objectContaining({
             where: {
               status: CareRoomMembershipStatus.ACTIVE,
+              revoked_at: null,
               family_contact: {
                 organization_id: 'org-1',
                 disabled_at: null,
                 auth_subject: 'clerk-family-subject',
               },
+              organization_membership_invitation: expect.objectContaining({
+                organization_id: 'org-1',
+                intended_role: 'family',
+                status: 'ACCEPTED',
+                bound_auth_subject: 'clerk-family-subject',
+              }),
             },
           }),
         }),
@@ -48,7 +61,7 @@ describe('CarebridgeRepository', () => {
     );
   });
 
-  it('forbids cross-tenant email fallback when looking up a room', async () => {
+  it('tenant-binds a direct room lookup to the verified subject', async () => {
     const prisma = {
       careRoom: {
         findFirst: jest.fn().mockResolvedValue(null),
@@ -58,7 +71,7 @@ describe('CarebridgeRepository', () => {
 
     await repository.findRoomByIdForFamilyAccess('room-1', {
       organizationId: 'org-1',
-      email: 'duplicate@example.com',
+      authSubject: 'clerk-family-subject',
     });
 
     expect(prisma.careRoom.findFirst).toHaveBeenCalledWith(
@@ -70,15 +83,76 @@ describe('CarebridgeRepository', () => {
           memberships: {
             some: {
               status: CareRoomMembershipStatus.ACTIVE,
+              revoked_at: null,
               family_contact: {
                 organization_id: 'org-1',
                 disabled_at: null,
-                email: 'duplicate@example.com',
+                auth_subject: 'clerk-family-subject',
               },
+              organization_membership_invitation: expect.objectContaining({
+                organization_id: 'org-1',
+                intended_role: 'family',
+                status: 'ACCEPTED',
+                bound_auth_subject: 'clerk-family-subject',
+              }),
             },
           },
         },
       }),
     );
+  });
+
+  it('shows family-safe stories only while the source visit remains completed and active', async () => {
+    const prisma = {
+      verifiedVisitStory: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const repository = new CarebridgeRepository(prisma as any);
+
+    await repository.listFamilySafePublishedStoriesByRoomId('room-1');
+
+    expect(prisma.verifiedVisitStory.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          care_room_id: 'room-1',
+          status: 'PUBLISHED',
+          family_safe_version: 1,
+          visit: { status: 'COMPLETED', deleted_at: null },
+        }),
+      }),
+    );
+  });
+
+  it('publishes only one exact draft transition', async () => {
+    const prisma = {
+      verifiedVisitStory: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        findUnique: jest.fn(),
+      },
+    };
+    const repository = new CarebridgeRepository(prisma as any);
+
+    await expect(
+      repository.publishVerifiedVisitStory(
+        'story-1',
+        'Care visit update',
+        'Safe family body',
+        'admin-1',
+      ),
+    ).resolves.toBeNull();
+    expect(prisma.verifiedVisitStory.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 'story-1',
+          status: 'DRAFT',
+          family_safe_version: 1,
+          family_safe_title: 'Care visit update',
+          family_safe_body: 'Safe family body',
+          visit: { status: 'COMPLETED', deleted_at: null },
+        }),
+      }),
+    );
+    expect(prisma.verifiedVisitStory.findUnique).not.toHaveBeenCalled();
   });
 });

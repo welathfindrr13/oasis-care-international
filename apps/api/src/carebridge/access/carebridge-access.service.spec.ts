@@ -66,7 +66,6 @@ describe('CarebridgeAccessService', () => {
       careRoomId: 'room-1',
       organizationId: 'org-1',
       authSubject: 'auth-sub-1',
-      email: 'ignored@example.com',
       requiredScopes: [AccessGrantScope.VIEW_UPDATES],
     });
 
@@ -75,6 +74,7 @@ describe('CarebridgeAccessService', () => {
         id: 'membership-1',
         care_room_id: 'room-1',
         status: 'ACTIVE',
+        revoked_at: null,
         care_room: {
           status: 'ACTIVE',
           organization_id: 'org-1',
@@ -83,6 +83,19 @@ describe('CarebridgeAccessService', () => {
           organization_id: 'org-1',
           disabled_at: null,
           auth_subject: 'auth-sub-1',
+        },
+        organization_membership_invitation: {
+          status: 'ACCEPTED',
+          organization_id: 'org-1',
+          intended_role: 'family',
+          bound_auth_subject: 'auth-sub-1',
+          activated_membership: {
+            organization_id: 'org-1',
+            auth_subject: 'auth-sub-1',
+            role: 'family',
+            status: 'ACTIVE',
+            revoked_at: null,
+          },
         },
       },
       include: {
@@ -106,7 +119,7 @@ describe('CarebridgeAccessService', () => {
       service.requireFamilyScopes({
         careRoomId: 'room-1',
         organizationId: 'org-1',
-        email: 'Relative@Example.com',
+        authSubject: 'auth-sub-1',
         requiredScopes: storyScopes,
       }),
     ).resolves.toMatchObject({ id: 'membership-1' });
@@ -163,7 +176,7 @@ describe('CarebridgeAccessService', () => {
       service.requireFamilyScopes({
         careRoomId: 'room-1',
         organizationId: 'org-1',
-        email: 'shared@example.com',
+        authSubject: 'auth-sub-1',
         requiredScopes: [AccessGrantScope.VIEW_UPDATES],
       }),
     ).rejects.toMatchObject({ status: 403 });

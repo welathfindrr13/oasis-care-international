@@ -78,6 +78,11 @@ describe("verified organization invitation activation", () => {
     clerk.listAcceptedInvitationsForUser.mockReset();
     clerk.getOrganizationMembership.mockReset();
     await prisma.auditLog.deleteMany();
+    await prisma.accessGrant.deleteMany();
+    await prisma.careRoomMembership.deleteMany();
+    await prisma.familyContact.deleteMany();
+    await prisma.careRoom.deleteMany();
+    await prisma.client.deleteMany();
     await prisma.organizationProvisioningOutbox.deleteMany();
     await prisma.organizationProviderBinding.deleteMany();
     await prisma.organizationMembershipInvitation.deleteMany();
@@ -302,6 +307,105 @@ describe("verified organization invitation activation", () => {
       membershipState: "ACTIVE",
       surface: "NONE",
       onboardingState: "SETUP_REQUIRED",
+    });
+  });
+
+  it('binds the verified family subject and activates the exact zero-grant care-room membership', async () => {
+    await prisma.organizationProvisioningOutbox.deleteMany();
+    await prisma.organizationMembershipInvitation.deleteMany();
+    const client = await prisma.client.create({
+      data: {
+        organization_id: organizationId,
+        full_name: 'Synthetic Family Client',
+        address_line1: '1 Test Street',
+        city: 'Leeds',
+        postcode: 'LS1 1AA',
+      },
+    });
+    const room = await prisma.careRoom.create({
+      data: { organization_id: organizationId, client_id: client.id },
+    });
+    const contact = await prisma.familyContact.create({
+      data: {
+        organization_id: organizationId,
+        full_name: 'Synthetic Relative',
+        email: 'family@example.test',
+        relationship: 'Daughter',
+        identity_type: 'clerk',
+      },
+    });
+    await prisma.organizationMembershipInvitation.create({
+      data: {
+        id: invitationId,
+        organization_id: organizationId,
+        source_request_id: null,
+        identity_provider: 'clerk',
+        intended_email: 'family@example.test',
+        normalized_email: 'family@example.test',
+        intended_role: 'family',
+        status: 'PENDING',
+        external_invitation_id: externalInvitationId,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+    const roomMembership = await prisma.careRoomMembership.create({
+      data: {
+        care_room_id: room.id,
+        family_contact_id: contact.id,
+        organization_membership_invitation_id: invitationId,
+        role: 'FAMILY_VIEWER',
+        access_basis: 'CLIENT_CONSENT',
+        status: 'INVITED',
+      },
+    });
+    await prisma.organizationProvisioningOutbox.create({
+      data: {
+        organization_id: organizationId,
+        source_request_id: null,
+        invitation_id: invitationId,
+        status: 'DELIVERED',
+        delivered_at: new Date(),
+      },
+    });
+    clerk.listAcceptedInvitationsForUser.mockResolvedValue([
+      acceptedInvitation({
+        emailAddress: 'family@example.test',
+        role: 'org:member',
+      }),
+    ]);
+    clerk.getOrganizationMembership.mockResolvedValue({
+      id: externalMembershipId,
+      organizationId: externalOrganizationId,
+      userId: subject,
+      role: 'org:member',
+    });
+
+    const activated = await activate().expect(200);
+    expect(activated.body.errors).toBeUndefined();
+    expect(activated.body.data.activateViewerOrganizationInvitation).toEqual({
+      status: 'ACTIVE',
+      externalOrganizationId,
+      nextPath: '/family',
+    });
+    await expect(
+      prisma.organizationMembership.findFirstOrThrow({ where: { auth_subject: subject } }),
+    ).resolves.toMatchObject({ role: 'family', status: 'ACTIVE' });
+    await expect(
+      prisma.familyContact.findUniqueOrThrow({ where: { id: contact.id } }),
+    ).resolves.toMatchObject({ auth_subject: subject });
+    await expect(
+      prisma.careRoomMembership.findUniqueOrThrow({ where: { id: roomMembership.id } }),
+    ).resolves.toMatchObject({ status: 'ACTIVE', accepted_at: expect.any(Date) });
+    expect(
+      await prisma.accessGrant.count({
+        where: { care_room_membership_id: roomMembership.id },
+      }),
+    ).toBe(0);
+    const snapshot = await accessSnapshot(bearer(true)).expect(200);
+    expect(snapshot.body.data.viewerAccessSnapshot).toMatchObject({
+      membershipState: 'ACTIVE',
+      surface: 'FAMILY',
+      onboardingState: 'READY',
     });
   });
 

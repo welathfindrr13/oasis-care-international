@@ -1,41 +1,55 @@
 import Link from 'next/link'
 import { Header } from '../../../../components/oasis/Header'
-import { VerifiedVisitStoryCard } from '../../../../components/carebridge/VerifiedVisitStoryCard'
 import { query } from '../../../../lib/graphql/client'
 import {
-  CAREBRIDGE_ROOM_QUERY,
-  VERIFIED_VISIT_STORIES_QUERY,
-  type CareRoomQueryResponse,
-  type CarebridgeRoom,
-  type VerifiedVisitStoriesQueryResponse,
-  type VerifiedVisitStory,
+  FAMILY_CAREBRIDGE_ROOM_QUERY,
+  FAMILY_VERIFIED_VISIT_STORIES_QUERY,
+  type FamilyCareRoomQueryResponse,
+  type FamilyCarebridgeRoom,
+  type FamilyVerifiedVisitStoriesQueryResponse,
+  type FamilyVerifiedVisitStory,
 } from '../../../../lib/graphql/queries'
 
 export const dynamic = 'force-dynamic'
 
-function isFamilyVisibleStory(story: VerifiedVisitStory): boolean {
-  const normalized = (story.status || '').toUpperCase()
-  return normalized === 'PUBLISHED'
+type RoomResult = {
+  room: FamilyCarebridgeRoom | null
+  error: string | null
+  unavailable: boolean
 }
 
-async function getRoomSafe(id: string): Promise<{ room: CarebridgeRoom | null; error: string | null }> {
+async function getRoomSafe(id: string): Promise<RoomResult> {
   try {
-    const data = await query<CareRoomQueryResponse>(CAREBRIDGE_ROOM_QUERY, { id })
-    return { room: data.careRoom, error: null }
+    const data = await query<FamilyCareRoomQueryResponse>(FAMILY_CAREBRIDGE_ROOM_QUERY, { id })
+    return { room: data.familyCareRoom, error: null, unavailable: false }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    return { room: null, error: message }
+    const accessDenied = error instanceof Error && error.message.includes(
+      'You do not have access to this CareBridge room.',
+    )
+    return accessDenied
+      ? {
+          room: null,
+          error: 'This room is not available with your current family access.',
+          unavailable: false,
+        }
+      : {
+          room: null,
+          error: 'This room is temporarily unavailable. Please try again.',
+          unavailable: true,
+        }
   }
 }
 
-async function getRoomStoriesSafe(careRoomId: string): Promise<VerifiedVisitStory[]> {
+async function getRoomStoriesSafe(
+  careRoomId: string,
+): Promise<{ stories: FamilyVerifiedVisitStory[]; unavailable: boolean }> {
   try {
-    const data = await query<VerifiedVisitStoriesQueryResponse>(VERIFIED_VISIT_STORIES_QUERY, {
+    const data = await query<FamilyVerifiedVisitStoriesQueryResponse>(FAMILY_VERIFIED_VISIT_STORIES_QUERY, {
       careRoomId,
     })
-    return (data.verifiedVisitStories || []).filter(isFamilyVisibleStory)
+    return { stories: data.familyVerifiedVisitStories || [], unavailable: false }
   } catch {
-    return []
+    return { stories: [], unavailable: true }
   }
 }
 
@@ -48,15 +62,17 @@ export default async function FamilyCareRoomPage({ params }: { params: { id: str
         <Header />
         <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
           <section className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-            <h1 className="font-heading text-2xl font-semibold text-slate-900">Room unavailable</h1>
+            <h1 className="font-heading text-2xl font-semibold text-slate-900">
+              {roomResult.unavailable ? 'Room temporarily unavailable' : 'Room unavailable'}
+            </h1>
             <p className="mt-2 text-sm text-slate-600">
               {roomResult.error || 'This room is not available with your current family access.'}
             </p>
             <Link
-              href="/family"
+              href={roomResult.unavailable ? `/family/care-rooms/${params.id}` : '/family'}
               className="mt-4 inline-flex rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
-              Back to family home
+              {roomResult.unavailable ? 'Try again' : 'Back to family home'}
             </Link>
           </section>
         </main>
@@ -65,21 +81,21 @@ export default async function FamilyCareRoomPage({ params }: { params: { id: str
   }
 
   const room = roomResult.room
-  const stories = await getRoomStoriesSafe(room.id)
+  const { stories, unavailable: storiesUnavailable } = await getRoomStoriesSafe(room.id)
 
   return (
     <div className="min-h-screen bg-slate-50">
       <Header />
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        <nav className="mb-6 text-sm">
+        <nav className="mb-6 text-sm" aria-label="Breadcrumb">
           <ol className="flex items-center gap-2">
             <li>
               <Link href="/family" className="text-slate-500 hover:text-slate-700">
                 Family home
               </Link>
             </li>
-            <li className="text-slate-400">/</li>
-            <li className="font-medium text-slate-900">{room.client.fullName}</li>
+            <li className="text-slate-400" aria-hidden="true">/</li>
+            <li className="font-medium text-slate-900" aria-current="page">{room.clientDisplayName}</li>
           </ol>
         </nav>
 
@@ -87,7 +103,7 @@ export default async function FamilyCareRoomPage({ params }: { params: { id: str
           <p className="mb-3 inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
             Family Assurance Room
           </p>
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-slate-900">{room.client.fullName}</h1>
+          <h1 className="font-heading text-3xl font-bold tracking-tight text-slate-900">{room.clientDisplayName}</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
             You are seeing approved proof-of-care updates only. Internal notes and operational records stay inside the
             care team workflow.
@@ -106,10 +122,20 @@ export default async function FamilyCareRoomPage({ params }: { params: { id: str
         <section className="mt-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-heading text-xl font-semibold text-slate-900">Approved updates</h2>
-            <p className="text-sm text-slate-500">{stories.length} updates</p>
+            {!storiesUnavailable ? <p className="text-sm text-slate-500">{stories.length} updates</p> : null}
           </div>
 
-          {stories.length === 0 ? (
+          {storiesUnavailable ? (
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-sm text-slate-600">Approved updates are temporarily unavailable. Please try again.</p>
+              <Link
+                href={`/family/care-rooms/${room.id}`}
+                className="mt-3 inline-flex font-medium text-sky-700 hover:text-sky-800"
+              >
+                Try again
+              </Link>
+            </article>
+          ) : stories.length === 0 ? (
             <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <p className="text-sm text-slate-600">
                 No approved updates are available yet. When your care team publishes them, they will appear here.
@@ -117,7 +143,16 @@ export default async function FamilyCareRoomPage({ params }: { params: { id: str
             </article>
           ) : (
             stories.map((story) => (
-              <VerifiedVisitStoryCard key={story.id} story={story} audience="family" />
+              <article
+                key={`${story.publishedAt}:${story.title}`}
+                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  {new Date(story.publishedAt).toLocaleDateString('en-GB')}
+                </p>
+                <h3 className="mt-2 font-heading text-lg font-semibold text-slate-900">{story.title}</h3>
+                <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-700">{story.body}</p>
+              </article>
             ))
           )}
         </section>

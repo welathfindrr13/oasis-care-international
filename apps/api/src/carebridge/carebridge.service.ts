@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import {
   AccessGrantScope,
   CareRoomMembershipStatus,
@@ -12,7 +13,6 @@ import { ErrorCode } from '../common/errors/error-codes';
 import { CarebridgeRepository } from './carebridge.repository';
 import { CarebridgeAccessService } from './access/carebridge-access.service';
 import {
-  InviteFamilyContactInput,
   RaiseConcernInput,
   SubmitFamilyPulseInput,
   UpdateCarebridgePolicyInput,
@@ -29,8 +29,7 @@ interface ViewerContext {
 
 interface FamilyAccessLookup {
   organizationId: string;
-  authSubject?: string;
-  email?: string;
+  authSubject: string;
 }
 
 interface CreateCarebridgeAuditOptions {
@@ -87,47 +86,6 @@ export class CarebridgeService {
     });
   }
 
-  async inviteFamilyContact(input: InviteFamilyContactInput, actorUserId: string, actorRole: string, organizationId: string) {
-    this.assertStaffRole(actorRole);
-    const room = await this.repository.findRoomByIdForOrganization(input.careRoomId, organizationId);
-    if (!room) {
-      throw new BaseHttpException(
-        ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
-        'CareBridge room could not be found for your organisation.',
-        HttpStatus.FORBIDDEN,
-      );
-    }
-
-    const familyContact = await this.repository.upsertFamilyContact({
-      organization_id: organizationId,
-      full_name: input.fullName,
-      email: input.email.trim().toLowerCase(),
-      relationship: input.relationship,
-    });
-
-    const membership = await this.repository.createMembershipWithDefaultScopes({
-      care_room_id: room.id,
-      family_contact_id: familyContact.id,
-      role: input.role,
-      access_basis: input.accessBasis,
-    });
-
-    await this.createAudit({
-      organizationId: room.organization_id,
-      actorId: actorUserId,
-      action: 'CAREBRIDGE_FAMILY_INVITED',
-      resourceType: 'CareRoomMembership',
-      resourceId: membership.id,
-      newValues: {
-        careRoomId: room.id,
-        familyContactId: familyContact.id,
-        accessBasis: input.accessBasis,
-      },
-    });
-
-    return this.mapMembership(membership);
-  }
-
   async updatePolicy(input: UpdateCarebridgePolicyInput, actorUserId: string, actorRole: string, organizationId: string) {
     this.assertStaffRole(actorRole);
     const room = await this.repository.findRoomByIdForOrganization(input.careRoomId, organizationId);
@@ -159,33 +117,7 @@ export class CarebridgeService {
   }
 
   async listCareRooms(viewer: ViewerContext) {
-    if (this.isExternalViewer(viewer)) {
-      const lookup = this.requireFamilyAccessLookup(viewer);
-      for (const candidate of this.familyLookupCandidates(lookup)) {
-        const rooms = await this.repository.listRoomsForFamilyAccess(candidate);
-        if (rooms.length > 0) {
-          const authorizedRooms = [];
-          for (const room of rooms) {
-            const membership = this.findFamilyMembership(room.memberships, candidate);
-            if (!membership) {
-              continue;
-            }
-            await this.requireFamilyScopes(
-              room.id,
-              membership.id,
-              candidate,
-              [AccessGrantScope.VIEW_UPDATES],
-            );
-            authorizedRooms.push(
-              this.mapCareRoom(room, { familyMembership: membership }),
-            );
-          }
-          return authorizedRooms;
-        }
-      }
-      return [];
-    }
-
+    this.assertStaffRole(viewer.role);
     if (!viewer.organizationId) {
       return [];
     }
@@ -195,15 +127,7 @@ export class CarebridgeService {
   }
 
   async getCareRoom(id: string, viewer: ViewerContext) {
-    if (this.isExternalViewer(viewer)) {
-      const access = await this.requireScopedFamilyRoomAccess(
-        id,
-        viewer,
-        [AccessGrantScope.VIEW_UPDATES],
-      );
-      return this.mapCareRoom(access.room, { familyMembership: access.membership });
-    }
-
+    this.assertStaffRole(viewer.role);
     const room = await this.repository.findRoomByIdForOrganization(
       id,
       viewer.organizationId || '',
@@ -217,20 +141,53 @@ export class CarebridgeService {
   }
 
   async listVerifiedVisitStories(careRoomId: string, viewer: ViewerContext) {
-    const familyVisible = this.isExternalViewer(viewer);
-    if (familyVisible) {
-      await this.requireScopedFamilyRoomAccess(careRoomId, viewer, [
-        AccessGrantScope.VIEW_UPDATES,
-        AccessGrantScope.VIEW_VISIT_TIMES,
-        AccessGrantScope.VIEW_TASK_SUMMARY,
-        AccessGrantScope.VIEW_MEDICATION_SUPPORT_STATUS,
-      ]);
-    } else {
-      await this.getCareRoom(careRoomId, viewer);
+    this.assertStaffRole(viewer.role);
+    await this.getCareRoom(careRoomId, viewer);
+    const stories = await this.repository.listVerifiedVisitStoriesByRoomId(careRoomId);
+    return stories.map((story: any) => this.mapStory(story));
+  }
+
+  async listFamilyCareRooms(viewer: ViewerContext) {
+    const lookup = this.requireFamilyAccessLookup(viewer);
+    const rooms = await this.repository.listRoomsForFamilyAccess(lookup);
+    const authorizedRooms = [];
+    for (const room of rooms) {
+      const membership = this.findFamilyMembership(room.memberships, lookup);
+      if (!membership) continue;
+      try {
+        await this.requireFamilyScopes(room.id, membership.id, lookup, [
+          AccessGrantScope.VIEW_UPDATES,
+        ]);
+        authorizedRooms.push(this.mapFamilyCareRoom(room));
+      } catch (error) {
+        // A zero-grant or revoked family room is intentionally indistinguishable
+        // from a room that does not exist for this viewer.
+        if (!this.isFamilyDenial(error)) throw error;
+      }
     }
-    const status = familyVisible ? 'PUBLISHED' : undefined;
-    const stories = await this.repository.listVerifiedVisitStoriesByRoomId(careRoomId, status as any);
-    return stories.map((story: any) => this.mapStory(story, { familyVisible }));
+    return authorizedRooms;
+  }
+
+  async getFamilyCareRoom(id: string, viewer: ViewerContext) {
+    const access = await this.requireScopedFamilyRoomAccess(id, viewer, [
+      AccessGrantScope.VIEW_UPDATES,
+    ]);
+    return this.mapFamilyCareRoom(access.room);
+  }
+
+  async listFamilyVerifiedVisitStories(careRoomId: string, viewer: ViewerContext) {
+    await this.requireScopedFamilyRoomAccess(careRoomId, viewer, [
+      AccessGrantScope.VIEW_UPDATES,
+      AccessGrantScope.VIEW_TASK_SUMMARY,
+    ]);
+    const stories = await this.repository.listFamilySafePublishedStoriesByRoomId(
+      careRoomId,
+    );
+    return stories.map((story: any) => ({
+      title: story.family_safe_title,
+      body: story.family_safe_body,
+      publishedAt: story.published_at,
+    }));
   }
 
   async listVerifiedVisitStoryApprovalQueue(viewer: ViewerContext, careRoomId?: string) {
@@ -268,6 +225,13 @@ export class CarebridgeService {
         HttpStatus.NOT_FOUND,
       );
     }
+    if (visit.status !== 'COMPLETED') {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Only completed visits can become family updates.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
     const room = typeof (this.repository as any).findRoomByClientId === 'function'
       ? await (this.repository as any).findRoomByClientId(visit.client_id, organizationId)
@@ -295,6 +259,15 @@ export class CarebridgeService {
         : null,
       visit.notes ? `Care update: ${visit.notes}` : null,
     ].filter(Boolean).join(' ');
+    const familySafeBody = [
+      'The scheduled care visit was completed.',
+      completedTasks.length === 1
+        ? 'One care task was recorded as completed.'
+        : `${completedTasks.length} care tasks were recorded as completed.`,
+      pendingTasks.length > 0
+        ? `${pendingTasks.length} care ${pendingTasks.length === 1 ? 'task needs' : 'tasks need'} follow-up.`
+        : 'No care tasks need follow-up.',
+    ].join(' ');
 
     const sourceRefs = [
       { type: 'Visit', id: visit.id },
@@ -309,6 +282,9 @@ export class CarebridgeService {
       status: 'DRAFT' as any,
       draft_title: draftTitle,
       draft_body: draftBody,
+      family_safe_version: 1,
+      family_safe_title: 'Care visit update',
+      family_safe_body: familySafeBody,
       source_refs: sourceRefs,
     });
 
@@ -340,6 +316,13 @@ export class CarebridgeService {
         HttpStatus.NOT_FOUND,
       );
     }
+    if (story.status !== 'DRAFT') {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Only draft verified visit stories can be published.',
+        HttpStatus.CONFLICT,
+      );
+    }
 
     const refs = Array.isArray(story.source_refs) ? story.source_refs : [];
     if (refs.length === 0) {
@@ -349,20 +332,57 @@ export class CarebridgeService {
         HttpStatus.BAD_REQUEST,
       );
     }
+    if (
+      story.family_safe_version !== 1 ||
+      !String(story.family_safe_title || '').trim() ||
+      !String(story.family_safe_body || '').trim()
+    ) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Verified visit stories require family-safe content before publication.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const familySafeTitle = story.family_safe_title as string;
+    const familySafeBody = story.family_safe_body as string;
+    if (story.visit?.status !== 'COMPLETED' || story.visit.deleted_at) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Only completed visits can be published as family updates.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
     const published = await this.repository.publishVerifiedVisitStory(
       storyId,
-      story.draft_title,
-      story.draft_body,
+      familySafeTitle,
+      familySafeBody,
       approvalActorUserId,
     );
+    if (!published) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Verified visit story state changed before publication.',
+        HttpStatus.CONFLICT,
+      );
+    }
+    const familySafeDigest = createHash('sha256')
+      .update(JSON.stringify({
+        version: story.family_safe_version,
+        title: familySafeTitle,
+        body: familySafeBody,
+      }))
+      .digest('hex');
     await this.createAudit({
       organizationId: story.organization_id,
       actorId: approvalActorUserId,
       action: 'CAREBRIDGE_VISIT_STORY_PUBLISHED',
       resourceType: 'VerifiedVisitStory',
       resourceId: storyId,
-      newValues: {},
+      newValues: {
+        familySafeVersion: story.family_safe_version,
+        familySafeDigest,
+      },
     });
     return this.mapStory(published);
   }
@@ -391,15 +411,22 @@ export class CarebridgeService {
       );
     }
 
-    if (story.status === 'PUBLISHED') {
+    if (story.status !== 'DRAFT') {
       throw new BaseHttpException(
         ErrorCode.VALIDATION_FAILED,
-        'Published verified visit stories cannot be rejected.',
-        HttpStatus.BAD_REQUEST,
+        'Only draft verified visit stories can be rejected.',
+        HttpStatus.CONFLICT,
       );
     }
 
     const rejected = await this.repository.rejectVerifiedVisitStory(storyId, reason);
+    if (!rejected) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Verified visit story state changed before rejection.',
+        HttpStatus.CONFLICT,
+      );
+    }
     await this.createAudit({
       organizationId: story.organization_id,
       actorId: rejectionActorUserId,
@@ -437,6 +464,11 @@ export class CarebridgeService {
       room,
       familyAccess?.membership,
     );
+  }
+
+  async raiseFamilyConcern(input: RaiseConcernInput, viewer: ViewerContext) {
+    const concern = await this.raiseConcern(input, viewer);
+    return { title: concern.title, status: concern.status };
   }
 
   private async createConcernForRoom(
@@ -664,40 +696,22 @@ export class CarebridgeService {
 
   private requireFamilyAccessLookup(viewer: ViewerContext): FamilyAccessLookup {
     const organizationId = (viewer.organizationId || '').trim();
-    const authSubject = (viewer.authSubject || viewer.userId || '').trim() || undefined;
-    const email = (viewer.email || '').trim().toLowerCase() || undefined;
-    if (!organizationId || (!authSubject && !email)) {
+    const authSubject = (viewer.authSubject || viewer.userId || '').trim();
+    if (!organizationId || !authSubject) {
       throw new BaseHttpException(
         ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
         'Family access is not permitted.',
         HttpStatus.FORBIDDEN,
       );
     }
-    return { organizationId, authSubject, email };
-  }
-
-  private familyLookupCandidates(lookup: FamilyAccessLookup) {
-    return [
-      ...(lookup.authSubject
-        ? [{ organizationId: lookup.organizationId, authSubject: lookup.authSubject }]
-        : []),
-      ...(lookup.email
-        ? [{ organizationId: lookup.organizationId, email: lookup.email }]
-        : []),
-    ];
+    return { organizationId, authSubject };
   }
 
   private async findFamilyRoomAccess(id: string, lookup: FamilyAccessLookup) {
-    for (const candidate of this.familyLookupCandidates(lookup)) {
-      const room = await this.repository.findRoomByIdForFamilyAccess(id, candidate);
-      if (!room) {
-        continue;
-      }
-
-      const membership = this.findFamilyMembership(room.memberships, candidate);
-      return membership ? { room, membership, lookup: candidate } : undefined;
-    }
-    return undefined;
+    const room = await this.repository.findRoomByIdForFamilyAccess(id, lookup);
+    if (!room) return undefined;
+    const membership = this.findFamilyMembership(room.memberships, lookup);
+    return membership ? { room, membership, lookup } : undefined;
   }
 
   private async requireScopedFamilyRoomAccess(
@@ -713,12 +727,17 @@ export class CarebridgeService {
       throw this.familyRoomForbidden();
     }
 
-    await this.requireFamilyScopes(
-      id,
-      access.membership.id,
-      access.lookup,
-      requiredScopes,
-    );
+    try {
+      await this.requireFamilyScopes(
+        id,
+        access.membership.id,
+        access.lookup,
+        requiredScopes,
+      );
+    } catch (error) {
+      if (this.isFamilyDenial(error)) throw this.familyRoomForbidden();
+      throw error;
+    }
     return access;
   }
 
@@ -733,7 +752,6 @@ export class CarebridgeService {
       careRoomId,
       organizationId: lookup.organizationId,
       authSubject: lookup.authSubject,
-      email: lookup.email,
       requiredScopes,
     });
   }
@@ -742,10 +760,9 @@ export class CarebridgeService {
     const eligibleMemberships = (memberships ?? []).filter((membership: any) =>
       this.isEligibleFamilyMembership(membership, lookup),
     );
-    const matches = eligibleMemberships.filter((membership: any) =>
-      lookup.authSubject
-        ? membership.family_contact.auth_subject === lookup.authSubject
-        : membership.family_contact.email?.trim().toLowerCase() === lookup.email,
+    const matches = eligibleMemberships.filter(
+      (membership: any) =>
+        membership.family_contact.auth_subject === lookup.authSubject,
     );
     return matches.length === 1 ? matches[0] : undefined;
   }
@@ -754,9 +771,17 @@ export class CarebridgeService {
     const familyContact = membership.family_contact;
     return (
       membership.status === CareRoomMembershipStatus.ACTIVE &&
+      !membership.revoked_at &&
       Boolean(familyContact) &&
       familyContact.organization_id === lookup.organizationId &&
-      !familyContact.disabled_at
+      !familyContact.disabled_at &&
+      membership.organization_membership_invitation?.status === 'ACCEPTED' &&
+      membership.organization_membership_invitation?.organization_id === lookup.organizationId &&
+      membership.organization_membership_invitation?.intended_role === 'family' &&
+      membership.organization_membership_invitation?.bound_auth_subject === lookup.authSubject &&
+      membership.organization_membership_invitation?.activated_membership?.status === 'ACTIVE' &&
+      !membership.organization_membership_invitation?.activated_membership?.revoked_at &&
+      membership.organization_membership_invitation?.activated_membership?.auth_subject === lookup.authSubject
     );
   }
 
@@ -766,6 +791,10 @@ export class CarebridgeService {
       'You do not have access to this CareBridge room.',
       HttpStatus.FORBIDDEN,
     );
+  }
+
+  private isFamilyDenial(error: unknown) {
+    return error instanceof BaseHttpException && error.getStatus() === HttpStatus.FORBIDDEN;
   }
 
   private requireFamilyAuditActorId(viewer: ViewerContext, membership: any) {
@@ -840,9 +869,17 @@ export class CarebridgeService {
     };
   }
 
+  private mapFamilyCareRoom(room: any) {
+    return {
+      id: room.id,
+      clientDisplayName: room.client?.full_name || 'Care recipient',
+    };
+  }
+
   private mapMembership(membership: any) {
     return {
       id: membership.id,
+      invitationId: membership.organization_membership_invitation?.id ?? null,
       role: membership.role,
       status: membership.status,
       accessBasis: membership.access_basis,
@@ -861,6 +898,16 @@ export class CarebridgeService {
         grantedAt: grant.granted_at,
         revokedAt: grant.revoked_at ?? null,
       })),
+      invitationStatus: membership.organization_membership_invitation?.status ?? null,
+      deliveryStatus:
+        membership.organization_membership_invitation?.provisioning_outbox?.status ?? null,
+      cleanupStatus: membership.organization_membership_invitation?.external_cleanup_required
+        ? membership.organization_membership_invitation.external_cleanup_error_code
+          ? 'MANUAL_REVIEW'
+          : 'PENDING'
+        : 'COMPLETE',
+      invitationExpiresAt:
+        membership.organization_membership_invitation?.expires_at ?? null,
     };
   }
 
@@ -877,26 +924,7 @@ export class CarebridgeService {
     };
   }
 
-  private mapStory(story: any, options?: { familyVisible?: boolean }) {
-    if (options?.familyVisible) {
-      const approvedTitle = story.approved_title ?? '';
-      const approvedBody = story.approved_body ?? '';
-
-      return {
-        id: story.id,
-        status: story.status,
-        draftTitle: approvedTitle,
-        draftBody: approvedBody,
-        approvedTitle: story.approved_title ?? null,
-        approvedBody: story.approved_body ?? null,
-        approvedAt: story.approved_at ?? null,
-        rejectionReason: null,
-        rejectedAt: null,
-        sourceRefs: story.source_refs,
-        publishedAt: story.published_at ?? null,
-      };
-    }
-
+  private mapStory(story: any) {
     return {
       id: story.id,
       status: story.status,
@@ -904,6 +932,9 @@ export class CarebridgeService {
       draftBody: story.draft_body,
       approvedTitle: story.approved_title ?? null,
       approvedBody: story.approved_body ?? null,
+      familySafeVersion: story.family_safe_version ?? null,
+      familySafeTitle: story.family_safe_title ?? null,
+      familySafeBody: story.family_safe_body ?? null,
       approvedAt: story.approved_at ?? null,
       rejectionReason: story.rejection_reason ?? null,
       rejectedAt: story.rejected_at ?? null,

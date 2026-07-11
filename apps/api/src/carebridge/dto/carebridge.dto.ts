@@ -1,5 +1,16 @@
-import { Field, ID, InputType, ObjectType, registerEnumType } from '@nestjs/graphql';
+import { Field, ID, InputType, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
 import { GraphQLJSON, GraphQLJSONObject } from 'graphql-type-json';
+import {
+  ArrayUnique,
+  IsArray,
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 import {
   AccessGrantScope,
   CareRoomMembershipStatus,
@@ -74,6 +85,9 @@ export class CareRoomMembershipDTO {
   @Field(() => ID)
   id!: string;
 
+  @Field(() => ID, { nullable: true })
+  invitationId?: string | null;
+
   @Field(() => CareRoomRole)
   role!: CareRoomRole;
 
@@ -91,6 +105,18 @@ export class CareRoomMembershipDTO {
 
   @Field(() => [AccessGrantDTO])
   accessGrants!: AccessGrantDTO[];
+
+  @Field(() => String, { nullable: true })
+  invitationStatus?: string | null;
+
+  @Field(() => String, { nullable: true })
+  deliveryStatus?: string | null;
+
+  @Field(() => String, { nullable: true })
+  cleanupStatus?: string | null;
+
+  @Field(() => Date, { nullable: true })
+  invitationExpiresAt?: Date | null;
 }
 
 @ObjectType()
@@ -145,6 +171,27 @@ export class CareRoomDTO {
 }
 
 @ObjectType()
+export class FamilyCareRoomDTO {
+  @Field(() => ID)
+  id!: string;
+
+  @Field()
+  clientDisplayName!: string;
+}
+
+@ObjectType()
+export class FamilyVerifiedVisitStoryDTO {
+  @Field()
+  title!: string;
+
+  @Field()
+  body!: string;
+
+  @Field()
+  publishedAt!: Date;
+}
+
+@ObjectType()
 export class VerifiedVisitStoryDTO {
   @Field(() => ID)
   id!: string;
@@ -163,6 +210,15 @@ export class VerifiedVisitStoryDTO {
 
   @Field(() => String, { nullable: true })
   approvedBody?: string | null;
+
+  @Field(() => Int, { nullable: true })
+  familySafeVersion?: number | null;
+
+  @Field(() => String, { nullable: true })
+  familySafeTitle?: string | null;
+
+  @Field(() => String, { nullable: true })
+  familySafeBody?: string | null;
 
   @Field(() => Date, { nullable: true })
   approvedAt?: Date | null;
@@ -262,6 +318,15 @@ export class ConcernDTO {
 }
 
 @ObjectType()
+export class FamilyConcernReceiptDTO {
+  @Field()
+  title!: string;
+
+  @Field(() => ConcernStatus)
+  status!: ConcernStatus;
+}
+
+@ObjectType()
 export class FamilyPulseDTO {
   @Field(() => ID)
   id!: string;
@@ -285,22 +350,60 @@ export class CreateCareRoomInput {
 @InputType()
 export class InviteFamilyContactInput {
   @Field()
+  @IsUUID()
   careRoomId!: string;
 
   @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
   fullName!: string;
 
   @Field()
+  @IsEmail()
+  @MaxLength(320)
   email!: string;
 
   @Field(() => String, { nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
   relationship?: string;
 
   @Field(() => CareRoomRole)
+  @IsEnum(CareRoomRole)
   role!: CareRoomRole;
 
   @Field(() => FamilyAccessBasis)
+  @IsEnum(FamilyAccessBasis)
   accessBasis!: FamilyAccessBasis;
+}
+
+@InputType()
+export class UpdateFamilyAccessGrantsInput {
+  @Field(() => ID)
+  @IsUUID()
+  careRoomMembershipId!: string;
+
+  @Field(() => [AccessGrantScope])
+  @IsArray()
+  @ArrayUnique()
+  @IsEnum(AccessGrantScope, { each: true })
+  scopes!: AccessGrantScope[];
+}
+
+@InputType()
+export class FamilyMembershipActionInput {
+  @Field(() => ID)
+  @IsUUID()
+  careRoomMembershipId!: string;
+}
+
+@InputType()
+export class FamilyInvitationActionInput {
+  @Field(() => ID)
+  @IsUUID()
+  invitationId!: string;
 }
 
 @InputType()

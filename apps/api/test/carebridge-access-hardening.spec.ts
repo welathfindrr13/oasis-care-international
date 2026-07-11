@@ -10,6 +10,7 @@ import { MedicationResolver } from '../src/medication/medication.resolver';
 import { ShiftResolver } from '../src/shift/shift.resolver';
 import { StatsController } from '../src/stats/stats.controller';
 import { VisitResolver } from '../src/visit/visit.resolver';
+import { CarebridgeResolver } from '../src/carebridge/carebridge.resolver';
 
 function getRoles(target: object, methodName: string): string[] {
   return Reflect.getMetadata('roles', (target as any)[methodName]) ?? [];
@@ -82,5 +83,16 @@ describe('CareBridge access hardening metadata', () => {
   it('has no raw medication audit resolver for family users', () => {
     expect((MedicationResolver.prototype as any).medicationAudit).toBeUndefined();
     expect((MedicationResolver.prototype as any).medicationAudits).toBeUndefined();
+  });
+
+  it('separates staff CareBridge operations from family-safe operations', () => {
+    expect(getRoles(CarebridgeResolver.prototype, 'careRooms')).toEqual(['admin']);
+    expect(getRoles(CarebridgeResolver.prototype, 'careRoom')).toEqual(['admin']);
+    expect(getRoles(CarebridgeResolver.prototype, 'verifiedVisitStories')).toEqual(['admin']);
+    expect(getRoles(CarebridgeResolver.prototype, 'raiseCarebridgeConcern')).toEqual(['admin']);
+    expect(getRoles(CarebridgeResolver.prototype, 'familyCareRooms')).toEqual(['user']);
+    expect(getRoles(CarebridgeResolver.prototype, 'familyCareRoom')).toEqual(['user']);
+    expect(getRoles(CarebridgeResolver.prototype, 'familyVerifiedVisitStories')).toEqual(['user']);
+    expect(getRoles(CarebridgeResolver.prototype, 'raiseFamilyCarebridgeConcern')).toEqual(['user']);
   });
 });

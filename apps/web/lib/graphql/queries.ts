@@ -799,12 +799,17 @@ export interface CarebridgeAccessGrant {
 
 export interface CarebridgeMembership {
   id: string;
+  invitationId?: string | null;
   role: string;
   status: string;
   accessBasis: string;
   reviewDueAt?: string | null;
   familyContact: CarebridgeFamilyContact;
   accessGrants: CarebridgeAccessGrant[];
+  invitationStatus?: string | null;
+  deliveryStatus?: string | null;
+  cleanupStatus?: string | null;
+  invitationExpiresAt?: string | null;
 }
 
 export interface CarebridgePolicy {
@@ -838,6 +843,9 @@ export interface VerifiedVisitStory {
   draftBody: string;
   approvedTitle?: string | null;
   approvedBody?: string | null;
+  familySafeVersion?: number | null;
+  familySafeTitle?: string | null;
+  familySafeBody?: string | null;
   approvedAt?: string | null;
   rejectionReason?: string | null;
   rejectedAt?: string | null;
@@ -859,6 +867,29 @@ export interface VerifiedVisitStoriesQueryResponse {
 
 export interface VerifiedVisitStoryApprovalQueueQueryResponse {
   verifiedVisitStoryApprovalQueue: VerifiedVisitStory[];
+}
+
+export interface FamilyCarebridgeRoom {
+  id: string;
+  clientDisplayName: string;
+}
+
+export interface FamilyVerifiedVisitStory {
+  title: string;
+  body: string;
+  publishedAt: string;
+}
+
+export interface FamilyCareRoomsQueryResponse {
+  familyCareRooms: FamilyCarebridgeRoom[];
+}
+
+export interface FamilyCareRoomQueryResponse {
+  familyCareRoom: FamilyCarebridgeRoom;
+}
+
+export interface FamilyVerifiedVisitStoriesQueryResponse {
+  familyVerifiedVisitStories: FamilyVerifiedVisitStory[];
 }
 
 export interface CarebridgeConcernMessage {
@@ -909,6 +940,7 @@ export const CAREBRIDGE_ROOMS_QUERY = `
       }
       memberships {
         id
+        invitationId
         role
         status
         accessBasis
@@ -925,6 +957,10 @@ export const CAREBRIDGE_ROOMS_QUERY = `
           grantedAt
           revokedAt
         }
+        invitationStatus
+        deliveryStatus
+        cleanupStatus
+        invitationExpiresAt
       }
       policy {
         id
@@ -953,6 +989,7 @@ export const CAREBRIDGE_ROOM_QUERY = `
       }
       memberships {
         id
+        invitationId
         role
         status
         accessBasis
@@ -969,6 +1006,10 @@ export const CAREBRIDGE_ROOM_QUERY = `
           grantedAt
           revokedAt
         }
+        invitationStatus
+        deliveryStatus
+        cleanupStatus
+        invitationExpiresAt
       }
       policy {
         id
@@ -995,6 +1036,9 @@ export const VERIFIED_VISIT_STORIES_QUERY = `
       draftBody
       approvedTitle
       approvedBody
+      familySafeVersion
+      familySafeTitle
+      familySafeBody
       approvedAt
       rejectionReason
       rejectedAt
@@ -1013,10 +1057,41 @@ export const VERIFIED_VISIT_STORY_APPROVAL_QUEUE_QUERY = `
       draftBody
       approvedTitle
       approvedBody
+      familySafeVersion
+      familySafeTitle
+      familySafeBody
       approvedAt
       rejectionReason
       rejectedAt
       sourceRefs
+      publishedAt
+    }
+  }
+`;
+
+export const FAMILY_CAREBRIDGE_ROOMS_QUERY = `
+  query FamilyCareRooms {
+    familyCareRooms {
+      id
+      clientDisplayName
+    }
+  }
+`;
+
+export const FAMILY_CAREBRIDGE_ROOM_QUERY = `
+  query FamilyCareRoom($id: String!) {
+    familyCareRoom(id: $id) {
+      id
+      clientDisplayName
+    }
+  }
+`;
+
+export const FAMILY_VERIFIED_VISIT_STORIES_QUERY = `
+  query FamilyVerifiedVisitStories($careRoomId: String!) {
+    familyVerifiedVisitStories(careRoomId: $careRoomId) {
+      title
+      body
       publishedAt
     }
   }

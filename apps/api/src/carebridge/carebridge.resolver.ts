@@ -16,31 +16,65 @@ import {
   ConcernDTO,
   FamilyPulseDTO,
   CareBridgePolicyDTO,
+  FamilyCareRoomDTO,
+  FamilyVerifiedVisitStoryDTO,
+  UpdateFamilyAccessGrantsInput,
+  FamilyMembershipActionInput,
+  FamilyInvitationActionInput,
+  FamilyConcernReceiptDTO,
 } from './dto/carebridge.dto';
+import { FamilyInvitationService } from './family-invitation.service';
 
 const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => SetMetadata('roles', roles);
 
 @Resolver()
 @UseGuards(GqlRolesGuard)
 export class CarebridgeResolver {
-  constructor(private readonly carebridgeService: CarebridgeService) {}
+  constructor(
+    private readonly carebridgeService: CarebridgeService,
+    private readonly familyInvitations: FamilyInvitationService,
+  ) {}
 
   @Query(() => [CareRoomDTO])
-  @Roles('admin', 'user')
+  @Roles('admin')
   async careRooms(@Context() ctx: any) {
     return this.carebridgeService.listCareRooms(this.viewerFromContext(ctx));
   }
 
   @Query(() => CareRoomDTO)
-  @Roles('admin', 'user')
+  @Roles('admin')
   async careRoom(@Args('id') id: string, @Context() ctx: any) {
     return this.carebridgeService.getCareRoom(id, this.viewerFromContext(ctx));
   }
 
   @Query(() => [VerifiedVisitStoryDTO])
-  @Roles('admin', 'user')
+  @Roles('admin')
   async verifiedVisitStories(@Args('careRoomId') careRoomId: string, @Context() ctx: any) {
     return this.carebridgeService.listVerifiedVisitStories(careRoomId, this.viewerFromContext(ctx));
+  }
+
+  @Query(() => [FamilyCareRoomDTO])
+  @Roles('user')
+  async familyCareRooms(@Context() ctx: any) {
+    return this.carebridgeService.listFamilyCareRooms(this.viewerFromContext(ctx));
+  }
+
+  @Query(() => FamilyCareRoomDTO)
+  @Roles('user')
+  async familyCareRoom(@Args('id') id: string, @Context() ctx: any) {
+    return this.carebridgeService.getFamilyCareRoom(id, this.viewerFromContext(ctx));
+  }
+
+  @Query(() => [FamilyVerifiedVisitStoryDTO])
+  @Roles('user')
+  async familyVerifiedVisitStories(
+    @Args('careRoomId') careRoomId: string,
+    @Context() ctx: any,
+  ) {
+    return this.carebridgeService.listFamilyVerifiedVisitStories(
+      careRoomId,
+      this.viewerFromContext(ctx),
+    );
   }
 
   @Query(() => [ConcernDTO])
@@ -77,12 +111,51 @@ export class CarebridgeResolver {
   @Mutation(() => CareRoomMembershipDTO)
   @Roles('admin')
   async inviteFamilyContact(@Args('input') input: InviteFamilyContactInput, @Context() ctx: any) {
-    const viewer = this.viewerFromContext(ctx);
-    return this.carebridgeService.inviteFamilyContact(
-      input,
-      viewer.userId || 'unknown',
-      viewer.role,
-      viewer.organizationId || '',
+    return this.familyInvitations.invite(input, this.adminPrincipal(ctx));
+  }
+
+  @Mutation(() => CareRoomMembershipDTO)
+  @Roles('admin')
+  async updateFamilyAccessGrants(
+    @Args('input') input: UpdateFamilyAccessGrantsInput,
+    @Context() ctx: any,
+  ) {
+    return this.familyInvitations.setGrants(input, this.adminPrincipal(ctx));
+  }
+
+  @Mutation(() => CareRoomMembershipDTO)
+  @Roles('admin')
+  async revokeFamilyAccess(
+    @Args('input') input: FamilyMembershipActionInput,
+    @Context() ctx: any,
+  ) {
+    return this.familyInvitations.revokeAccess(
+      input.careRoomMembershipId,
+      this.adminPrincipal(ctx),
+    );
+  }
+
+  @Mutation(() => CareRoomMembershipDTO)
+  @Roles('admin')
+  async revokeFamilyInvitation(
+    @Args('input') input: FamilyInvitationActionInput,
+    @Context() ctx: any,
+  ) {
+    return this.familyInvitations.revokeInvitation(
+      input.invitationId,
+      this.adminPrincipal(ctx),
+    );
+  }
+
+  @Mutation(() => CareRoomMembershipDTO)
+  @Roles('admin')
+  async retryFamilyInvitationDelivery(
+    @Args('input') input: FamilyInvitationActionInput,
+    @Context() ctx: any,
+  ) {
+    return this.familyInvitations.retryDelivery(
+      input.invitationId,
+      this.adminPrincipal(ctx),
     );
   }
 
@@ -129,9 +202,21 @@ export class CarebridgeResolver {
   }
 
   @Mutation(() => ConcernDTO)
-  @Roles('admin', 'user')
+  @Roles('admin')
   async raiseCarebridgeConcern(@Args('input') input: RaiseConcernInput, @Context() ctx: any) {
     return this.carebridgeService.raiseConcern(input, this.viewerFromContext(ctx));
+  }
+
+  @Mutation(() => FamilyConcernReceiptDTO)
+  @Roles('user')
+  async raiseFamilyCarebridgeConcern(
+    @Args('input') input: RaiseConcernInput,
+    @Context() ctx: any,
+  ) {
+    return this.carebridgeService.raiseFamilyConcern(
+      input,
+      this.viewerFromContext(ctx),
+    );
   }
 
   @Mutation(() => ConcernDTO)
@@ -162,6 +247,15 @@ export class CarebridgeResolver {
       organizationId: user.organizationId || null,
       email: user.email || null,
       authSubject: user.sub || user.id || null,
+    };
+  }
+
+  private adminPrincipal(ctx: any) {
+    const user = ctx?.req?.user ?? {};
+    return {
+      organizationId: user.organizationId || null,
+      organizationMembershipId: user.organizationMembershipId || null,
+      authSubject: user.accessContext?.authSubject || user.sub || user.id || null,
     };
   }
 }

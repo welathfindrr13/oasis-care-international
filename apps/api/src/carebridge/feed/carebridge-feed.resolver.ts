@@ -1,9 +1,7 @@
-import { Args, Context, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, Context, Mutation, Resolver } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
 import { GqlRolesGuard } from '../../auth/gql-roles.guard';
-import { CarebridgeAccessService } from '../access/carebridge-access.service';
 import { getCarebridgeActor } from '../current-user';
-import { AccessGrantScope } from '../dto/carebridge.enums';
 import { mapVerifiedVisitStory } from '../mappers';
 import { CarebridgeRoles } from '../roles';
 import { PublishVerifiedVisitStoryInput } from './dto/publish-verified-visit-story.input';
@@ -13,10 +11,7 @@ import { CarebridgeFeedService } from './carebridge-feed.service';
 @Resolver(() => VerifiedVisitStoryDTO)
 @UseGuards(GqlRolesGuard)
 export class CarebridgeFeedResolver {
-  constructor(
-    private readonly feedService: CarebridgeFeedService,
-    private readonly accessService: CarebridgeAccessService,
-  ) {}
+  constructor(private readonly feedService: CarebridgeFeedService) {}
 
   @Mutation(() => VerifiedVisitStoryDTO)
   @CarebridgeRoles('admin')
@@ -40,25 +35,5 @@ export class CarebridgeFeedResolver {
       actorUserId: actor.userId,
     });
     return mapVerifiedVisitStory(story);
-  }
-
-  @Query(() => [VerifiedVisitStoryDTO])
-  @CarebridgeRoles('user')
-  async careRoomFeed(@Args('careRoomId') careRoomId: string, @Context() ctx: any) {
-    const actor = getCarebridgeActor(ctx);
-    await this.accessService.requireFamilyScopes({
-      careRoomId,
-      organizationId: actor.organizationId || '',
-      authSubject: actor.userId,
-      email: actor.email,
-      requiredScopes: [
-        AccessGrantScope.VIEW_UPDATES,
-        AccessGrantScope.VIEW_VISIT_TIMES,
-        AccessGrantScope.VIEW_TASK_SUMMARY,
-        AccessGrantScope.VIEW_MEDICATION_SUPPORT_STATUS,
-      ],
-    });
-    const stories = await this.feedService.listPublishedStoriesForRoom(careRoomId);
-    return stories.map(mapVerifiedVisitStory);
   }
 }

@@ -19,6 +19,8 @@ const migrationsUnderTest = [
   "20260710160000_onboarding_lifecycle_foundation",
   "20260710180000_company_request_bootstrap",
   "20260710203000_verified_invitation_activation",
+  "20260710223000_carer_invitation_lifecycle",
+  "20260711003000_family_invitation_grants",
 ];
 const { PrismaClient } = generatedClient;
 
