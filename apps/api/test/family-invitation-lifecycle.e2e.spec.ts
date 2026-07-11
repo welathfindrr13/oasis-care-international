@@ -855,7 +855,7 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     });
   });
 
-  it('retries a committed family invitation whose initial delivery never started', async () => {
+  it('retries a committed invitation before delivery and after an expired lease', async () => {
     const invitationId = 'family_invitation_committed_pending_delivery';
     const contact = await prisma.familyContact.create({
       data: {
@@ -916,5 +916,40 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
         where: { invitation_id: invitationId },
       }),
     ).resolves.toMatchObject({ status: 'DELIVERED', attempt_count: 1 });
+
+    await prisma.organizationMembershipInvitation.update({
+      where: { id: invitationId },
+      data: { external_invitation_id: null },
+    });
+    await prisma.organizationProvisioningOutbox.update({
+      where: { invitation_id: invitationId },
+      data: {
+        status: 'PROCESSING',
+        delivered_at: null,
+        lease_token: 'expired-family-delivery-lease',
+        lease_expires_at: new Date(Date.now() - 60_000),
+      },
+    });
+    adminClerk.ensureOrganizationInvitation.mockClear();
+
+    const recovered = await gql(
+      bearer(adminSubject),
+      `mutation Retry($input: FamilyInvitationActionInput!) {
+        retryFamilyInvitationDelivery(input: $input) { deliveryStatus invitationStatus }
+      }`,
+      { input: { invitationId } },
+    ).expect(200);
+
+    expect(recovered.body.errors).toBeUndefined();
+    expect(recovered.body.data.retryFamilyInvitationDelivery).toEqual({
+      deliveryStatus: 'DELIVERED',
+      invitationStatus: 'PENDING',
+    });
+    expect(adminClerk.ensureOrganizationInvitation).toHaveBeenCalledTimes(1);
+    await expect(
+      prisma.organizationProvisioningOutbox.findUniqueOrThrow({
+        where: { invitation_id: invitationId },
+      }),
+    ).resolves.toMatchObject({ status: 'DELIVERED', attempt_count: 2 });
   });
 });

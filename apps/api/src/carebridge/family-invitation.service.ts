@@ -400,6 +400,7 @@ export class FamilyInvitationService {
     this.requireInvitationProvider();
     const actor = this.requirePrincipal(principal);
     await this.requireVerifiedAdmin(this.prisma, actor);
+    const now = new Date();
     const invitation = await this.prisma.organizationMembershipInvitation.findFirst({
       where: {
         id: invitationId,
@@ -408,7 +409,12 @@ export class FamilyInvitationService {
         intended_role: 'family',
         source_request_id: null,
         status: 'PENDING',
-        provisioning_outbox: { status: { in: ['PENDING', 'RETRYABLE'] } },
+        provisioning_outbox: {
+          OR: [
+            { status: { in: ['PENDING', 'RETRYABLE'] } },
+            { status: 'PROCESSING', lease_expires_at: { lte: now } },
+          ],
+        },
       },
       select: { id: true },
     });
