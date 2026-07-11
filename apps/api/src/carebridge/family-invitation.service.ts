@@ -65,7 +65,7 @@ export class FamilyInvitationService {
     }
 
     await this.requireVerifiedAdmin(this.prisma, actor);
-    await this.withSerializableRetry(() =>
+    const cleanupInvitationIds = await this.withSerializableRetry<string[]>(() =>
       this.prisma.$transaction(
         async (tx: any) => {
           await this.requireVerifiedAdmin(tx, actor);
@@ -76,10 +76,14 @@ export class FamilyInvitationService {
             email,
             new Date(),
           );
+          return this.markTerminalInvitationCleanup(tx, actor, email);
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       ),
     );
+    for (const cleanupInvitationId of cleanupInvitationIds) {
+      await this.reconcileInvitationCleanup(cleanupInvitationId, actor.organizationId);
+    }
     let result: { membershipId: string; invitationId: string; deliveryRequired: boolean };
     try {
       result = await this.withSerializableRetry(() =>
@@ -276,6 +280,7 @@ export class FamilyInvitationService {
                 OR: [
                   { external_cleanup_required: true },
                   {
+                    status: 'PENDING',
                     provisioning_outbox: {
                       status: { in: ['PROCESSING', 'RETRYABLE', 'NEEDS_ATTENTION'] },
                     },
@@ -618,7 +623,7 @@ export class FamilyInvitationService {
     this.requireInvitationProvider();
     const actor = this.requirePrincipal(principal);
     await this.requireVerifiedAdmin(this.prisma, actor);
-    await this.withSerializableRetry(() =>
+    const cleanupInvitationIds = await this.withSerializableRetry<string[]>(() =>
       this.prisma.$transaction(
         async (tx: any) => {
           await this.requireVerifiedAdmin(tx, actor);
@@ -633,7 +638,7 @@ export class FamilyInvitationService {
             },
             select: { normalized_email: true },
           });
-          if (!target) return;
+          if (!target) return [];
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`family-invitation:${actor.organizationId}:${target.normalized_email}`}, 0))`;
           await this.expireOverdueInvitations(
             tx,
@@ -641,10 +646,18 @@ export class FamilyInvitationService {
             target.normalized_email,
             new Date(),
           );
+          return this.markTerminalInvitationCleanup(
+            tx,
+            actor,
+            target.normalized_email,
+          );
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       ),
     );
+    for (const cleanupInvitationId of cleanupInvitationIds) {
+      await this.reconcileInvitationCleanup(cleanupInvitationId, actor.organizationId);
+    }
     const now = new Date();
     const invitation = await this.prisma.organizationMembershipInvitation.findFirst({
       where: {
@@ -763,6 +776,53 @@ export class FamilyInvitationService {
         },
       });
     }
+  }
+
+  private async markTerminalInvitationCleanup(
+    tx: any,
+    actor: ReturnType<FamilyInvitationService['requirePrincipal']>,
+    email: string,
+  ): Promise<string[]> {
+    const histories = await tx.organizationMembershipInvitation.findMany({
+      where: {
+        organization_id: actor.organizationId,
+        identity_provider: this.identityProvider(),
+        normalized_email: email,
+        intended_role: 'family',
+        source_request_id: null,
+        activated_membership_id: null,
+        status: { in: ['EXPIRED', 'REVOKED'] },
+        external_cleanup_completed_at: null,
+        OR: [
+          { external_cleanup_required: true },
+          { external_invitation_id: { not: null } },
+          { provisioning_outbox: { attempt_count: { gt: 0 } } },
+        ],
+      },
+      select: { id: true, external_cleanup_required: true },
+    });
+
+    const cleanupInvitationIds: string[] = [];
+    for (const history of histories) {
+      if (history.external_cleanup_required) {
+        cleanupInvitationIds.push(history.id);
+        continue;
+      }
+      const marked = await tx.organizationMembershipInvitation.updateMany({
+        where: {
+          id: history.id,
+          status: { in: ['EXPIRED', 'REVOKED'] },
+          external_cleanup_required: false,
+          external_cleanup_completed_at: null,
+        },
+        data: {
+          external_cleanup_required: true,
+          external_cleanup_error_code: null,
+        },
+      });
+      if (marked.count === 1) cleanupInvitationIds.push(history.id);
+    }
+    return cleanupInvitationIds;
   }
 
   private async deliver(invitationId: string, actor: ReturnType<FamilyInvitationService['requirePrincipal']>) {

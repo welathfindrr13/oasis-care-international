@@ -629,10 +629,22 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     await prisma.organizationMembershipInvitation.update({
       where: { id: invitationId },
       data: {
+        external_invitation_id: null,
         created_at: new Date(Date.now() - 120_000),
         expires_at: new Date(Date.now() - 60_000),
       },
     });
+    await prisma.organizationProvisioningOutbox.update({
+      where: { invitation_id: invitationId },
+      data: {
+        status: 'RETRYABLE',
+        delivered_at: null,
+        lease_token: null,
+        lease_expires_at: null,
+        last_error_code: 'CLERK_TIMEOUT',
+      },
+    });
+    adminClerk.revokeOrganizationInvitationByInternalId.mockClear();
     const overdueRetry = await gql(
       bearer(adminSubject),
       inviteMutation,
@@ -647,7 +659,18 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
       prisma.organizationMembershipInvitation.findUniqueOrThrow({
         where: { id: invitationId },
       }),
-    ).resolves.toMatchObject({ status: 'EXPIRED', expired_at: expect.any(Date) });
+    ).resolves.toMatchObject({
+      status: 'EXPIRED',
+      expired_at: expect.any(Date),
+      external_cleanup_required: false,
+      external_cleanup_completed_at: expect.any(Date),
+    });
+    expect(adminClerk.revokeOrganizationInvitationByInternalId).toHaveBeenCalledWith({
+      externalOrganizationId,
+      invitationId,
+      emailAddress: input.email,
+      intendedRole: 'family',
+    });
     await expect(
       prisma.careRoomMembership.findUniqueOrThrow({
         where: { id: first.body.data.inviteFamilyContact.id },
