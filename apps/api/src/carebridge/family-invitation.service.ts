@@ -618,6 +618,33 @@ export class FamilyInvitationService {
     this.requireInvitationProvider();
     const actor = this.requirePrincipal(principal);
     await this.requireVerifiedAdmin(this.prisma, actor);
+    await this.withSerializableRetry(() =>
+      this.prisma.$transaction(
+        async (tx: any) => {
+          await this.requireVerifiedAdmin(tx, actor);
+          const target = await tx.organizationMembershipInvitation.findFirst({
+            where: {
+              id: invitationId,
+              organization_id: actor.organizationId,
+              identity_provider: this.identityProvider(),
+              intended_role: 'family',
+              source_request_id: null,
+              status: 'PENDING',
+            },
+            select: { normalized_email: true },
+          });
+          if (!target) return;
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`family-invitation:${actor.organizationId}:${target.normalized_email}`}, 0))`;
+          await this.expireOverdueInvitations(
+            tx,
+            actor,
+            target.normalized_email,
+            new Date(),
+          );
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      ),
+    );
     const now = new Date();
     const invitation = await this.prisma.organizationMembershipInvitation.findFirst({
       where: {
@@ -627,6 +654,7 @@ export class FamilyInvitationService {
         intended_role: 'family',
         source_request_id: null,
         status: 'PENDING',
+        expires_at: { gt: now },
         provisioning_outbox: {
           OR: [
             { status: { in: ['PENDING', 'RETRYABLE'] } },
@@ -833,6 +861,10 @@ export class FamilyInvitationService {
         current.invitation.intended_role !== 'family'
       ) return null;
       const now = new Date();
+      if (
+        current.invitation.status !== 'PENDING' ||
+        current.invitation.expires_at <= now
+      ) return null;
       const eligible =
         current.status === 'PENDING' ||
         current.status === 'RETRYABLE' ||

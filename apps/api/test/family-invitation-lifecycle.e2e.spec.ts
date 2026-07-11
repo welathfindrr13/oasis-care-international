@@ -1163,5 +1163,44 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
         where: { invitation_id: invitationId },
       }),
     ).resolves.toMatchObject({ status: 'DELIVERED', attempt_count: 2 });
+
+    await prisma.organizationMembershipInvitation.update({
+      where: { id: invitationId },
+      data: {
+        created_at: new Date(Date.now() - 120_000),
+        expires_at: new Date(Date.now() - 60_000),
+      },
+    });
+    await prisma.organizationProvisioningOutbox.update({
+      where: { invitation_id: invitationId },
+      data: {
+        status: 'PENDING',
+        delivered_at: null,
+        lease_token: null,
+        lease_expires_at: null,
+      },
+    });
+    adminClerk.ensureOrganizationInvitation.mockClear();
+
+    const expiredRetry = await gql(
+      bearer(adminSubject),
+      `mutation Retry($input: FamilyInvitationActionInput!) {
+        retryFamilyInvitationDelivery(input: $input) { deliveryStatus invitationStatus }
+      }`,
+      { input: { invitationId } },
+    ).expect(200);
+
+    expect(expiredRetry.body.errors).toHaveLength(1);
+    expect(adminClerk.ensureOrganizationInvitation).not.toHaveBeenCalled();
+    await expect(
+      prisma.organizationMembershipInvitation.findUniqueOrThrow({
+        where: { id: invitationId },
+      }),
+    ).resolves.toMatchObject({ status: 'EXPIRED', expired_at: expect.any(Date) });
+    await expect(
+      prisma.careRoomMembership.findFirstOrThrow({
+        where: { organization_membership_invitation_id: invitationId },
+      }),
+    ).resolves.toMatchObject({ status: 'EXPIRED' });
   });
 });
