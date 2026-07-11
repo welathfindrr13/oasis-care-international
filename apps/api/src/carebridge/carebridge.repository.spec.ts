@@ -120,6 +120,7 @@ describe('CarebridgeRepository', () => {
           family_safe_version: 1,
           visit: { status: 'COMPLETED', deleted_at: null },
         }),
+        orderBy: [{ published_at: 'desc' }, { id: 'desc' }],
       }),
     );
   });

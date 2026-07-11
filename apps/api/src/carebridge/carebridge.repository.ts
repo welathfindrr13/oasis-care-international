@@ -207,7 +207,7 @@ export class CarebridgeRepository {
           deleted_at: null,
         },
       },
-      orderBy: { created_at: 'desc' },
+      orderBy: [{ published_at: 'desc' }, { id: 'desc' }],
       select: {
         family_safe_title: true,
         family_safe_body: true,
