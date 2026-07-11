@@ -854,4 +854,67 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
       intendedRole: 'family',
     });
   });
+
+  it('retries a committed family invitation whose initial delivery never started', async () => {
+    const invitationId = 'family_invitation_committed_pending_delivery';
+    const contact = await prisma.familyContact.create({
+      data: {
+        organization_id: organizationId,
+        full_name: 'Committed Relative',
+        email: 'committed-family@example.test',
+        identity_type: 'clerk',
+      },
+    });
+    await prisma.organizationMembershipInvitation.create({
+      data: {
+        id: invitationId,
+        organization_id: organizationId,
+        identity_provider: 'clerk',
+        intended_email: 'committed-family@example.test',
+        normalized_email: 'committed-family@example.test',
+        intended_role: 'family',
+        created_by_subject: adminSubject,
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+    await prisma.careRoomMembership.create({
+      data: {
+        care_room_id: roomId,
+        family_contact_id: contact.id,
+        organization_membership_invitation_id: invitationId,
+        role: 'FAMILY_VIEWER',
+        access_basis: 'CLIENT_CONSENT',
+        status: 'INVITED',
+        invited_by_user_id: adminSubject,
+      },
+    });
+    await prisma.organizationProvisioningOutbox.create({
+      data: {
+        id: 'family_outbox_committed_pending_delivery',
+        organization_id: organizationId,
+        invitation_id: invitationId,
+        status: 'PENDING',
+      },
+    });
+
+    const retried = await gql(
+      bearer(adminSubject),
+      `mutation Retry($input: FamilyInvitationActionInput!) {
+        retryFamilyInvitationDelivery(input: $input) { deliveryStatus invitationStatus }
+      }`,
+      { input: { invitationId } },
+    ).expect(200);
+
+    expect(retried.body.errors).toBeUndefined();
+    expect(retried.body.data.retryFamilyInvitationDelivery).toEqual({
+      deliveryStatus: 'DELIVERED',
+      invitationStatus: 'PENDING',
+    });
+    expect(adminClerk.ensureOrganizationInvitation).toHaveBeenCalledTimes(1);
+    await expect(
+      prisma.organizationProvisioningOutbox.findUniqueOrThrow({
+        where: { invitation_id: invitationId },
+      }),
+    ).resolves.toMatchObject({ status: 'DELIVERED', attempt_count: 1 });
+  });
 });

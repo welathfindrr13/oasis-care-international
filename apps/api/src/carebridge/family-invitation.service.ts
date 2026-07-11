@@ -408,7 +408,7 @@ export class FamilyInvitationService {
         intended_role: 'family',
         source_request_id: null,
         status: 'PENDING',
-        provisioning_outbox: { status: 'RETRYABLE' },
+        provisioning_outbox: { status: { in: ['PENDING', 'RETRYABLE'] } },
       },
       select: { id: true },
     });
