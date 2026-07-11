@@ -23,13 +23,20 @@ test('explicit family grants are unique and the migration creates no automatic s
   assert.match(migration, /access_grant_membership_scope_key/);
   assert.match(schema, /@@unique\(\[care_room_membership_id, scope\]/);
   assert.doesNotMatch(migration, /INSERT INTO "access_grant"/);
-  assert.doesNotMatch(migration, /UPDATE "access_grant"/);
 });
 
-test('family invitation migration is expand-only and preflights conflicting history', () => {
-  assert.match(migration, /duplicate care room memberships exist/);
-  assert.match(migration, /duplicate access grants exist/);
-  assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|DELETE FROM|TRUNCATE/);
+test('historical duplicate family access is audited and quarantined before consolidation', () => {
+  assert.match(migration, /^BEGIN;/);
+  assert.match(migration, /COMMIT;\s*$/);
+  assert.match(migration, /FAMILY_MEMBERSHIP_DUPLICATE_QUARANTINED/);
+  assert.match(migration, /ACCESS_GRANT_DUPLICATE_QUARANTINED/);
+  assert.match(migration, /UPDATE "family_pulse"/);
+  assert.match(migration, /UPDATE "concern"/);
+  assert.match(migration, /UPDATE "access_grant"/);
+  assert.match(migration, /"status" = 'REVOKED'/);
+  assert.match(migration, /unresolved duplicate care room memberships/);
+  assert.match(migration, /unresolved duplicate access grants/);
+  assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|TRUNCATE/);
 });
 
 test('legacy published stories remain hidden until versioned family-safe content exists', () => {
