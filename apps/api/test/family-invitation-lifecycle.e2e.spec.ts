@@ -1156,7 +1156,7 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     ).toBe(1);
   });
 
-  it('retries a committed invitation before delivery and after an expired lease', async () => {
+  it('retries committed, expired-lease, and manual-review deliveries', async () => {
     const invitationId = 'family_invitation_committed_pending_delivery';
     const contact = await prisma.familyContact.create({
       data: {
@@ -1252,6 +1252,46 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
         where: { invitation_id: invitationId },
       }),
     ).resolves.toMatchObject({ status: 'DELIVERED', attempt_count: 2 });
+
+    await prisma.organizationMembershipInvitation.update({
+      where: { id: invitationId },
+      data: { external_invitation_id: null },
+    });
+    await prisma.organizationProvisioningOutbox.update({
+      where: { invitation_id: invitationId },
+      data: {
+        status: 'NEEDS_ATTENTION',
+        delivered_at: null,
+        lease_token: null,
+        lease_expires_at: null,
+        last_error_code: 'CLERK_ORGANIZATION_NOT_BOUND',
+      },
+    });
+    adminClerk.ensureOrganizationInvitation.mockClear();
+
+    const manuallyRecovered = await gql(
+      bearer(adminSubject),
+      `mutation Retry($input: FamilyInvitationActionInput!) {
+        retryFamilyInvitationDelivery(input: $input) { deliveryStatus invitationStatus }
+      }`,
+      { input: { invitationId } },
+    ).expect(200);
+
+    expect(manuallyRecovered.body.errors).toBeUndefined();
+    expect(manuallyRecovered.body.data.retryFamilyInvitationDelivery).toEqual({
+      deliveryStatus: 'DELIVERED',
+      invitationStatus: 'PENDING',
+    });
+    expect(adminClerk.ensureOrganizationInvitation).toHaveBeenCalledTimes(1);
+    await expect(
+      prisma.organizationProvisioningOutbox.findUniqueOrThrow({
+        where: { invitation_id: invitationId },
+      }),
+    ).resolves.toMatchObject({
+      status: 'DELIVERED',
+      attempt_count: 3,
+      last_error_code: null,
+    });
 
     await prisma.organizationMembershipInvitation.update({
       where: { id: invitationId },

@@ -3,6 +3,7 @@ import { ClerkProvisioningError } from "../company-access/clerk-provisioning.ada
 
 const CLERK_API_BASE_URL = "https://api.clerk.com/v1";
 const CLERK_TIMEOUT_MS = 10_000;
+const CLERK_PAGE_LIMIT = 500;
 
 type ClerkMetadata = Record<string, unknown> | null | undefined;
 
@@ -33,17 +34,10 @@ export class ClerkInvitationAdministrationAdapter {
     input: EnsureOrganizationInvitationInput,
   ): Promise<{ externalInvitationId: string }> {
     const secretKey = this.secretKey();
-    const query = new URLSearchParams({ limit: "500" });
-    for (const status of ["pending", "accepted", "revoked", "expired"]) {
-      query.append("status", status);
-    }
-    const response = await this.request<
-      ClerkListResponse<ClerkOrganizationInvitation>
-    >(
+    const invitations = await this.listOrganizationInvitations(
       secretKey,
-      `/organizations/${encodeURIComponent(input.externalOrganizationId)}/invitations?${query.toString()}`,
+      input.externalOrganizationId,
     );
-    const invitations = response.data || [];
     const exactMatches = invitations.filter(
       (item) =>
         item.private_metadata?.oasis_invitation_id === input.invitationId,
@@ -56,16 +50,6 @@ export class ClerkInvitationAdministrationAdapter {
       this.validateInvitation(exact, input);
       return { externalInvitationId: exact.id };
     }
-    if (
-      typeof response.total_count === "number" &&
-      response.total_count > invitations.length
-    ) {
-      throw new ClerkProvisioningError(
-        "CLERK_INVITATION_PAGE_INCOMPLETE",
-        false,
-      );
-    }
-
     const email = this.normalizeEmail(input.emailAddress);
     if (
       invitations.some(
@@ -129,32 +113,16 @@ export class ClerkInvitationAdministrationAdapter {
     input: EnsureOrganizationInvitationInput,
   ): Promise<void> {
     const secretKey = this.secretKey();
-    const query = new URLSearchParams({ limit: "500" });
-    for (const status of ["pending", "accepted", "revoked", "expired"]) {
-      query.append("status", status);
-    }
-    const response = await this.request<
-      ClerkListResponse<ClerkOrganizationInvitation>
-    >(
+    const invitations = await this.listOrganizationInvitations(
       secretKey,
-      `/organizations/${encodeURIComponent(input.externalOrganizationId)}/invitations?${query.toString()}`,
+      input.externalOrganizationId,
     );
-    const invitations = response.data || [];
     const exact = invitations.filter(
       (item) =>
         item.private_metadata?.oasis_invitation_id === input.invitationId,
     );
     if (exact.length > 1) {
       throw new ClerkProvisioningError("CLERK_INVITATION_AMBIGUOUS", false);
-    }
-    if (
-      typeof response.total_count === "number" &&
-      response.total_count > invitations.length
-    ) {
-      throw new ClerkProvisioningError(
-        "CLERK_INVITATION_PAGE_INCOMPLETE",
-        false,
-      );
     }
     const invitation = exact[0];
     const email = this.normalizeEmail(input.emailAddress);
@@ -242,6 +210,85 @@ export class ClerkInvitationAdministrationAdapter {
 
   private normalizeEmail(value: string): string {
     return value.trim().toLowerCase();
+  }
+
+  private async listOrganizationInvitations(
+    secretKey: string,
+    externalOrganizationId: string,
+  ): Promise<ClerkOrganizationInvitation[]> {
+    const invitations: ClerkOrganizationInvitation[] = [];
+    const invitationIds = new Set<string>();
+    let offset = 0;
+    let expectedTotal: number | undefined;
+
+    while (true) {
+      const query = new URLSearchParams({
+        limit: String(CLERK_PAGE_LIMIT),
+        offset: String(offset),
+      });
+      for (const status of ["pending", "accepted", "revoked", "expired"]) {
+        query.append("status", status);
+      }
+      const response = await this.request<
+        ClerkListResponse<ClerkOrganizationInvitation>
+      >(
+        secretKey,
+        `/organizations/${encodeURIComponent(externalOrganizationId)}/invitations?${query.toString()}`,
+      );
+      const page = response.data || [];
+      if (typeof response.total_count === "number") {
+        if (
+          expectedTotal !== undefined &&
+          response.total_count !== expectedTotal
+        ) {
+          throw new ClerkProvisioningError(
+            "CLERK_INVITATION_PAGE_INCOMPLETE",
+            false,
+          );
+        }
+        expectedTotal = response.total_count;
+      }
+      if (page.length === 0) {
+        if (expectedTotal !== undefined && offset < expectedTotal) {
+          throw new ClerkProvisioningError(
+            "CLERK_INVITATION_PAGE_INCOMPLETE",
+            false,
+          );
+        }
+        break;
+      }
+      for (const invitation of page) {
+        if (invitationIds.has(invitation.id)) {
+          throw new ClerkProvisioningError(
+            "CLERK_INVITATION_PAGE_INCOMPLETE",
+            false,
+          );
+        }
+        invitationIds.add(invitation.id);
+        invitations.push(invitation);
+      }
+      offset += page.length;
+      if (expectedTotal !== undefined && offset > expectedTotal) {
+        throw new ClerkProvisioningError(
+          "CLERK_INVITATION_PAGE_INCOMPLETE",
+          false,
+        );
+      }
+      if (expectedTotal !== undefined && offset === expectedTotal) break;
+      if (expectedTotal === undefined && page.length < CLERK_PAGE_LIMIT) break;
+    }
+
+    if (
+      expectedTotal !== undefined &&
+      invitationIds.size !== expectedTotal
+    ) {
+      throw new ClerkProvisioningError(
+        "CLERK_INVITATION_PAGE_INCOMPLETE",
+        false,
+      );
+    }
+
+    return invitations;
   }
 
   private secretKey(): string {

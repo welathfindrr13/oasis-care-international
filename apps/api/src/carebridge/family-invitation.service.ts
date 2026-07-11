@@ -670,7 +670,7 @@ export class FamilyInvitationService {
         expires_at: { gt: now },
         provisioning_outbox: {
           OR: [
-            { status: { in: ['PENDING', 'RETRYABLE'] } },
+            { status: { in: ['PENDING', 'RETRYABLE', 'NEEDS_ATTENTION'] } },
             { status: 'PROCESSING', lease_expires_at: { lte: now } },
           ],
         },
@@ -928,7 +928,10 @@ export class FamilyInvitationService {
       const eligible =
         current.status === 'PENDING' ||
         current.status === 'RETRYABLE' ||
-        (current.status === 'PROCESSING' && current.lease_expires_at && current.lease_expires_at <= now);
+        current.status === 'NEEDS_ATTENTION' ||
+        (current.status === 'PROCESSING' &&
+          current.lease_expires_at &&
+          current.lease_expires_at <= now);
       if (!eligible) return null;
       const leaseToken = randomUUID();
       const where: Record<string, unknown> = { id: current.id, status: current.status };
