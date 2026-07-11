@@ -157,6 +157,16 @@ export class ClerkInvitationAdministrationAdapter {
           false,
         );
       }
+      const email = this.normalizeEmail(input.emailAddress);
+      if (
+        invitations.some(
+          (item) =>
+            item.status.toLowerCase() === "pending" &&
+            this.normalizeEmail(item.email_address) === email,
+        )
+      ) {
+        throw new ClerkProvisioningError("CLERK_INVITATION_AMBIGUOUS", false);
+      }
       return;
     }
     const invitation = exact[0];

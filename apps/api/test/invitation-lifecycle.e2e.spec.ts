@@ -310,7 +310,7 @@ describe("verified organization invitation activation", () => {
     });
   });
 
-  it('binds the verified family subject and activates the exact zero-grant care-room membership', async () => {
+  it('binds the verified family subject when the exact care-room membership has zero active grants', async () => {
     await prisma.organizationProvisioningOutbox.deleteMany();
     await prisma.organizationMembershipInvitation.deleteMany();
     const client = await prisma.client.create({
@@ -358,6 +358,13 @@ describe("verified organization invitation activation", () => {
         status: 'INVITED',
       },
     });
+    await prisma.accessGrant.create({
+      data: {
+        care_room_membership_id: roomMembership.id,
+        scope: 'VIEW_UPDATES',
+        revoked_at: new Date(Date.now() - 60_000),
+      },
+    });
     await prisma.organizationProvisioningOutbox.create({
       data: {
         organization_id: organizationId,
@@ -398,9 +405,17 @@ describe("verified organization invitation activation", () => {
     ).resolves.toMatchObject({ status: 'ACTIVE', accepted_at: expect.any(Date) });
     expect(
       await prisma.accessGrant.count({
-        where: { care_room_membership_id: roomMembership.id },
+        where: {
+          care_room_membership_id: roomMembership.id,
+          revoked_at: null,
+        },
       }),
     ).toBe(0);
+    expect(
+      await prisma.accessGrant.count({
+        where: { care_room_membership_id: roomMembership.id },
+      }),
+    ).toBe(1);
     const snapshot = await accessSnapshot(bearer(true)).expect(200);
     expect(snapshot.body.data.viewerAccessSnapshot).toMatchObject({
       membershipState: 'ACTIVE',

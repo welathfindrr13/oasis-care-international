@@ -197,6 +197,33 @@ describe("ClerkInvitationAdministrationAdapter", () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps cleanup unresolved for an unmatched pending invitation with the same email", async () => {
+    global.fetch = jest.fn(async () =>
+      response({
+        data: [
+          {
+            id: "orginv_ambiguous",
+            email_address: "carer@example.test",
+            role: "org:member",
+            status: "pending",
+            public_metadata: {},
+            private_metadata: {},
+          },
+        ],
+      }),
+    ) as typeof fetch;
+
+    await expect(
+      new ClerkInvitationAdministrationAdapter().revokeOrganizationInvitationByInternalId(
+        input,
+      ),
+    ).rejects.toMatchObject<Partial<ClerkProvisioningError>>({
+      code: "CLERK_INVITATION_AMBIGUOUS",
+      retryable: false,
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("revokes an exact invitation and removes membership by user subject", async () => {
     const calls: Array<{ url: string; method?: string }> = [];
     global.fetch = jest.fn(async (url: string | URL, init?: RequestInit) => {

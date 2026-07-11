@@ -202,7 +202,10 @@ export class InvitationLifecycleService {
                   include: {
                     care_room: true,
                     family_contact: true,
-                    access_grants: true,
+                    access_grants: {
+                      where: { revoked_at: null },
+                      select: { id: true },
+                    },
                   },
                 },
               },

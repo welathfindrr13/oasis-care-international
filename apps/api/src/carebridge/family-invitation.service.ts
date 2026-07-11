@@ -634,7 +634,7 @@ export class FamilyInvitationService {
               identity_provider: this.identityProvider(),
               intended_role: 'family',
               source_request_id: null,
-              status: 'PENDING',
+              status: { in: ['PENDING', 'EXPIRED', 'REVOKED'] },
             },
             select: { normalized_email: true },
           });

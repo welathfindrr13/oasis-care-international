@@ -709,6 +709,72 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     expect(await prisma.accessGrant.count()).toBe(0);
   });
 
+  it('keeps an expired invitation blocked when ambiguous provider cleanup cannot be proven', async () => {
+    const inviteMutation = `mutation Invite($input: InviteFamilyContactInput!) {
+      inviteFamilyContact(input: $input) { id invitationId }
+    }`;
+    const input = {
+      careRoomId: roomId,
+      fullName: 'Ambiguous Relative',
+      email: 'ambiguous-family@example.test',
+      role: 'FAMILY_VIEWER',
+      accessBasis: 'CLIENT_CONSENT',
+    };
+    const invited = await gql(
+      bearer(adminSubject),
+      inviteMutation,
+      { input },
+    ).expect(200);
+    expect(invited.body.errors).toBeUndefined();
+    const invitationId = invited.body.data.inviteFamilyContact.invitationId;
+    const membershipId = invited.body.data.inviteFamilyContact.id;
+
+    await prisma.organizationMembershipInvitation.update({
+      where: { id: invitationId },
+      data: {
+        external_invitation_id: null,
+        created_at: new Date(Date.now() - 120_000),
+        expires_at: new Date(Date.now() - 60_000),
+      },
+    });
+    await prisma.organizationProvisioningOutbox.update({
+      where: { invitation_id: invitationId },
+      data: {
+        status: 'NEEDS_ATTENTION',
+        delivered_at: null,
+        last_error_code: 'CLERK_INVITATION_AMBIGUOUS',
+      },
+    });
+    adminClerk.revokeOrganizationInvitationByInternalId.mockRejectedValueOnce(
+      new ClerkProvisioningError('CLERK_INVITATION_AMBIGUOUS', false),
+    );
+
+    const reinvite = await gql(
+      bearer(adminSubject),
+      inviteMutation,
+      { input },
+    ).expect(200);
+    expect(reinvite.body.errors).toHaveLength(1);
+    expect(
+      await prisma.organizationMembershipInvitation.count({
+        where: { normalized_email: input.email },
+      }),
+    ).toBe(1);
+    await expect(
+      prisma.organizationMembershipInvitation.findUniqueOrThrow({
+        where: { id: invitationId },
+      }),
+    ).resolves.toMatchObject({
+      status: 'EXPIRED',
+      external_cleanup_required: true,
+      external_cleanup_error_code: 'CLERK_INVITATION_AMBIGUOUS',
+      external_cleanup_completed_at: null,
+    });
+    await expect(
+      prisma.careRoomMembership.findUniqueOrThrow({ where: { id: membershipId } }),
+    ).resolves.toMatchObject({ status: 'EXPIRED' });
+  });
+
   it('adds an already verified family member to a second CareRoom with zero grants', async () => {
     const email = 'verified-multi-room-family@example.test';
     const organizationMembership = await prisma.organizationMembership.create({
@@ -1225,5 +1291,39 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
         where: { organization_membership_invitation_id: invitationId },
       }),
     ).resolves.toMatchObject({ status: 'EXPIRED' });
+
+    await prisma.organizationMembershipInvitation.update({
+      where: { id: invitationId },
+      data: {
+        external_cleanup_required: false,
+        external_cleanup_error_code: null,
+        external_cleanup_completed_at: null,
+      },
+    });
+    adminClerk.revokeOrganizationInvitationByInternalId.mockClear();
+    const terminalRetry = await gql(
+      bearer(adminSubject),
+      `mutation Retry($input: FamilyInvitationActionInput!) {
+        retryFamilyInvitationDelivery(input: $input) { deliveryStatus invitationStatus }
+      }`,
+      { input: { invitationId } },
+    ).expect(200);
+    expect(terminalRetry.body.errors).toHaveLength(1);
+    expect(adminClerk.revokeOrganizationInvitationByInternalId).toHaveBeenCalledWith({
+      externalOrganizationId,
+      invitationId,
+      emailAddress: 'committed-family@example.test',
+      intendedRole: 'family',
+    });
+    await expect(
+      prisma.organizationMembershipInvitation.findUniqueOrThrow({
+        where: { id: invitationId },
+      }),
+    ).resolves.toMatchObject({
+      status: 'EXPIRED',
+      external_cleanup_required: false,
+      external_cleanup_error_code: null,
+      external_cleanup_completed_at: expect.any(Date),
+    });
   });
 });
