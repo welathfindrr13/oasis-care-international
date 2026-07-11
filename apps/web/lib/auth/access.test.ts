@@ -28,8 +28,10 @@ test('unknown roles never become family or admin access', () => {
   assert.equal(context.isAdmin, false)
 })
 
-test('pre-workspace onboarding routes bypass authoritative workspace redirects', () => {
+test('pre-workspace and offline routes bypass authoritative workspace redirects', () => {
   for (const pathname of [
+    '/offline',
+    '/offline/help',
     '/accept-invitation',
     '/accept-invitation/complete',
     '/activate-invitation',

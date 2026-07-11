@@ -234,6 +234,29 @@ test("pre-workspace invitation activation renders before membership resolution",
   ).toBeVisible();
 });
 
+test("the offline shell renders without waiting for session resolution", async ({
+  page,
+}) => {
+  let releaseSession!: () => void;
+  const heldSession = new Promise<void>((resolve) => {
+    releaseSession = resolve;
+  });
+  await page.route("**/api/auth/session", async (route) => {
+    await heldSession;
+    await route.continue().catch(() => undefined);
+  });
+
+  await page.goto("/offline");
+
+  await expect(
+    page.getByRole("heading", { name: "You are offline" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Oasis Care needs an internet connection", { exact: false }),
+  ).toBeVisible();
+  releaseSession();
+});
+
 test("an administrator sees lifecycle readiness and only identity-valid Carers are assignable", async ({
   page,
 }) => {

@@ -45,6 +45,7 @@ const ADMIN_ONLY_PATHS = [
 const FAMILY_PATH = /^\/family(?:\/|$)/
 const ACCESS_STATE_PATH = /^\/access\/(?:no-membership|disabled|pending|setup|unavailable)$/
 const AUTHORITATIVE_ROUTE_BYPASS_PATHS = [
+  /^\/offline(?:\/|$)/,
   /^\/accept-invitation(?:\/|$)/,
   /^\/activate-invitation(?:\/|$)/,
   /^\/platform(?:\/|$)/,
