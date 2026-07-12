@@ -19,7 +19,7 @@ const UPPERCASE_ERROR_PATTERN = /(?:^|\s)ERROR(?:\s|:|\[)/m;
 const EXPECTED_HTTP_DENIAL_PATTERN =
   /\bERROR\s+\[HttpExceptionFilter\].*→\s*4\d{2}\s*::/;
 const AUTH_DENIAL_PATTERN =
-  /(?:→\s*(?:401|403)\s*::|["']statusCode["']\s*:\s*(?:401|403)\b|["']?code["']?\s*[:=]\s*["']?(?:UNAUTHENTICATED|FORBIDDEN(?:_[A-Z_]+)?)\b|\b(?:Clerk|JWT)\b.*\b(?:unauthorized|forbidden|invalid|denied|rejected)\b)/i;
+  /(?:→\s*(?:401|403)\s*::|GraphQL proxy failed:\s*(?:401|403)\b|["']statusCode["']\s*:\s*(?:401|403)\b|["']?code["']?\s*[:=]\s*["']?(?:UNAUTHENTICATED|FORBIDDEN(?:_[A-Z_]+)?)\b|\b(?:Clerk|JWT)\b.*\b(?:unauthorized|forbidden|invalid|denied|rejected)\b)/i;
 const PRIVATE_FILE_MASK = 0o077;
 const MAX_COMMAND_OUTPUT_BYTES = 1024 * 1024;
 const MAX_LOGIN_BODY_BYTES = 256 * 1024;

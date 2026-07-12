@@ -312,6 +312,7 @@ test("does not classify ordinary authorization denials as critical errors", asyn
               "[Nest] 101 - ERROR [HttpExceptionFilter] GET /missing → 404 :: Not Found",
               '{"level":50,"statusCode":401,"msg":"request denied"}',
               '{"errors":[{"extensions":{"code":"UNAUTHENTICATED"}}]}',
+              "GraphQL proxy failed: 401 upstream denied the request",
               "ERROR JWT invalid for request",
               "Clerk token rejected",
             ].join("\n"),
@@ -328,9 +329,9 @@ test("fails safely when repeated authorization denials reach the reviewed thresh
   const denials = [
     `[Nest] 1 - ERROR [HttpExceptionFilter] GET /graphql → 401 :: ${privateSentinel}`,
     `{"level":50,"statusCode":403,"msg":"${privateSentinel}"}`,
+    `GraphQL proxy failed: 401 ${privateSentinel}`,
     `{"extensions":{"code":"UNAUTHENTICATED"},"message":"${privateSentinel}"}`,
     `extensions.code=FORBIDDEN ERROR ${privateSentinel}`,
-    `ERROR Clerk token rejected ${privateSentinel}`,
   ].join("\n");
   let observed;
   try {
