@@ -8,6 +8,7 @@ import { CareLogFilterArgs } from './dto/care-log-filter.args';
 import { MonthlyCareSummaryDTO } from './dto/monthly-care-summary.dto';
 import { LegacyOperationalSurface } from '../auth/legacy-operational-access';
 import { requireOperationalActor } from '../carer/carer-access.service';
+import { RequireCapabilities } from '../auth/access-capability';
 
 const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => SetMetadata('roles', roles);
 
@@ -18,11 +19,11 @@ export class CareLogResolver {
   constructor(private readonly careLogService: CareLogService) {}
 
   @Mutation(() => CareLogDTO)
-  @Roles('admin', 'carer')
+  @RequireCapabilities('FRONTLINE_VISIT_EXECUTE')
   async createCareLog(@Args('input') input: CreateCareLogInput, @Context() ctx: any): Promise<CareLogDTO> {
-    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
+    const { userId, userRole, organizationId, accessContext } = requireOperationalActor(ctx.req.user);
 
-    const careLog = await this.careLogService.createCareLog(input, userId, userRole, organizationId);
+    const careLog = await this.careLogService.createCareLog(input, userId, userRole, organizationId, accessContext);
     return this.mapToDTO(careLog);
   }
 

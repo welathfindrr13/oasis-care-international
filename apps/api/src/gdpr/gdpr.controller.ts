@@ -9,7 +9,6 @@ import {
   Post,
   Query,
   Req,
-  SetMetadata,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
@@ -17,15 +16,18 @@ import { ConsentService, GrantConsentInput } from './services/consent.service';
 import { SarService } from './services/sar.service';
 import { ErasureService } from './services/erasure.service';
 import { ApiRolesGuard } from '../auth/api-roles.guard';
-
-export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
-  SetMetadata('roles', roles);
+import {
+  type CapabilitySource,
+  hasAccessCapability,
+  RequireCapabilities,
+} from '../auth/access-capability';
 
 type GdprActor = {
   id?: string | null;
   sub?: string | null;
   role?: string | null;
   organizationId?: string | null;
+  accessContext?: CapabilitySource | null;
   realm_access?: {
     roles?: unknown;
   } | null;
@@ -54,7 +56,7 @@ interface ErasureRequestDto {
 
 @Controller('gdpr')
 @UseGuards(ApiRolesGuard)
-@Roles('admin', 'manager')
+@RequireCapabilities('GDPR_MANAGE')
 export class GdprController {
   constructor(
     private readonly consentService: ConsentService,
@@ -223,23 +225,9 @@ export class GdprController {
       throw new UnauthorizedException('GDPR requests require authentication');
     }
 
-    const roles = new Set<string>();
-    if (typeof actor.role === 'string' && actor.role.trim().length > 0) {
-      roles.add(actor.role.toLowerCase().trim());
-    }
-
-    if (Array.isArray(actor.realm_access?.roles)) {
-      for (const role of actor.realm_access.roles) {
-        const normalized = String(role || '')
-          .toLowerCase()
-          .trim();
-        if (normalized) {
-          roles.add(normalized);
-        }
-      }
-    }
-
-    if (roles.has('admin') || roles.has('manager')) {
+    const authoritativeRole =
+      actor.accessContext || null;
+    if (authoritativeRole && hasAccessCapability(authoritativeRole, 'GDPR_MANAGE')) {
       const organizationId = (actor.organizationId || '').trim();
       if (!organizationId) {
         throw new ForbiddenException('Organization context is required for GDPR operations.');

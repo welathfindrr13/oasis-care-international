@@ -18,6 +18,7 @@ async function mockActivation(page: Page, outcome: 'active' | 'forbidden') {
         linkedIdentityState: 'NOT_REQUIRED',
         onboardingState: 'NONE',
         resolution: 'MISSING',
+        capabilities: [],
       }),
     });
   });

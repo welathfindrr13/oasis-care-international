@@ -2,6 +2,7 @@ import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { ApiRolesGuard } from '../auth/api-roles.guard';
 import { GdprController } from './gdpr.controller';
+import { REQUIRED_ACCESS_CAPABILITIES } from '../auth/access-capability';
 
 describe('GdprController access control', () => {
   const consentService = {
@@ -35,12 +36,11 @@ describe('GdprController access control', () => {
     expect(guards).toContain(ApiRolesGuard);
   });
 
-  it('limits GDPR endpoints to admin and manager roles', () => {
-    const roles = Reflect.getMetadata('roles', GdprController) ?? [];
+  it('limits GDPR endpoints through the canonical GDPR capability', () => {
+    const capabilities =
+      Reflect.getMetadata(REQUIRED_ACCESS_CAPABILITIES, GdprController) ?? [];
 
-    expect(roles).toEqual(expect.arrayContaining(['admin', 'manager']));
-    expect(roles).not.toContain('user');
-    expect(roles).not.toContain('carer');
+    expect(capabilities).toEqual(['GDPR_MANAGE']);
   });
 
   it('rejects unauthenticated SAR requests before enqueueing', async () => {
@@ -72,7 +72,14 @@ describe('GdprController access control', () => {
 
     await expect(
       (controller.requestDataErasure as any)(
-        { user: { id: 'manager-1', role: 'manager', organizationId: 'org-1' } },
+        {
+          user: {
+            id: 'manager-1',
+            role: 'carer',
+            organizationId: 'org-1',
+            accessContext: { effectiveRole: 'manager', surface: 'STAFF' },
+          },
+        },
         { userId: 'client-1', requestType: 'full', reason: 'subject request' },
       ),
     ).resolves.toEqual(
@@ -93,7 +100,13 @@ describe('GdprController access control', () => {
   it('rejects GDPR operations without organisation context', async () => {
     await expect(
       (controller.requestSubjectAccessReport as any)(
-        { user: { id: 'admin-1', role: 'admin' } },
+        {
+          user: {
+            id: 'admin-1',
+            role: 'admin',
+            accessContext: { effectiveRole: 'admin', surface: 'ADMIN' },
+          },
+        },
         { userId: 'client-1', requestType: 'full' },
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);

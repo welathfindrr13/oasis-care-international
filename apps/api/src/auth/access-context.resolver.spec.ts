@@ -26,6 +26,19 @@ describe("AccessContextResolver", () => {
     await expect(resolver.viewerAccessSnapshot(request)).resolves.toMatchObject({
       organizationId: "org-1",
       surface: "ADMIN",
+      capabilities: expect.arrayContaining([
+        "PROFILE_HELP_VIEW",
+        "TENANT_ADMIN",
+        "PEOPLE_MANAGE",
+        "WORKFORCE_MANAGE",
+        "SCHEDULE_MANAGE",
+        "FAMILY_ACCESS_MANAGE",
+        "OPERATIONAL_REPORTS_VIEW",
+        "AI_SUMMARY_REVIEW",
+        "AI_SUMMARY_GENERATE",
+        "AI_SUMMARY_CONFIGURE",
+        "GDPR_MANAGE",
+      ]),
     });
     expect(service.resolveForRequest).toHaveBeenCalledWith(request);
   });

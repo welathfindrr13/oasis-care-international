@@ -13,6 +13,10 @@ import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
 import { Inject } from '@nestjs/common';
 import { Counter } from 'prom-client';
+import {
+  type CanonicalCapabilityActor,
+  hasCanonicalActorCapability,
+} from '../auth/access-capability';
 
 // Inline types for now
 interface CreatePrescriptionInput {
@@ -175,7 +179,22 @@ export class MedicationService {
     userRole: string,
     organizationId?: string,
     actorAuthSubject?: string,
+    accessContext?: CanonicalCapabilityActor,
   ): Promise<MedicationAdministration> {
+    if (
+      !organizationId ||
+      !hasCanonicalActorCapability(accessContext, 'FRONTLINE_VISIT_EXECUTE', {
+        organizationId,
+        userId,
+        userRole,
+      })
+    ) {
+      throw new BaseHttpException(
+        ErrorCode.FORBIDDEN_ROLE_REQUIRED,
+        'Only the assigned Carer can record medication support',
+        HttpStatus.FORBIDDEN,
+      );
+    }
     const orgId = await this.requireOrganizationId(organizationId);
     const normalizedRole = this.normalizeRole(userRole);
     this.checkMedicationReadAccess(normalizedRole);

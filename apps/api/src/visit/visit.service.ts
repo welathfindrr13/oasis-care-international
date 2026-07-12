@@ -21,6 +21,10 @@ import { CompleteVisitInput } from "./dto/complete-visit.input";
 import { CreateCareLogInput } from "../care-log/dto/create-care-log.input";
 import { VisitTaskOutcome } from "./dto/visit.dto";
 import { VISIT_TASK_OUTCOME_PREFIX } from "./visit.constants";
+import {
+  type CanonicalCapabilityActor,
+  hasCanonicalActorCapability,
+} from "../auth/access-capability";
 
 @Injectable()
 export class VisitService {
@@ -264,7 +268,9 @@ export class VisitService {
     userId: string,
     userRole: string,
     organizationId?: string,
+    accessContext?: CanonicalCapabilityActor,
   ): Promise<VisitTask> {
+    this.assertFrontlineExecution(accessContext, userId, userRole, organizationId);
     const orgId = await this.requireOrganizationId(organizationId);
     const requestId = this.cls.get("requestId");
     const task = await this.visitRepository.findTaskById(taskId, orgId);
@@ -307,7 +313,9 @@ export class VisitService {
     userId: string,
     userRole: string,
     organizationId?: string,
+    accessContext?: CanonicalCapabilityActor,
   ): Promise<Visit> {
+    this.assertFrontlineExecution(accessContext, userId, userRole, organizationId);
     const orgId = await this.requireOrganizationId(organizationId);
     const visit = await this.visitRepository.findById(visitId, orgId);
     if (!visit) {
@@ -346,7 +354,9 @@ export class VisitService {
     userId: string,
     userRole: string,
     organizationId?: string,
+    accessContext?: CanonicalCapabilityActor,
   ): Promise<VisitTask> {
+    this.assertFrontlineExecution(accessContext, userId, userRole, organizationId);
     const orgId = await this.requireOrganizationId(organizationId);
     const task = await this.visitRepository.findTaskById(input.taskId, orgId);
     if (!task) {
@@ -399,7 +409,9 @@ export class VisitService {
     userId: string,
     userRole: string,
     organizationId?: string,
+    accessContext?: CanonicalCapabilityActor,
   ): Promise<CareLog> {
+    this.assertFrontlineExecution(accessContext, userId, userRole, organizationId);
     const orgId = await this.requireOrganizationId(organizationId);
     const visit = await this.visitRepository.findById(input.visitId, orgId);
     if (!visit) {
@@ -429,6 +441,7 @@ export class VisitService {
       userId,
       userRole,
       orgId,
+      accessContext,
     );
   }
 
@@ -437,7 +450,9 @@ export class VisitService {
     userId: string,
     userRole: string,
     organizationId?: string,
+    accessContext?: CanonicalCapabilityActor,
   ): Promise<Visit> {
+    this.assertFrontlineExecution(accessContext, userId, userRole, organizationId);
     const orgId = await this.requireOrganizationId(organizationId);
     const visit = await this.visitRepository.findById(input.visitId, orgId);
     if (!visit) {
@@ -535,6 +550,29 @@ export class VisitService {
         HttpStatus.FORBIDDEN,
       );
     }
+  }
+
+  private assertFrontlineExecution(
+    accessContext: CanonicalCapabilityActor | undefined,
+    userId: string,
+    userRole: string,
+    organizationId?: string,
+  ): void {
+    if (
+      organizationId &&
+      hasCanonicalActorCapability(accessContext, "FRONTLINE_VISIT_EXECUTE", {
+        organizationId,
+        userId,
+        userRole,
+      })
+    ) {
+      return;
+    }
+    throw new BaseHttpException(
+      ErrorCode.FORBIDDEN_ROLE_REQUIRED,
+      "Only the assigned Carer can record visit care",
+      HttpStatus.FORBIDDEN,
+    );
   }
 
   private async requireOrganizationId(

@@ -11,6 +11,10 @@ import request from "supertest";
 import { StartedTestContainer } from "testcontainers";
 import { AuthAccessModule } from "../src/auth/auth-access.module";
 import { AccessContextService } from "../src/auth/access-context.service";
+import { AiSummaryResolver } from "../src/ai-summary/ai-summary.resolver";
+import { AiSummaryService } from "../src/ai-summary/ai-summary.service";
+import { VisitResolver } from "../src/visit/visit.resolver";
+import { VisitService } from "../src/visit/visit.service";
 import { generateTestToken, getTestJwtSecret } from "./jwt.mock";
 import { startPostgres } from "./utils/test-container";
 
@@ -18,6 +22,12 @@ describe("canonical viewer access snapshot", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let container: StartedTestContainer;
+  const aiSummaryService = {
+    listPendingSummaries: jest.fn().mockResolvedValue({ items: [], total: 0 }),
+  };
+  const visitService = {
+    startVisit: jest.fn().mockResolvedValue({ id: "visit-capability-probe" }),
+  };
 
   const organizationId = "access-context-org";
   const otherOrganizationId = "access-context-other-org";
@@ -44,7 +54,13 @@ describe("canonical viewer access snapshot", () => {
         }),
         AuthAccessModule,
       ],
-      providers: [JwtStrategy],
+      providers: [
+        JwtStrategy,
+        AiSummaryResolver,
+        { provide: AiSummaryService, useValue: aiSummaryService },
+        VisitResolver,
+        { provide: VisitService, useValue: visitService },
+      ],
     }).compile();
 
     app = moduleRef.createNestApplication();
@@ -58,8 +74,15 @@ describe("canonical viewer access snapshot", () => {
   });
 
   beforeEach(async () => {
+    aiSummaryService.listPendingSummaries.mockClear();
+    visitService.startVisit.mockClear();
+    await prisma.accessGrant.deleteMany();
+    await prisma.careRoomMembership.deleteMany();
+    await prisma.careRoom.deleteMany();
+    await prisma.familyContact.deleteMany();
     await prisma.organizationMembership.deleteMany();
     await prisma.carer.deleteMany();
+    await prisma.client.deleteMany();
     await prisma.organization.deleteMany();
     await prisma.organization.createMany({
       data: [
@@ -96,10 +119,106 @@ describe("canonical viewer access snapshot", () => {
               surface
               linkedIdentityState
               onboardingState
+              capabilities
             }
           }
         `,
       });
+  }
+
+  function queryPendingSummaries(tokenRole: string) {
+    return request(app.getHttpServer())
+      .post("/graphql")
+      .set("Authorization", bearer(tokenRole))
+      .send({
+        query: `
+          query PendingAiSummaries {
+            listPendingSummaries {
+              total
+            }
+          }
+        `,
+      });
+  }
+
+  function startVisit(tokenRole: string) {
+    return request(app.getHttpServer())
+      .post("/graphql")
+      .set("Authorization", bearer(tokenRole))
+      .send({
+        query: `
+          mutation StartAssignedVisit {
+            startVisit(visitId: "visit-capability-probe") {
+              id
+            }
+          }
+        `,
+      });
+  }
+
+  async function createMembershipForRole(role: string): Promise<void> {
+    let carerId: string | undefined;
+    if (role === "carer" || role === "staff") {
+      const carer = await prisma.carer.create({
+        data: {
+          organization_id: organizationId,
+          first_name: "Capability",
+          last_name: "Carer",
+          email: "capability.carer@example.test",
+        },
+      });
+      carerId = carer.id;
+    }
+    if (role === "family") {
+      const client = await prisma.client.create({
+        data: {
+          organization_id: organizationId,
+          full_name: "Capability Family Person",
+          address_line1: "1 Test Street",
+          city: "Leeds",
+          postcode: "LS1 1AA",
+        },
+      });
+      const room = await prisma.careRoom.create({
+        data: { organization_id: organizationId, client_id: client.id },
+      });
+      const contact = await prisma.familyContact.create({
+        data: {
+          organization_id: organizationId,
+          auth_subject: subject,
+          full_name: "Capability Relative",
+          email: "capability.family@example.test",
+          identity_type: "cognito",
+        },
+      });
+      const roomMembership = await prisma.careRoomMembership.create({
+        data: {
+          care_room_id: room.id,
+          family_contact_id: contact.id,
+          role: "FAMILY_VIEWER",
+          status: "ACTIVE",
+          access_basis: "CLIENT_CONSENT",
+          accepted_at: new Date(),
+        },
+      });
+      await prisma.accessGrant.create({
+        data: {
+          care_room_membership_id: roomMembership.id,
+          scope: "VIEW_UPDATES",
+        },
+      });
+    }
+    await prisma.organizationMembership.create({
+      data: {
+        organization_id: organizationId,
+        identity_provider: "cognito",
+        auth_subject: subject,
+        normalized_email: `capability.${role}@example.test`,
+        role,
+        status: "ACTIVE",
+        carer_id: carerId,
+      },
+    });
   }
 
   it("uses the linked database Carer when the token falsely claims admin", async () => {
@@ -133,6 +252,13 @@ describe("canonical viewer access snapshot", () => {
       surface: "STAFF",
       linkedIdentityState: "LINKED",
       onboardingState: "READY",
+      capabilities: [
+        "PROFILE_HELP_VIEW",
+        "FRONTLINE_SHIFT_VIEW",
+        "FRONTLINE_SHIFT_EXECUTE",
+        "FRONTLINE_ASSIGNED_VISITS_VIEW",
+        "FRONTLINE_VISIT_EXECUTE",
+      ],
     });
   });
 
@@ -157,6 +283,87 @@ describe("canonical viewer access snapshot", () => {
       onboardingState: "READY",
     });
   });
+
+  it("publishes capabilities from the database manager role, not conflicting token claims", async () => {
+    await prisma.organizationMembership.create({
+      data: {
+        organization_id: organizationId,
+        identity_provider: "cognito",
+        auth_subject: subject,
+        normalized_email: "canonical.manager@example.test",
+        role: "manager",
+        status: "ACTIVE",
+      },
+    });
+
+    const response = await querySnapshot("admin").expect(200);
+    expect(response.body.errors).toBeUndefined();
+    expect(response.body.data.viewerAccessSnapshot).toMatchObject({
+      effectiveRole: "manager",
+      surface: "STAFF",
+      capabilities: ["PROFILE_HELP_VIEW", "AI_SUMMARY_REVIEW", "GDPR_MANAGE"],
+    });
+    expect(response.body.data.viewerAccessSnapshot.capabilities).not.toContain(
+      "TENANT_ADMIN",
+    );
+    expect(response.body.data.viewerAccessSnapshot.capabilities).not.toContain(
+      "FRONTLINE_VISIT_EXECUTE",
+    );
+  });
+
+  it.each([
+    ["admin", "carer", true],
+    ["manager", "carer", true],
+    ["care_manager", "admin", false],
+    ["office", "admin", false],
+    ["carer", "admin", false],
+    ["staff", "admin", false],
+    ["family", "admin", false],
+  ] as const)(
+    "enforces AI review for database role %s despite token role %s",
+    async (databaseRole, tokenRole, allowed) => {
+      await createMembershipForRole(databaseRole);
+
+      const response = await queryPendingSummaries(tokenRole).expect(200);
+      if (allowed) {
+        expect(response.body.errors).toBeUndefined();
+        expect(response.body.data.listPendingSummaries).toEqual({ total: 0 });
+        expect(aiSummaryService.listPendingSummaries).toHaveBeenCalledTimes(1);
+      } else {
+        expect(response.body.data?.listPendingSummaries ?? null).toBeNull();
+        expect(response.body.errors?.[0]?.message).toBeDefined();
+        expect(aiSummaryService.listPendingSummaries).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it.each([
+    ["carer", "admin", true],
+    ["staff", "admin", true],
+    ["admin", "carer", false],
+    ["manager", "carer", false],
+    ["care_manager", "admin", false],
+    ["office", "admin", false],
+    ["family", "admin", false],
+  ] as const)(
+    "enforces frontline visit execution for database role %s despite token role %s",
+    async (databaseRole, tokenRole, allowed) => {
+      await createMembershipForRole(databaseRole);
+
+      const response = await startVisit(tokenRole).expect(200);
+      if (allowed) {
+        expect(response.body.errors).toBeUndefined();
+        expect(response.body.data.startVisit).toEqual({
+          id: "visit-capability-probe",
+        });
+        expect(visitService.startVisit).toHaveBeenCalledTimes(1);
+      } else {
+        expect(response.body.data?.startVisit ?? null).toBeNull();
+        expect(response.body.errors?.[0]?.message).toBeDefined();
+        expect(visitService.startVisit).not.toHaveBeenCalled();
+      }
+    },
+  );
 
   it("derives aliased snapshot fields from one immutable request snapshot", async () => {
     await prisma.organizationMembership.create({
@@ -223,6 +430,7 @@ describe("canonical viewer access snapshot", () => {
         linkedIdentityState: "NOT_REQUIRED",
         onboardingState:
           membershipState === "MISSING" ? "NOT_STARTED" : "BLOCKED",
+        capabilities: [],
       });
       expect(JSON.stringify(response.body)).not.toContain(subject);
       expect(JSON.stringify(response.body)).not.toContain("Prisma");

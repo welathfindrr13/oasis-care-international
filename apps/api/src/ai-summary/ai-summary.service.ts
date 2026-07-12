@@ -12,6 +12,11 @@ import { assertTenantIdForSensitiveWrite } from '../common/tenant/tenant-ownersh
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import * as fs from 'fs';
 import * as path from 'path';
+import {
+  type AccessCapability,
+  type CanonicalCapabilityActor,
+  hasCanonicalActorCapability,
+} from '../auth/access-capability';
 
 type RiskLevel = 'green' | 'amber' | 'red';
 
@@ -68,8 +73,10 @@ export class AiSummaryService {
     userId: string,
     userRole: string,
     organizationId?: string,
+    accessContext?: CanonicalCapabilityActor,
   ): Promise<HealthSummary> {
     const orgId = await this.requireOrganizationId(organizationId);
+    this.assertActorCapability(accessContext, 'AI_SUMMARY_GENERATE', orgId, userId, userRole);
     const requestId = this.cls.get('requestId');
     this.validateGenerationPreflight();
     this.logger.log(`Generating AI summary for client ${data.clientId}`, { requestId });
@@ -141,17 +148,13 @@ export class AiSummaryService {
   async setOrganizationAIEnabledForClient(
     clientId: string,
     enabled: boolean,
+    userId: string,
     userRole: string,
     organizationId?: string,
+    accessContext?: CanonicalCapabilityActor,
   ): Promise<boolean> {
     const orgId = await this.requireOrganizationId(organizationId);
-    if (userRole !== 'admin' && userRole !== 'manager') {
-      throw new BaseHttpException(
-        ErrorCode.FORBIDDEN_ROLE_REQUIRED,
-        'Only managers and admins can change AI summary feature settings',
-        HttpStatus.FORBIDDEN,
-      );
-    }
+    this.assertActorCapability(accessContext, 'AI_SUMMARY_CONFIGURE', orgId, userId, userRole);
 
     const updated = await this.aiSummaryRepository.setOrganizationAIEnabledByClientId(
       clientId,
@@ -170,8 +173,15 @@ export class AiSummaryService {
     return true;
   }
 
-  async isOrganizationAIEnabledForClient(clientId: string, organizationId?: string): Promise<boolean> {
+  async isOrganizationAIEnabledForClient(
+    clientId: string,
+    userId: string,
+    userRole: string,
+    organizationId?: string,
+    accessContext?: CanonicalCapabilityActor,
+  ): Promise<boolean> {
     const orgId = await this.requireOrganizationId(organizationId);
+    this.assertActorCapability(accessContext, 'AI_SUMMARY_REVIEW', orgId, userId, userRole);
     return this.aiSummaryRepository.checkOrganizationAIEnabled(clientId, orgId);
   }
 
@@ -181,18 +191,13 @@ export class AiSummaryService {
     userId?: string,
     userRole?: string,
     organizationId?: string,
+    accessContext?: CanonicalCapabilityActor,
   ): Promise<{ items: HealthSummary[]; total: number }> {
     const orgId = await this.requireOrganizationId(organizationId);
     const requestId = this.cls.get('requestId');
     
     // Only managers and admins can view pending summaries
-    if (userRole !== 'admin' && userRole !== 'manager') {
-      throw new BaseHttpException(
-        ErrorCode.FORBIDDEN_ROLE_REQUIRED,
-        'Only managers and admins can view pending summaries',
-        HttpStatus.FORBIDDEN
-      );
-    }
+    this.assertActorCapability(accessContext, 'AI_SUMMARY_REVIEW', orgId, userId || '', userRole || '');
 
     this.logger.log(`Listing pending AI summaries`, { requestId, userRole });
     
@@ -204,8 +209,10 @@ export class AiSummaryService {
     userId: string,
     userRole: string,
     organizationId?: string,
+    accessContext?: CanonicalCapabilityActor,
   ): Promise<{ items: HealthSummary[]; total: number }> {
     const orgId = await this.requireOrganizationId(organizationId);
+    this.assertActorCapability(accessContext, 'AI_SUMMARY_REVIEW', orgId, userId, userRole);
     const requestId = this.cls.get('requestId');
     const where: any = {};
 
@@ -285,18 +292,13 @@ export class AiSummaryService {
     userRole: string,
     userEmail?: string,
     organizationId?: string,
+    accessContext?: CanonicalCapabilityActor,
   ): Promise<HealthSummary> {
     const orgId = await this.requireOrganizationId(organizationId);
     const requestId = this.cls.get('requestId');
     
     // Only managers and admins can approve summaries
-    if (userRole !== 'admin' && userRole !== 'manager') {
-      throw new BaseHttpException(
-        ErrorCode.FORBIDDEN_ROLE_REQUIRED,
-        'Only managers and admins can approve summaries',
-        HttpStatus.FORBIDDEN
-      );
-    }
+    this.assertActorCapability(accessContext, 'AI_SUMMARY_REVIEW', orgId, userId, userRole);
 
     const summary = await this.aiSummaryRepository.findById(data.summaryId, orgId);
     if (!summary) {
@@ -431,8 +433,10 @@ export class AiSummaryService {
     userId: string,
     userRole: string,
     organizationId?: string,
+    accessContext?: CanonicalCapabilityActor,
   ): Promise<HealthSummary | null> {
     const orgId = await this.requireOrganizationId(organizationId);
+    this.assertActorCapability(accessContext, 'AI_SUMMARY_REVIEW', orgId, userId, userRole);
     // Check access permissions
     if (userRole === 'client' && clientId !== userId) {
       throw new BaseHttpException(
@@ -460,6 +464,29 @@ export class AiSummaryService {
     throw new BaseHttpException(
       ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
       'Organization context is required for this request',
+      HttpStatus.FORBIDDEN,
+    );
+  }
+
+  private assertActorCapability(
+    accessContext: CanonicalCapabilityActor | undefined,
+    capability: AccessCapability,
+    organizationId: string,
+    userId: string,
+    userRole: string,
+  ): void {
+    if (
+      hasCanonicalActorCapability(accessContext, capability, {
+        organizationId,
+        userId,
+        userRole,
+      })
+    ) {
+      return;
+    }
+    throw new BaseHttpException(
+      ErrorCode.FORBIDDEN_ROLE_REQUIRED,
+      'This account cannot perform the requested AI summary action',
       HttpStatus.FORBIDDEN,
     );
   }

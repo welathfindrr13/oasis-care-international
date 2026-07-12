@@ -169,7 +169,7 @@ test("carer profile help exposes only carer-safe operational shortcuts", () => {
 test("settings keep restricted management roles out of operational workspaces", () => {
   assert.match(
     settings,
-    /const isRestrictedManagement =[\s\S]*?accessContext\.surface === 'staff' && hasRestrictedManagementRole\(roles\)/,
+    /const isRestrictedManagement =[\s\S]*?accessContext\.surface === 'staff' && accessContext\.homePath === '\/settings'/,
   );
   assert.match(
     settings,

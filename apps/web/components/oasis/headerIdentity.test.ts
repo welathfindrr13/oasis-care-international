@@ -52,6 +52,10 @@ test("management identities keep their authoritative label instead of becoming C
       pathname: "/settings",
       status: "authenticated",
       roles: [role, "carer"],
+      capabilities:
+        role === "manager"
+          ? ["PROFILE_HELP_VIEW", "AI_SUMMARY_REVIEW", "GDPR_MANAGE"]
+          : ["PROFILE_HELP_VIEW"],
       userName: "Workforce Manager",
       userEmail: "manager@example.test",
     });
@@ -59,5 +63,6 @@ test("management identities keep their authoritative label instead of becoming C
     assert.equal(viewer.userRole, role.replace(/_/g, " ").toUpperCase());
     assert.equal(viewer.accessContext.isAdmin, false);
     assert.equal(viewer.accessContext.surface, "staff");
+    assert.equal(viewer.accessContext.homePath, "/settings");
   }
 });

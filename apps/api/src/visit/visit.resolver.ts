@@ -12,6 +12,7 @@ import { GqlRolesGuard } from '../auth/gql-roles.guard';
 import { LegacyOperationalSurface } from '../auth/legacy-operational-access';
 import { CareLogDTO } from '../care-log/dto/care-log.dto';
 import { requireOperationalActor } from '../carer/carer-access.service';
+import { RequireCapabilities } from '../auth/access-capability';
 
 export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => SetMetadata('roles', roles);
 
@@ -71,56 +72,56 @@ export class VisitResolver {
   }
 
   @Mutation(() => VisitTaskDTO)
-  @Roles('admin', 'carer')
+  @RequireCapabilities('FRONTLINE_VISIT_EXECUTE')
   async completeVisitTask(
     @Args('taskId') taskId: string,
     @Args('notes', { nullable: true, type: () => String })
     notes: string | undefined,
     @Context() ctx: any,
   ): Promise<VisitTaskDTO> {
-    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
+    const { userId, userRole, organizationId, accessContext } = requireOperationalActor(ctx.req.user);
 
-    const task = await this.visitService.completeTask(taskId, notes, userId, userRole, organizationId);
+    const task = await this.visitService.completeTask(taskId, notes, userId, userRole, organizationId, accessContext);
 
     return this.mapVisitTaskToDTO(task);
   }
 
   @Mutation(() => VisitDTO)
-  @Roles('admin', 'carer')
+  @RequireCapabilities('FRONTLINE_VISIT_EXECUTE')
   async startVisit(@Args('visitId') visitId: string, @Context() ctx: any): Promise<VisitDTO> {
-    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
+    const { userId, userRole, organizationId, accessContext } = requireOperationalActor(ctx.req.user);
 
-    const visit = await this.visitService.startVisit(visitId, userId, userRole, organizationId);
+    const visit = await this.visitService.startVisit(visitId, userId, userRole, organizationId, accessContext);
     return this.mapVisitToDTO(visit);
   }
 
   @Mutation(() => VisitTaskDTO)
-  @Roles('admin', 'carer')
+  @RequireCapabilities('FRONTLINE_VISIT_EXECUTE')
   async recordVisitTaskOutcome(
     @Args('input') input: RecordVisitTaskOutcomeInput,
     @Context() ctx: any,
   ): Promise<VisitTaskDTO> {
-    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
+    const { userId, userRole, organizationId, accessContext } = requireOperationalActor(ctx.req.user);
 
-    const task = await this.visitService.recordVisitTaskOutcome(input, userId, userRole, organizationId);
+    const task = await this.visitService.recordVisitTaskOutcome(input, userId, userRole, organizationId, accessContext);
     return this.mapVisitTaskToDTO(task);
   }
 
   @Mutation(() => CareLogDTO)
-  @Roles('admin', 'carer')
+  @RequireCapabilities('FRONTLINE_VISIT_EXECUTE')
   async submitVisitCareNote(@Args('input') input: SubmitVisitCareNoteInput, @Context() ctx: any): Promise<CareLogDTO> {
-    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
+    const { userId, userRole, organizationId, accessContext } = requireOperationalActor(ctx.req.user);
 
-    const careLog = await this.visitService.submitVisitCareNote(input, userId, userRole, organizationId);
+    const careLog = await this.visitService.submitVisitCareNote(input, userId, userRole, organizationId, accessContext);
     return this.mapCareLogToDTO(careLog);
   }
 
   @Mutation(() => VisitDTO)
-  @Roles('admin', 'carer')
+  @RequireCapabilities('FRONTLINE_VISIT_EXECUTE')
   async completeVisit(@Args('input') input: CompleteVisitInput, @Context() ctx: any): Promise<VisitDTO> {
-    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
+    const { userId, userRole, organizationId, accessContext } = requireOperationalActor(ctx.req.user);
 
-    const visit = await this.visitService.completeVisit(input, userId, userRole, organizationId);
+    const visit = await this.visitService.completeVisit(input, userId, userRole, organizationId, accessContext);
     return this.mapVisitToDTO(visit);
   }
 

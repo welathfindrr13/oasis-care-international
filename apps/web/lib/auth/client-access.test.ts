@@ -4,6 +4,12 @@ import { createClientAccessSnapshot } from './client-access';
 import { AuthoritativeAccessSnapshot, unavailableAccessSnapshot } from './access-snapshot';
 
 function ready(surface: 'ADMIN' | 'STAFF' | 'FAMILY', effectiveRole: string): AuthoritativeAccessSnapshot {
+  const capabilities =
+    surface === 'ADMIN'
+      ? ['PROFILE_HELP_VIEW', 'TENANT_ADMIN', 'PEOPLE_MANAGE'] as const
+      : surface === 'STAFF'
+        ? ['PROFILE_HELP_VIEW', 'FRONTLINE_ASSIGNED_VISITS_VIEW'] as const
+        : ['FAMILY_UPDATES_VIEW'] as const;
   return {
     authenticated: true,
     organizationId: 'org-1',
@@ -13,6 +19,7 @@ function ready(surface: 'ADMIN' | 'STAFF' | 'FAMILY', effectiveRole: string): Au
     linkedIdentityState: surface === 'ADMIN' ? 'NOT_REQUIRED' : 'LINKED',
     onboardingState: 'READY',
     resolution: 'READY',
+    capabilities: [...capabilities],
   };
 }
 
@@ -27,6 +34,10 @@ test('authoritative admin, carer and family snapshots drive capabilities', () =>
   assert.equal(carer.isAdmin, false);
   assert.equal(family.accessContext.workspace, 'family');
   assert.equal(family.isStaff, false);
+  assert.deepEqual(carer.capabilities, [
+    'PROFILE_HELP_VIEW',
+    'FRONTLINE_ASSIGNED_VISITS_VIEW',
+  ]);
 });
 
 test('provider loading and unavailable resolution expose no prior capabilities', () => {

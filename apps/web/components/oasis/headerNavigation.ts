@@ -1,3 +1,5 @@
+import { hasAccessCapability, type AccessCapability } from "../../lib/auth/capabilities";
+
 export type HeaderSurface =
   | "admin"
   | "management"
@@ -60,21 +62,15 @@ const managementNavigation: readonly HeaderNavigationItem[] = [
   { id: "settings", href: "/settings", label: "Settings" },
 ];
 
-const restrictedManagementRoles = new Set([
-  "manager",
-  "care_manager",
-  "office",
-]);
-
 const familyNavigation: readonly HeaderNavigationItem[] = [
   { id: "home", href: "/family", label: "Home", exact: true },
   {
-    id: "care-rooms",
+    id: "updates",
     href: "/family#care-rooms",
-    label: "Care rooms",
+    label: "Updates",
     aliases: ["/family/care-rooms"],
   },
-  { id: "updates", href: "/family#updates", label: "Updates" },
+  { id: "latest-update", href: "/family#updates", label: "Latest update" },
   {
     id: "concerns-help",
     href: "/family#concerns-help",
@@ -85,6 +81,7 @@ const familyNavigation: readonly HeaderNavigationItem[] = [
 export function getHeaderNavigation(
   surface: HeaderSurface,
   pathname: string,
+  capabilities: readonly AccessCapability[] = [],
 ): readonly HeaderNavigationItem[] {
   if (surface === "admin") return adminNavigation;
   if (surface === "management") return managementNavigation;
@@ -107,23 +104,20 @@ export function getHeaderNavigation(
       carerNavigation[1],
       ...currentVisit,
       ...carerNavigation.slice(2),
-    ];
+    ].filter((item) => {
+      if (item.id === "my-shift") {
+        return hasAccessCapability(capabilities, "FRONTLINE_SHIFT_VIEW");
+      }
+      if (["today", "my-visits", "current-visit"].includes(item.id)) {
+        return hasAccessCapability(
+          capabilities,
+          "FRONTLINE_ASSIGNED_VISITS_VIEW",
+        );
+      }
+      return hasAccessCapability(capabilities, "PROFILE_HELP_VIEW");
+    });
   }
   return [];
-}
-
-export function getHeaderSurfaceForViewer(
-  surface: Exclude<HeaderSurface, "management">,
-  roles: readonly string[],
-): HeaderSurface {
-  if (surface === "staff" && hasRestrictedManagementRole(roles)) {
-    return "management";
-  }
-  return surface;
-}
-
-export function hasRestrictedManagementRole(roles: readonly string[]): boolean {
-  return roles.some((role) => restrictedManagementRoles.has(role));
 }
 
 export function getHeaderHomePath(

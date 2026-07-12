@@ -1,5 +1,5 @@
 import { Resolver, Query, Mutation, Args, Context, ID, Int } from '@nestjs/graphql';
-import { UseGuards, SetMetadata } from '@nestjs/common';
+import { UseGuards } from '@nestjs/common';
 import { AiSummaryService } from './ai-summary.service';
 import { HealthSummaryDTO, HealthSummaryPaginatedResponse } from './dto/health-summary.dto';
 import { GenerateSummaryInput } from './dto/generate-summary.input';
@@ -8,8 +8,7 @@ import { HealthSummaryFilterArgs } from './dto/health-summary-filter.args';
 import { GqlRolesGuard } from '../auth/gql-roles.guard';
 import { LegacyOperationalSurface } from '../auth/legacy-operational-access';
 import { requireOperationalActor } from '../carer/carer-access.service';
-
-export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => SetMetadata('roles', roles);
+import { RequireCapabilities } from '../auth/access-capability';
 
 @Resolver(() => HealthSummaryDTO)
 @UseGuards(GqlRolesGuard)
@@ -18,15 +17,15 @@ export class AiSummaryResolver {
   constructor(private readonly aiSummaryService: AiSummaryService) {}
 
   @Query(() => HealthSummaryPaginatedResponse)
-  @Roles('admin', 'manager')
+  @RequireCapabilities('AI_SUMMARY_REVIEW')
   async listPendingSummaries(
     @Args('skip', { type: () => Int, nullable: true }) skip: number = 0,
     @Args('take', { type: () => Int, nullable: true }) take: number = 20,
     @Context() ctx: any,
   ): Promise<HealthSummaryPaginatedResponse> {
-    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
+    const { userId, userRole, organizationId, accessContext } = requireOperationalActor(ctx.req.user);
 
-    const result = await this.aiSummaryService.listPendingSummaries(skip, take, userId, userRole, organizationId);
+    const result = await this.aiSummaryService.listPendingSummaries(skip, take, userId, userRole, organizationId, accessContext);
 
     return {
       items: result.items.map((s) => this.mapHealthSummaryToDTO(s)),
@@ -35,14 +34,14 @@ export class AiSummaryResolver {
   }
 
   @Query(() => HealthSummaryPaginatedResponse)
-  @Roles('admin', 'manager')
+  @RequireCapabilities('AI_SUMMARY_REVIEW')
   async listHistory(
     @Args() filter: HealthSummaryFilterArgs,
     @Context() ctx: any,
   ): Promise<HealthSummaryPaginatedResponse> {
-    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
+    const { userId, userRole, organizationId, accessContext } = requireOperationalActor(ctx.req.user);
 
-    const result = await this.aiSummaryService.listHistory(filter, userId, userRole, organizationId);
+    const result = await this.aiSummaryService.listHistory(filter, userId, userRole, organizationId, accessContext);
 
     return {
       items: result.items.map((s) => this.mapHealthSummaryToDTO(s)),
@@ -51,41 +50,41 @@ export class AiSummaryResolver {
   }
 
   @Query(() => HealthSummaryDTO, { nullable: true })
-  @Roles('admin', 'manager')
+  @RequireCapabilities('AI_SUMMARY_REVIEW')
   async currentWeekSummary(
     @Args('clientId', { type: () => ID }) clientId: string,
     @Context() ctx: any,
   ): Promise<HealthSummaryDTO | null> {
-    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
+    const { userId, userRole, organizationId, accessContext } = requireOperationalActor(ctx.req.user);
 
-    const summary = await this.aiSummaryService.getCurrentWeekSummary(clientId, userId, userRole, organizationId);
+    const summary = await this.aiSummaryService.getCurrentWeekSummary(clientId, userId, userRole, organizationId, accessContext);
 
     return summary ? this.mapHealthSummaryToDTO(summary) : null;
   }
 
   @Mutation(() => HealthSummaryDTO)
-  @Roles('admin', 'manager')
+  @RequireCapabilities('AI_SUMMARY_GENERATE')
   async generateSummary(@Args('input') input: GenerateSummaryInput, @Context() ctx: any): Promise<HealthSummaryDTO> {
-    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
+    const { userId, userRole, organizationId, accessContext } = requireOperationalActor(ctx.req.user);
 
-    const summary = await this.aiSummaryService.generateSummary(input, userId, userRole, organizationId);
+    const summary = await this.aiSummaryService.generateSummary(input, userId, userRole, organizationId, accessContext);
 
     return this.mapHealthSummaryToDTO(summary);
   }
 
   @Mutation(() => HealthSummaryDTO)
-  @Roles('admin', 'manager')
+  @RequireCapabilities('AI_SUMMARY_REVIEW')
   async approveSummary(@Args('input') input: ApproveSummaryInput, @Context() ctx: any): Promise<HealthSummaryDTO> {
-    const { userId, userRole, organizationId } = requireOperationalActor(ctx.req.user);
+    const { userId, userRole, organizationId, accessContext } = requireOperationalActor(ctx.req.user);
     const email = ctx.req.user?.email;
 
-    const summary = await this.aiSummaryService.approveSummary(input, userId, userRole, email, organizationId);
+    const summary = await this.aiSummaryService.approveSummary(input, userId, userRole, email, organizationId, accessContext);
 
     return this.mapHealthSummaryToDTO(summary);
   }
 
   @Mutation(() => Boolean)
-  @Roles('admin', 'manager')
+  @RequireCapabilities('AI_SUMMARY_CONFIGURE')
   async setAiSummaryEnabledForClientOrganization(
     @Args('clientId', { type: () => ID }) clientId: string,
     @Args('enabled', {
@@ -96,19 +95,19 @@ export class AiSummaryResolver {
     enabled: boolean,
     @Context() ctx: any,
   ): Promise<boolean> {
-    const { userRole, organizationId } = requireOperationalActor(ctx.req.user);
+    const { userId, userRole, organizationId, accessContext } = requireOperationalActor(ctx.req.user);
 
-    return this.aiSummaryService.setOrganizationAIEnabledForClient(clientId, enabled, userRole, organizationId);
+    return this.aiSummaryService.setOrganizationAIEnabledForClient(clientId, enabled, userId, userRole, organizationId, accessContext);
   }
 
   @Query(() => Boolean)
-  @Roles('admin', 'manager')
+  @RequireCapabilities('AI_SUMMARY_REVIEW')
   async isAiSummaryEnabledForClientOrganization(
     @Args('clientId', { type: () => ID }) clientId: string,
     @Context() ctx: any,
   ): Promise<boolean> {
-    const { organizationId } = requireOperationalActor(ctx.req.user);
-    return this.aiSummaryService.isOrganizationAIEnabledForClient(clientId, organizationId);
+    const { userId, userRole, organizationId, accessContext } = requireOperationalActor(ctx.req.user);
+    return this.aiSummaryService.isOrganizationAIEnabledForClient(clientId, userId, userRole, organizationId, accessContext);
   }
 
   private mapHealthSummaryToDTO(summary: any): HealthSummaryDTO {

@@ -16,7 +16,6 @@ import {
 import {
   getHeaderHomePath,
   getHeaderNavigation,
-  getHeaderSurfaceForViewer,
   isHeaderNavigationItemActive,
 } from "./headerNavigation";
 
@@ -58,6 +57,7 @@ function ClerkHeader({ className }: HeaderProps) {
     pathname,
     status: isLoaded ? access.status : "loading",
     roles: access.roles,
+    capabilities: access.capabilities,
     userName: user?.fullName,
     userEmail: user?.primaryEmailAddress?.emailAddress,
   });
@@ -80,6 +80,7 @@ function NextAuthHeader({ className }: HeaderProps) {
     pathname,
     status: status === "loading" ? "loading" : access.status,
     roles: access.roles,
+    capabilities: access.capabilities,
     userName: session?.user?.name,
     userEmail: session?.user?.email,
   });
@@ -117,15 +118,19 @@ function HeaderContent({
   const managementRole = viewer.roles.find((role) =>
     ["manager", "care_manager", "office"].includes(role),
   );
-  const navigationSurface = getHeaderSurfaceForViewer(
-    accessContext.surface,
-    viewer.roles,
-  );
+  const navigationSurface =
+    accessContext.surface === "staff" && accessContext.homePath === "/settings"
+      ? "management"
+      : accessContext.surface;
   const homePath = getHeaderHomePath(
     navigationSurface,
     accessContext.homePath,
   );
-  const navItems = getHeaderNavigation(navigationSurface, pathname);
+  const navItems = getHeaderNavigation(
+    navigationSurface,
+    pathname,
+    accessContext.capabilities,
+  );
 
   useEffect(() => {
     setMobileMenuOpen(false);

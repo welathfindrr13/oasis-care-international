@@ -1,5 +1,6 @@
 import { AuthoritativeAccessSnapshot, rolesFromAccessSnapshot } from './access-snapshot'
 import { normalizeAppRoles } from './roles'
+import { type AccessCapability, hasAccessCapability } from './capabilities'
 
 export type AppWorkspace = 'staff' | 'family' | 'none'
 export type AppHomePath = '/today' | '/family' | '/settings' | '/access'
@@ -13,6 +14,7 @@ export interface AccessContext {
   isExternal: boolean
   workspace: AppWorkspace
   homePath: AppHomePath
+  capabilities: AccessCapability[]
 }
 
 export type AccessDestination =
@@ -32,6 +34,7 @@ export type RouteDecision =
 
 const ADMIN_ONLY_PATHS = [
   /^\/admin(?:\/|$)/,
+  /^\/dashboard(?:\/|$)/,
   /^\/activity(?:\/|$)/,
   /^\/management(?:\/|$)/,
   /^\/staff(?:\/|$)/,
@@ -42,6 +45,14 @@ const ADMIN_ONLY_PATHS = [
   /^\/visits\/new$/,
   /^\/schedule\/new$/,
   /^\/clients\/[^/]+\/edit$/,
+]
+const FRONTLINE_PATHS = [
+  /^\/today$/,
+  /^\/visits(?:\/[^/]+)?$/,
+  /^\/schedule\/[^/]+$/,
+  /^\/shift(?:\/|$)/,
+  /^\/settings(?:\/|$)/,
+  /^\/clients\/[^/]+$/,
 ]
 const FAMILY_PATH = /^\/family(?:\/|$)/
 const SETTINGS_PATH = /^\/settings(?:\/|$)/
@@ -64,16 +75,23 @@ export function resolveProtectedRoute(
   pathname: string,
   authenticated: boolean,
   rawRoles: unknown,
+  capabilities: readonly AccessCapability[] = [],
 ): RouteDecision {
   if (!authenticated) return { action: 'redirect', destination: '/login' }
-  return resolveAuthenticatedRoute(pathname, rawRoles)
+  return resolveAuthenticatedRoute(pathname, rawRoles, capabilities)
 }
 
-export function getAccessContext(rawRoles: unknown): AccessContext {
+export function getAccessContext(
+  rawRoles: unknown,
+  rawCapabilities: readonly AccessCapability[] = [],
+): AccessContext {
   const roles = normalizeAppRoles(rawRoles)
+  const capabilities = Array.from(new Set(rawCapabilities))
   const isAdmin = roles.includes('admin')
   const isRestrictedManagement =
-    !isAdmin && roles.some((role) => ['manager', 'care_manager', 'office'].includes(role))
+    !isAdmin &&
+    roles.some((role) => ['manager', 'care_manager', 'office'].includes(role)) &&
+    !hasAccessCapability(capabilities, 'FRONTLINE_ASSIGNED_VISITS_VIEW')
   const isStaff = isAdmin || roles.includes('carer')
   const isClientSelf = roles.includes('client')
   const isExternal = roles.length > 0 && !isStaff
@@ -95,11 +113,12 @@ export function getAccessContext(rawRoles: unknown): AccessContext {
         : isExternal
           ? '/family'
           : '/access',
+    capabilities,
   }
 }
 
 export function getAccessContextFromSnapshot(snapshot: AuthoritativeAccessSnapshot): AccessContext {
-  return getAccessContext(rolesFromAccessSnapshot(snapshot))
+  return getAccessContext(rolesFromAccessSnapshot(snapshot), snapshot.capabilities)
 }
 
 export function resolveAuthoritativeRoute(
@@ -127,11 +146,19 @@ export function resolveAuthoritativeRoute(
     }
     return { action: 'redirect', destination: '/access/unavailable' }
   }
-  return resolveAuthenticatedRoute(pathname, rolesFromAccessSnapshot(snapshot))
+  return resolveAuthenticatedRoute(
+    pathname,
+    rolesFromAccessSnapshot(snapshot),
+    snapshot.capabilities,
+  )
 }
 
-export function resolveAuthenticatedRoute(pathname: string, rawRoles: unknown): RouteDecision {
-  const context = getAccessContext(rawRoles)
+export function resolveAuthenticatedRoute(
+  pathname: string,
+  rawRoles: unknown,
+  capabilities: readonly AccessCapability[] = [],
+): RouteDecision {
+  const context = getAccessContext(rawRoles, capabilities)
   if (context.workspace === 'none') {
     return { action: 'redirect', destination: '/access/unavailable' }
   }
@@ -154,8 +181,27 @@ export function resolveAuthenticatedRoute(pathname: string, rawRoles: unknown): 
   if (FAMILY_PATH.test(pathname)) {
     return { action: 'redirect', destination: '/today' }
   }
+  const hasFrontlineWorkspace = hasAccessCapability(
+    context.capabilities,
+    'FRONTLINE_ASSIGNED_VISITS_VIEW',
+  )
+  if (
+    hasFrontlineWorkspace &&
+    !hasAccessCapability(context.capabilities, 'TENANT_ADMIN')
+  ) {
+    const isAllowedFrontlinePath =
+      pathname !== '/visits/new' &&
+      pathname !== '/schedule/new' &&
+      FRONTLINE_PATHS.some((pattern) => pattern.test(pathname))
+    return isAllowedFrontlinePath
+      ? { action: 'allow' }
+      : { action: 'redirect', destination: '/today' }
+  }
   const isAdminOnlyPath = ADMIN_ONLY_PATHS.some((pattern) => pattern.test(pathname))
-  if (isAdminOnlyPath && !context.isAdmin) {
+  if (
+    isAdminOnlyPath &&
+    !hasAccessCapability(context.capabilities, 'TENANT_ADMIN')
+  ) {
     return { action: 'redirect', destination: '/today' }
   }
   return { action: 'allow' }

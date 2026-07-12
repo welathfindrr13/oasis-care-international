@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { RolesGuard } from '@oasis/auth';
 import { AccessContextService, CanonicalAccessContext } from './access-context.service';
 import { ApiRolesGuard } from './api-roles.guard';
+import { REQUIRED_ACCESS_CAPABILITIES, type AccessCapability } from './access-capability';
 
 describe('ApiRolesGuard canonical access', () => {
   afterEach(() => jest.restoreAllMocks());
@@ -22,10 +23,15 @@ describe('ApiRolesGuard canonical access', () => {
     domainIdentityId: null,
   };
 
-  function harness(requiredRoles: string[] = []) {
+  function harness(
+    requiredRoles: string[] = [],
+    requiredCapabilities: AccessCapability[] = [],
+  ) {
     const reflector = {
       get: jest.fn().mockReturnValue(requiredRoles),
-      getAllAndOverride: jest.fn().mockReturnValue(false),
+      getAllAndOverride: jest.fn((key: string) =>
+        key === REQUIRED_ACCESS_CAPABILITIES ? requiredCapabilities : false,
+      ),
     } as unknown as Reflector;
     const accessContextService = {
       resolveForRequest: jest.fn().mockResolvedValue(adminAccess),
@@ -98,5 +104,33 @@ describe('ApiRolesGuard canonical access', () => {
     });
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
+
+  it('grants capability metadata from the canonical membership instead of token claims', async () => {
+    const { guard, context, accessContextService, user } = harness([], ['AI_SUMMARY_REVIEW']);
+    user.role = 'user';
+    user.realm_access = { roles: ['user', 'admin'] };
+    accessContextService.resolveForRequest.mockResolvedValue({
+      ...adminAccess,
+      rawRole: 'manager',
+      effectiveRole: 'manager',
+      surface: 'STAFF',
+    });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
+
+  it('denies capabilities that the canonical management role does not have', async () => {
+    const { guard, context, accessContextService } = harness([], ['AI_SUMMARY_REVIEW']);
+    accessContextService.resolveForRequest.mockResolvedValue({
+      ...adminAccess,
+      rawRole: 'care_manager',
+      effectiveRole: 'care_manager',
+      surface: 'STAFF',
+    });
+
+    await expect(guard.canActivate(context)).rejects.toEqual(
+      new ForbiddenException('Forbidden resource'),
+    );
   });
 });
