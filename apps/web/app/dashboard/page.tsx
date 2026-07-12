@@ -1,10 +1,15 @@
 import { Metadata } from 'next'
 import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Header } from '../../components/oasis/Header'
 import { Button } from '../../components/ui/Button'
 import { getServerAuthContext } from '../../lib/auth/server-auth'
+import { hasAccessCapability } from '../../lib/auth/capabilities'
+import { resolveAuthoritativeRoute } from '../../lib/auth/access'
+import type { AuthoritativeAccessSnapshot } from '../../lib/auth/access-snapshot'
 import { getSiteBaseUrl } from '../../lib/url'
+import { formatLondonLongDate, formatTime, getLondonDayUtcRange } from '../../lib/time'
 import { query } from '../../lib/graphql/client'
 import {
   CAREBRIDGE_CONCERN_INBOX_QUERY,
@@ -29,7 +34,7 @@ export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'Today - Oasis Care',
-  description: 'Today Command Centre for visits, people, family updates, and care exceptions',
+  description: 'Today’s visits, staffing, family updates, and urgent exceptions',
 }
 
 interface TodayStats {
@@ -88,11 +93,7 @@ interface UpcomingVisitItem {
 }
 
 function formatVisitTime(value: string): string {
-  return new Date(value).toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
+  return formatTime(value);
 }
 
 function mapVisitStatusToActivity(visit: Visit): RecentActivityItem['status'] {
@@ -166,7 +167,7 @@ async function getClientTotal(): Promise<number> {
     })
     return response.clients.total
   } catch {
-    return 0
+    throw new Error('People data is unavailable')
   }
 }
 
@@ -181,13 +182,13 @@ async function getTodayStats(): Promise<TodayStats> {
     
     if (!response.ok) {
       console.error('Failed to fetch today stats:', response.status);
-      return { booked: 0, finished: 0 };
+      throw new Error('Visit statistics are unavailable');
     }
     
     return await response.json();
   } catch (error) {
     console.error('Error fetching today stats:', error);
-    return { booked: 0, finished: 0 };
+    throw error;
   }
 }
 
@@ -197,7 +198,7 @@ async function getShiftDashboardData(isAdmin: boolean): Promise<ShiftDashboardDa
       const response = await query<ShiftAnalyticsQueryResponse>(SHIFT_ANALYTICS_QUERY)
       return { activeCarersNow: response.shiftAnalytics.activeCarersNow }
     } catch {
-      return { activeCarersNow: 0 }
+      throw new Error('Shift data is unavailable')
     }
   }
 
@@ -205,27 +206,24 @@ async function getShiftDashboardData(isAdmin: boolean): Promise<ShiftDashboardDa
     const response = await query<MyActiveShiftQueryResponse>(MY_ACTIVE_SHIFT_QUERY)
     return { activeCarersNow: response.myActiveShift?.isActive ? 1 : 0 }
   } catch {
-    return { activeCarersNow: 0 }
+    throw new Error('Shift data is unavailable')
   }
 }
 
 async function getTodayVisits(): Promise<TodayVisitsData> {
   try {
-    const start = new Date();
-    start.setUTCHours(0, 0, 0, 0);
-    const end = new Date(start);
-    end.setUTCDate(end.getUTCDate() + 1);
+    const { start, end } = getLondonDayUtcRange();
 
     const response = await query<VisitsQueryResponse>(VISITS_QUERY, {
-      scheduledStartFrom: start.toISOString(),
-      scheduledStartTo: end.toISOString(),
+      scheduledStartFrom: start,
+      scheduledStartTo: end,
       take: 100,
       skip: 0,
     });
 
     return { visits: response.visits.items || [] };
   } catch {
-    return { visits: [] };
+    throw new Error('Visit data is unavailable');
   }
 }
 
@@ -237,7 +235,7 @@ async function getFamilyUpdateReviewCount(): Promise<number> {
     );
     return response.verifiedVisitStoryApprovalQueue.length;
   } catch {
-    return 0;
+    throw new Error('Family update review data is unavailable');
   }
 }
 
@@ -251,7 +249,7 @@ async function getOpenConcernCount(): Promise<number> {
       (concern) => concern.status !== 'RESOLVED' && concern.status !== 'CLOSED',
     ).length;
   } catch {
-    return 0;
+    throw new Error('Concern data is unavailable');
   }
 }
 
@@ -289,7 +287,7 @@ async function getMissingCareNoteCount(visits: Visit[]): Promise<number> {
         });
         return response.careLogs.total === 0 ? 1 : 0;
       } catch {
-        return 0;
+        throw new Error('Care note data is unavailable');
       }
     }),
   );
@@ -310,7 +308,7 @@ async function getMedicationExceptionCount(): Promise<number> {
       return administration.status === 'SCHEDULED' && new Date(administration.scheduledTime).getTime() < now;
     }).length;
   } catch {
-    return 0;
+    throw new Error('Medication exception data is unavailable');
   }
 }
 
@@ -351,7 +349,7 @@ async function getCareSpineSignalData(): Promise<CareSpineSignalData> {
             take: 50,
           });
         } catch {
-          return null;
+          throw new Error('Care planning data is unavailable');
         }
       }),
     );
@@ -422,7 +420,7 @@ async function getCareSpineSignalData(): Promise<CareSpineSignalData> {
       evidenceGaps: clientsWithEvidenceGaps.size,
     };
   } catch {
-    return safeFallback;
+    throw new Error('Care planning data is unavailable');
   }
 }
 
@@ -433,32 +431,103 @@ const statusConfig = {
   cancelled: { bg: 'bg-rose-50', text: 'text-rose-700', dot: 'bg-rose-500', label: 'Cancelled' },
 }
 
-export default async function DashboardPage() {
-  const { roles } = await getServerAuthContext()
-  const isAdmin = roles.some((role: unknown) => String(role).toLowerCase() === 'admin')
-  const activityHref = isAdmin ? '/activity' : '/today'
-
-  const [stats, activeClientTotal, shiftData, todayVisitsData, familyUpdateReviewCount, openConcernCount, careSpineSignalData, medicationExceptionCount] = await Promise.all([
+async function loadAdminTodayData() {
+  const [
+    stats,
+    activeClientTotal,
+    shiftData,
+    todayVisitsData,
+    familyUpdateReviewCount,
+    openConcernCount,
+    careSpineSignalData,
+    medicationExceptionCount,
+  ] = await Promise.all([
     getTodayStats(),
     getClientTotal(),
-    getShiftDashboardData(isAdmin),
+    getShiftDashboardData(true),
     getTodayVisits(),
     getFamilyUpdateReviewCount(),
     getOpenConcernCount(),
     getCareSpineSignalData(),
     getMedicationExceptionCount(),
-  ]);
+  ])
+  const missingCareNoteCount = await getMissingCareNoteCount(
+    todayVisitsData.visits,
+  )
+  return {
+    stats,
+    activeClientTotal,
+    shiftData,
+    todayVisitsData,
+    familyUpdateReviewCount,
+    openConcernCount,
+    careSpineSignalData,
+    medicationExceptionCount,
+    missingCareNoteCount,
+  }
+}
+
+function AdminTodayUnavailable() {
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <Header />
+      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-6 text-slate-950 shadow-sm">
+          <h1 className="font-heading text-2xl font-bold">
+            Today&apos;s overview is unavailable
+          </h1>
+          <p className="mt-2 leading-6 text-slate-700">
+            Oasis could not load all of today&apos;s operational information. No
+            totals or all-clear messages are being shown until the data is
+            available.
+          </p>
+          <form action="/today" method="get" className="mt-5">
+            <Button type="submit">Try again</Button>
+          </form>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+export default async function DashboardPage({
+  accessSnapshot: suppliedAccessSnapshot,
+}: {
+  accessSnapshot?: AuthoritativeAccessSnapshot
+} = {}) {
+  const accessSnapshot =
+    suppliedAccessSnapshot ?? (await getServerAuthContext()).accessSnapshot
+  const routeDecision = resolveAuthoritativeRoute('/dashboard', accessSnapshot)
+  if (routeDecision.action === 'redirect') {
+    redirect(routeDecision.destination)
+  }
+  const isAdmin = hasAccessCapability(accessSnapshot.capabilities, 'TENANT_ADMIN')
+  if (!isAdmin) {
+    redirect('/access/unavailable')
+  }
+  const activityHref = '/activity'
+  let data: Awaited<ReturnType<typeof loadAdminTodayData>>
+  try {
+    data = await loadAdminTodayData()
+  } catch {
+    return <AdminTodayUnavailable />
+  }
+  const {
+    stats,
+    activeClientTotal,
+    shiftData,
+    todayVisitsData,
+    familyUpdateReviewCount,
+    openConcernCount,
+    careSpineSignalData,
+    medicationExceptionCount,
+    missingCareNoteCount,
+  } = data
   const recentActivity = buildRecentActivity(todayVisitsData.visits);
   const upcomingVisits = buildUpcomingVisits(todayVisitsData.visits);
   const attentionCount = calculateAttentionCount(todayVisitsData.visits);
-  const missingCareNoteCount = await getMissingCareNoteCount(todayVisitsData.visits);
 
-  const currentDate = new Date().toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
+  const currentDate = formatLondonLongDate(new Date());
 
   const commandCentreCards = [
     {
@@ -496,14 +565,14 @@ export default async function DashboardPage() {
     {
       label: 'Family updates to review',
       count: familyUpdateReviewCount,
-      detail: 'Verified Visit Updates awaiting staff approval.',
+      detail: 'Family updates awaiting approval.',
       href: '/family-updates/approvals',
       tone: familyUpdateReviewCount > 0 ? 'sky' : 'slate',
     },
     {
       label: 'Concerns needing response',
       count: openConcernCount,
-      detail: 'Open Concern Cases in the resolution tracker.',
+      detail: 'Open family concerns awaiting a response.',
       href: '/family-updates/concerns',
       tone: openConcernCount > 0 ? 'rose' : 'slate',
     },
@@ -526,11 +595,11 @@ export default async function DashboardPage() {
       tone: careSpineSignalData.assessmentsNeedingCompletion > 0 ? 'sky' : 'slate',
     },
     {
-      label: 'Evidence gaps',
+      label: 'Care records to review',
       count: careSpineSignalData.evidenceGaps,
       detail: careSpineSignalData.evidenceGaps > 0
-        ? 'People with active plans lacking evidence packs, or no packs yet, need evidence follow-up.'
-        : 'No immediate evidence-pack gaps detected for people in scope.',
+        ? 'People with active care plans but no linked care records need follow-up.'
+        : 'No immediate care-record gaps detected for people in scope.',
       href: '/evidence',
       tone: careSpineSignalData.evidenceGaps > 0 ? 'rose' : 'slate',
     },
@@ -552,12 +621,12 @@ export default async function DashboardPage() {
         {/* Page Title */}
         <div className="mb-8">
           <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">
-            Today Command Centre
+            Today
           </h1>
           <p className="text-slate-500 mt-1">
-            Start with today&apos;s care risks, review queues, family concerns, and operational exceptions.
+            Start with visits, records, family concerns, and other work needing attention today.
           </p>
-          <p className="text-sm text-slate-400 mt-2">{currentDate}</p>
+          <p className="mt-2 text-sm text-slate-500">{currentDate}</p>
         </div>
 
         <section className="mb-8 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
@@ -593,7 +662,7 @@ export default async function DashboardPage() {
                 className="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-sky-200 hover:bg-sky-50"
               >
                 <p className="text-sm font-semibold text-slate-900">Family Updates</p>
-                <p className="mt-1 text-sm text-slate-600">Approve proof-of-care updates and resolve concerns.</p>
+                <p className="mt-1 text-sm text-slate-600">Approve family updates and respond to concerns.</p>
               </Link>
             </div>
           </div>
@@ -611,9 +680,9 @@ export default async function DashboardPage() {
         <section className="mb-8">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
-              <h2 className="font-heading text-2xl font-bold text-slate-900">Action lanes</h2>
+              <h2 className="font-heading text-2xl font-bold text-slate-900">Needs attention</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Every card has a destination. Empty lanes explain what will become active as the frontier modules land.
+                Open an item to review the relevant visits, records, or updates.
               </p>
             </div>
           </div>
@@ -668,7 +737,7 @@ export default async function DashboardPage() {
               </div>
             </div>
             <div className="mt-4">
-              <span className="text-sm text-slate-500">Organization-scoped total</span>
+              <span className="text-sm text-slate-500">Active person profiles</span>
             </div>
           </div>
 
@@ -697,20 +766,20 @@ export default async function DashboardPage() {
           </div>
 
           {/* Alerts */}
-          <div className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-6 text-slate-950 shadow-sm transition-shadow hover:shadow-md">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-amber-100">Needs Attention</p>
-                <p className="text-3xl font-bold text-white mt-1">{attentionCount}</p>
+                <p className="text-sm font-medium text-amber-900">Needs attention</p>
+                <p className="mt-1 text-3xl font-bold text-slate-950">{attentionCount}</p>
               </div>
               <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-6 w-6 text-amber-950" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
             </div>
             <div className="mt-4">
-              <span className="text-sm text-amber-100">
+              <span className="text-sm text-amber-900">
                 {attentionCount > 0 ? 'Scheduled visits now overdue' : 'No overdue scheduled visits'}
               </span>
             </div>
@@ -761,7 +830,7 @@ export default async function DashboardPage() {
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
                             {config.label}
                           </span>
-                          <time className="text-sm text-slate-400 tabular-nums">
+                          <time className="text-sm text-slate-500 tabular-nums">
                             {activity.time}
                           </time>
                         </div>
@@ -836,17 +905,17 @@ export default async function DashboardPage() {
             </div>
 
             {/* AI Summaries Card */}
-            <div className="bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl shadow-sm p-6 text-white">
+            <div className="rounded-2xl border border-violet-300 bg-violet-50 p-6 text-slate-950 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
                 <h3 className="font-heading font-semibold">AI Health Summaries</h3>
               </div>
-              <p className="text-violet-100 text-sm mb-4">
+              <p className="mb-4 text-sm text-violet-900">
                 Review current client summaries and approvals
               </p>
-              <Link href="/people" className="block text-center w-full bg-white/20 hover:bg-white/30 rounded-xl py-2.5 font-medium transition-colors">
+              <Link href="/people" className="block w-full rounded-xl border border-violet-300 bg-white py-2.5 text-center font-medium text-violet-950 transition-colors hover:bg-violet-100">
                 Review Summaries
               </Link>
             </div>

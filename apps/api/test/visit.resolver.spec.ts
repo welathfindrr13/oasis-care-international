@@ -364,14 +364,19 @@ describe('VisitResolver', () => {
     it('should complete a task successfully', async () => {
       mockVisitService.completeTask.mockResolvedValue(completedTask);
 
-      const result = await resolver.completeVisitTask('task-1', 'Completed successfully', mockContext);
+      const result = await resolver.completeVisitTask(
+        'task-1',
+        'Completed successfully',
+        mockCarerContext,
+      );
 
       expect(service.completeTask).toHaveBeenCalledWith(
         'task-1',
         'Completed successfully',
-        'user-123',
-        'admin',
+        'domain-carer-123',
+        'carer',
         'org-123',
+        mockCarerContext.req.user.accessContext,
       );
       expect(result.isCompleted).toBe(true);
       expect(result.completedAt).toBeDefined();
@@ -386,7 +391,14 @@ describe('VisitResolver', () => {
 
       await resolver.completeVisitTask('task-1', undefined, mockCarerContext);
 
-      expect(service.completeTask).toHaveBeenCalledWith('task-1', undefined, 'domain-carer-123', 'carer', 'org-123');
+      expect(service.completeTask).toHaveBeenCalledWith(
+        'task-1',
+        undefined,
+        'domain-carer-123',
+        'carer',
+        'org-123',
+        mockCarerContext.req.user.accessContext,
+      );
     });
   });
 
@@ -400,7 +412,13 @@ describe('VisitResolver', () => {
 
       const result = await resolver.startVisit('visit-123', mockCarerContext);
 
-      expect(service.startVisit).toHaveBeenCalledWith('visit-123', 'domain-carer-123', 'carer', 'org-123');
+      expect(service.startVisit).toHaveBeenCalledWith(
+        'visit-123',
+        'domain-carer-123',
+        'carer',
+        'org-123',
+        mockCarerContext.req.user.accessContext,
+      );
       expect(result.status).toBe(VisitStatus.IN_PROGRESS);
     });
   });
@@ -416,7 +434,13 @@ describe('VisitResolver', () => {
 
       const result = await resolver.recordVisitTaskOutcome(input, mockCarerContext);
 
-      expect(service.recordVisitTaskOutcome).toHaveBeenCalledWith(input, 'domain-carer-123', 'carer', 'org-123');
+      expect(service.recordVisitTaskOutcome).toHaveBeenCalledWith(
+        input,
+        'domain-carer-123',
+        'carer',
+        'org-123',
+        mockCarerContext.req.user.accessContext,
+      );
       expect(result.id).toBe('task-1');
       expect(result.isCompleted).toBe(true);
       expect(result.notes).toContain('VISIT_TASK_OUTCOME::');
@@ -434,7 +458,13 @@ describe('VisitResolver', () => {
 
       const result = await resolver.submitVisitCareNote(input, mockCarerContext);
 
-      expect(service.submitVisitCareNote).toHaveBeenCalledWith(input, 'domain-carer-123', 'carer', 'org-123');
+      expect(service.submitVisitCareNote).toHaveBeenCalledWith(
+        input,
+        'domain-carer-123',
+        'carer',
+        'org-123',
+        mockCarerContext.req.user.accessContext,
+      );
       expect(result.id).toBe('care-log-1');
       expect(result.clientId).toBe('client-123');
       expect(result.carerId).toBe('carer-123');
@@ -457,7 +487,13 @@ describe('VisitResolver', () => {
 
       const result = await resolver.completeVisit(input, mockCarerContext);
 
-      expect(service.completeVisit).toHaveBeenCalledWith(input, 'domain-carer-123', 'carer', 'org-123');
+      expect(service.completeVisit).toHaveBeenCalledWith(
+        input,
+        'domain-carer-123',
+        'carer',
+        'org-123',
+        mockCarerContext.req.user.accessContext,
+      );
       expect(result.status).toBe(VisitStatus.COMPLETED);
       expect(result.actualEnd).toBeDefined();
     });

@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { InstallAppPrompt } from '../../components/pwa/InstallAppPrompt';
 import { useClientAccess } from '../../components/providers/ClientAccessProvider';
-import { hasRestrictedManagementRole } from '../../components/oasis/headerNavigation';
 import { resolveAuthMode } from '../../lib/auth/mode';
 
 function formatRole(role: string): string {
@@ -48,7 +47,7 @@ function SettingsContent({ userName, userEmail }: { userName: string; userEmail:
   const { roles, accessContext, isAdmin, isCarer } = useClientAccess();
   const primaryRole = roles[0] || 'Access pending';
   const isRestrictedManagement =
-    accessContext.surface === 'staff' && hasRestrictedManagementRole(roles);
+    accessContext.surface === 'staff' && accessContext.homePath === '/settings';
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -58,8 +57,8 @@ function SettingsContent({ userName, userEmail }: { userName: string; userEmail:
           <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">
             Settings
           </h1>
-          <p className="text-slate-500 mt-1">
-            Review your account, device access, and operational tools
+          <p className="mt-1 text-slate-500">
+            Review your account details, install Oasis and open the pages available to you
           </p>
         </div>
 
@@ -95,7 +94,13 @@ function SettingsContent({ userName, userEmail }: { userName: string; userEmail:
                   <div className="rounded-lg bg-slate-50 p-4">
                     <dt className="text-sm text-slate-500">Access</dt>
                     <dd className="mt-1 font-medium text-slate-900">
-                      {isAdmin ? 'Administrative workspace' : isCarer ? 'Point-of-care workspace' : 'Standard access'}
+                      {isAdmin
+                        ? 'Administrative workspace'
+                        : isCarer
+                          ? 'Carer workspace'
+                          : isRestrictedManagement
+                            ? 'Profile and settings access'
+                            : 'Standard access'}
                     </dd>
                   </div>
                 </dl>
@@ -103,7 +108,7 @@ function SettingsContent({ userName, userEmail }: { userName: string; userEmail:
             </CardContent>
           </Card>
 
-          <Card>
+          {!isRestrictedManagement && <Card>
             <CardHeader>
               <h2 className="text-xl font-semibold text-slate-900 font-heading">
                 Operational shortcuts
@@ -152,7 +157,7 @@ function SettingsContent({ userName, userEmail }: { userName: string; userEmail:
                 )}
               </div>
             </CardContent>
-          </Card>
+          </Card>}
 
           <Card>
             <CardHeader>
@@ -163,12 +168,12 @@ function SettingsContent({ userName, userEmail }: { userName: string; userEmail:
             <CardContent>
               <div className="space-y-3 text-sm text-slate-600">
                 <p>
-                  This page shows your current account context and access routes. Preference management is not
-                  wired to persistent backend settings yet, so Oasis does not present fake toggles here.
+                  This page shows your account details and the pages currently available to you. Notification and
+                  preference controls are not available yet.
                 </p>
                 <p>
-                  Use the install prompt above for device access, and use the profile menu to sign out when you
-                  finish your shift or admin session.
+                  Install Oasis above to add it to this device&apos;s home screen. Use the profile menu to sign out
+                  when you finish using Oasis.
                 </p>
               </div>
             </CardContent>

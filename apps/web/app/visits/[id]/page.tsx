@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Header } from '../../../components/oasis/Header';
 import { useClientAccess } from '../../../components/providers/ClientAccessProvider';
+import { hasAccessCapability } from '../../../lib/auth/capabilities';
 import { Button } from '../../../components/ui/Button';
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card';
 import { clientQuery } from '../../../lib/graphql/client-side';
@@ -341,15 +342,18 @@ export default function VisitDetailPage() {
   const visitId = String(params.id || '');
   const {
     authenticated,
+    capabilities,
     getBearerToken,
     isAdmin,
-    isCarer,
     isStaff,
     status,
   } = useClientAccess();
-  const canLogCare = isAdmin || isCarer;
-  const canRecordMedication = isAdmin || isCarer;
-  const canRunVisitWorkflow = isAdmin || isCarer;
+  const canRunVisitWorkflow = hasAccessCapability(
+    capabilities,
+    'FRONTLINE_VISIT_EXECUTE',
+  );
+  const canLogCare = canRunVisitWorkflow;
+  const canRecordMedication = canRunVisitWorkflow;
 
   const [visit, setVisit] = useState<Visit | null>(null);
   const [careLogs, setCareLogs] = useState<CareLog[]>([]);

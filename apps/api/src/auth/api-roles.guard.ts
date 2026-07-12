@@ -12,6 +12,11 @@ import {
   AuthRoleCarrier,
   LEGACY_OPERATIONAL_SURFACE_KEY,
 } from './legacy-operational-access';
+import {
+  capabilitiesForAccess,
+  REQUIRED_ACCESS_CAPABILITIES,
+  type AccessCapability,
+} from './access-capability';
 
 export type AccessEnrichedAuthUser = AuthRoleCarrier & {
   id?: string;
@@ -54,9 +59,26 @@ export class ApiRolesGuard extends RolesGuard implements CanActivate {
     );
     this.applyAccessContext(user, access);
     this.assertRequiredRoles(context, user);
+    this.assertRequiredCapabilities(context, access);
     this.preventNormalizedRoleConfusion(context, user, access);
     this.enforceLegacyOperationalAccess(context, user);
     return true;
+  }
+
+  private assertRequiredCapabilities(
+    context: ExecutionContext,
+    access: CanonicalAccessContext,
+  ): void {
+    const required =
+      this.appReflector.getAllAndOverride<AccessCapability[]>(
+        REQUIRED_ACCESS_CAPABILITIES,
+        [context.getHandler(), context.getClass()],
+      ) || [];
+    if (required.length === 0) return;
+    const granted = capabilitiesForAccess(access);
+    if (!required.every((capability) => granted.includes(capability))) {
+      throw new ForbiddenException('Forbidden resource');
+    }
   }
 
   handleRequest(err: unknown, user: any): any {

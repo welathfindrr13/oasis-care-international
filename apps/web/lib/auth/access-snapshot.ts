@@ -1,3 +1,8 @@
+import {
+  type AccessCapability,
+  parseAccessCapabilities,
+} from "./capabilities";
+
 export type MembershipState =
   | "ACTIVE"
   | "MISSING"
@@ -31,6 +36,7 @@ export interface AuthoritativeAccessSnapshot {
   linkedIdentityState: LinkedIdentityState;
   onboardingState: OnboardingState;
   resolution: AccessResolution;
+  capabilities: AccessCapability[];
 }
 
 const VIEWER_ACCESS_QUERY = `
@@ -43,6 +49,7 @@ const VIEWER_ACCESS_QUERY = `
       surface
       linkedIdentityState
       onboardingState
+      capabilities
     }
   }
 `;
@@ -57,6 +64,7 @@ export function unauthenticatedAccessSnapshot(): AuthoritativeAccessSnapshot {
     linkedIdentityState: "NOT_REQUIRED",
     onboardingState: "NOT_STARTED",
     resolution: "UNAUTHENTICATED",
+    capabilities: [],
   };
 }
 
@@ -70,6 +78,7 @@ export function unavailableAccessSnapshot(): AuthoritativeAccessSnapshot {
     linkedIdentityState: "NOT_REQUIRED",
     onboardingState: "BLOCKED",
     resolution: "UNAVAILABLE",
+    capabilities: [],
   };
 }
 
@@ -190,6 +199,8 @@ export function parseAccessSnapshot(
     typeof candidate.effectiveRole === "string" && candidate.effectiveRole.trim()
       ? candidate.effectiveRole.trim().toLowerCase()
       : null;
+  const capabilities = parseAccessCapabilities(candidate.capabilities);
+  if (!capabilities) return null;
   const organizationId =
     typeof candidate.organizationId === "string" && candidate.organizationId.trim()
       ? candidate.organizationId.trim()
@@ -228,6 +239,7 @@ export function parseAccessSnapshot(
     linkedIdentityState: candidate.linkedIdentityState as LinkedIdentityState,
     onboardingState: candidate.onboardingState as OnboardingState,
     resolution: ready ? "READY" : "DENIED",
+    capabilities: ready ? capabilities : [],
   };
 }
 

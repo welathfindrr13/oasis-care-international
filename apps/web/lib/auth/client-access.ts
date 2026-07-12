@@ -17,6 +17,7 @@ export interface ClientAccessSnapshot {
   isAdmin: boolean;
   isCarer: boolean;
   isStaff: boolean;
+  capabilities: AuthoritativeAccessSnapshot['capabilities'];
 }
 
 export function createClientAccessSnapshot(
@@ -48,6 +49,7 @@ export function createClientAccessSnapshot(
       resolvedStatus === 'authenticated' &&
       ['ADMIN', 'STAFF'].includes(snapshot.surface) &&
       snapshot.resolution === 'READY',
+    capabilities: resolvedStatus === 'authenticated' ? snapshot.capabilities : [],
   };
 }
 

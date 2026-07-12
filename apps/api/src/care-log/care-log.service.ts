@@ -6,6 +6,10 @@ import { CreateCareLogInput } from './dto/create-care-log.input';
 import { CareLogFilterArgs } from './dto/care-log-filter.args';
 import { CareLogRepository } from './care-log.repository';
 import { MonthlyCareSummaryDTO } from './dto/monthly-care-summary.dto';
+import {
+  type CanonicalCapabilityActor,
+  hasCanonicalActorCapability,
+} from '../auth/access-capability';
 
 @Injectable()
 export class CareLogService {
@@ -21,13 +25,28 @@ export class CareLogService {
     userId: string,
     userRole: string,
     organizationId?: string,
+    accessContext?: CanonicalCapabilityActor,
   ): Promise<CareLog> {
-    const role = this.normalizeRole(userRole);
-    const orgId = await this.requireOrganizationId(organizationId);
-    if (!['admin', 'carer'].includes(role)) {
+    if (
+      !organizationId ||
+      !hasCanonicalActorCapability(accessContext, 'FRONTLINE_VISIT_EXECUTE', {
+        organizationId,
+        userId,
+        userRole,
+      })
+    ) {
       throw new BaseHttpException(
         ErrorCode.FORBIDDEN_ROLE_REQUIRED,
-        'Only carers and admins can create care logs',
+        'Only the assigned Carer can create care notes',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    const role = this.normalizeRole(userRole);
+    const orgId = await this.requireOrganizationId(organizationId);
+    if (role !== 'carer') {
+      throw new BaseHttpException(
+        ErrorCode.FORBIDDEN_ROLE_REQUIRED,
+        'Only Carers can create care notes',
         HttpStatus.FORBIDDEN,
       );
     }

@@ -6,6 +6,10 @@ import {
   CanonicalAccessContext,
   LinkedIdentityState,
 } from "./access-context.service";
+import {
+  AccessCapability,
+  capabilitiesForAccess,
+} from "./access-capability";
 
 export enum ViewerMembershipState {
   ACTIVE = "ACTIVE",
@@ -67,6 +71,9 @@ export class ViewerAccessSnapshotDto {
   @Field(() => ViewerOnboardingState)
   onboardingState!: AccessOnboardingState;
 
+  @Field(() => [String])
+  capabilities!: AccessCapability[];
+
   static from(context: CanonicalAccessContext): ViewerAccessSnapshotDto {
     return {
       authenticated: true,
@@ -76,6 +83,7 @@ export class ViewerAccessSnapshotDto {
       surface: context.surface,
       linkedIdentityState: context.linkedIdentityState,
       onboardingState: context.onboardingState,
+      capabilities: Array.from(capabilitiesForAccess(context)),
     };
   }
 }

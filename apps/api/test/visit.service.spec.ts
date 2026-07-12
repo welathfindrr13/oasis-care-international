@@ -76,6 +76,20 @@ describe("VisitService", () => {
     deleted_at: null,
   };
   const organizationId = "org-123";
+  const frontlineAccess = {
+    authenticated: true as const,
+    identityProvider: "test",
+    membershipId: "membership-carer-123",
+    surface: "STAFF" as const,
+    effectiveRole: "carer",
+    organizationId: "org-123",
+    membershipState: "ACTIVE",
+    onboardingState: "READY",
+    rawRole: "carer",
+    linkedIdentityState: "LINKED",
+    domainIdentityId: "carer-123",
+    authSubject: "auth-carer-123",
+  } satisfies import('../src/auth/access-context.service').CanonicalAccessContext;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -163,7 +177,7 @@ describe("VisitService", () => {
       await expect(
         service.createVisit(
           createVisitInput,
-          "user-123",
+          "carer-123",
           "admin",
           organizationId,
         ),
@@ -172,7 +186,7 @@ describe("VisitService", () => {
       await expect(
         service.createVisit(
           createVisitInput,
-          "user-123",
+          "carer-123",
           "admin",
           organizationId,
         ),
@@ -249,7 +263,7 @@ describe("VisitService", () => {
           "visit-123",
           updateVisitInput,
           "user-123",
-          "admin",
+          "carer",
           organizationId,
         ),
       ).rejects.toThrow(BaseHttpException);
@@ -259,7 +273,7 @@ describe("VisitService", () => {
           "visit-123",
           updateVisitInput,
           "user-123",
-          "admin",
+          "carer",
           organizationId,
         ),
       ).rejects.toMatchObject({
@@ -461,6 +475,7 @@ describe("VisitService", () => {
         "carer-123",
         "carer",
         organizationId,
+        frontlineAccess,
       );
 
       expect(repository.updateTask).toHaveBeenCalledWith(
@@ -482,9 +497,10 @@ describe("VisitService", () => {
         service.completeTask(
           "task-123",
           undefined,
-          "user-123",
-          "admin",
+          "carer-123",
+          "carer",
           organizationId,
+          frontlineAccess,
         ),
       ).rejects.toThrow(BaseHttpException);
 
@@ -492,9 +508,10 @@ describe("VisitService", () => {
         service.completeTask(
           "task-123",
           undefined,
-          "user-123",
-          "admin",
+          "carer-123",
+          "carer",
           organizationId,
+          frontlineAccess,
         ),
       ).rejects.toMatchObject({
         response: { code: ErrorCode.TASK_NOT_FOUND },
@@ -516,6 +533,7 @@ describe("VisitService", () => {
         "carer-123",
         "carer",
         organizationId,
+        frontlineAccess,
       );
 
       expect(repository.update).toHaveBeenCalledWith(
@@ -533,9 +551,15 @@ describe("VisitService", () => {
       mockVisitRepository.findById.mockResolvedValue(mockVisit);
 
       await expect(
-        service.startVisit("visit-123", "family-123", "family", organizationId),
+        service.startVisit(
+          "visit-123",
+          "family-123",
+          "family",
+          organizationId,
+          { surface: "FAMILY", effectiveRole: "family" } as any,
+        ),
       ).rejects.toMatchObject({
-        response: { code: ErrorCode.INVALID_ROLE },
+        response: { code: ErrorCode.FORBIDDEN_ROLE_REQUIRED },
       });
     });
   });
@@ -571,6 +595,7 @@ describe("VisitService", () => {
         "carer-123",
         "carer",
         organizationId,
+        frontlineAccess,
       );
 
       expect(repository.updateTask).toHaveBeenCalledWith(
@@ -605,6 +630,7 @@ describe("VisitService", () => {
         "carer-123",
         "carer",
         organizationId,
+        frontlineAccess,
       );
 
       expect(repository.updateTask).toHaveBeenCalledWith(
@@ -620,6 +646,10 @@ describe("VisitService", () => {
     it("should deny unassigned carers from recording task outcomes", async () => {
       mockVisitRepository.findTaskById.mockResolvedValue(task);
       mockVisitRepository.findById.mockResolvedValue(mockVisit);
+      const otherCarerAccess = {
+        ...frontlineAccess,
+        domainIdentityId: "other-carer-999",
+      };
 
       await expect(
         service.recordVisitTaskOutcome(
@@ -627,6 +657,7 @@ describe("VisitService", () => {
           "other-carer-999",
           "carer",
           organizationId,
+          otherCarerAccess,
         ),
       ).rejects.toMatchObject({
         response: { code: ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY },
@@ -662,6 +693,7 @@ describe("VisitService", () => {
         "carer-123",
         "carer",
         organizationId,
+        frontlineAccess,
       );
 
       expect(mockCareLogService.createCareLog).toHaveBeenCalledWith(
@@ -675,6 +707,7 @@ describe("VisitService", () => {
         "carer-123",
         "carer",
         organizationId,
+        frontlineAccess,
       );
       expect(result.id).toBe("care-log-123");
     });
@@ -692,9 +725,10 @@ describe("VisitService", () => {
           "family-123",
           "family",
           organizationId,
+          { surface: "FAMILY", effectiveRole: "family" } as any,
         ),
       ).rejects.toMatchObject({
-        response: { code: ErrorCode.INVALID_ROLE },
+        response: { code: ErrorCode.FORBIDDEN_ROLE_REQUIRED },
       });
     });
   });
@@ -712,6 +746,7 @@ describe("VisitService", () => {
           "carer-123",
           "carer",
           organizationId,
+          frontlineAccess,
         ),
       ).rejects.toMatchObject({
         response: { code: ErrorCode.VALIDATION_FAILED },
@@ -735,6 +770,7 @@ describe("VisitService", () => {
         "carer-123",
         "carer",
         organizationId,
+        frontlineAccess,
       );
 
       expect(repository.update).toHaveBeenCalledWith(
@@ -765,6 +801,7 @@ describe("VisitService", () => {
         "carer-123",
         "carer",
         organizationId,
+        frontlineAccess,
       );
 
       expect(result.status).toBe(VisitStatus.COMPLETED);

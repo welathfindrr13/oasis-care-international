@@ -14,6 +14,19 @@ const adminPayload = {
   surface: "ADMIN",
   linkedIdentityState: "NOT_REQUIRED",
   onboardingState: "READY",
+  capabilities: [
+    "PROFILE_HELP_VIEW",
+    "TENANT_ADMIN",
+    "PEOPLE_MANAGE",
+    "WORKFORCE_MANAGE",
+    "SCHEDULE_MANAGE",
+    "FAMILY_ACCESS_MANAGE",
+    "OPERATIONAL_REPORTS_VIEW",
+    "AI_SUMMARY_REVIEW",
+    "AI_SUMMARY_GENERATE",
+    "AI_SUMMARY_CONFIGURE",
+    "GDPR_MANAGE",
+  ],
 };
 
 test("parses only the safe canonical contract and derives roles from its surface", () => {
@@ -21,6 +34,14 @@ test("parses only the safe canonical contract and derives roles from its surface
   assert(parsed);
   assert.equal(parsed.resolution, "READY");
   assert.deepEqual(rolesFromAccessSnapshot(parsed), ["admin"]);
+  assert.deepEqual(parsed.capabilities, adminPayload.capabilities);
+  assert.equal(
+    parseAccessSnapshot({
+      ...adminPayload,
+      capabilities: ["TENANT_ADMIN", "UNKNOWN_CAPABILITY"],
+    }),
+    null,
+  );
   assert.equal(
     parseAccessSnapshot({ ...adminPayload, surface: "SUPERUSER" }),
     null,

@@ -42,6 +42,20 @@ describe('AiSummaryService Deployment V2 runtime guard', () => {
         'user-1',
         'admin',
         'org-1',
+        {
+          authenticated: true,
+          authSubject: 'user-1',
+          identityProvider: 'test',
+          organizationId: 'org-1',
+          membershipId: 'membership-1',
+          membershipState: 'ACTIVE',
+          rawRole: 'admin',
+          effectiveRole: 'admin',
+          surface: 'ADMIN',
+          linkedIdentityState: 'NOT_REQUIRED',
+          onboardingState: 'READY',
+          domainIdentityId: null,
+        },
       ).catch((error) => {
         expect(error.getStatus()).toBe(HttpStatus.FORBIDDEN);
         expect(error.getResponse()).toEqual({

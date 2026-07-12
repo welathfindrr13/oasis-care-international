@@ -181,6 +181,34 @@ test("account switching clears stale capabilities and follows each database memb
   await expect(page.getByRole("link", { name: "Schedule" })).toHaveCount(0);
 });
 
+test("manager, care manager, and office memberships stay outside admin and Carer workspaces", async ({
+  page,
+}) => {
+  const profiles = [
+    { email: "manager@local.dev", name: "Local Manager", workspace: "Manager workspace" },
+    { email: "care-manager@local.dev", name: "Local Care Manager", workspace: "Care manager workspace" },
+    { email: "office@local.dev", name: "Local Office", workspace: "Office workspace" },
+  ];
+
+  for (const profile of profiles) {
+    await signIn(page, {
+      email: profile.email,
+      name: profile.name,
+      role: "admin",
+      callbackUrl: "http://localhost:3002/today",
+    });
+    await page.goto("/today");
+
+    await expect(page).toHaveURL("/settings");
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+    await expect(page.getByLabel(`Oasis Care, ${profile.workspace}`)).toBeVisible();
+    await expect(page.getByText("Profile and settings access", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Workforce", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "My visits", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Updates", exact: true })).toHaveCount(0);
+  }
+});
+
 test("an administrator sees the real organization in the guided synthetic setup", async ({
   page,
 }) => {
@@ -422,6 +450,19 @@ test("the lifecycle UI handles duplicate and expired invitation actions with sta
         linkedIdentityState: "NOT_REQUIRED",
         onboardingState: "READY",
         resolution: "READY",
+        capabilities: [
+          "PROFILE_HELP_VIEW",
+          "TENANT_ADMIN",
+          "PEOPLE_MANAGE",
+          "WORKFORCE_MANAGE",
+          "SCHEDULE_MANAGE",
+          "FAMILY_ACCESS_MANAGE",
+          "OPERATIONAL_REPORTS_VIEW",
+          "AI_SUMMARY_REVIEW",
+          "AI_SUMMARY_GENERATE",
+          "AI_SUMMARY_CONFIGURE",
+          "GDPR_MANAGE",
+        ],
       }),
     });
   });

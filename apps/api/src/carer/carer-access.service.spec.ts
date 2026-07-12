@@ -19,31 +19,35 @@ describe('canonical Carer operational actor', () => {
   };
 
   it.each(['carer', 'staff'])('uses the linked domain Carer id for raw %s actors', (rawRole) => {
-    expect(requireOperationalActor({ accessContext: { ...linkedCarer, rawRole } })).toEqual({
+    const accessContext = { ...linkedCarer, rawRole };
+    expect(requireOperationalActor({ accessContext })).toEqual({
       userId: 'domain-carer-1',
       userRole: 'carer',
       organizationId: 'org-1',
       authSubject: 'provider-subject-1',
+      accessContext,
     });
   });
 
   it('preserves the raw membership role and auth subject for a manager', () => {
+    const accessContext: CanonicalAccessContext = {
+      ...linkedCarer,
+      authSubject: 'manager-subject-1',
+      rawRole: 'manager',
+      effectiveRole: 'manager',
+      linkedIdentityState: 'NOT_REQUIRED',
+      domainIdentityId: null,
+    };
     expect(
       requireOperationalActor({
-        accessContext: {
-          ...linkedCarer,
-          authSubject: 'manager-subject-1',
-          rawRole: 'manager',
-          effectiveRole: 'manager',
-          linkedIdentityState: 'NOT_REQUIRED',
-          domainIdentityId: null,
-        },
+        accessContext,
       }),
     ).toEqual({
       userId: 'manager-subject-1',
       userRole: 'manager',
       organizationId: 'org-1',
       authSubject: 'manager-subject-1',
+      accessContext,
     });
   });
 

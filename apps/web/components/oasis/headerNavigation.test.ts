@@ -3,11 +3,15 @@ import test from "node:test";
 import {
   getHeaderHomePath,
   getHeaderNavigation,
-  getHeaderSurfaceForViewer,
-  hasRestrictedManagementRole,
   isHeaderNavigationItemActive,
 } from "./headerNavigation";
 import { createHeaderViewer } from "./headerIdentity";
+
+const frontlineCapabilities = [
+  "PROFILE_HELP_VIEW",
+  "FRONTLINE_ASSIGNED_VISITS_VIEW",
+  "FRONTLINE_SHIFT_VIEW",
+] as const;
 
 test("admin navigation exposes the seven required operational destinations in order", () => {
   const items = getHeaderNavigation("admin", "/admin/carers");
@@ -42,6 +46,7 @@ test("carer and family navigation never inherit admin destinations", () => {
     const labels = getHeaderNavigation(
       surface,
       surface === "staff" ? "/today" : "/family",
+      surface === "staff" ? frontlineCapabilities : [],
     ).map((item) => item.label);
     assert.equal(
       labels.some((label) => forbidden.has(label)),
@@ -50,28 +55,28 @@ test("carer and family navigation never inherit admin destinations", () => {
   }
 
   assert.deepEqual(
-    getHeaderNavigation("staff", "/today").map((item) => item.label),
+    getHeaderNavigation("staff", "/today", frontlineCapabilities).map((item) => item.label),
     ["Today", "My visits", "My shift", "Profile/help"],
   );
   assert.deepEqual(
     getHeaderNavigation("family", "/family").map((item) => item.label),
-    ["Home", "Care rooms", "Updates", "Concerns/help"],
+    ["Home", "Updates", "Latest update", "Concerns/help"],
   );
 });
 
 test("current visit navigation appears only inside a concrete visit workspace", () => {
   assert.equal(
-    getHeaderNavigation("staff", "/visits").some(
+    getHeaderNavigation("staff", "/visits", frontlineCapabilities).some(
       (item) => item.label === "Current visit",
     ),
     false,
   );
-  const items = getHeaderNavigation("staff", "/visits/visit-123");
+  const items = getHeaderNavigation("staff", "/visits/visit-123", frontlineCapabilities);
   assert.equal(
     items.find((item) => item.label === "Current visit")?.href,
     "/visits/visit-123",
   );
-  const scheduledItems = getHeaderNavigation("staff", "/schedule/visit-123");
+  const scheduledItems = getHeaderNavigation("staff", "/schedule/visit-123", frontlineCapabilities);
   assert.equal(
     scheduledItems.find((item) => item.label === "Current visit")?.href,
     "/schedule/visit-123",
@@ -85,7 +90,7 @@ test("current visit navigation appears only inside a concrete visit workspace", 
     ["Current visit"],
   );
   assert.equal(
-    getHeaderNavigation("staff", "/schedule/new").some(
+    getHeaderNavigation("staff", "/schedule/new", frontlineCapabilities).some(
       (item) => item.label === "Current visit",
     ),
     false,
@@ -102,10 +107,10 @@ test("family hash destinations do not all announce themselves as current", () =>
   );
 
   const roomItems = getHeaderNavigation("family", "/family/care-rooms/room-1");
-  const careRooms = roomItems.find((item) => item.label === "Care rooms");
-  assert.ok(careRooms);
+  const updates = roomItems.find((item) => item.label === "Updates");
+  assert.ok(updates);
   assert.equal(
-    isHeaderNavigationItemActive("/family/care-rooms/room-1", careRooms),
+    isHeaderNavigationItemActive("/family/care-rooms/room-1", updates),
     true,
   );
 });
@@ -115,13 +120,14 @@ test("unsupported management roles receive no admin or Carer action links", () =
     pathname: "/settings",
     status: "authenticated",
     roles: ["manager", "carer"],
+    capabilities: ["PROFILE_HELP_VIEW", "AI_SUMMARY_REVIEW", "GDPR_MANAGE"],
     userName: "Workforce Manager",
     userEmail: "manager@example.test",
   });
-  const surface = getHeaderSurfaceForViewer(
-    viewer.accessContext.surface,
-    viewer.roles,
-  );
+  const surface =
+    viewer.accessContext.homePath === "/settings"
+      ? "management"
+      : viewer.accessContext.surface;
   assert.equal(surface, "management");
   assert.deepEqual(
     getHeaderNavigation(surface, "/settings").map((item) => item.label),
@@ -131,12 +137,33 @@ test("unsupported management roles receive no admin or Carer action links", () =
     getHeaderHomePath(surface, viewer.accessContext.homePath),
     "/settings",
   );
-  assert.equal(hasRestrictedManagementRole(viewer.roles), true);
 });
 
 test("supported role home links retain their authoritative destinations", () => {
   assert.equal(getHeaderHomePath("admin", "/today"), "/today");
   assert.equal(getHeaderHomePath("staff", "/today"), "/today");
   assert.equal(getHeaderHomePath("family", "/family"), "/family");
-  assert.equal(hasRestrictedManagementRole(["carer"]), false);
+});
+
+test("a management identity with explicit frontline access receives the frontline header", () => {
+  const viewer = createHeaderViewer({
+    pathname: "/today",
+    status: "authenticated",
+    roles: ["manager", "carer"],
+    capabilities: [
+      "PROFILE_HELP_VIEW",
+      "FRONTLINE_ASSIGNED_VISITS_VIEW",
+    ],
+  });
+  assert.equal(viewer.accessContext.homePath, "/today");
+  assert.deepEqual(
+    getHeaderNavigation(
+      viewer.accessContext.surface,
+      "/today",
+      viewer.accessContext.capabilities,
+    ).map(
+      (item) => item.label,
+    ),
+    ["Today", "My visits", "Profile/help"],
+  );
 });

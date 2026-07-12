@@ -14,6 +14,9 @@ const UNASSIGNED_VISIT_ID = "55555555-5555-4555-8555-666666666666";
 const TASK_ID = "66666666-6666-4666-8666-666666666666";
 const ADMIN_MEMBERSHIP_ID = "77777777-7777-4777-8777-777777777777";
 const FAMILY_MEMBERSHIP_ID = "88888888-8888-4888-8888-888888888888";
+const MANAGER_MEMBERSHIP_ID = "12121212-1212-4212-8212-121212121212";
+const CARE_MANAGER_MEMBERSHIP_ID = "13131313-1313-4313-8313-131313131313";
+const OFFICE_MEMBERSHIP_ID = "14141414-1414-4414-8414-141414141414";
 const FAMILY_CONTACT_ID = "99999999-9999-4999-8999-999999999999";
 const CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const CARE_ROOM_MEMBERSHIP_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -34,6 +37,9 @@ function localSubject(role, email) {
 const carerSubject = localSubject("admin", "carer@local.dev");
 const adminSubject = localSubject("user", "admin@local.dev");
 const familySubject = localSubject("user", "family@local.dev");
+const managerSubject = localSubject("admin", "manager@local.dev");
+const careManagerSubject = localSubject("admin", "care-manager@local.dev");
+const officeSubject = localSubject("admin", "office@local.dev");
 
 const prisma = new PrismaClient();
 const scheduledStart = new Date(Date.now() + 60 * 60 * 1000);
@@ -151,6 +157,33 @@ try {
         auth_subject: familySubject,
         normalized_email: "family@local.dev",
         role: "family",
+        status: "ACTIVE",
+      },
+      {
+        id: MANAGER_MEMBERSHIP_ID,
+        organization_id: ORGANIZATION_ID,
+        identity_provider: "cognito",
+        auth_subject: managerSubject,
+        normalized_email: "manager@local.dev",
+        role: "manager",
+        status: "ACTIVE",
+      },
+      {
+        id: CARE_MANAGER_MEMBERSHIP_ID,
+        organization_id: ORGANIZATION_ID,
+        identity_provider: "cognito",
+        auth_subject: careManagerSubject,
+        normalized_email: "care-manager@local.dev",
+        role: "care_manager",
+        status: "ACTIVE",
+      },
+      {
+        id: OFFICE_MEMBERSHIP_ID,
+        organization_id: ORGANIZATION_ID,
+        identity_provider: "cognito",
+        auth_subject: officeSubject,
+        normalized_email: "office@local.dev",
+        role: "office",
         status: "ACTIVE",
       },
     ],

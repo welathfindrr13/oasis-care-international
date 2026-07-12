@@ -19,6 +19,18 @@ const ready = (surface: 'ADMIN' | 'STAFF' | 'FAMILY'): AuthoritativeAccessSnapsh
   linkedIdentityState: surface === 'ADMIN' ? 'NOT_REQUIRED' : 'LINKED',
   onboardingState: 'READY',
   resolution: 'READY',
+  capabilities:
+    surface === 'ADMIN'
+      ? ['PROFILE_HELP_VIEW', 'TENANT_ADMIN', 'PEOPLE_MANAGE']
+      : surface === 'STAFF'
+        ? [
+            'PROFILE_HELP_VIEW',
+            'FRONTLINE_SHIFT_VIEW',
+            'FRONTLINE_SHIFT_EXECUTE',
+            'FRONTLINE_ASSIGNED_VISITS_VIEW',
+            'FRONTLINE_VISIT_EXECUTE',
+          ]
+        : ['FAMILY_UPDATES_VIEW', 'FAMILY_CONCERN_CREATE'],
 })
 
 test('unknown roles never become family or admin access', () => {
@@ -60,6 +72,10 @@ test('restricted management snapshots route only to Settings', () => {
       ...ready('STAFF'),
       effectiveRole,
       linkedIdentityState: 'NOT_REQUIRED',
+      capabilities:
+        effectiveRole === 'manager'
+          ? ['PROFILE_HELP_VIEW', 'AI_SUMMARY_REVIEW', 'GDPR_MANAGE']
+          : ['PROFILE_HELP_VIEW'],
     }
     assert.deepEqual(resolveAuthoritativeRoute('/', snapshot), {
       action: 'redirect',
@@ -73,6 +89,21 @@ test('restricted management snapshots route only to Settings', () => {
       action: 'allow',
     })
   }
+})
+
+test('authoritative routing consumes capabilities instead of a second role policy', () => {
+  const managementWithFrontlineAccess: AuthoritativeAccessSnapshot = {
+    ...ready('STAFF'),
+    effectiveRole: 'manager',
+    linkedIdentityState: 'NOT_REQUIRED',
+    capabilities: [
+      'PROFILE_HELP_VIEW',
+      'FRONTLINE_ASSIGNED_VISITS_VIEW',
+    ],
+  }
+  assert.deepEqual(resolveAuthoritativeRoute('/today', managementWithFrontlineAccess), {
+    action: 'allow',
+  })
 })
 
 test('ready access redirects stale denial-state URLs back to the canonical workspace', () => {
@@ -90,6 +121,7 @@ test('canonical denied states have explicit provider-neutral routes', () => {
     effectiveRole: null,
     surface: 'NONE',
     resolution: 'DENIED',
+    capabilities: [],
   }
   assert.deepEqual(resolveAuthoritativeRoute('/today', { ...base, membershipState: 'MISSING', onboardingState: 'NOT_STARTED' }), {
     action: 'redirect', destination: '/access/no-membership',
@@ -183,7 +215,11 @@ test('keeps admin-only pages restricted for non-admin staff', () => {
 })
 
 test('allows admins to open activity reporting', () => {
-  const decision = resolveAuthenticatedRoute('/activity', ['admin'])
+  const decision = resolveAuthenticatedRoute(
+    '/activity',
+    ['admin'],
+    ['TENANT_ADMIN'],
+  )
 
   assert.deepEqual(decision, {
     action: 'allow',
@@ -209,6 +245,7 @@ test('redirects family users away from activity reporting', () => {
 })
 
 const managementRoutes = [
+  '/dashboard',
   '/management',
   '/management/operations',
   '/activity',
@@ -228,7 +265,12 @@ const managementRoutes = [
 
 test('allows admins to access management routes and equivalent aliases', () => {
   for (const pathname of managementRoutes) {
-    assert.deepEqual(resolveProtectedRoute(pathname, true, ['admin']), {
+    assert.deepEqual(resolveProtectedRoute(
+      pathname,
+      true,
+      ['admin'],
+      ['TENANT_ADMIN'],
+    ), {
       action: 'allow',
     }, pathname)
   }
@@ -259,17 +301,44 @@ test('redirects logged-out management requests to login before render', () => {
   })
 })
 
-test('keeps shared staff workflows available to carers', () => {
+test('frontline carers can open only assigned-work and profile routes', () => {
+  const capabilities = [
+    'PROFILE_HELP_VIEW',
+    'FRONTLINE_SHIFT_VIEW',
+    'FRONTLINE_SHIFT_EXECUTE',
+    'FRONTLINE_ASSIGNED_VISITS_VIEW',
+    'FRONTLINE_VISIT_EXECUTE',
+  ] as const
+
+  for (const pathname of [
+    '/today',
+    '/visits',
+    '/visits/visit-1',
+    '/schedule/visit-1',
+    '/shift',
+    '/settings',
+    '/clients/client-1',
+  ]) {
+    assert.deepEqual(resolveAuthenticatedRoute(pathname, ['carer'], capabilities), {
+      action: 'allow',
+    }, pathname)
+  }
+
   for (const pathname of [
     '/people',
     '/schedule',
+    '/schedule/new',
     '/medication',
     '/family-updates',
+    '/family-updates/approvals',
+    '/carebridge',
     '/care-planning',
-    '/settings',
+    '/evidence',
+    '/visits/new',
   ]) {
-    assert.deepEqual(resolveAuthenticatedRoute(pathname, ['carer']), {
-      action: 'allow',
+    assert.deepEqual(resolveAuthenticatedRoute(pathname, ['carer'], capabilities), {
+      action: 'redirect',
+      destination: '/today',
     }, pathname)
   }
 })

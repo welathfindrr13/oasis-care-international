@@ -11,6 +11,8 @@ import { PrescriptionDto } from './dto/prescription.dto';
 import { MedicationAdministrationDto } from './dto/medication-administration.dto';
 import { LegacyOperationalSurface } from '../auth/legacy-operational-access';
 import { requireOperationalActor } from '../carer/carer-access.service';
+import { RequireCapabilities } from '../auth/access-capability';
+import type { CanonicalAccessContext } from '../auth/access-context.service';
 
 export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => SetMetadata('roles', roles);
 
@@ -25,6 +27,7 @@ export class MedicationResolver {
     userRole: string;
     organizationId?: string;
     authSubject: string;
+    accessContext: CanonicalAccessContext;
   } {
     return requireOperationalActor(req?.user);
   }
@@ -63,18 +66,19 @@ export class MedicationResolver {
   }
 
   @Mutation(() => MedicationAdministrationDto)
-  @Roles('admin', 'carer')
+  @RequireCapabilities('FRONTLINE_VISIT_EXECUTE')
   async recordAdministration(
     @Args('input') input: RecordAdministrationInput,
     @Context('req') req: any,
   ): Promise<MedicationAdministrationDto> {
-    const { userId, userRole, organizationId, authSubject } = this.getUserContext(req);
+    const { userId, userRole, organizationId, authSubject, accessContext } = this.getUserContext(req);
     const administration = await this.medicationService.recordAdministration(
       input,
       userId,
       userRole,
       organizationId,
       authSubject,
+      accessContext,
     );
     return new MedicationAdministrationDto(administration);
   }

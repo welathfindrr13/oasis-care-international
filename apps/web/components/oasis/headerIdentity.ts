@@ -1,5 +1,6 @@
 import { getAccessContext, type AccessContext } from "../../lib/auth/access";
 import { normalizeAppRoles } from "../../lib/auth/roles";
+import type { AccessCapability } from "../../lib/auth/capabilities";
 
 type HeaderAuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -18,6 +19,7 @@ interface HeaderViewerInput {
   pathname: string;
   status: HeaderAuthStatus;
   roles: unknown;
+  capabilities?: readonly AccessCapability[];
   userName?: string | null;
   userEmail?: string | null;
 }
@@ -60,12 +62,13 @@ export function createHeaderViewer({
   pathname,
   status,
   roles,
+  capabilities = [],
   userName,
   userEmail,
 }: HeaderViewerInput): HeaderViewer {
   const normalizedRoles = hasRawRoles(roles) ? normalizeAppRoles(roles) : [];
   const effectiveRoles = status === "authenticated" ? normalizedRoles : [];
-  const accessContext = getAccessContext(effectiveRoles);
+  const accessContext = getAccessContext(effectiveRoles, capabilities);
   const suppliedRole = firstSuppliedRole(roles);
   const primaryRole = effectiveRoles.includes(suppliedRole)
     ? suppliedRole

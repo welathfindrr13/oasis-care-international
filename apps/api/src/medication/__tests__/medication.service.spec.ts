@@ -25,6 +25,20 @@ describe('MedicationService', () => {
     role: 'admin',
   };
   const organizationId = 'org-123';
+  const frontlineAccess = {
+    authenticated: true as const,
+    identityProvider: 'test',
+    membershipId: 'membership-user-123',
+    surface: 'STAFF' as const,
+    effectiveRole: 'carer',
+    organizationId,
+    membershipState: 'ACTIVE',
+    onboardingState: 'READY',
+    rawRole: 'carer',
+    linkedIdentityState: 'LINKED',
+    domainIdentityId: mockUser.id,
+    authSubject: 'auth-user-123',
+  } satisfies import('../../auth/access-context.service').CanonicalAccessContext;
 
   const mockMedicationAdministration = {
     id: 'med-admin-123',
@@ -152,6 +166,8 @@ describe('MedicationService', () => {
         mockUser.id,
         mockUser.role,
         organizationId,
+        undefined,
+        frontlineAccess,
       );
 
       expect(result.status).toBe(MedicationStatus.ADMINISTERED);
@@ -182,7 +198,14 @@ describe('MedicationService', () => {
       repository.findMedicationAdministrationById.mockResolvedValue(null);
 
       await expect(
-        service.recordAdministration(input, mockUser.id, mockUser.role, organizationId)
+        service.recordAdministration(
+          input,
+          mockUser.id,
+          mockUser.role,
+          organizationId,
+          undefined,
+          frontlineAccess,
+        )
       ).rejects.toThrow(
         new BaseHttpException(
           ErrorCode.MEDICATION_ADMINISTRATION_NOT_FOUND,
@@ -209,7 +232,14 @@ describe('MedicationService', () => {
       repository.findMedicationAdministrationById.mockResolvedValue(differentCarerAdmin as any);
 
       await expect(
-        service.recordAdministration(input, mockUser.id, mockUser.role, organizationId)
+        service.recordAdministration(
+          input,
+          mockUser.id,
+          mockUser.role,
+          organizationId,
+          undefined,
+          frontlineAccess,
+        )
       ).rejects.toThrow(
         new BaseHttpException(
           ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
@@ -236,7 +266,14 @@ describe('MedicationService', () => {
       repository.findOverlappingMedicationTimes.mockResolvedValue([overlappingMedication] as any);
 
       await expect(
-        service.recordAdministration(input, mockUser.id, mockUser.role, organizationId)
+        service.recordAdministration(
+          input,
+          mockUser.id,
+          mockUser.role,
+          organizationId,
+          undefined,
+          frontlineAccess,
+        )
       ).rejects.toThrow(
         new BaseHttpException(
           ErrorCode.MEDICATION_OVERLAP,
@@ -275,6 +312,8 @@ describe('MedicationService', () => {
         mockUser.id,
         mockUser.role,
         organizationId,
+        undefined,
+        frontlineAccess,
       );
 
       expect(result.status).toBe(MedicationStatus.ADMINISTERED);
@@ -300,6 +339,8 @@ describe('MedicationService', () => {
         mockUser.id,
         mockUser.role,
         organizationId,
+        undefined,
+        frontlineAccess,
       );
 
       expect(result.status).toBe(MedicationStatus.MISSED);

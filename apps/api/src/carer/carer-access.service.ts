@@ -19,6 +19,7 @@ export type ResolvedOperationalActor = {
   userRole: string;
   organizationId: string;
   authSubject: string;
+  accessContext: CanonicalAccessContext;
 };
 
 const CARER_LINK_REQUIRED_MESSAGE = 'Active carer membership link is required';
@@ -45,6 +46,7 @@ export function requireOperationalActor(user: CarerEnrichedRequestUser | null | 
       userRole: 'carer',
       organizationId: access.organizationId,
       authSubject: access.authSubject,
+      accessContext: access,
     };
   }
 
@@ -53,6 +55,7 @@ export function requireOperationalActor(user: CarerEnrichedRequestUser | null | 
     userRole: access.rawRole,
     organizationId: access.organizationId,
     authSubject: access.authSubject,
+    accessContext: access,
   };
 }
 

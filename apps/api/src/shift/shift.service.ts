@@ -6,6 +6,11 @@ import { ClockInInput } from './dto/clock-in.input';
 import { ClockOutInput } from './dto/clock-out.input';
 import { CarerShiftDto, ShiftAnalyticsDto, ShiftMethodBreakdownDto } from './dto/carer-shift.dto';
 import { ShiftRepository } from './shift.repository';
+import {
+  type AccessCapability,
+  type CanonicalCapabilityActor,
+  hasCanonicalActorCapability,
+} from '../auth/access-capability';
 
 @Injectable()
 export class ShiftService {
@@ -15,29 +20,26 @@ export class ShiftService {
     private readonly shiftRepository: ShiftRepository,
   ) {}
 
-  async myActiveShift(userId: string, userRole: string, organizationId?: string): Promise<CarerShiftDto | null> {
+  async myActiveShift(userId: string, userRole: string, organizationId?: string, accessContext?: CanonicalCapabilityActor): Promise<CarerShiftDto | null> {
     const orgId = await this.requireOrganizationId(organizationId);
-    const role = this.normalizeRole(userRole);
-    this.checkShiftReadAccess(role);
+    this.assertActorCapability(accessContext, 'FRONTLINE_SHIFT_VIEW', orgId, userId, userRole);
 
     const shift = await this.shiftRepository.findActiveShiftByCarerId(userId, orgId);
     if (!shift) return null;
     return this.mapShiftToDto(shift);
   }
 
-  async myRecentShifts(userId: string, userRole: string, organizationId?: string, take = 5): Promise<CarerShiftDto[]> {
+  async myRecentShifts(userId: string, userRole: string, organizationId?: string, take = 5, accessContext?: CanonicalCapabilityActor): Promise<CarerShiftDto[]> {
     const orgId = await this.requireOrganizationId(organizationId);
-    const role = this.normalizeRole(userRole);
-    this.checkShiftReadAccess(role);
+    this.assertActorCapability(accessContext, 'FRONTLINE_SHIFT_VIEW', orgId, userId, userRole);
 
     const shifts = await this.shiftRepository.findRecentShiftsByCarerId(userId, orgId, take);
     return shifts.map((shift) => this.mapShiftToDto(shift));
   }
 
-  async clockIn(input: ClockInInput, userId: string, userRole: string, organizationId?: string): Promise<CarerShiftDto> {
+  async clockIn(input: ClockInInput, userId: string, userRole: string, organizationId?: string, accessContext?: CanonicalCapabilityActor): Promise<CarerShiftDto> {
     const orgId = await this.requireOrganizationId(organizationId);
-    const role = this.normalizeRole(userRole);
-    this.checkClockActionAccess(role);
+    this.assertActorCapability(accessContext, 'FRONTLINE_SHIFT_EXECUTE', orgId, userId, userRole);
 
     const carer = await this.shiftRepository.findCarerById(userId, orgId);
     if (!carer) {
@@ -74,10 +76,9 @@ export class ShiftService {
     return this.mapShiftToDto(created);
   }
 
-  async clockOut(input: ClockOutInput, userId: string, userRole: string, organizationId?: string): Promise<CarerShiftDto> {
+  async clockOut(input: ClockOutInput, userId: string, userRole: string, organizationId?: string, accessContext?: CanonicalCapabilityActor): Promise<CarerShiftDto> {
     const orgId = await this.requireOrganizationId(organizationId);
-    const role = this.normalizeRole(userRole);
-    this.checkClockActionAccess(role);
+    this.assertActorCapability(accessContext, 'FRONTLINE_SHIFT_EXECUTE', orgId, userId, userRole);
 
     const activeShift = await this.shiftRepository.findActiveShiftByCarerId(userId, orgId);
     if (!activeShift) {
@@ -109,8 +110,9 @@ export class ShiftService {
     return this.mapShiftToDto(closed);
   }
 
-  async analytics(from?: string, to?: string, organizationId?: string): Promise<ShiftAnalyticsDto> {
+  async analytics(from: string | undefined, to: string | undefined, userId: string, userRole: string, organizationId?: string, accessContext?: CanonicalCapabilityActor): Promise<ShiftAnalyticsDto> {
     const orgId = await this.requireOrganizationId(organizationId);
+    this.assertActorCapability(accessContext, 'WORKFORCE_MANAGE', orgId, userId, userRole);
     const range = this.getRange(from, to);
 
     const [
@@ -197,28 +199,19 @@ export class ShiftService {
     return { from: start, to: end };
   }
 
-  private normalizeRole(userRole: string): string {
-    return (userRole || '').toLowerCase().trim();
-  }
-
-  private checkShiftReadAccess(userRole: string): void {
-    if (!['admin', 'carer'].includes(userRole)) {
-      throw new BaseHttpException(
-        ErrorCode.FORBIDDEN_ROLE_REQUIRED,
-        'Clinical staff access required',
-        HttpStatus.FORBIDDEN,
-      );
-    }
-  }
-
-  private checkClockActionAccess(userRole: string): void {
-    if (userRole !== 'carer') {
-      throw new BaseHttpException(
-        ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
-        'Only carers can clock in or out',
-        HttpStatus.FORBIDDEN,
-      );
-    }
+  private assertActorCapability(
+    accessContext: CanonicalCapabilityActor | undefined,
+    capability: AccessCapability,
+    organizationId: string,
+    userId: string,
+    userRole: string,
+  ): void {
+    if (hasCanonicalActorCapability(accessContext, capability, { organizationId, userId, userRole })) return;
+    throw new BaseHttpException(
+      ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
+      'This account cannot perform the requested shift action',
+      HttpStatus.FORBIDDEN,
+    );
   }
 
   private mapShiftToDto(shift: any): CarerShiftDto {

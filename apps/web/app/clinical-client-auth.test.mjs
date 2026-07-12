@@ -133,6 +133,10 @@ test("visit creation and medication keep admin-only controls separate from staff
     new URL("emar/page.tsx", import.meta.url),
     "utf8",
   );
+  const visitWorkspace = readFileSync(
+    new URL("visits/[id]/page.tsx", import.meta.url),
+    "utf8",
+  );
 
   assert.match(visitCreation, /if \(!isAdmin\)/);
   assert.match(
@@ -140,4 +144,12 @@ test("visit creation and medication keep admin-only controls separate from staff
     /if \(authStatus === 'loading' \|\| !authenticated \|\| !isAdmin\) return/,
   );
   assert.match(medication, /if \(!isStaff\)/);
+  assert.match(
+    visitWorkspace,
+    /hasAccessCapability\([\s\S]*?'FRONTLINE_VISIT_EXECUTE'/,
+  );
+  assert.doesNotMatch(
+    visitWorkspace,
+    /canRunVisitWorkflow\s*=\s*isAdmin\s*\|\|\s*isCarer/,
+  );
 });
