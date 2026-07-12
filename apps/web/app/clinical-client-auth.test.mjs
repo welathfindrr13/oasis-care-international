@@ -146,10 +146,40 @@ test("visit creation and medication keep admin-only controls separate from staff
   assert.match(medication, /if \(!isStaff\)/);
   assert.match(
     visitWorkspace,
-    /hasAccessCapability\([\s\S]*?'FRONTLINE_VISIT_EXECUTE'/,
+    /hasAccessCapability\([\s\S]*?["']FRONTLINE_VISIT_EXECUTE["']/,
   );
   assert.doesNotMatch(
     visitWorkspace,
     /canRunVisitWorkflow\s*=\s*isAdmin\s*\|\|\s*isCarer/,
   );
+});
+
+test("Carer Today and My visits use assigned-work cards instead of admin schedule controls", () => {
+  const today = readFileSync(
+    new URL("today/page.tsx", import.meta.url),
+    "utf8",
+  );
+  const visits = readFileSync(
+    new URL("visits/page.tsx", import.meta.url),
+    "utf8",
+  );
+  const visitWorkspace = readFileSync(
+    new URL("visits/[id]/page.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(today, /getLondonDayUtcRange\(\)/);
+  assert.match(today, /Current visit/);
+  assert.match(today, /Next visit/);
+  assert.match(today, /MY_ACTIVE_SHIFT_QUERY/);
+  assert.match(
+    visits,
+    /if \(!isAdmin\) return <CarerVisits visits=\{visits\} \/>/,
+  );
+  assert.match(visits, /Care visits assigned to you/);
+  assert.doesNotMatch(visitWorkspace, />Visit Header</);
+  assert.doesNotMatch(visitWorkspace, />Step 3\. Medication Round</);
+  assert.doesNotMatch(visitWorkspace, /Care note and evidence/);
+  assert.match(visitWorkspace, /isAdmin &&\s*visit\?\.client/);
+  assert.match(visitWorkspace, /\{isAdmin && \([\s\S]*?Open care-note records/);
 });

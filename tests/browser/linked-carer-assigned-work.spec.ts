@@ -71,26 +71,29 @@ test("a linked fake carer follows the database role despite an admin token claim
     email: "carer@local.dev",
     name: "Local Carer",
     role: "admin",
-    callbackUrl: "http://localhost:3002/visits",
+    callbackUrl: "http://localhost:3002/today",
   });
 
-  await page.goto("/visits");
+  await page.goto("/today");
 
-  await expect(page).toHaveURL("/visits");
+  await expect(page).toHaveURL("/today");
+  await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
+  await expect(page.getByText("Next visit", { exact: true }).first()).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Workforce", exact: true }),
   ).toHaveCount(0);
 
-  const assignedVisit = page.locator(`a[href="/schedule/${VISIT_ID}"]`);
-  await expect(assignedVisit).toHaveCount(1);
+  await expect(page.getByText("Assigned Fake Client", { exact: true })).toBeVisible();
   await expect(
     page.locator(`a[href="/schedule/${UNASSIGNED_VISIT_ID}"]`),
   ).toHaveCount(0);
-  await assignedVisit.click();
+  await page.getByRole("link", { name: "Open visit" }).click();
 
   await expect(page).toHaveURL(`/schedule/${VISIT_ID}`);
-  await expect(page.getByRole("heading", { name: "Care Visit" })).toBeVisible();
-  await expect(page.getByText("Browser Carer", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Assigned Fake Client" })).toBeVisible();
+  await expect(page.getByText("Browser Carer", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Visit details" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Step 3. Medication support" })).toBeVisible();
   await expect(
     page.getByText("Confirm assigned visit", { exact: true }),
   ).toBeVisible();

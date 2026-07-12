@@ -453,7 +453,7 @@ export default function VisitDetailPage() {
       id: `care-log-${log.id}`,
       occurredAt: log.occurredAt,
       title: `${CARE_LOG_CATEGORIES.find((entry) => entry.value === log.category)?.label || log.category} care note recorded`,
-      detail: log.notes || (log.escalated ? `Escalated to ${log.escalatedTo || 'team lead'}` : 'Care evidence recorded'),
+      detail: log.notes || (log.escalated ? `Escalated to ${log.escalatedTo || 'team lead'}` : 'Care note recorded'),
       kind: 'care-log' as const,
     }));
 
@@ -669,26 +669,28 @@ export default function VisitDetailPage() {
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
-          <Link href="/schedule" className="text-teal-700 hover:text-teal-800">
-            ← Back to Visits
+          <Link href={isAdmin ? '/schedule' : '/visits'} className="text-teal-700 hover:text-teal-800">
+            ← {isAdmin ? 'Back to Schedule' : 'Back to my visits'}
           </Link>
           {visit?.client && (
             <Link href={`/clients/${visit.client.id}`} className="text-slate-500 hover:text-slate-700">
-              Open client record
+              Person details
             </Link>
           )}
-          {visit?.client && (
+          {isAdmin && visit?.client && (
             <Link href={`/emar?clientId=${visit.client.id}`} className="text-slate-500 hover:text-slate-700">
-              Open Medication Round
+              Open medication records
             </Link>
           )}
         </div>
 
         <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">Care Visit</h1>
+            <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">
+              {visit?.client?.fullName || 'Care visit'}
+            </h1>
             <p className="mt-1 text-slate-500">
-              Guided workflow for delivering care, recording medication outcomes, and completing this visit.
+              Follow the visit steps, record care, and finish when everything is complete.
             </p>
           </div>
           {visit && (
@@ -715,8 +717,8 @@ export default function VisitDetailPage() {
             <div className="space-y-6 xl:col-span-2">
               <Card>
                 <CardHeader>
-                  <h2 className="text-xl font-semibold text-slate-900">Visit Header</h2>
-                  <p className="text-sm text-slate-500">Person, carer, status, and scheduled versus actual timings.</p>
+                  <h2 className="text-xl font-semibold text-slate-900">Visit details</h2>
+                  <p className="text-sm text-slate-500">Who you are visiting, where to go, and the planned time.</p>
                 </CardHeader>
                 <CardContent className="mb-0 grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="rounded-lg bg-slate-50 p-4">
@@ -730,13 +732,15 @@ export default function VisitDetailPage() {
                       </p>
                     )}
                   </div>
-                  <div className="rounded-lg bg-slate-50 p-4">
-                    <p className="text-sm text-slate-500">Carer</p>
-                    <p className="mt-1 text-base font-medium text-slate-900">
-                      {visit.carer ? `${visit.carer.firstName} ${visit.carer.lastName}` : visit.carerId}
-                    </p>
-                    {visit.carer?.phone && <p className="mt-1 text-sm text-slate-600">{visit.carer.phone}</p>}
-                  </div>
+                  {isAdmin && (
+                    <div className="rounded-lg bg-slate-50 p-4">
+                      <p className="text-sm text-slate-500">Assigned Carer</p>
+                      <p className="mt-1 text-base font-medium text-slate-900">
+                        {visit.carer ? `${visit.carer.firstName} ${visit.carer.lastName}` : visit.carerId}
+                      </p>
+                      {visit.carer?.phone && <p className="mt-1 text-sm text-slate-600">{visit.carer.phone}</p>}
+                    </div>
+                  )}
                   <div className="rounded-lg bg-slate-50 p-4">
                     <p className="text-sm text-slate-500">Status</p>
                     <span className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusBadge(visit.status)}`}>
@@ -763,7 +767,7 @@ export default function VisitDetailPage() {
               <Card>
                 <CardHeader>
                   <h2 className="text-xl font-semibold text-slate-900">Step 1. Start visit</h2>
-                  <p className="text-sm text-slate-500">Start the visit before recording care actions, medication, and evidence.</p>
+                  <p className="text-sm text-slate-500">Start when you arrive before recording care and medication support.</p>
                 </CardHeader>
                 <CardContent className="mb-0 space-y-3">
                   {!canRunVisitWorkflow ? (
@@ -854,8 +858,8 @@ export default function VisitDetailPage() {
 
               <Card>
                 <CardHeader>
-                  <h2 className="text-xl font-semibold text-slate-900">Step 3. Medication Round</h2>
-                  <p className="text-sm text-slate-500">Record medication outcomes for administrations due on this visit.</p>
+                  <h2 className="text-xl font-semibold text-slate-900">Step 3. Medication support</h2>
+                  <p className="text-sm text-slate-500">Record the outcome for medication due during this visit.</p>
                 </CardHeader>
                 <CardContent className="mb-0">
                   {medications.length === 0 ? (
@@ -952,8 +956,8 @@ export default function VisitDetailPage() {
 
               <Card>
                 <CardHeader>
-                  <h2 className="text-xl font-semibold text-slate-900">Step 4. Care note and evidence</h2>
-                  <p className="text-sm text-slate-500">Capture care notes and escalation details for this visit.</p>
+                  <h2 className="text-xl font-semibold text-slate-900">Step 4. Care notes</h2>
+                  <p className="text-sm text-slate-500">Record the care provided and anything the team needs to follow up.</p>
                 </CardHeader>
                 <CardContent className="mb-0">
                   {status === 'loading' ? (
@@ -1059,8 +1063,8 @@ export default function VisitDetailPage() {
 
               <Card>
                 <CardHeader>
-                  <h2 className="text-xl font-semibold text-slate-900">Step 5. Complete visit</h2>
-                  <p className="text-sm text-slate-500">Finish the visit once care actions and evidence are captured.</p>
+                  <h2 className="text-xl font-semibold text-slate-900">Step 5. Finish visit</h2>
+                  <p className="text-sm text-slate-500">Finish once care actions, medication outcomes, and notes are recorded.</p>
                 </CardHeader>
                 <CardContent className="mb-0 space-y-4">
                   {visit.status === 'COMPLETED' ? (
@@ -1136,20 +1140,26 @@ export default function VisitDetailPage() {
 
               <Card>
                 <CardHeader>
-                  <h2 className="text-xl font-semibold text-slate-900">Operational links</h2>
+                  <h2 className="text-xl font-semibold text-slate-900">Visit links</h2>
                 </CardHeader>
                 <CardContent className="mb-0 space-y-3">
+                  {isAdmin && (
+                    <>
+                      <Button asChild variant="outline" className="w-full justify-center">
+                        <Link href={`/clients/${visit.clientId}/care-logs`}>Open care-note records</Link>
+                      </Button>
+                      <Button asChild variant="outline" className="w-full justify-center">
+                        <Link href={`/emar?clientId=${visit.clientId}`}>Open medication records</Link>
+                      </Button>
+                    </>
+                  )}
                   <Button asChild variant="outline" className="w-full justify-center">
-                    <Link href={`/clients/${visit.clientId}/care-logs`}>Open client care notes</Link>
-                  </Button>
-                  <Button asChild variant="outline" className="w-full justify-center">
-                    <Link href={`/emar?clientId=${visit.clientId}`}>Open Medication Round</Link>
-                  </Button>
-                  <Button asChild variant="outline" className="w-full justify-center">
-                    <Link href={`/clients/${visit.clientId}`}>Open client record</Link>
+                    <Link href={`/clients/${visit.clientId}`}>Person details</Link>
                   </Button>
                   <Button asChild variant="ghost" className="w-full justify-center">
-                    <Link href="/schedule">Back to Schedule</Link>
+                    <Link href={isAdmin ? '/schedule' : '/visits'}>
+                      {isAdmin ? 'Back to Schedule' : 'Back to my visits'}
+                    </Link>
                   </Button>
                 </CardContent>
               </Card>
