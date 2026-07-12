@@ -265,6 +265,43 @@ test("an administrator sees the real organization in the guided synthetic setup"
   ).toBeVisible();
 });
 
+test("Admin Today prioritizes visit exceptions at mobile and desktop sizes", async ({
+  page,
+}, testInfo) => {
+  await signIn(page, {
+    email: "admin@local.dev",
+    name: "Local Admin",
+    role: "user",
+    callbackUrl: "http://localhost:3002/today",
+  });
+
+  for (const viewport of [
+    { width: 390, height: 844, name: "mobile" },
+    { width: 1440, height: 900, name: "desktop" },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/today");
+    await expect(page).toHaveURL("/today");
+    await expect(page.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open today's schedule" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Needs attention" })).toBeVisible();
+    await expect(page.getByText("Late or missed visits", { exact: true })).toBeVisible();
+    await expect(page.getByText("Assignments not ready", { exact: true })).toBeVisible();
+    await expect(page.getByText("Incomplete visit records", { exact: true })).toBeVisible();
+    await expect(page.getByText("AI Health Summaries", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Care plan reviews due soon", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Medication exceptions", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Review visits assigned to a Carer whose account is not ready.")).toBeVisible();
+
+    const accessibility = await new AxeBuilder({ page }).analyze();
+    expect(accessibility.violations).toEqual([]);
+    await page.screenshot({
+      path: testInfo.outputPath(`admin-today-${viewport.name}.png`),
+      fullPage: true,
+    });
+  }
+});
+
 test("pre-workspace invitation activation renders before membership resolution", async ({
   page,
 }) => {
