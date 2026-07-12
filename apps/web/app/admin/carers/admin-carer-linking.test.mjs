@@ -178,7 +178,7 @@ test("settings keep restricted management roles out of operational workspaces", 
 });
 
 test("family shell destinations and install help are truthful and reachable", () => {
-  assert.match(family, /id="updates"[\s\S]*?>Updates</);
+  assert.match(family, /id="updates"[\s\S]*?>Latest update</);
   assert.match(family, /id="concerns-help"[\s\S]*?>Concerns and help</);
   assert.match(family, /<InstallAppPrompt \/>/);
   assert.match(installPrompt, /<Button/);

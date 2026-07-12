@@ -892,6 +892,15 @@ export interface FamilyVerifiedVisitStoriesQueryResponse {
   familyVerifiedVisitStories: FamilyVerifiedVisitStory[];
 }
 
+export interface FamilyConcernReceipt {
+  title: string;
+  status: string;
+}
+
+export interface RaiseFamilyConcernMutationResponse {
+  raiseFamilyCarebridgeConcern: FamilyConcernReceipt;
+}
+
 export interface CarebridgeConcernMessage {
   id: string;
   body: string;
@@ -1093,6 +1102,15 @@ export const FAMILY_VERIFIED_VISIT_STORIES_QUERY = `
       title
       body
       publishedAt
+    }
+  }
+`;
+
+export const RAISE_FAMILY_CONCERN_MUTATION = `
+  mutation RaiseFamilyCarebridgeConcern($input: RaiseConcernInput!) {
+    raiseFamilyCarebridgeConcern(input: $input) {
+      title
+      status
     }
   }
 `;

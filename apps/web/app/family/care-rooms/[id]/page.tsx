@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Header } from '../../../../components/oasis/Header'
+import { FamilyConcernForm } from '../../../../components/carebridge/FamilyConcernForm'
 import { query } from '../../../../lib/graphql/client'
 import {
   FAMILY_CAREBRIDGE_ROOM_QUERY,
@@ -29,12 +30,12 @@ async function getRoomSafe(id: string): Promise<RoomResult> {
     return accessDenied
       ? {
           room: null,
-          error: 'This room is not available with your current family access.',
+          error: 'These updates are not available with your current family access.',
           unavailable: false,
         }
       : {
           room: null,
-          error: 'This room is temporarily unavailable. Please try again.',
+          error: 'These updates are temporarily unavailable. Please try again.',
           unavailable: true,
         }
   }
@@ -72,10 +73,10 @@ export default async function FamilyCareRoomPage({ params }: { params: { id: str
         <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
           <section className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
             <h1 className="font-heading text-2xl font-semibold text-slate-900">
-              {roomResult.unavailable ? 'Room temporarily unavailable' : 'Room unavailable'}
+              {roomResult.unavailable ? 'Updates temporarily unavailable' : 'Updates unavailable'}
             </h1>
             <p className="mt-2 text-sm text-slate-600">
-              {roomResult.error || 'This room is not available with your current family access.'}
+              {roomResult.error || 'These updates are not available with your current family access.'}
             </p>
             <Link
               href={roomResult.unavailable ? `/family/care-rooms/${params.id}` : '/family'}
@@ -114,17 +115,16 @@ export default async function FamilyCareRoomPage({ params }: { params: { id: str
 
         <section className="rounded-3xl border border-sky-100 bg-gradient-to-br from-white via-sky-50 to-cyan-50 p-8 shadow-sm">
           <p className="mb-3 inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
-            Family Assurance Room
+            Family updates
           </p>
           <h1 className="font-heading text-3xl font-bold tracking-tight text-slate-900">{room.clientDisplayName}</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-            You are seeing approved proof-of-care updates only. Internal notes and operational records stay inside the
-            care team workflow.
+            Read the updates that {room.clientDisplayName}’s care team has approved for family viewing.
           </p>
         </section>
 
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="font-heading text-lg font-semibold text-slate-900">What this page includes</h2>
+          <h2 className="font-heading text-lg font-semibold text-slate-900">What you can see here</h2>
           <ul className="mt-3 space-y-2 text-sm text-slate-600">
             <li>Approved updates prepared by your care team.</li>
             <li>Clear language about what happened and what changed.</li>
@@ -177,6 +177,17 @@ export default async function FamilyCareRoomPage({ params }: { params: { id: str
               </article>
             ))
           )}
+        </section>
+
+        <section id="concerns-help" className="mt-6 scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="font-heading text-xl font-semibold text-slate-900">Tell us about a concern</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Send a question or concern about {room.clientDisplayName} directly to the care team. This form is not
+            monitored as an emergency service. If someone is in immediate danger, call 999.
+          </p>
+          <div className="mt-5">
+            <FamilyConcernForm careRoomId={room.id} personName={room.clientDisplayName} />
+          </div>
         </section>
       </main>
     </div>

@@ -1,0 +1,157 @@
+'use client'
+
+import { useState, type FormEvent } from 'react'
+import { hasAccessCapability } from '../../lib/auth/capabilities'
+import { clientQuery } from '../../lib/graphql/client-side'
+import {
+  RAISE_FAMILY_CONCERN_MUTATION,
+  type RaiseFamilyConcernMutationResponse,
+} from '../../lib/graphql/queries'
+import { useClientAccess } from '../providers/ClientAccessProvider'
+
+interface FamilyConcernFormProps {
+  careRoomId: string
+  personName: string
+}
+
+const categories = [
+  { value: 'VISIT_DELIVERY', label: 'A visit or care task' },
+  { value: 'COMMUNICATION', label: 'Communication' },
+  { value: 'MEDICATION_SUPPORT', label: 'Medication support' },
+  { value: 'WELLBEING_CHANGE', label: 'A change in wellbeing' },
+  { value: 'SCHEDULING', label: 'Visit timing or schedule' },
+  { value: 'OTHER', label: 'Something else' },
+] as const
+
+export function FamilyConcernForm({ careRoomId, personName }: FamilyConcernFormProps) {
+  const access = useClientAccess()
+  const [category, setCategory] = useState<(typeof categories)[number]['value']>('COMMUNICATION')
+  const [severity, setSeverity] = useState('MEDIUM')
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [submittedTitle, setSubmittedTitle] = useState<string | null>(null)
+
+  if (!hasAccessCapability(access.capabilities, 'FAMILY_CONCERN_CREATE')) {
+    return (
+      <p className="text-sm leading-6 text-slate-600">
+        Online concerns are not included in your current access. Please contact the care provider using the details
+        they have given you.
+      </p>
+    )
+  }
+
+  async function submitConcern(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSubmitting(true)
+    setError(null)
+    setSubmittedTitle(null)
+
+    try {
+      const data = await clientQuery<RaiseFamilyConcernMutationResponse>(
+        RAISE_FAMILY_CONCERN_MUTATION,
+        {
+          input: {
+            careRoomId,
+            title: title.trim(),
+            description: description.trim() || undefined,
+            category,
+            severity,
+          },
+        },
+        { getBearerToken: access.getBearerToken },
+      )
+      setSubmittedTitle(data.raiseFamilyCarebridgeConcern.title)
+      setTitle('')
+      setDescription('')
+      setCategory('COMMUNICATION')
+      setSeverity('MEDIUM')
+    } catch {
+      setError('We could not send your concern. Please try again or contact the care provider directly.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (submittedTitle) {
+    return (
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4" role="status">
+        <h3 className="font-semibold text-emerald-900">Your concern has been sent</h3>
+        <p className="mt-1 text-sm leading-6 text-emerald-800">
+          The care team has received “{submittedTitle}”. They will review it and contact you using your agreed contact
+          details.
+        </p>
+        <button
+          type="button"
+          onClick={() => setSubmittedTitle(null)}
+          className="mt-3 text-sm font-semibold text-emerald-900 underline underline-offset-2"
+        >
+          Send another concern
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <form className="space-y-4" onSubmit={submitConcern}>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="text-sm font-medium text-slate-800">
+          What is this about?
+          <select
+            value={category}
+            onChange={(event) => setCategory(event.target.value as typeof category)}
+            className="mt-2 block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-slate-900"
+          >
+            {categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+          </select>
+        </label>
+        <label className="text-sm font-medium text-slate-800">
+          How important is it?
+          <select
+            value={severity}
+            onChange={(event) => setSeverity(event.target.value)}
+            className="mt-2 block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-slate-900"
+          >
+            <option value="LOW">Routine question</option>
+            <option value="MEDIUM">Important</option>
+            <option value="HIGH">Urgent</option>
+          </select>
+        </label>
+      </div>
+
+      <label className="block text-sm font-medium text-slate-800">
+        Short summary
+        <input
+          required
+          maxLength={200}
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          placeholder={`What are you worried about for ${personName}?`}
+          className="mt-2 block min-h-11 w-full rounded-xl border border-slate-300 px-3 text-slate-900"
+        />
+      </label>
+
+      <label className="block text-sm font-medium text-slate-800">
+        Tell us more <span className="font-normal text-slate-500">(optional)</span>
+        <textarea
+          maxLength={2000}
+          rows={5}
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          className="mt-2 block w-full rounded-xl border border-slate-300 p-3 text-slate-900"
+        />
+      </label>
+
+      {error ? <p className="text-sm text-rose-700" role="alert">{error}</p> : null}
+
+      <button
+        type="submit"
+        disabled={submitting || !title.trim()}
+        className="inline-flex min-h-11 items-center rounded-full bg-teal-700 px-5 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {submitting ? 'Sending…' : 'Send concern to the care team'}
+      </button>
+    </form>
+  )
+}

@@ -11,6 +11,7 @@ const CLIENT_ID = "client-browser-linked-carer";
 const MEMBERSHIP_ID = "44444444-4444-4444-8444-444444444444";
 const VISIT_ID = "55555555-5555-4555-8555-555555555555";
 const UNASSIGNED_VISIT_ID = "55555555-5555-4555-8555-666666666666";
+const FAMILY_UPDATE_VISIT_ID = "55555555-5555-4555-8555-777777777777";
 const TASK_ID = "66666666-6666-4666-8666-666666666666";
 const ADMIN_MEMBERSHIP_ID = "77777777-7777-4777-8777-777777777777";
 const FAMILY_MEMBERSHIP_ID = "88888888-8888-4888-8888-888888888888";
@@ -20,6 +21,8 @@ const OFFICE_MEMBERSHIP_ID = "14141414-1414-4414-8414-141414141414";
 const FAMILY_CONTACT_ID = "99999999-9999-4999-8999-999999999999";
 const CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const CARE_ROOM_MEMBERSHIP_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const FAMILY_UPDATE_ID = "abababab-abab-4bab-8bab-abababababab";
+const FAMILY_INVITATION_ID = "acacacac-acac-4cac-8cac-acacacacacac";
 const PENDING_INVITATION_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const EXPIRED_INVITATION_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const REVOKED_INVITATION_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
@@ -59,6 +62,18 @@ try {
     where: {
       care_room_membership: { care_room: { organization_id: ORGANIZATION_ID } },
     },
+  });
+  await prisma.concernMessage.deleteMany({
+    where: { concern: { organization_id: ORGANIZATION_ID } },
+  });
+  await prisma.concernEvent.deleteMany({
+    where: { concern: { organization_id: ORGANIZATION_ID } },
+  });
+  await prisma.concern.deleteMany({
+    where: { organization_id: ORGANIZATION_ID },
+  });
+  await prisma.verifiedVisitStory.deleteMany({
+    where: { organization_id: ORGANIZATION_ID },
   });
   await prisma.careRoomMembership.deleteMany({
     where: { care_room: { organization_id: ORGANIZATION_ID } },
@@ -229,6 +244,21 @@ try {
         expires_at: sevenDaysFromNow,
         revoked_at: now,
       },
+      {
+        id: FAMILY_INVITATION_ID,
+        organization_id: ORGANIZATION_ID,
+        activated_membership_id: FAMILY_MEMBERSHIP_ID,
+        identity_provider: "cognito",
+        intended_email: "family@local.dev",
+        normalized_email: "family@local.dev",
+        intended_role: "family",
+        status: "ACCEPTED",
+        external_invitation_id: "external-family-browser",
+        bound_auth_subject: familySubject,
+        created_at: oneDayAgo,
+        expires_at: sevenDaysFromNow,
+        accepted_at: now,
+      },
     ],
   });
   await prisma.organizationProvisioningOutbox.createMany({
@@ -276,12 +306,18 @@ try {
       id: CARE_ROOM_MEMBERSHIP_ID,
       care_room_id: CARE_ROOM_ID,
       family_contact_id: FAMILY_CONTACT_ID,
+      organization_membership_invitation_id: FAMILY_INVITATION_ID,
       role: "FAMILY_VIEWER",
       status: "ACTIVE",
       access_basis: "CLIENT_CONSENT",
       accepted_at: new Date(),
       access_grants: {
-        create: [{ scope: "VIEW_UPDATES" }, { scope: "VIEW_VISIT_TIMES" }],
+        create: [
+          { scope: "VIEW_UPDATES" },
+          { scope: "VIEW_VISIT_TIMES" },
+          { scope: "VIEW_TASK_SUMMARY" },
+          { scope: "RAISE_CONCERNS" },
+        ],
       },
     },
   });
@@ -314,6 +350,38 @@ try {
       scheduled_end: scheduledEnd,
       status: VisitStatus.SCHEDULED,
       notes: "Synthetic unassigned visit exclusion proof",
+    },
+  });
+  await prisma.visit.create({
+    data: {
+      id: FAMILY_UPDATE_VISIT_ID,
+      organization_id: ORGANIZATION_ID,
+      carer_id: OTHER_CARER_ID,
+      client_id: CLIENT_ID,
+      scheduled_start: new Date(scheduledStart.getTime() - 24 * 60 * 60 * 1000),
+      scheduled_end: new Date(scheduledEnd.getTime() - 24 * 60 * 60 * 1000),
+      status: VisitStatus.COMPLETED,
+      notes: "Synthetic completed family update visit",
+    },
+  });
+  await prisma.verifiedVisitStory.create({
+    data: {
+      id: FAMILY_UPDATE_ID,
+      organization_id: ORGANIZATION_ID,
+      care_room_id: CARE_ROOM_ID,
+      client_id: CLIENT_ID,
+      visit_id: FAMILY_UPDATE_VISIT_ID,
+      status: "PUBLISHED",
+      draft_title: "Internal synthetic draft",
+      draft_body: "Internal synthetic browser-only draft body.",
+      approved_title: "A comfortable morning visit",
+      approved_body: "The morning visit went well.",
+      family_safe_version: 1,
+      family_safe_title: "A comfortable morning visit",
+      family_safe_body: "The morning visit went well and the planned support was completed.",
+      source_refs: [{ type: "Visit", id: FAMILY_UPDATE_VISIT_ID }],
+      approved_at: new Date(),
+      published_at: new Date(),
     },
   });
 } finally {

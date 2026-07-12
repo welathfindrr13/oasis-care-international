@@ -13,13 +13,14 @@ export function FamilyAssuranceRoom({ room, stories }: FamilyAssuranceRoomProps)
     <div className="space-y-6">
       <section className="rounded-3xl border border-sky-100 bg-gradient-to-br from-white via-sky-50 to-cyan-50 p-8 shadow-sm">
         <p className="mb-3 inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
-          Family Assurance Room
+          Family updates
         </p>
         <h1 className="font-heading text-3xl font-bold tracking-tight text-slate-900">
           {room.client.fullName}
         </h1>
         <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
-          This space contains approved proof-of-care updates written for family viewing. It shows what happened, what changed, and what needs attention without exposing raw internal care notes.
+          Read the updates the care team has approved for family viewing. These explain what happened and what changed
+          without showing private staff notes.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Button asChild variant="ghost">
