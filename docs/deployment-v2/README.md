@@ -371,6 +371,51 @@ after two minutes to the platform operator. Each subprocess has a ten-second
 deadline and the complete probe is killed after two minutes. The external
 scheduling action must not expose the key or raw command output.
 
+The repository-owned systemd scheduler uses the existing production VPS and
+does not create another server, storage product, or monitoring subscription.
+Install it only after the server is running the exact reviewed main SHA, the
+new `OASISB2` backup has passed disposable restore proof, and the first
+production signal probe succeeds. The approved production transport must first
+stage the reviewed installer itself at the root-owned
+`/usr/local/sbin/oasis-install-production-signal-scheduler` path. Do not
+execute an installer directly from the mutable deploy checkout. Then run:
+
+```bash
+sudo TARGET_SHA=<exact-reviewed-main-sha> \
+  OASIS_PRODUCTION_APP_URL=https://care.example.org \
+  BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+  /usr/local/sbin/oasis-install-production-signal-scheduler
+```
+
+The installer validates the exact local revision against `origin/main`,
+private `0600` environment/key inputs, unit syntax, and one successful probe
+before enabling the persistent five-minute calendar timer. It disables an
+existing timer before replacement and leaves it disabled if the replacement
+cannot prove a fresh success. Runtime JavaScript, helpers, Compose definition,
+and unit files are read from the approved Git object and installed beneath a
+root-owned, revision-specific `/usr/local/lib/oasis-production-signals`
+directory; the timer never executes code from `/opt/oasis-care`. The service
+has a 150-second outer deadline around a 130-second child deadline and writes
+only a private, atomic, revision-bound heartbeat beneath
+`/var/lib/oasis-production-signals`.
+
+An independent runner must execute the following read-only check often enough
+to alert within the reviewed window:
+
+```bash
+sudo /usr/local/sbin/oasis-verify-production-signal-scheduler
+```
+
+The check emits only `PRODUCTION_SIGNAL_HEARTBEAT_OK` or
+`PRODUCTION_SIGNAL_HEARTBEAT_FAILED`. It fails if the timer is disabled or
+inactive, the latest systemd service result failed, the heartbeat belongs to
+another revision, or the last successful completion is more than seven minutes
+and 15 seconds old. That window is the five-minute interval plus the probe's
+two-minute completion deadline and a bounded publication margin.
+The external runner and its operator notification destination remain a
+separate production configuration choice; do not claim missing-heartbeat
+alerting is live until that independent check has been observed to alert.
+
 Before real client data, the business must also decide RTO/RPO targets and retain
 an incident log covering time, impact, containment, and follow-up.
 

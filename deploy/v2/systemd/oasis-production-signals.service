@@ -1,0 +1,41 @@
+[Unit]
+Description=Oasis Care bounded production signal probe
+Documentation=file:/opt/oasis-care/docs/deployment-v2/README.md
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+ConditionPathIsDirectory=/usr/local/lib/oasis-production-signals/current
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/usr/local/lib/oasis-production-signals/current
+Environment=PATH=/usr/sbin:/usr/bin:/sbin:/bin
+Environment=NODE_OPTIONS=
+Environment=NODE_PATH=
+EnvironmentFile=/etc/oasis/production-signals.env
+ExecStart=/usr/bin/node /usr/local/lib/oasis-production-signals/current/deploy/v2/scripts/production-signal-runner.mjs run
+TimeoutStartSec=150
+StateDirectory=oasis-production-signals
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=true
+PrivateDevices=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/oasis-production-signals
+ReadOnlyPaths=/usr/local/lib/oasis-production-signals
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+SystemCallArchitectures=native
