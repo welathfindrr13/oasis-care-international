@@ -2,7 +2,7 @@ import { AuthoritativeAccessSnapshot, rolesFromAccessSnapshot } from './access-s
 import { normalizeAppRoles } from './roles'
 
 export type AppWorkspace = 'staff' | 'family' | 'none'
-export type AppHomePath = '/today' | '/family' | '/access'
+export type AppHomePath = '/today' | '/family' | '/settings' | '/access'
 
 export interface AccessContext {
   roles: string[]
@@ -19,6 +19,7 @@ export type AccessDestination =
   | '/login'
   | '/today'
   | '/family'
+  | '/settings'
   | '/access/no-membership'
   | '/access/disabled'
   | '/access/pending'
@@ -43,7 +44,21 @@ const ADMIN_ONLY_PATHS = [
   /^\/clients\/[^/]+\/edit$/,
 ]
 const FAMILY_PATH = /^\/family(?:\/|$)/
+const SETTINGS_PATH = /^\/settings(?:\/|$)/
 const ACCESS_STATE_PATH = /^\/access\/(?:no-membership|disabled|pending|setup|unavailable)$/
+const AUTHORITATIVE_ROUTE_BYPASS_PATHS = [
+  /^\/offline(?:\/|$)/,
+  /^\/request-access(?:\/|$)/,
+  /^\/accept-invitation(?:\/|$)/,
+  /^\/activate-invitation(?:\/|$)/,
+  /^\/platform(?:\/|$)/,
+]
+
+export function shouldBypassAuthoritativeRoute(pathname: string): boolean {
+  return AUTHORITATIVE_ROUTE_BYPASS_PATHS.some((pattern) =>
+    pattern.test(pathname),
+  )
+}
 
 export function resolveProtectedRoute(
   pathname: string,
@@ -57,6 +72,8 @@ export function resolveProtectedRoute(
 export function getAccessContext(rawRoles: unknown): AccessContext {
   const roles = normalizeAppRoles(rawRoles)
   const isAdmin = roles.includes('admin')
+  const isRestrictedManagement =
+    !isAdmin && roles.some((role) => ['manager', 'care_manager', 'office'].includes(role))
   const isStaff = isAdmin || roles.includes('carer')
   const isClientSelf = roles.includes('client')
   const isExternal = roles.length > 0 && !isStaff
@@ -71,7 +88,13 @@ export function getAccessContext(rawRoles: unknown): AccessContext {
     isClientSelf,
     isExternal,
     workspace,
-    homePath: isStaff ? '/today' : isExternal ? '/family' : '/access',
+    homePath: isRestrictedManagement
+      ? '/settings'
+      : isStaff
+        ? '/today'
+        : isExternal
+          ? '/family'
+          : '/access',
   }
 }
 
@@ -113,7 +136,15 @@ export function resolveAuthenticatedRoute(pathname: string, rawRoles: unknown): 
     return { action: 'redirect', destination: '/access/unavailable' }
   }
   if (pathname === '/' || pathname === '/access' || ACCESS_STATE_PATH.test(pathname)) {
-    return { action: 'redirect', destination: context.homePath as '/today' | '/family' }
+    return {
+      action: 'redirect',
+      destination: context.homePath as '/today' | '/family' | '/settings',
+    }
+  }
+  if (context.homePath === '/settings') {
+    return SETTINGS_PATH.test(pathname)
+      ? { action: 'allow' }
+      : { action: 'redirect', destination: '/settings' }
   }
   if (context.isExternal) {
     return FAMILY_PATH.test(pathname)

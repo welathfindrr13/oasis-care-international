@@ -1,375 +1,353 @@
-'use client'
+"use client";
 
-import React, { useState } from 'react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useAuth, useClerk, useUser } from '@clerk/nextjs'
-import { useSession, signOut as nextAuthSignOut } from 'next-auth/react'
-import { cn } from '../../lib/utils'
-import { InstallAppPrompt } from '../pwa/InstallAppPrompt'
-import { resolveAuthMode } from '../../lib/auth/mode'
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useAuth, useClerk, useUser } from "@clerk/nextjs";
+import { signOut as nextAuthSignOut, useSession } from "next-auth/react";
+import { cn } from "../../lib/utils";
+import { resolveAuthMode } from "../../lib/auth/mode";
+import { useClientAccess } from "../providers/ClientAccessProvider";
 import {
   createHeaderViewer,
   getHeaderAccessLabel,
   type HeaderViewer,
-} from './headerIdentity'
-import { useClientAccess } from '../providers/ClientAccessProvider'
-
-const staffNavItems = [
-  { href: '/today', label: 'Today', icon: '📊', aliases: ['/dashboard'] },
-  { href: '/people', label: 'People', icon: '👥', aliases: ['/clients'] },
-  { href: '/schedule', label: 'Schedule', icon: '📅', aliases: ['/visits'] },
-  { href: '/family-updates', label: 'Family Updates', icon: '🤝', aliases: ['/carebridge'] },
-  { href: '/medication', label: 'Medication Round', icon: '💊', aliases: ['/emar'] },
-  { href: '/shift', label: 'My Shift', icon: '⏱️', aliases: [] },
-] as const
-
-const managementNavItems = [
-  { href: '/management', label: 'Management', icon: '🧭', aliases: ['/activity'] },
-  { href: '/staff', label: 'Workforce', icon: '👤', aliases: ['/admin/carers', '/admin/analytics'] },
-  { href: '/evidence', label: 'Reports', icon: '📋', aliases: ['/admin/metrics'] },
-  { href: '/settings', label: 'Settings', icon: '⚙️', aliases: [] },
-] as const
-
-const familyNavItems = [
-  { href: '/family', label: 'Family Assurance', icon: '🏠', aliases: [] },
-] as const
-
-function isNavItemActive(pathname: string, item: { href: string; aliases?: readonly string[] }): boolean {
-  const paths = [item.href, ...(item.aliases ?? [])]
-  return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`))
-}
+} from "./headerIdentity";
+import {
+  getHeaderHomePath,
+  getHeaderNavigation,
+  getHeaderSurfaceForViewer,
+  isHeaderNavigationItemActive,
+} from "./headerNavigation";
 
 export interface HeaderProps {
-  className?: string
-  notificationCount?: number
+  className?: string;
 }
 
-interface HeaderContentProps extends HeaderProps {
-  pathname: string
-  viewer: HeaderViewer
-  onSignOut: () => Promise<void>
+interface HeaderContentProps {
+  className?: string;
+  pathname: string;
+  viewer: HeaderViewer;
+  onSignOut: () => Promise<void>;
 }
 
 function getBrowserAuthMode() {
   return resolveAuthMode({
     NODE_ENV: process.env.NODE_ENV,
-    NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: process.env.NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER,
+    NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER:
+      process.env.NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER,
     NEXT_PUBLIC_LOCAL_AUTH_ENABLED: process.env.NEXT_PUBLIC_LOCAL_AUTH_ENABLED,
-  } as NodeJS.ProcessEnv)
+  } as NodeJS.ProcessEnv);
 }
 
 export function Header(props: HeaderProps) {
-  if (getBrowserAuthMode() === 'clerk') {
-    return <ClerkHeader {...props} />
-  }
-
-  return <NextAuthHeader {...props} />
+  return getBrowserAuthMode() === "clerk" ? (
+    <ClerkHeader {...props} />
+  ) : (
+    <NextAuthHeader {...props} />
+  );
 }
 
-function ClerkHeader({ className, notificationCount = 0 }: HeaderProps) {
-  const pathname = usePathname()
-  const { isLoaded } = useAuth()
-  const { user } = useUser()
-  const { signOut } = useClerk()
-  const access = useClientAccess()
+function ClerkHeader({ className }: HeaderProps) {
+  const pathname = usePathname();
+  const { isLoaded } = useAuth();
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const access = useClientAccess();
   const viewer = createHeaderViewer({
     pathname,
-    status: isLoaded ? access.status : 'loading',
+    status: isLoaded ? access.status : "loading",
     roles: access.roles,
     userName: user?.fullName,
     userEmail: user?.primaryEmailAddress?.emailAddress,
-  })
-
-  async function handleSignOut() {
-    await signOut({ redirectUrl: '/login' })
-  }
+  });
 
   return (
     <HeaderContent
       className={className}
-      notificationCount={notificationCount}
       pathname={pathname}
       viewer={viewer}
-      onSignOut={handleSignOut}
+      onSignOut={() => signOut({ redirectUrl: "/login" })}
     />
-  )
+  );
 }
 
-function NextAuthHeader({ className, notificationCount = 0 }: HeaderProps) {
-  const pathname = usePathname()
-  const { data: session, status } = useSession()
-  const access = useClientAccess()
+function NextAuthHeader({ className }: HeaderProps) {
+  const pathname = usePathname();
+  const { data: session, status } = useSession();
+  const access = useClientAccess();
   const viewer = createHeaderViewer({
     pathname,
-    status: status === 'loading' ? 'loading' : access.status,
+    status: status === "loading" ? "loading" : access.status,
     roles: access.roles,
     userName: session?.user?.name,
     userEmail: session?.user?.email,
-  })
+  });
 
   async function handleSignOut() {
     try {
       await nextAuthSignOut({ redirect: false });
     } finally {
-      window.location.assign('/api/auth/cognito-logout');
+      window.location.assign("/api/auth/cognito-logout");
     }
   }
 
   return (
     <HeaderContent
       className={className}
-      notificationCount={notificationCount}
       pathname={pathname}
       viewer={viewer}
       onSignOut={handleSignOut}
     />
-  )
+  );
 }
 
 function HeaderContent({
   className,
-  notificationCount = 0,
   pathname,
   viewer,
   onSignOut,
 }: HeaderContentProps) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
-  const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const { accessContext, userName, userEmail, userInitial, isAdmin } = viewer
-  const userRole = getHeaderAccessLabel(viewer)
-  const navItems = accessContext.workspace === 'none'
-    ? []
-    : accessContext.isExternal
-    ? familyNavItems
-    : isAdmin
-    ? [...staffNavItems, ...managementNavItems] as const
-    : staffNavItems
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const accountTriggerRef = useRef<HTMLButtonElement>(null);
+  const navigationTriggerRef = useRef<HTMLButtonElement>(null);
+  const { accessContext, userName, userEmail, userInitial } = viewer;
+  const userRole = getHeaderAccessLabel(viewer);
+  const managementRole = viewer.roles.find((role) =>
+    ["manager", "care_manager", "office"].includes(role),
+  );
+  const navigationSurface = getHeaderSurfaceForViewer(
+    accessContext.surface,
+    viewer.roles,
+  );
+  const homePath = getHeaderHomePath(
+    navigationSurface,
+    accessContext.homePath,
+  );
+  const navItems = getHeaderNavigation(navigationSurface, pathname);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setProfileOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        if (profileOpen) {
+          setProfileOpen(false);
+          accountTriggerRef.current?.focus();
+        } else if (mobileMenuOpen) {
+          setMobileMenuOpen(false);
+          navigationTriggerRef.current?.focus();
+        }
+      }
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [mobileMenuOpen, profileOpen]);
+
+  const workspaceLabel =
+    managementRole === "care_manager"
+      ? "Care manager workspace"
+      : managementRole === "manager"
+        ? "Manager workspace"
+        : managementRole === "office"
+          ? "Office workspace"
+          : accessContext.surface === "admin"
+            ? "Admin workspace"
+            : accessContext.surface === "staff"
+              ? "Carer workspace"
+              : accessContext.surface === "family"
+                ? "Family workspace"
+                : "Secure access";
 
   return (
-    <header className={cn('bg-white border-b border-slate-200 sticky top-0 z-50', className)}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <div className="flex items-center gap-3">
-            <Link href={accessContext.homePath} className="flex items-center gap-3">
-              <div className={cn(
-                'w-10 h-10 rounded-xl flex items-center justify-center shadow-lg',
-                accessContext.isExternal
-                  ? 'bg-gradient-to-br from-sky-500 to-cyan-700 shadow-sky-500/25'
-                  : 'bg-gradient-to-br from-teal-500 to-teal-700 shadow-teal-500/25'
-              )}>
-                <span className="text-white font-bold text-lg">O</span>
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="font-heading font-bold text-lg text-slate-900 tracking-tight">
-                  {accessContext.isExternal ? 'Family Assurance Hub' : 'Oasis Care'}
-                </h1>
-                <p className="text-xs text-slate-500 -mt-0.5">International</p>
-              </div>
-            </Link>
-          </div>
+    <header
+      className={cn(
+        "sticky top-0 z-50 border-b border-oasis-border bg-white",
+        className,
+      )}
+    >
+      <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
+        <div className="flex min-h-16 items-center justify-between gap-3">
+          <Link
+            href={homePath}
+            className="flex min-h-11 min-w-11 shrink-0 items-center gap-3 rounded-md text-oasis-ink hover:no-underline"
+            aria-label={`Oasis Care, ${workspaceLabel}`}
+          >
+            <span
+              className="flex h-9 w-9 items-center justify-center rounded-md bg-oasis-teal text-base font-bold text-white"
+              aria-hidden="true"
+            >
+              O
+            </span>
+            <span className="hidden min-w-0 sm:block">
+              <span className="block text-sm font-bold tracking-tight">
+                Oasis Care
+              </span>
+              <span className="block text-xs text-oasis-muted">
+                {workspaceLabel}
+              </span>
+            </span>
+          </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav
+            className="hidden min-w-0 items-center gap-0.5 xl:flex"
+            aria-label="Primary navigation"
+          >
             {navItems.map((item) => {
-              const isActive = isNavItemActive(pathname, item)
-              
+              const active = isHeaderNavigationItemActive(pathname, item);
               return (
                 <Link
-                  key={item.href}
+                  key={item.id}
                   href={item.href}
                   className={cn(
-                    'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
-                    'hover:bg-slate-100',
-                    {
-                      'bg-teal-50 text-teal-700 font-semibold': isActive,
-                      'text-slate-600': !isActive
-                    }
+                    "flex min-h-11 items-center rounded-md px-3 text-sm font-semibold text-oasis-muted hover:bg-base-gray-50 hover:text-oasis-ink hover:no-underline",
+                    active && "bg-oasis-teal-soft text-oasis-teal-dark",
                   )}
-                  aria-current={isActive ? 'page' : undefined}
+                  aria-current={active ? "page" : undefined}
                 >
                   {item.label}
                 </Link>
-              )
+              );
             })}
           </nav>
 
-          {/* Right side - notifications & profile */}
-          <div className="flex items-center gap-3">
-            <div className="hidden lg:block">
-              <InstallAppPrompt compact />
-            </div>
-
-            {/* Notifications */}
-            <button 
-              onClick={() => setNotificationsOpen((open) => !open)}
-              className="relative p-2 rounded-lg hover:bg-slate-100 transition-colors"
-              aria-label={`Notifications ${notificationCount > 0 ? `(${notificationCount} new)` : ''}`}
-            >
-              <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              {notificationCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                  {notificationCount > 9 ? '9+' : notificationCount}
-                </span>
-              )}
-            </button>
-            {notificationsOpen && (
-              <div className="absolute right-20 top-14 z-50 w-80 rounded-xl border border-slate-200 bg-white p-4 shadow-lg">
-                <p className="text-sm font-semibold text-slate-900">Notifications</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Live notification delivery is coming with the outbox work. For now, use Today for urgent visits,
-                  Family Updates for approvals, and Management for system checks.
-                </p>
-                <div className="mt-3 grid gap-2">
-                  <Link href="/today" className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
-                    Open Today Command Centre
-                  </Link>
-                  <Link href="/family-updates" className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
-                    Review Family Updates
-                  </Link>
-                </div>
-              </div>
-            )}
-
-            {/* Profile dropdown */}
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <div className="relative">
               <button
-                onClick={() => setProfileOpen(!profileOpen)}
-                className="flex items-center gap-2 p-1.5 pr-3 rounded-lg hover:bg-slate-100 transition-colors"
+                ref={accountTriggerRef}
+                type="button"
+                className="flex min-h-11 items-center gap-2 rounded-md px-2 text-left hover:bg-base-gray-50"
+                onClick={() => {
+                  setProfileOpen((open) => !open);
+                  setMobileMenuOpen(false);
+                }}
+                aria-expanded={profileOpen}
+                aria-controls="oasis-account-menu"
+                aria-label={
+                  profileOpen ? "Close account menu" : "Open account menu"
+                }
               >
-                <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-teal-600 rounded-lg flex items-center justify-center text-white font-semibold text-sm">
+                <span
+                  className="flex h-8 w-8 items-center justify-center rounded-md bg-oasis-teal-soft text-sm font-bold text-oasis-teal-dark"
+                  aria-hidden="true"
+                >
                   {userInitial}
-                </div>
-                <div className="hidden sm:block text-left">
-                  <p className="text-sm font-medium text-slate-900">{userName || ' '}</p>
-                  <p className="text-xs text-slate-500">
-                    {userRole}
-                  </p>
-                </div>
-                <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </span>
+                <span className="hidden max-w-36 sm:block">
+                  <span className="block truncate text-sm font-semibold text-oasis-ink">
+                    {userName || "Account"}
+                  </span>
+                  <span className="block truncate text-xs text-oasis-muted">
+                    {userRole || workspaceLabel}
+                  </span>
+                </span>
+                <svg
+                  className="h-4 w-4 text-oasis-muted"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="m6 8 4 4 4-4"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </button>
 
-              {/* Profile dropdown menu */}
               {profileOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50">
-                  <div className="px-4 py-2 border-b border-slate-100">
-                    <p className="text-sm font-medium text-slate-900">{userName || 'User'}</p>
-                    <p className="text-xs text-slate-500">{userEmail || userRole || 'No email available'}</p>
+                <div
+                  id="oasis-account-menu"
+                  className="absolute right-0 mt-2 w-64 rounded-lg border border-oasis-border bg-white p-2 shadow-md"
+                >
+                  <div className="border-b border-oasis-border px-3 py-2">
+                    <p className="truncate text-sm font-semibold text-oasis-ink">
+                      {userName || "Account"}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-oasis-muted">
+                      {userEmail || userRole || "Authenticated user"}
+                    </p>
                   </div>
-                  {accessContext.isExternal ? (
-                    <Link href="/family" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7.5A2.5 2.5 0 015.5 5h13A2.5 2.5 0 0121 7.5v9a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 16.5v-9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10h10M7 14h6" />
-                      </svg>
-                      Family Assurance Hub
-                    </Link>
-                  ) : (
-                    <>
-                      <Link href="/settings" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        Settings
-                      </Link>
-                      <Link href="/shift" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        My Shift
-                      </Link>
-                    </>
-                  )}
-                  {!accessContext.isExternal && isAdmin && (
-                    <>
-                      <Link href="/admin/analytics" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3v18m4-12v12m4-6v6M7 13v8M3 21h18" />
-                        </svg>
-                        Workforce Analytics
-                      </Link>
-                      <Link href="/admin/metrics" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                        </svg>
-                        System Health
-                      </Link>
-                      <Link href="/admin/carers" className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        Carer Directory
-                      </Link>
-                    </>
-                  )}
-                  <div className="border-t border-slate-100 mt-2 pt-2">
-                    <button 
-                      onClick={onSignOut}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                      </svg>
-                      Sign out
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void onSignOut()}
+                    className="mt-2 flex min-h-11 w-full items-center rounded-md px-3 text-sm font-semibold text-oasis-danger hover:bg-oasis-danger-soft"
+                  >
+                    Sign out
+                  </button>
                 </div>
               )}
             </div>
 
-            {/* Mobile menu button */}
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors"
-              aria-label="Toggle menu"
+              ref={navigationTriggerRef}
+              type="button"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-oasis-ink hover:bg-base-gray-50 xl:hidden"
+              onClick={() => {
+                setMobileMenuOpen((open) => !open);
+                setProfileOpen(false);
+              }}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="oasis-mobile-navigation"
+              aria-label={
+                mobileMenuOpen ? "Close navigation" : "Open navigation"
+              }
             >
-              <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                {mobileMenuOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  d={
+                    mobileMenuOpen
+                      ? "M6 6l12 12M18 6 6 18"
+                      : "M4 7h16M4 12h16M4 17h16"
+                  }
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
           </div>
         </div>
 
-        {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <nav className="md:hidden py-4 border-t border-slate-100">
-            <div className="flex flex-col gap-1">
+          <nav
+            id="oasis-mobile-navigation"
+            className="border-t border-oasis-border py-3 xl:hidden"
+            aria-label="Primary navigation"
+          >
+            <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
               {navItems.map((item) => {
-                const isActive = isNavItemActive(pathname, item)
-                
+                const active = isHeaderNavigationItemActive(pathname, item);
                 return (
                   <Link
-                    key={item.href}
+                    key={item.id}
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
                     className={cn(
-                      'flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors',
-                      {
-                        'bg-teal-50 text-teal-700': isActive,
-                        'text-slate-600 hover:bg-slate-50': !isActive
-                      }
+                      "flex min-h-11 items-center rounded-md px-3 text-sm font-semibold text-oasis-muted hover:bg-base-gray-50 hover:text-oasis-ink hover:no-underline",
+                      active && "bg-oasis-teal-soft text-oasis-teal-dark",
                     )}
+                    aria-current={active ? "page" : undefined}
                   >
-                    <span>{item.icon}</span>
                     {item.label}
                   </Link>
-                )
+                );
               })}
             </div>
           </nav>
         )}
       </div>
     </header>
-  )
+  );
 }

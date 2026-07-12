@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Header } from '../../components/oasis/Header'
+import { InstallAppPrompt } from '../../components/pwa/InstallAppPrompt'
 import { query } from '../../lib/graphql/client'
 import {
   FAMILY_CAREBRIDGE_ROOMS_QUERY,
@@ -41,7 +42,7 @@ export default async function FamilyPage() {
         </section>
 
         <section className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-          <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <article id="care-rooms" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="font-heading text-xl font-semibold text-slate-900">Your care rooms</h2>
             {unavailable ? (
               <div className="mt-3 text-sm leading-6 text-slate-600">
@@ -71,14 +72,30 @@ export default async function FamilyPage() {
             )}
           </article>
 
-          <aside className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="font-heading text-lg font-semibold text-slate-900">What is shared</h2>
+          <aside id="concerns-help" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="font-heading text-lg font-semibold text-slate-900">Concerns and help</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               You will see approved updates and concern progress when enabled. You will not see raw care records or
               internal staff handover notes.
             </p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              If you are worried about someone’s care, use the contact route agreed with their care provider. In an
+              emergency, call 999.
+            </p>
           </aside>
         </section>
+
+        <section id="updates" className="mt-6 scroll-mt-24 border-l-4 border-teal-700 px-4 py-1">
+          <h2 className="font-heading text-lg font-semibold text-slate-900">Updates</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Open a care room above to read its approved updates in date order. Drafts and internal care notes are never
+            shown here.
+          </p>
+        </section>
+
+        <div className="mt-6">
+          <InstallAppPrompt />
+        </div>
       </main>
     </div>
   )

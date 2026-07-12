@@ -1,73 +1,76 @@
 /**
- * Design Tokens - Generated from Figma
- * Source: A's team library (XPh9lANClKeAtHfnDT5q7l)
- * Generated: 2025-08-11T15:03:00Z
- * 
- * DO NOT EDIT MANUALLY - This file is generated automatically
+ * Oasis Care visual foundation.
+ * Calm, high-contrast tokens for operational care work.
  */
 
 :root {
-  /* Colors - Base */
-  --color-base-black: #000000;
+  /* Core surfaces and text */
+  --color-base-black: #101816;
   --color-base-white: #ffffff;
-  --color-base-gray-50: #fafafa;
-  --color-base-gray-100: #edf5fa;
-  --color-base-gray-300: #d8d8d8;
-  --color-base-gray-500: #afafaf;
-  --color-base-gray-800: rgba(0, 0, 0, 0.8);
-
-  /* Colors - Brand */
-  --color-brand-fuschia-100: #ef5da8;
-  --color-brand-fuschia-80: #f178b6;
-  --color-brand-fuschia-60: #fcddec;
-  --color-brand-iris-100: #5d5fef;
-  --color-brand-iris-80: #7879f1;
-  --color-brand-iris-60: #a5a6f6;
-  --color-brand-blue-primary: #007be5;
-  --color-brand-blue-light: #56ccf2;
-  --color-brand-blue-medium: #359dd9;
-
-  /* Colors - Semantic */
-  --color-text-primary: #0e0e2c;
-  --color-text-secondary: rgba(0, 0, 0, 0.8);
+  --color-base-gray-50: #faf9f6;
+  --color-base-gray-100: #f1f0eb;
+  --color-base-gray-300: #d7dcd8;
+  --color-base-gray-500: #64716d;
+  --color-base-gray-800: #26332f;
+  --color-control-border: #87958f;
+  --color-text-primary: #17211f;
+  --color-text-secondary: #52615d;
   --color-text-inverse: #ffffff;
   --color-background-primary: #ffffff;
-  --color-background-secondary: #fafafa;
-  --color-background-accent: #edf5fa;
+  --color-background-secondary: #f7f5f0;
+  --color-background-accent: #edf7f4;
 
-  /* Typography - Font Families */
-  --font-family-sans: Inter, system-ui, sans-serif;
-  --font-family-heading: "Work Sans", system-ui, sans-serif;
-  --font-family-body: "Droid Sans", system-ui, sans-serif;
+  /* Brand and semantic states */
+  --color-accent-teal: #0f766e;
+  --color-accent-teal-dark: #115e59;
+  --color-accent-teal-soft: #e7f5f1;
+  --color-info: #245d86;
+  --color-info-soft: #eef6fb;
+  --color-attention: #92500a;
+  --color-attention-soft: #fff7e6;
+  --color-danger: #b42318;
+  --color-danger-soft: #fff1f0;
+  --color-success: #166534;
+  --color-success-soft: #effaf2;
+  --color-focus: #2b7a78;
 
-  /* Typography - Font Sizes */
-  --font-size-xs: 11px;
-  --font-size-sm: 12px;
-  --font-size-base: 13px;
-  --font-size-md: 14px;
-  --font-size-lg: 20px;
-  --font-size-xl: 34px;
-  --font-size-2xl: 72px;
+  /* Backwards-compatible aliases while older routes migrate */
+  --color-brand-blue-primary: var(--color-accent-teal);
+  --color-brand-blue-light: #80c7be;
+  --color-brand-blue-medium: var(--color-accent-teal-dark);
+  --color-brand-fuschia-100: var(--color-danger);
+  --color-brand-fuschia-80: #e7a6a0;
+  --color-brand-fuschia-60: var(--color-danger-soft);
+  --color-brand-iris-100: var(--color-success);
+  --color-brand-iris-80: #91c69f;
+  --color-brand-iris-60: var(--color-success-soft);
 
-  /* Typography - Font Weights */
+  /* Typography */
+  --font-family-sans:
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-family-heading: var(--font-family-sans);
+  --font-family-body: var(--font-family-sans);
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.5rem;
+  --font-size-2xl: 2rem;
   --font-weight-normal: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
-
-  /* Typography - Line Heights */
-  --line-height-tight: 1.17;
-  --line-height-normal: 1.33;
-  --line-height-relaxed: 1.45;
-  --line-height-loose: 1.6;
-
-  /* Typography - Letter Spacing */
-  --letter-spacing-tight: -0.02em;
-  --letter-spacing-normal: 0em;
-  --letter-spacing-wide: 0.005em;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.45;
+  --line-height-relaxed: 1.6;
+  --line-height-loose: 1.7;
+  --letter-spacing-tight: -0.015em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.04em;
 
   /* Spacing */
-  --space-0: 0px;
+  --space-0: 0;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -80,146 +83,93 @@
   --space-16: 64px;
   --space-20: 80px;
 
-  /* Border Radius */
-  --radius-none: 0px;
-  --radius-sm: 3px;
-  --radius-md: 6px;
+  /* Shape and elevation */
+  --radius-none: 0;
+  --radius-sm: 8px;
+  --radius-md: 8px;
   --radius-lg: 12px;
-  --radius-full: 1000px;
+  --radius-full: 999px;
+  --shadow-sm: 0 1px 2px rgba(23, 33, 31, 0.06);
+  --shadow-md: 0 8px 24px rgba(23, 33, 31, 0.08);
+  --shadow-lg: 0 18px 48px rgba(23, 33, 31, 0.12);
 
-  /* Shadows */
-  --shadow-sm: 0px 1px 3px 0px rgba(0, 0, 0, 0.1);
-  --shadow-md: 0px 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0px 10px 15px -3px rgba(0, 0, 0, 0.1);
-
-  /* Component Tokens - Button */
-  --button-primary-background: var(--color-brand-blue-primary);
+  --button-primary-background: var(--color-accent-teal);
   --button-primary-text: var(--color-text-inverse);
-  --button-primary-radius: var(--radius-full);
-  --button-secondary-background: var(--color-base-gray-500);
-  --button-secondary-text: var(--color-text-inverse);
-  --button-secondary-radius: var(--radius-full);
+  --button-primary-radius: var(--radius-sm);
+  --button-secondary-background: var(--color-background-primary);
+  --button-secondary-text: var(--color-text-primary);
+  --button-secondary-radius: var(--radius-sm);
 }
 
-/* Utility classes for common patterns */
 .text-primary {
   color: var(--color-text-primary);
 }
-
 .text-secondary {
   color: var(--color-text-secondary);
 }
-
 .text-inverse {
   color: var(--color-text-inverse);
 }
-
 .bg-primary {
   background-color: var(--color-background-primary);
 }
-
 .bg-secondary {
   background-color: var(--color-background-secondary);
 }
-
 .bg-accent {
   background-color: var(--color-background-accent);
 }
-
-/* Typography utility classes */
 .font-heading {
   font-family: var(--font-family-heading);
 }
-
 .font-body {
   font-family: var(--font-family-body);
 }
-
 .font-sans {
   font-family: var(--font-family-sans);
 }
 
-/* Spacing utility classes */
 .space-y-1 > * + * {
   margin-top: var(--space-1);
 }
-
 .space-y-2 > * + * {
   margin-top: var(--space-2);
 }
-
 .space-y-4 > * + * {
   margin-top: var(--space-4);
 }
-
 .space-y-6 > * + * {
   margin-top: var(--space-6);
 }
 
-/* Component classes */
-.button-primary {
-  background-color: var(--button-primary-background);
-  color: var(--button-primary-text);
-  border-radius: var(--button-primary-radius);
-  padding: var(--space-3) var(--space-6);
-  font-weight: var(--font-weight-medium);
-  font-size: var(--font-size-sm);
+.button-primary,
+.button-secondary {
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-4);
   font-family: var(--font-family-sans);
-  border: none;
-  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease-in-out;
 }
 
-.button-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
+.button-primary {
+  color: var(--button-primary-text);
+  background: var(--button-primary-background);
 }
 
 .button-secondary {
-  background-color: var(--button-secondary-background);
   color: var(--button-secondary-text);
-  border-radius: var(--button-secondary-radius);
-  padding: var(--space-3) var(--space-6);
-  font-weight: var(--font-weight-medium);
-  font-size: var(--font-size-sm);
-  font-family: var(--font-family-sans);
-  border: none;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease-in-out;
+  background: var(--button-secondary-background);
+  border: 1px solid var(--color-control-border);
 }
 
-.button-secondary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-/* Card component */
 .card {
-  background-color: var(--color-background-primary);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-6);
+  padding: var(--space-5);
   border: 1px solid var(--color-base-gray-300);
-}
-
-.card-header {
-  margin-bottom: var(--space-4);
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--color-base-gray-100);
-}
-
-.card-content {
-  margin-bottom: var(--space-4);
-}
-
-.card-footer {
-  margin-top: var(--space-4);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-base-gray-100);
+  border-radius: var(--radius-lg);
+  background: var(--color-background-primary);
+  box-shadow: var(--shadow-sm);
 }

@@ -2,7 +2,10 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import type { NextFetchEvent, NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { withAuth } from 'next-auth/middleware'
-import { resolveAuthoritativeRoute } from './lib/auth/access'
+import {
+  resolveAuthoritativeRoute,
+  shouldBypassAuthoritativeRoute,
+} from './lib/auth/access'
 import { fetchAuthoritativeAccessSnapshot, unavailableAccessSnapshot } from './lib/auth/access-snapshot'
 import { resolveAuthMode } from './lib/auth/mode'
 
@@ -21,13 +24,12 @@ const isPublicRoute = createRouteMatcher([
   '/api/company-access-requests(.*)',
   '/accept-invitation(.*)',
 ])
-const isPlatformRoute = createRouteMatcher(['/platform(.*)'])
-const isInvitationActivationRoute = createRouteMatcher(['/activate-invitation(.*)'])
 const nextAuthMiddleware = withAuth(
   async function middleware(req) {
     if (isPublicRoute(req)) return NextResponse.next()
-    if (isPlatformRoute(req)) return NextResponse.next()
-    if (isInvitationActivationRoute(req)) return NextResponse.next()
+    if (shouldBypassAuthoritativeRoute(req.nextUrl.pathname)) {
+      return NextResponse.next()
+    }
     const token = req.nextauth.token as Record<string, any> | null
     const accessToken = String(token?.accessToken || token?.idToken || '')
     const snapshot = accessToken
@@ -46,8 +48,9 @@ const clerkAuthMiddleware = clerkMiddleware(async (auth, req) => {
   if (isPublicRoute(req)) return NextResponse.next()
   const authObject = auth()
   if (!authObject.userId) return authObject.redirectToSignIn()
-  if (isPlatformRoute(req)) return NextResponse.next()
-  if (isInvitationActivationRoute(req)) return NextResponse.next()
+  if (shouldBypassAuthoritativeRoute(req.nextUrl.pathname)) {
+    return NextResponse.next()
+  }
   let accessToken: string | null = null
   try {
     accessToken = await authObject.getToken()

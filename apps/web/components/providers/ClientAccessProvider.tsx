@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
-import { useAuth } from '@clerk/nextjs';
-import { useSession } from 'next-auth/react';
+import { useAuth } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
+import { usePathname } from "next/navigation";
 import {
   createContext,
   type ReactNode,
@@ -11,17 +12,21 @@ import {
   useMemo,
   useRef,
   useState,
-} from 'react';
+} from "react";
 import {
   createClientAccessSnapshot,
   loadingClientAccessSnapshot,
   type ClientAccessSnapshot,
-} from '../../lib/auth/client-access';
+} from "../../lib/auth/client-access";
 import {
   AuthoritativeAccessSnapshot,
   unauthenticatedAccessSnapshot,
   unavailableAccessSnapshot,
-} from '../../lib/auth/access-snapshot';
+} from "../../lib/auth/access-snapshot";
+import {
+  resolveAuthoritativeRoute,
+  shouldBypassAuthoritativeRoute,
+} from "../../lib/auth/access";
 
 export type GetBearerToken = () => Promise<string | null | undefined>;
 export interface ClientAccessValue extends ClientAccessSnapshot {
@@ -30,79 +35,140 @@ export interface ClientAccessValue extends ClientAccessSnapshot {
 
 const ClientAccessContext = createContext<ClientAccessValue | null>(null);
 
-export function ClerkClientAccessProvider({ children }: { children: ReactNode }) {
+export function ClerkClientAccessProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const { getToken, isLoaded, isSignedIn, orgId, userId } = useAuth();
-  const providerStatus = !isLoaded ? 'loading' : isSignedIn ? 'authenticated' : 'unauthenticated';
-  const identityKey = `${userId || ''}:${orgId || ''}`;
-  const switchingAccount = useAccountSwitchBoundary(providerStatus, identityKey);
+  const providerStatus = !isLoaded
+    ? "loading"
+    : isSignedIn
+      ? "authenticated"
+      : "unauthenticated";
+  const identityKey = `${userId || ""}:${orgId || ""}`;
+  const switchingAccount = useAccountSwitchBoundary(
+    providerStatus,
+    identityKey,
+  );
   const snapshot = useAuthoritativeBrowserSnapshot(providerStatus, identityKey);
+  const routeTransition = useAuthoritativeRouteBoundary(snapshot);
   const getBearerToken = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return null;
     try {
       const token = await getToken();
-      return typeof token === 'string' && token.trim() ? token : null;
+      return typeof token === "string" && token.trim() ? token : null;
     } catch {
       return null;
     }
   }, [getToken, isLoaded, isSignedIn]);
-  const value = useMemo(() => ({ ...snapshot, getBearerToken }), [getBearerToken, snapshot]);
+  const value = useMemo(
+    () => ({ ...snapshot, getBearerToken }),
+    [getBearerToken, snapshot],
+  );
   return (
     <ClientAccessContext.Provider value={value}>
-      {switchingAccount ? <AccountTransition /> : children}
+      {switchingAccount || routeTransition ? <AccountTransition /> : children}
     </ClientAccessContext.Provider>
   );
 }
 
-export function NextAuthClientAccessProvider({ children }: { children: ReactNode }) {
+export function NextAuthClientAccessProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const { data: session, status } = useSession();
-  const identityKey = `${session?.user?.email || ''}:${(session as any)?.accessToken || ''}`;
+  const identityKey = `${session?.user?.email || ""}:${(session as any)?.accessToken || ""}`;
   const switchingAccount = useAccountSwitchBoundary(status, identityKey);
   const snapshot = useAuthoritativeBrowserSnapshot(status, identityKey);
+  const routeTransition = useAuthoritativeRouteBoundary(snapshot);
   const getBearerToken = useCallback(async () => null, []);
-  const value = useMemo(() => ({ ...snapshot, getBearerToken }), [getBearerToken, snapshot]);
+  const value = useMemo(
+    () => ({ ...snapshot, getBearerToken }),
+    [getBearerToken, snapshot],
+  );
   return (
     <ClientAccessContext.Provider value={value}>
-      {switchingAccount ? <AccountTransition /> : children}
+      {switchingAccount || routeTransition ? <AccountTransition /> : children}
     </ClientAccessContext.Provider>
   );
 }
 
 function useAccountSwitchBoundary(
-  providerStatus: 'loading' | 'authenticated' | 'unauthenticated',
+  providerStatus: "loading" | "authenticated" | "unauthenticated",
   identityKey: string,
 ): boolean {
-  const [mountedIdentity, setMountedIdentity] = useState<string | null>(null);
+  const mountedIdentity = useRef<string | null>(null);
+  if (providerStatus === "authenticated" && mountedIdentity.current === null) {
+    mountedIdentity.current = identityKey;
+  }
   const switchingAccount =
-    mountedIdentity !== null &&
-    (providerStatus !== 'authenticated' || mountedIdentity !== identityKey);
+    mountedIdentity.current !== null &&
+    (providerStatus !== "authenticated" ||
+      mountedIdentity.current !== identityKey);
 
   useEffect(() => {
-    if (providerStatus === 'unauthenticated') {
-      if (mountedIdentity !== null) window.location.replace('/login');
+    if (providerStatus === "unauthenticated") {
+      if (mountedIdentity.current !== null) window.location.replace("/login");
       return;
     }
-    if (providerStatus !== 'authenticated') return;
-    if (mountedIdentity !== null && mountedIdentity !== identityKey) {
-      window.location.replace('/access');
-      return;
+    if (providerStatus !== "authenticated") return;
+    if (
+      mountedIdentity.current !== null &&
+      mountedIdentity.current !== identityKey
+    ) {
+      window.location.replace("/access");
     }
-    setMountedIdentity(identityKey);
-  }, [identityKey, mountedIdentity, providerStatus]);
+  }, [identityKey, providerStatus]);
 
   return switchingAccount;
 }
 
 function AccountTransition() {
-  return <div className="min-h-screen bg-slate-50" aria-busy="true" aria-label="Switching account" />;
+  return (
+    <div
+      className="min-h-screen bg-slate-50"
+      aria-busy="true"
+      aria-label="Switching account"
+    />
+  );
+}
+
+function useAuthoritativeRouteBoundary(
+  snapshot: ClientAccessSnapshot,
+): boolean {
+  const pathname = usePathname();
+  const bypassAuthoritativeRoute = shouldBypassAuthoritativeRoute(pathname);
+  const decision =
+    snapshot.status === "authenticated" && !bypassAuthoritativeRoute
+      ? resolveAuthoritativeRoute(pathname, snapshot.authoritativeSnapshot)
+      : { action: "allow" as const };
+  const destination =
+    decision.action === "redirect" && decision.destination !== pathname
+      ? decision.destination
+      : null;
+
+  useEffect(() => {
+    if (destination) window.location.replace(destination);
+  }, [destination]);
+
+  return (
+    !bypassAuthoritativeRoute &&
+    (snapshot.status === "loading" || destination !== null)
+  );
 }
 
 function useAuthoritativeBrowserSnapshot(
-  providerStatus: 'loading' | 'authenticated' | 'unauthenticated',
+  providerStatus: "loading" | "authenticated" | "unauthenticated",
   identityKey: string,
 ): ClientAccessSnapshot {
   const requestKey = `${providerStatus}:${identityKey}`;
   const loadingSnapshot = useMemo(() => loadingClientAccessSnapshot(), []);
-  const [resolved, setResolved] = useState<{ key: string; snapshot: ClientAccessSnapshot }>(() => ({
+  const [resolved, setResolved] = useState<{
+    key: string;
+    snapshot: ClientAccessSnapshot;
+  }>(() => ({
     key: requestKey,
     snapshot: loadingClientAccessSnapshot(),
   }));
@@ -112,36 +178,50 @@ function useAuthoritativeBrowserSnapshot(
     const requestGeneration = ++generation.current;
     const controller = new AbortController();
 
-    if (providerStatus === 'loading') {
+    if (providerStatus === "loading") {
       setResolved({ key: requestKey, snapshot: loadingClientAccessSnapshot() });
       return () => controller.abort();
     }
-    if (providerStatus === 'unauthenticated') {
+    if (providerStatus === "unauthenticated") {
       setResolved({
         key: requestKey,
-        snapshot: createClientAccessSnapshot('unauthenticated', unauthenticatedAccessSnapshot()),
+        snapshot: createClientAccessSnapshot(
+          "unauthenticated",
+          unauthenticatedAccessSnapshot(),
+        ),
       });
       return () => controller.abort();
     }
 
     setResolved({ key: requestKey, snapshot: loadingClientAccessSnapshot() });
-    void fetch('/api/access-context', { cache: 'no-store', signal: controller.signal })
+    void fetch("/api/access-context", {
+      cache: "no-store",
+      signal: controller.signal,
+    })
       .then(async (response) => {
-        const value = (await response.json().catch(() => null)) as AuthoritativeAccessSnapshot | null;
+        const value = (await response
+          .json()
+          .catch(() => null)) as AuthoritativeAccessSnapshot | null;
         if (requestGeneration !== generation.current) return;
         setResolved({
           key: requestKey,
           snapshot: createClientAccessSnapshot(
-            'authenticated',
+            "authenticated",
             response.ok && value ? value : unavailableAccessSnapshot(),
           ),
         });
       })
       .catch(() => {
-        if (requestGeneration === generation.current && !controller.signal.aborted) {
+        if (
+          requestGeneration === generation.current &&
+          !controller.signal.aborted
+        ) {
           setResolved({
             key: requestKey,
-            snapshot: createClientAccessSnapshot('authenticated', unavailableAccessSnapshot()),
+            snapshot: createClientAccessSnapshot(
+              "authenticated",
+              unavailableAccessSnapshot(),
+            ),
           });
         }
       });
@@ -157,6 +237,7 @@ function useAuthoritativeBrowserSnapshot(
 
 export function useClientAccess(): ClientAccessValue {
   const value = useContext(ClientAccessContext);
-  if (!value) throw new Error('useClientAccess must be used within AppAuthProviders');
+  if (!value)
+    throw new Error("useClientAccess must be used within AppAuthProviders");
   return value;
 }

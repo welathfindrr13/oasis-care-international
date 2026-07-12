@@ -6,6 +6,7 @@ import {
   resolveAuthoritativeRoute,
   resolveAuthenticatedRoute,
   resolveProtectedRoute,
+  shouldBypassAuthoritativeRoute,
 } from './access'
 import { AuthoritativeAccessSnapshot } from './access-snapshot'
 
@@ -27,10 +28,51 @@ test('unknown roles never become family or admin access', () => {
   assert.equal(context.isAdmin, false)
 })
 
+test('pre-workspace and offline routes bypass authoritative workspace redirects', () => {
+  for (const pathname of [
+    '/offline',
+    '/offline/help',
+    '/request-access',
+    '/request-access/complete',
+    '/accept-invitation',
+    '/accept-invitation/complete',
+    '/activate-invitation',
+    '/activate-invitation/complete',
+    '/platform',
+    '/platform/company-requests',
+  ]) {
+    assert.equal(shouldBypassAuthoritativeRoute(pathname), true, pathname)
+  }
+  for (const pathname of ['/today', '/access', '/admin/setup']) {
+    assert.equal(shouldBypassAuthoritativeRoute(pathname), false, pathname)
+  }
+})
+
 test('canonical snapshot routes admin, carer and family surfaces', () => {
   assert.deepEqual(resolveAuthoritativeRoute('/access', ready('ADMIN')), { action: 'redirect', destination: '/today' })
   assert.deepEqual(resolveAuthoritativeRoute('/management', ready('STAFF')), { action: 'redirect', destination: '/today' })
   assert.deepEqual(resolveAuthoritativeRoute('/today', ready('FAMILY')), { action: 'redirect', destination: '/family' })
+})
+
+test('restricted management snapshots route only to Settings', () => {
+  for (const effectiveRole of ['manager', 'care_manager', 'office']) {
+    const snapshot: AuthoritativeAccessSnapshot = {
+      ...ready('STAFF'),
+      effectiveRole,
+      linkedIdentityState: 'NOT_REQUIRED',
+    }
+    assert.deepEqual(resolveAuthoritativeRoute('/', snapshot), {
+      action: 'redirect',
+      destination: '/settings',
+    })
+    assert.deepEqual(resolveAuthoritativeRoute('/today', snapshot), {
+      action: 'redirect',
+      destination: '/settings',
+    })
+    assert.deepEqual(resolveAuthoritativeRoute('/settings', snapshot), {
+      action: 'allow',
+    })
+  }
 })
 
 test('ready access redirects stale denial-state URLs back to the canonical workspace', () => {
