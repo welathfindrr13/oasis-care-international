@@ -7,6 +7,8 @@ REPO_ROOT="$(cd "${DEPLOY_DIR}/../.." && pwd)"
 
 COMPOSE_FILE="${COMPOSE_FILE:-${DEPLOY_DIR}/docker-compose.yml}"
 ENV_FILE="${ENV_FILE:-${DEPLOY_DIR}/.env}"
+NODE_BINARY="${NODE_BINARY:-node}"
+CRYPTO_HELPER="${CRYPTO_HELPER:-${SCRIPT_DIR}/backup-crypto.mjs}"
 
 read_env_value() {
   local name="$1"
@@ -27,6 +29,7 @@ POSTGRES_USER="${POSTGRES_USER:-$(read_env_value POSTGRES_USER)}"
 POSTGRES_DB="${POSTGRES_DB:-$(read_env_value POSTGRES_DB)}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-false}"
 PRE_RESTORE_BACKUP_CONFIRMED="${PRE_RESTORE_BACKUP_CONFIRMED:-false}"
+BACKUP_ENCRYPTION_KEY_FILE="${BACKUP_ENCRYPTION_KEY_FILE:-}"
 
 BACKUP_FILE="${1:-}"
 
@@ -35,9 +38,8 @@ if [[ -z "$BACKUP_FILE" ]]; then
   exit 2
 fi
 
-if [[ -z "$POSTGRES_USER" || -z "$POSTGRES_DB" ]]; then
-  echo "POSTGRES_USER and POSTGRES_DB must be set for restore." >&2
-  echo "Tip: create deploy/v2/.env, set ENV_FILE, or pass env vars explicitly." >&2
+if [[ -z "$POSTGRES_USER" || -z "$POSTGRES_DB" || -z "$BACKUP_ENCRYPTION_KEY_FILE" ]]; then
+  echo "RESTORE_CONFIGURATION_INVALID" >&2
   exit 2
 fi
 
@@ -46,22 +48,32 @@ if [[ ! -f "$BACKUP_FILE" ]]; then
   exit 2
 fi
 
-echo "Deployment V2 Postgres restore"
-echo "Compose file: $COMPOSE_FILE"
-echo "Database: $POSTGRES_DB"
-echo "Backup file: $BACKUP_FILE"
-echo
-echo "WARNING: this restore may overwrite existing database objects."
-echo "WARNING: run a fresh backup before restore unless this is a disposable rehearsal."
-echo "WARNING: do not run against real client data until the restore process has been rehearsed."
-
-if [[ "$PRE_RESTORE_BACKUP_CONFIRMED" != "true" && "$NON_INTERACTIVE" == "true" ]]; then
-  echo "PRE_RESTORE_BACKUP_CONFIRMED=true is required for non-interactive restore." >&2
+if [[ "$PRE_RESTORE_BACKUP_CONFIRMED" != "true" ]]; then
+  echo "PRE_RESTORE_BACKUP_CONFIRMED=true is required for restore." >&2
   exit 2
 fi
 
+umask 077
+restore_session="$(mktemp -d)"
+cleanup() {
+  rm -rf "$restore_session"
+}
+trap cleanup EXIT
+
+if ! archive_digest="$("$NODE_BINARY" "$CRYPTO_HELPER" prepare \
+  "$BACKUP_ENCRYPTION_KEY_FILE" "$BACKUP_FILE" "$restore_session")"; then
+  echo "ENCRYPTED_BACKUP_AUTHENTICATION_FAILED" >&2
+  exit 2
+fi
+if [[ ! "$archive_digest" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "RESTORE_SESSION_INVALID" >&2
+  exit 2
+fi
+echo "ENCRYPTED_BACKUP_AUTHENTICATED"
+echo "RESTORE_ARCHIVE_SHA256=$archive_digest"
+
 if [[ "$NON_INTERACTIVE" != "true" ]]; then
-  printf 'Type RESTORE to confirm you have a current backup and want to continue: '
+  printf 'Type RESTORE to confirm the target backup and continue: '
   read -r confirmation
   if [[ "$confirmation" != "RESTORE" ]]; then
     echo "Restore cancelled."
@@ -71,15 +83,22 @@ fi
 
 cd "$REPO_ROOT"
 
-docker compose -f "$COMPOSE_FILE" exec -T postgres \
-  pg_restore \
-  --username "$POSTGRES_USER" \
-  --dbname "$POSTGRES_DB" \
-  --clean \
-  --if-exists \
-  --no-owner \
-  --no-acl \
-  < "$BACKUP_FILE"
+if ! "$NODE_BINARY" "$CRYPTO_HELPER" decrypt-pinned \
+    "$BACKUP_ENCRYPTION_KEY_FILE" "$restore_session/archive.dump.enc" | \
+    docker compose -f "$COMPOSE_FILE" exec -T postgres \
+      pg_restore \
+      --username "$POSTGRES_USER" \
+      --dbname "$POSTGRES_DB" \
+      --clean \
+      --if-exists \
+      --single-transaction \
+      --no-owner \
+      --no-acl \
+      >/dev/null 2>&1; then
+  echo "RESTORE_FAILED" >&2
+  exit 1
+fi
 
-echo "Restore complete."
-echo "Next production hardening step: rehearse restore from encrypted offsite backup before real client data."
+rm -rf "$restore_session"
+trap - EXIT
+echo "RESTORE_COMPLETE"

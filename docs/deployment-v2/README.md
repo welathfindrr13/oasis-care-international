@@ -41,8 +41,9 @@ Use a VPS or single-server provider with:
 - `deploy/v2/Caddyfile`: reverse proxy routing.
 - `deploy/v2/.env.example`: placeholder-only environment template.
 - `deploy/v2/scripts/smoke-test.sh`: health and CareBridge boundary smoke checks.
-- `deploy/v2/scripts/backup-postgres.sh`: local Postgres backup.
-- `deploy/v2/scripts/restore-postgres.sh`: guarded restore procedure.
+- `deploy/v2/scripts/backup-postgres.sh`: authenticated encrypted Postgres backup.
+- `deploy/v2/scripts/restore-postgres.sh`: guarded encrypted restore procedure.
+- `deploy/v2/scripts/rehearse-backup-restore.sh`: disposable restore, query, and destruction proof.
 - `docs/deployment-v2/https-domain-cookie-proof.md`: Issue #11 HTTPS, domain, cookie, CORS, and Clerk callback proof runbook.
 
 ## Environment Setup
@@ -230,10 +231,21 @@ workflow does not authorize dispatch, approve a target SHA, or make the applicat
 
 ## Backup Flow
 
-Create a timestamped local backup:
+Create a private 256-bit key once and store it separately from the backup. The
+key file must remain a regular `0600` file and must never be committed:
+
+```bash
+umask 077
+openssl rand -hex 32 > /secure/operator-path/oasis-backup.key
+chmod 600 /secure/operator-path/oasis-backup.key
+```
+
+Create a timestamped AES-256-GCM encrypted backup. No plaintext dump is written
+to disk:
 
 ```bash
 POSTGRES_USER=oasis POSTGRES_DB=oasis \
+BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
 deploy/v2/scripts/backup-postgres.sh
 ```
 
@@ -242,40 +254,69 @@ Override backup location if needed:
 ```bash
 POSTGRES_USER=oasis POSTGRES_DB=oasis \
 BACKUP_DIR=/var/backups/oasis \
+BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
 deploy/v2/scripts/backup-postgres.sh
 ```
 
-If `deploy/v2/.env` exists, the script loads it automatically. Keep production backups outside the repo working tree.
-
-Next production hardening step: encrypt and copy backups to an offsite UK/EU-compatible provider.
+If `deploy/v2/.env` exists, the script loads the database name and user only.
+The encryption key path is always explicit. Keep encrypted production backups
+outside the repo working tree and keep the key in a separate operator-controlled
+location. Selecting or paying for an offsite UK/EU-compatible provider remains
+an external operator decision.
 
 ## Restore Flow
 
 Restore requires an explicit backup file and confirmation:
 
 ```bash
-deploy/v2/scripts/restore-postgres.sh /var/backups/oasis/oasis-oasis-YYYYMMDDTHHMMSSZ.dump
+BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+deploy/v2/scripts/restore-postgres.sh /var/backups/oasis/oasis-oasis-YYYYMMDDTHHMMSSZ.dump.enc
 ```
 
-Non-interactive restore for rehearsals:
+Before confirmation, the restore command authenticates and copies the selected
+encrypted archive into a private restore session and prints its SHA-256. The
+long-lived key is never copied; final decryption reads it once into memory. The
+transactional restore uses the pinned archive, so replacing the original archive
+path cannot change the confirmed restore input, while a changed key fails closed.
+Raw restore diagnostics are suppressed because database errors can contain row
+values; the command returns only allowlisted status markers.
 
-```bash
-NON_INTERACTIVE=true deploy/v2/scripts/restore-postgres.sh /path/to/backup.dump
-```
-
-Run a restore rehearsal before real client data.
-
-For non-interactive disposable rehearsals, explicitly confirm a pre-restore backup gate:
+For a non-interactive restore, explicitly confirm the pre-restore backup gate:
 
 ```bash
 PRE_RESTORE_BACKUP_CONFIRMED=true \
 NON_INTERACTIVE=true \
 POSTGRES_USER=oasis \
 POSTGRES_DB=oasis \
-deploy/v2/scripts/restore-postgres.sh /path/to/backup.dump
+BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+deploy/v2/scripts/restore-postgres.sh /path/to/backup.dump.enc
 ```
 
-Do not run restore against real client data until this has been rehearsed on disposable infrastructure.
+Before any production restore, prove the selected encrypted archive against a
+new disposable Postgres container. This command authenticates the archive,
+restores it, checks required schema objects, and destroys the container:
+
+```bash
+BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+deploy/v2/scripts/rehearse-backup-restore.sh /retrieved/offsite/backup.dump.enc
+```
+
+Only five allowlisted proof markers are printed. Raw database contents,
+credentials, container details, and diagnostics remain suppressed. Do not run a
+production restore until this rehearsal passes and a separate explicit recovery
+decision has been made.
+
+The rehearsal uses the digest-pinned Postgres image recorded in the script,
+disables container networking, keeps PostgreSQL data on a bounded tmpfs, checks
+that applied migration rows were recovered, disables persistent container logs,
+discards raw restore diagnostics, and verifies container destruction.
+CI also creates a synthetic migrated database and exercises this complete backup,
+restore, query, and destruction path against real PostgreSQL and Docker.
+
+Provider-level droplet backups complement this database archive; they do not
+replace it. Confirm the provider policy and a current private backup image before
+launch. Restoring a provider image is a separate, explicitly approved recovery
+exercise because it may create billable infrastructure.
 
 ## Observability And Incident Basics
 
