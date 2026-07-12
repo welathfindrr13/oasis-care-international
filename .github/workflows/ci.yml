@@ -192,6 +192,8 @@ jobs:
         node --test deploy/v2/scripts/backup-crypto.test.mjs
         node --test deploy/v2/scripts/backup-restore.test.mjs
         node --test deploy/v2/scripts/production-signals.test.mjs
+        node --test deploy/v2/scripts/production-signal-runner.test.mjs
+        node --test deploy/v2/scripts/production-signal-scheduler.test.mjs
         node deploy/v2/scripts/preflight-env.mjs "$TEMP_ENV"
         docker compose --env-file "$TEMP_ENV" -f deploy/v2/docker-compose.yml config
         docker run --rm --env-file "$TEMP_ENV" -v "$PWD/deploy/v2/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile
@@ -200,5 +202,14 @@ jobs:
         bash -n deploy/v2/scripts/restore-postgres.sh
         bash -n deploy/v2/scripts/rehearse-backup-restore.sh
         bash -n deploy/v2/scripts/backup-restore.integration.sh
+        bash -n deploy/v2/scripts/install-production-signal-scheduler.sh
+        bash -n deploy/v2/scripts/verify-production-signal-scheduler.sh
+        bash -n deploy/v2/scripts/verify-production-signal-systemd.sh
+        bash -n deploy/v2/scripts/production-signal-installer.integration.sh
+        deploy/v2/scripts/verify-production-signal-systemd.sh
+        docker run --rm -v "$PWD:/source:ro" \
+          ubuntu@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90 \
+          bash /source/deploy/v2/scripts/production-signal-installer.integration.sh
         deploy/v2/scripts/backup-restore.integration.sh
         node --check deploy/v2/scripts/production-signals.mjs
+        node --check deploy/v2/scripts/production-signal-runner.mjs

@@ -64,6 +64,13 @@ bash -n deploy/v2/scripts/backup-postgres.sh
 bash -n deploy/v2/scripts/restore-postgres.sh
 bash -n deploy/v2/scripts/rehearse-backup-restore.sh
 bash -n deploy/v2/scripts/backup-restore.integration.sh
+bash -n deploy/v2/scripts/install-production-signal-scheduler.sh
+bash -n deploy/v2/scripts/verify-production-signal-scheduler.sh
+bash -n deploy/v2/scripts/verify-production-signal-systemd.sh
+bash -n deploy/v2/scripts/production-signal-installer.integration.sh
+if command -v systemd-analyze >/dev/null 2>&1; then
+  deploy/v2/scripts/verify-production-signal-systemd.sh
+fi
 node --test apps/web/next.config.test.js
 node --test deploy/v2/Caddyfile.test.mjs
 node --test deploy/v2/scripts/preflight-env.test.mjs
@@ -71,6 +78,9 @@ node --test deploy/v2/scripts/smoke-test.test.mjs
 node --test deploy/v2/scripts/backup-crypto.test.mjs
 node --test deploy/v2/scripts/backup-restore.test.mjs
 node --test deploy/v2/scripts/production-signals.test.mjs
+node --test deploy/v2/scripts/production-signal-runner.test.mjs
+node --test deploy/v2/scripts/production-signal-scheduler.test.mjs
 node deploy/v2/scripts/preflight-env.mjs "$TEMP_ENV"
 deploy/v2/scripts/backup-restore.integration.sh
 node --check deploy/v2/scripts/production-signals.mjs
+node --check deploy/v2/scripts/production-signal-runner.mjs
