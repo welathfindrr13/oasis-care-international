@@ -3,7 +3,7 @@ set -euo pipefail
 
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
-unset BASH_ENV ENV CDPATH 2>/dev/null || true
+unset BASH_ENV ENV CDPATH NODE_OPTIONS NODE_PATH 2>/dev/null || true
 
 CONFIG_FILE=/etc/oasis/production-signals.env
 CONFIG_DIRECTORY=/etc/oasis

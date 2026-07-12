@@ -61,6 +61,8 @@ chmod 0600 deploy/v2/.env /secure/oasis-backup.key
 
 cat >/usr/bin/node <<'MOCK'
 #!/bin/sh
+[ -z "${NODE_OPTIONS+x}" ] || exit 42
+[ -z "${NODE_PATH+x}" ] || exit 43
 exit 0
 MOCK
 cat >/usr/bin/docker <<'MOCK'
@@ -112,6 +114,8 @@ run_install() {
 }
 
 : >/tmp/oasis-systemctl.log
+export NODE_OPTIONS=--require=/tmp/hostile-preload.cjs
+export NODE_PATH=/tmp/hostile-node-path
 run_install >/tmp/install.stdout 2>/tmp/install.stderr || fail
 [ "$(cat /tmp/install.stdout)" = PRODUCTION_SIGNAL_SCHEDULER_INSTALLED ] || fail
 [ ! -s /tmp/install.stderr ] || fail
@@ -125,6 +129,11 @@ fi
 [ -f /etc/systemd/system/oasis-production-signals.service ] || fail
 grep -qx 'start oasis-production-signals.service' /tmp/oasis-systemctl.log || fail
 grep -qx 'enable --now oasis-production-signals.timer' /tmp/oasis-systemctl.log || fail
+
+/usr/local/sbin/oasis-verify-production-signal-scheduler \
+  >/tmp/verify.stdout 2>/tmp/verify.stderr || fail
+[ "$(cat /tmp/verify.stdout)" = PRODUCTION_SIGNAL_HEARTBEAT_OK ] || fail
+[ ! -s /tmp/verify.stderr ] || fail
 
 : >/tmp/oasis-systemctl.log
 run_install >/tmp/install.stdout 2>/tmp/install.stderr || fail

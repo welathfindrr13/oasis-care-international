@@ -66,6 +66,14 @@ test("systemd timer is persistent and schedules every five minutes", () => {
 test("installer proves exact main revision and private inputs before enabling", () => {
   assert.match(installer, /^REPOSITORY=\/opt\/oasis-care$/m);
   assert.match(installer, /^PATH=\/usr\/sbin:\/usr\/bin:\/sbin:\/bin$/m);
+  assert.match(
+    installer,
+    /unset BASH_ENV ENV CDPATH NODE_OPTIONS NODE_PATH/,
+  );
+  assert.ok(
+    installer.indexOf("unset BASH_ENV ENV CDPATH NODE_OPTIONS NODE_PATH") <
+      installer.indexOf("/usr/bin/node --check"),
+  );
   assert.match(installer, /^GIT_NO_REPLACE_OBJECTS=1$/m);
   assert.match(installer, /\/usr\/bin\/git --no-replace-objects rev-parse HEAD/);
   assert.match(
@@ -139,6 +147,14 @@ test("external verifier fails closed on timer or heartbeat state", () => {
     /^CONFIG_FILE=\/etc\/oasis\/production-signals\.env$/m,
   );
   assert.match(verifier, /^CONFIG_DIRECTORY=\/etc\/oasis$/m);
+  assert.match(
+    verifier,
+    /unset BASH_ENV ENV CDPATH NODE_OPTIONS NODE_PATH/,
+  );
+  assert.ok(
+    verifier.indexOf("unset BASH_ENV ENV CDPATH NODE_OPTIONS NODE_PATH") <
+      verifier.indexOf("/usr/bin/node"),
+  );
   assert.match(verifier, /stat -c '%a'/);
   assert.match(verifier, /stat -c '%u'/);
   assert.match(verifier, /\)" = 600 \] \|\| fail/);
