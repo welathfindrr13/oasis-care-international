@@ -286,12 +286,12 @@ test("Admin Today prioritizes visit exceptions at mobile and desktop sizes", asy
     await expect(page.getByRole("link", { name: "Open today's schedule" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Needs attention" })).toBeVisible();
     await expect(page.getByText("Late or missed visits", { exact: true })).toBeVisible();
-    await expect(page.getByText("Unassigned visits", { exact: true })).toBeVisible();
+    await expect(page.getByText("Assignments not ready", { exact: true })).toBeVisible();
     await expect(page.getByText("Incomplete visit records", { exact: true })).toBeVisible();
     await expect(page.getByText("AI Health Summaries", { exact: true })).toHaveCount(0);
     await expect(page.getByText("Care plan reviews due soon", { exact: true })).toHaveCount(0);
     await expect(page.getByText("Medication exceptions", { exact: true })).toHaveCount(0);
-    await expect(page.locator("body")).toContainText("Unassigned");
+    await expect(page.getByText("Review visits assigned to a Carer whose account is not ready.")).toBeVisible();
 
     const accessibility = await new AxeBuilder({ page }).analyze();
     expect(accessibility.violations).toEqual([]);

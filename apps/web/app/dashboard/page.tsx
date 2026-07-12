@@ -9,13 +9,16 @@ import { hasAccessCapability } from '../../lib/auth/capabilities'
 import { getServerAuthContext } from '../../lib/auth/server-auth'
 import { query } from '../../lib/graphql/client'
 import {
+  CARER_ACCESS_LIFECYCLE_QUERY,
   SHIFT_ANALYTICS_QUERY,
   VISITS_QUERY,
+  type CarerAccessLifecycleQueryResponse,
   type ShiftAnalyticsQueryResponse,
   type Visit,
   type VisitsQueryResponse,
 } from '../../lib/graphql/queries'
 import { formatLondonLongDate, formatTime, getLondonDayUtcRange } from '../../lib/time'
+import { getAssignmentNotReadyVisits, getRemainingVisitPageOffsets } from './adminToday'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,7 +35,10 @@ type AdminTodayData = {
   visits: Visit[]
   activeCarersNow: number
   incompleteRecordCount: number
+  readyCarerIds: string[]
 }
+
+const VISIT_PAGE_SIZE = 100
 
 const CARE_LOG_COUNT_BY_VISIT_QUERY = `
   query CareLogCountByVisit($visitId: ID!, $skip: Int, $take: Int) {
@@ -74,25 +80,44 @@ async function getIncompleteRecordCount(visits: Visit[]): Promise<number> {
   return results.reduce<number>((total, value) => total + value, 0)
 }
 
+async function getAllTodayVisits(start: string, end: string): Promise<Visit[]> {
+  const firstPage = await query<VisitsQueryResponse>(VISITS_QUERY, {
+    scheduledStartFrom: start,
+    scheduledStartTo: end,
+    take: VISIT_PAGE_SIZE,
+    skip: 0,
+  })
+  const remainingPages = await Promise.all(
+    getRemainingVisitPageOffsets(firstPage.visits.total, VISIT_PAGE_SIZE).map((skip) =>
+      query<VisitsQueryResponse>(VISITS_QUERY, {
+        scheduledStartFrom: start,
+        scheduledStartTo: end,
+        take: VISIT_PAGE_SIZE,
+        skip,
+      }),
+    ),
+  )
+  return [firstPage, ...remainingPages].flatMap((response) => response.visits.items ?? [])
+}
+
 async function loadAdminTodayData(): Promise<AdminTodayData> {
   const range = getLondonDayUtcRange()
   const inclusiveEnd = new Date(new Date(range.end).getTime() - 1).toISOString()
-  const [visitsResponse, shiftResponse] = await Promise.all([
-    query<VisitsQueryResponse>(VISITS_QUERY, {
-      scheduledStartFrom: range.start,
-      scheduledStartTo: inclusiveEnd,
-      take: 100,
-      skip: 0,
-    }),
+  const [visitsResult, shiftResponse, lifecycleResponse] = await Promise.all([
+    getAllTodayVisits(range.start, inclusiveEnd),
     query<ShiftAnalyticsQueryResponse>(SHIFT_ANALYTICS_QUERY),
+    query<CarerAccessLifecycleQueryResponse>(CARER_ACCESS_LIFECYCLE_QUERY),
   ])
-  const visits = [...(visitsResponse.visits.items ?? [])].sort(
+  const visits = [...visitsResult].sort(
     (left, right) => new Date(left.scheduledStart).getTime() - new Date(right.scheduledStart).getTime(),
   )
   return {
     visits,
     activeCarersNow: shiftResponse.shiftAnalytics.activeCarersNow,
     incompleteRecordCount: await getIncompleteRecordCount(visits),
+    readyCarerIds: lifecycleResponse.carerAccessLifecycle
+      .filter((item) => item.readiness === 'READY' && item.carerId)
+      .map((item) => item.carerId as string),
   }
 }
 
@@ -135,10 +160,10 @@ export default async function DashboardPage({
   const lateVisits = data.visits.filter(
     (visit) => visit.status === 'SCHEDULED' && new Date(visit.scheduledStart).getTime() < now,
   )
-  const unassignedVisits = data.visits.filter((visit) => visit.status !== 'CANCELLED' && !visit.carer)
+  const assignmentNotReadyVisits = getAssignmentNotReadyVisits(data.visits, data.readyCarerIds)
   const completedVisits = data.visits.filter((visit) => visit.status === 'COMPLETED')
   const inProgressVisits = data.visits.filter((visit) => visit.status === 'IN_PROGRESS')
-  const urgentCount = lateVisits.length + unassignedVisits.length + data.incompleteRecordCount
+  const urgentCount = lateVisits.length + assignmentNotReadyVisits.length + data.incompleteRecordCount
   const attentionItems = [
     {
       label: 'Late or missed visits',
@@ -146,9 +171,11 @@ export default async function DashboardPage({
       detail: lateVisits.length === 0 ? 'No scheduled visits are overdue.' : 'Check visits that should already have started.',
     },
     {
-      label: 'Unassigned visits',
-      count: unassignedVisits.length,
-      detail: unassignedVisits.length === 0 ? 'Every active visit has a Carer.' : 'Assign a Carer before these visits start.',
+      label: 'Assignments not ready',
+      count: assignmentNotReadyVisits.length,
+      detail: assignmentNotReadyVisits.length === 0
+        ? 'Every active visit has a Carer who is ready to work.'
+        : 'Review visits assigned to a Carer whose account is not ready.',
     },
     {
       label: 'Incomplete visit records',
