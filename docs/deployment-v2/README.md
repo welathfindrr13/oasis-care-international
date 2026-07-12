@@ -269,6 +269,7 @@ an external operator decision.
 Restore requires an explicit backup file and confirmation:
 
 ```bash
+PRE_RESTORE_BACKUP_CONFIRMED=true \
 BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
 deploy/v2/scripts/restore-postgres.sh /var/backups/oasis/oasis-oasis-YYYYMMDDTHHMMSSZ.dump.enc
 ```
