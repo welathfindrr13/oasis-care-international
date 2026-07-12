@@ -462,7 +462,10 @@ function deliveryMessage(item: CarerAccessLifecycleItem) {
   if (item.deliveryStatus === "PROCESSING")
     return "Secure delivery in progress";
   if (item.deliveryStatus === "RETRYABLE") return "Delivery can be retried";
-  if (item.deliveryStatus === "NEEDS_ATTENTION")
+  if (
+    item.deliveryStatus === "NEEDS_ATTENTION" ||
+    item.deliveryStatus === "UNAVAILABLE"
+  )
     return "Delivery needs administrator support";
   return "";
 }

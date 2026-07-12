@@ -96,6 +96,10 @@ test("Carer lifecycle UI fixes tenant and role server-side and exposes only stab
   assert.match(lifecycle, /<Alert tone="danger" live>/);
   assert.match(lifecycle, /<Alert tone=\{notice\.tone\} live>/);
   assert.match(lifecycle, /getLifecycleActionNotice/);
+  assert.match(
+    lifecycle,
+    /item\.deliveryStatus === "NEEDS_ATTENTION" \|\|[\s\S]*?item\.deliveryStatus === "UNAVAILABLE"[\s\S]*?Delivery needs administrator support/,
+  );
   assert.match(lifecycle, /<caption/);
   assert.match(lifecycle, /aria-label="Carer invitations and access actions"/);
   assert.match(lifecycle, /tabIndex=\{0\}/);
