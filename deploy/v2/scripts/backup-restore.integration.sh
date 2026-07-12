@@ -72,6 +72,12 @@ YAML
 cd "$REPO_ROOT"
 docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" up -d --wait \
   >/dev/null
+source_container="$(docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" ps -q postgres)"
+if [[ ! "$source_container" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "BACKUP_RESTORE_SOURCE_CONTAINER_INVALID" >&2
+  exit 1
+fi
+node "$SCRIPT_DIR/production-signals.mjs" disk-probe "$source_container"
 host_port="$(docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" port postgres 5432 | awk -F: '{print $NF}')"
 if [[ ! "$host_port" =~ ^[0-9]+$ ]]; then
   echo "BACKUP_RESTORE_INTEGRATION_PORT_INVALID" >&2

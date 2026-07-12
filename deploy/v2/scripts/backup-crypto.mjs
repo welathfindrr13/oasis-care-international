@@ -6,11 +6,14 @@ import { pathToFileURL } from "node:url";
 import { Transform, Writable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
-const MAGIC = Buffer.from("OASISB1\n", "ascii");
+const MAGIC_V1 = Buffer.from("OASISB1\n", "ascii");
+const MAGIC_V2 = Buffer.from("OASISB2\n", "ascii");
+const MAGIC_BYTES = MAGIC_V2.length;
+const TIMESTAMP_BYTES = 8;
 const NONCE_BYTES = 12;
 const TAG_BYTES = 16;
 const KEY_PATTERN = /^[0-9a-f]{64}\n?$/;
-const MIN_ENCRYPTED_BYTES = MAGIC.length + NONCE_BYTES + TAG_BYTES + 1;
+const MIN_V1_ENCRYPTED_BYTES = MAGIC_BYTES + NONCE_BYTES + TAG_BYTES + 1;
 
 function fail(code) {
   const error = new Error(code);
@@ -60,16 +63,18 @@ export function readEncryptionKey(keyFile) {
   }
 }
 
-function encryptionTransform(key, nonce) {
+function encryptionTransform(key, nonce, authenticatedHeader) {
   const cipher = crypto.createCipheriv("aes-256-gcm", key, nonce);
+  cipher.setAAD(authenticatedHeader);
   return new TransformStreamAdapter(
     (chunk) => cipher.update(chunk),
     () => Buffer.concat([cipher.final(), cipher.getAuthTag()]),
   );
 }
 
-function decryptionTransform(key, nonce, tag) {
+function decryptionTransform(key, nonce, tag, authenticatedHeader) {
   const decipher = crypto.createDecipheriv("aes-256-gcm", key, nonce);
+  if (authenticatedHeader) decipher.setAAD(authenticatedHeader);
   decipher.setAuthTag(tag);
   return new TransformStreamAdapter(
     (chunk) => decipher.update(chunk),
@@ -101,17 +106,33 @@ class TransformStreamAdapter extends Transform {
   }
 }
 
-export async function encryptStream({ input, keyFile, outputFile }) {
+export async function encryptStream({
+  input,
+  keyFile,
+  outputFile,
+  createdAtMs = Date.now(),
+}) {
   const key = readEncryptionKey(keyFile);
+  if (!Number.isSafeInteger(createdAtMs) || createdAtMs <= 0) {
+    fail("BACKUP_ENCRYPTION_FAILED");
+  }
+  const createdAtSeconds = Math.floor(createdAtMs / 1000);
+  if (createdAtSeconds <= 0) fail("BACKUP_ENCRYPTION_FAILED");
+  const timestamp = Buffer.alloc(TIMESTAMP_BYTES);
+  timestamp.writeBigUInt64BE(BigInt(createdAtSeconds));
   const nonce = crypto.randomBytes(NONCE_BYTES);
+  const authenticatedHeader = Buffer.concat([MAGIC_V2, timestamp, nonce]);
   const output = fs.createWriteStream(outputFile, {
     flags: "w",
     mode: 0o600,
   });
-  output.write(MAGIC);
-  output.write(nonce);
+  output.write(authenticatedHeader);
   try {
-    await pipeline(input, encryptionTransform(key, nonce), output);
+    await pipeline(
+      input,
+      encryptionTransform(key, nonce, authenticatedHeader),
+      output,
+    );
     fs.chmodSync(outputFile, 0o600);
   } catch {
     try {
@@ -135,25 +156,59 @@ async function decryptOnce({ inputFile, key, output }) {
     fail("ENCRYPTED_BACKUP_INVALID");
   }
   const stat = fs.fstatSync(handle);
-  if (!stat.isFile() || stat.size < MIN_ENCRYPTED_BYTES) {
+  if (!stat.isFile() || stat.size < MIN_V1_ENCRYPTED_BYTES) {
     fs.closeSync(handle);
     fail("ENCRYPTED_BACKUP_INVALID");
   }
-  const header = Buffer.alloc(MAGIC.length + NONCE_BYTES);
+  const magic = Buffer.alloc(MAGIC_BYTES);
   const tag = Buffer.alloc(TAG_BYTES);
   try {
-    fs.readSync(handle, header, 0, header.length, 0);
+    fs.readSync(handle, magic, 0, magic.length, 0);
     fs.readSync(handle, tag, 0, tag.length, stat.size - TAG_BYTES);
   } catch {
     fs.closeSync(handle);
     fail("ENCRYPTED_BACKUP_INVALID");
   }
-  if (!header.subarray(0, MAGIC.length).equals(MAGIC)) {
+  let headerLength;
+  let formatVersion;
+  if (magic.equals(MAGIC_V2)) {
+    headerLength = MAGIC_BYTES + TIMESTAMP_BYTES + NONCE_BYTES;
+    formatVersion = 2;
+  } else if (magic.equals(MAGIC_V1)) {
+    headerLength = MAGIC_BYTES + NONCE_BYTES;
+    formatVersion = 1;
+  } else {
+    fs.closeSync(handle);
+    fail("ENCRYPTED_BACKUP_INVALID");
+  }
+  if (stat.size < headerLength + TAG_BYTES + 1) {
     fs.closeSync(handle);
     fail("ENCRYPTED_BACKUP_INVALID");
   }
 
-  const nonce = header.subarray(MAGIC.length);
+  const header = Buffer.alloc(headerLength);
+  try {
+    fs.readSync(handle, header, 0, header.length, 0);
+  } catch {
+    fs.closeSync(handle);
+    fail("ENCRYPTED_BACKUP_INVALID");
+  }
+
+  let createdAtMs = null;
+  let nonceOffset = MAGIC_BYTES;
+  let authenticatedHeader = null;
+  if (formatVersion === 2) {
+    const createdAtSeconds = header.readBigUInt64BE(MAGIC_BYTES);
+    if (createdAtSeconds > BigInt(Math.floor(Number.MAX_SAFE_INTEGER / 1000))) {
+      fs.closeSync(handle);
+      fail("ENCRYPTED_BACKUP_INVALID");
+    }
+    createdAtMs = Number(createdAtSeconds) * 1000;
+    nonceOffset += TIMESTAMP_BYTES;
+    authenticatedHeader = header;
+  }
+
+  const nonce = header.subarray(nonceOffset, nonceOffset + NONCE_BYTES);
   const encrypted = fs.createReadStream(null, {
     fd: handle,
     autoClose: true,
@@ -161,23 +216,32 @@ async function decryptOnce({ inputFile, key, output }) {
     end: stat.size - TAG_BYTES - 1,
   });
   try {
-    await pipeline(encrypted, decryptionTransform(key, nonce, tag), output);
+    await pipeline(
+      encrypted,
+      decryptionTransform(key, nonce, tag, authenticatedHeader),
+      output,
+    );
   } catch {
     fail("BACKUP_DECRYPTION_FAILED");
   }
+  return { formatVersion, createdAtMs };
 }
 
 export async function verifyEncryptedFile({ inputFile, keyFile }) {
   const key = readEncryptionKey(keyFile);
-  await verifyEncryptedFileWithKey({ inputFile, key });
+  return verifyEncryptedFileWithKey({ inputFile, key });
 }
 
 async function verifyEncryptedFileWithKey({ inputFile, key }) {
-  await decryptOnce({
+  return decryptOnce({
     inputFile,
     key,
     output: new Writable({ write(_chunk, _encoding, callback) { callback(); } }),
   });
+}
+
+export async function readAuthenticatedBackupMetadata({ inputFile, keyFile }) {
+  return verifyEncryptedFile({ inputFile, keyFile });
 }
 
 async function createEncryptedSnapshot(inputFile) {

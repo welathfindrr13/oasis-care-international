@@ -158,7 +158,7 @@ test("backup writes only an encrypted archive through the isolated Postgres serv
   assert.equal(result.status, 0, result.stderr || result.stdout);
   const encrypted = readFileSync(backupFile);
   assert.equal(encrypted.includes(Buffer.from("synthetic custom archive")), false);
-  assert.equal(encrypted.subarray(0, 8).toString("ascii"), "OASISB1\n");
+  assert.equal(encrypted.subarray(0, 8).toString("ascii"), "OASISB2\n");
   assert.equal(result.stdout, "BACKUP_ENCRYPTION_READY\nBACKUP_CREATED_ENCRYPTED\n");
   assert.deepEqual(readArguments(dockerArgumentsLog), [
     "compose",

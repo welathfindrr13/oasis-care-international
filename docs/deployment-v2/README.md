@@ -321,17 +321,58 @@ exercise because it may create billable infrastructure.
 
 ## Observability And Incident Basics
 
-Before launch, operators need:
+`production-signals.mjs` is the bounded production probe. It checks that the
+public login route returns the expected Oasis HTML, API/web/readiness revision
+agreement, all required container health plus restart/OOM state, in-container
+Postgres and host backup disk pressure, the authenticated creation time and tag
+of the newest encrypted database backup, and real critical API/web/Caddy formats
+from both log streams. It never prints URLs, container identifiers, log lines,
+backup names, or database data.
 
-- external uptime checks for `/login`, `/health`, and `/ready`;
-- container log access for `caddy`, `web`, `api`, and `postgres`;
-- disk-space alerting for the Postgres volume and backup directory;
-- backup job success/failure alerting;
-- API error reporting or log alerting for repeated `5xx` and auth failures;
-- a documented first-response owner and breach escalation path;
-- a pre-migration snapshot gate;
-- rollback steps for application image/tag rollback and database restore;
-- RTO/RPO targets decided by the business before real client data.
+Run it with the exact deployed SHA and explicit private backup key:
+
+```bash
+TARGET_SHA=<lowercase-40-character-reviewed-sha> \
+OASIS_PRODUCTION_APP_URL=https://care.example.org \
+BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+node deploy/v2/scripts/production-signals.mjs
+```
+
+The default thresholds are 85% disk use, a 26-hour maximum encrypted-backup age,
+a 15-minute critical-log window, and 25 authentication/authorization denials in
+that window. Override them only with reviewed operational values using
+`DISK_MAX_PERCENT`, `BACKUP_MAX_AGE_HOURS`, `CRITICAL_LOG_SINCE`, and
+`AUTH_DENIAL_THRESHOLD`.
+
+New backups use the `OASISB2` envelope, which authenticates creation time with
+the archive contents. Older `OASISB1` archives remain restorable, but cannot pass
+the freshness signal because filesystem timestamps are mutable. Create and prove
+a new encrypted backup before enabling the production gate.
+
+Every failure marker has one owner and one immediate action:
+
+| Failure marker | Owner | Immediate action |
+| --- | --- | --- |
+| `PRODUCTION_SIGNAL_PUBLIC_UPTIME_FAILED` | Platform operator | Confirm public routing and Caddy health; use explicit application rollback only for an availability failure after deployment. |
+| `PRODUCTION_SIGNAL_REVISION_FAILED` | Platform operator | Stop deployment/canary and compare API, web, readiness, and approved SHA before any further mutation. |
+| `PRODUCTION_SIGNAL_SERVICE_HEALTH_FAILED` | Platform operator | Inspect only the affected container's sanitized health/log metadata; do not run database restore automatically. |
+| `PRODUCTION_SIGNAL_DISK_FAILED` | Platform operator | Stop writes/deployment where safe, identify Postgres or backup pressure, and expand/clean storage only through an approved operational action. |
+| `PRODUCTION_SIGNAL_BACKUP_FAILED` | Platform operator | Stop migration/deployment, create or retrieve a fresh encrypted backup, then repeat disposable restore proof. |
+| `PRODUCTION_SIGNAL_CRITICAL_ERRORS_FAILED` | Platform operator | Stop the canary, inspect redacted application diagnostics, and classify availability versus security containment before rollback. |
+| `PRODUCTION_SIGNAL_AUTH_ABUSE_FAILED` | Platform operator | Stop the canary, preserve sanitized counts/timing, and investigate Clerk/JWT abuse or route probing without printing identities or tokens. |
+| `PRODUCTION_SIGNAL_TIMEOUT_FAILED` | Platform operator | Stop the gate, confirm the missing heartbeat, and inspect Docker/filesystem responsiveness before retrying; do not bypass the watchdog. |
+| `PRODUCTION_SIGNAL_CONFIGURATION_FAILED` | Platform operator | Correct only the missing/unsafe probe input; do not weaken thresholds, file permissions, TLS, or revision checks. |
+| `PRODUCTION_SIGNAL_INTERNAL_FAILED` | Platform operator | Treat probe state as unknown and stop the production gate until the probe itself is reviewed. |
+
+The probe is an executable gate, not a generalized monitoring platform. Before
+the controlled canary, wire this exact command to the approved host scheduler or
+monitoring runner and route any non-zero exit or missing completion heartbeat
+after two minutes to the platform operator. Each subprocess has a ten-second
+deadline and the complete probe is killed after two minutes. The external
+scheduling action must not expose the key or raw command output.
+
+Before real client data, the business must also decide RTO/RPO targets and retain
+an incident log covering time, impact, containment, and follow-up.
 
 ## GDPR And Care-Sector Pre-Live Gates
 
