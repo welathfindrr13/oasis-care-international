@@ -4,6 +4,9 @@ import AxeBuilder from "@axe-core/playwright";
 const VISIT_ID = "55555555-5555-4555-8555-555555555555";
 const UNASSIGNED_VISIT_ID = "55555555-5555-4555-8555-666666666666";
 const CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const SENTINEL_CLIENT_ID = "client-browser-sentinel";
+const SENTINEL_CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-bbbbbbbbbbbb";
+const SENTINEL_VISIT_ID = "55555555-5555-4555-8555-888888888888";
 
 async function signIn(
   page: import("playwright/test").Page,
@@ -603,6 +606,97 @@ test("the lifecycle UI handles duplicate and expired invitation actions with sta
   await expect(
     page.getByText("pending-carer@example.test", { exact: true }),
   ).toHaveCount(1);
+});
+
+test("tenant and family room guessing stays isolated", async ({ page }) => {
+  await signIn(page, {
+    email: "admin@local.dev",
+    name: "Local Admin",
+    role: "user",
+  });
+  await page.goto(`/people/${SENTINEL_CLIENT_ID}`);
+  await expect(
+    page.getByRole("heading", { name: /Person Not Found|Unable to Load Person/ }),
+  ).toBeVisible();
+  await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
+
+  await signIn(page, {
+    email: "carer@local.dev",
+    name: "Local Carer",
+    role: "admin",
+  });
+  await page.goto(`/schedule/${SENTINEL_VISIT_ID}`);
+  await expect(page.getByText("An internal error occurred", { exact: true })).toBeVisible();
+  await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
+
+  await signIn(page, {
+    email: "family@local.dev",
+    name: "Local Family",
+    role: "user",
+  });
+  await page.goto(`/family/care-rooms/${SENTINEL_CARE_ROOM_ID}`);
+  await expect(page.getByRole("heading", { name: "Updates temporarily unavailable" })).toBeVisible();
+  await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
+
+  await page.goto("/family/care-rooms/aaaaaaaa-aaaa-4aaa-8aaa-cccccccccccc");
+  await expect(page.getByRole("heading", { name: "Updates temporarily unavailable" })).toBeVisible();
+  await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
+});
+
+test("an unauthorized family identity receives zero rooms and sanitized denial", async ({ page }) => {
+  await signIn(page, {
+    email: "unauthorized-family@local.dev",
+    name: "Unauthorized Family",
+    role: "user",
+    callbackUrl: "http://localhost:3002/family",
+  });
+  await page.goto("/family");
+  await expect(page.getByText(/You do not have access to anyone’s updates yet\./)).toBeVisible();
+  await expect(page.getByText("Assigned Fake Client")).toHaveCount(0);
+
+  await page.goto(`/family/care-rooms/${CARE_ROOM_ID}`);
+  await expect(page.getByRole("heading", { name: /Updates (?:temporarily )?unavailable/ })).toBeVisible();
+  await expect(page.getByText("Assigned Fake Client")).toHaveCount(0);
+});
+
+test("a revoked family identity immediately loses room access", async ({ page }) => {
+  await signIn(page, {
+    email: "revoked-family@local.dev",
+    name: "Revoked Family",
+    role: "user",
+    callbackUrl: "http://localhost:3002/family",
+  });
+  await page.goto(`/family/care-rooms/${CARE_ROOM_ID}`);
+
+  await expect(page).toHaveURL(/\/access\/unavailable$/);
+  await expect(page.getByText("No care information has been loaded.")).toBeVisible();
+  await expect(page.getByText("Assigned Fake Client")).toHaveCount(0);
+});
+
+test("sign-out, Back, and refresh do not reveal protected content", async ({ page }) => {
+  await signIn(page, {
+    email: "admin@local.dev",
+    name: "Local Admin",
+    role: "user",
+    callbackUrl: "http://localhost:3002/people",
+  });
+  await page.goto("/people");
+  await expect(page.getByText("Assigned Fake Client", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Open account menu" }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/login(?:\?|$)/);
+  await expect(page.getByText("Assigned Fake Client", { exact: true })).toHaveCount(0);
+
+  await page.goBack();
+  await expect(page).not.toHaveURL(/\/people(?:\?|$)/);
+  await expect(page.getByText("Assigned Fake Client", { exact: true })).toHaveCount(0);
+
+  await page.goto("/people");
+  await expect(page).toHaveURL(/\/login(?:\?|$)/);
+  await page.reload();
+  await expect(page).toHaveURL(/\/login(?:\?|$)/);
+  await expect(page.getByText("Assigned Fake Client", { exact: true })).toHaveCount(0);
 });
 
 test("deactivation immediately denies a previously signed-in Carer", async ({
