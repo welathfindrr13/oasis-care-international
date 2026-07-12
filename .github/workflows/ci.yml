@@ -189,6 +189,7 @@ jobs:
         node --test deploy/v2/scripts/verify-local.test.mjs
         node --test deploy/v2/scripts/preflight-env.test.mjs
         node --test deploy/v2/scripts/smoke-test.test.mjs
+        node --test deploy/v2/scripts/backup-crypto.test.mjs
         node --test deploy/v2/scripts/backup-restore.test.mjs
         node deploy/v2/scripts/preflight-env.mjs "$TEMP_ENV"
         docker compose --env-file "$TEMP_ENV" -f deploy/v2/docker-compose.yml config
@@ -196,3 +197,6 @@ jobs:
         bash -n deploy/v2/scripts/smoke-test.sh
         bash -n deploy/v2/scripts/backup-postgres.sh
         bash -n deploy/v2/scripts/restore-postgres.sh
+        bash -n deploy/v2/scripts/rehearse-backup-restore.sh
+        bash -n deploy/v2/scripts/backup-restore.integration.sh
+        deploy/v2/scripts/backup-restore.integration.sh
