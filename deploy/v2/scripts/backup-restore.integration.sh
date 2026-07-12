@@ -82,7 +82,7 @@ DATABASE_URL="postgresql://oasis_source:synthetic-source-only@127.0.0.1:${host_p
   pnpm --dir libs/db exec prisma migrate deploy >/dev/null
 
 umask 077
-openssl rand -hex 32 -out "$KEY_FILE"
+openssl rand -hex -out "$KEY_FILE" 32
 chmod 600 "$KEY_FILE"
 
 COMPOSE_PROJECT_NAME="$PROJECT_NAME" \
