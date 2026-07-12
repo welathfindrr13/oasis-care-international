@@ -50,6 +50,7 @@ const carerNavigation: readonly HeaderNavigationItem[] = [
     href: "/visits",
     label: "My visits",
     aliases: ["/schedule"],
+    exact: true,
   },
   { id: "my-shift", href: "/shift", label: "My shift" },
   { id: "profile-help", href: "/settings", label: "Profile/help" },
@@ -89,7 +90,9 @@ export function getHeaderNavigation(
   if (surface === "management") return managementNavigation;
   if (surface === "family") return familyNavigation;
   if (surface === "staff") {
-    const currentVisit = /^\/visits\/[^/]+$/.test(pathname)
+    const currentVisit =
+      /^\/(?:visits|schedule)\/[^/]+$/.test(pathname) &&
+      !pathname.endsWith("/new")
       ? [
           {
             id: "current-visit",

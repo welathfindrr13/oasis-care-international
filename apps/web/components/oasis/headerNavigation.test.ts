@@ -71,6 +71,25 @@ test("current visit navigation appears only inside a concrete visit workspace", 
     items.find((item) => item.label === "Current visit")?.href,
     "/visits/visit-123",
   );
+  const scheduledItems = getHeaderNavigation("staff", "/schedule/visit-123");
+  assert.equal(
+    scheduledItems.find((item) => item.label === "Current visit")?.href,
+    "/schedule/visit-123",
+  );
+  assert.deepEqual(
+    scheduledItems
+      .filter((item) =>
+        isHeaderNavigationItemActive("/schedule/visit-123", item),
+      )
+      .map((item) => item.label),
+    ["Current visit"],
+  );
+  assert.equal(
+    getHeaderNavigation("staff", "/schedule/new").some(
+      (item) => item.label === "Current visit",
+    ),
+    false,
+  );
 });
 
 test("family hash destinations do not all announce themselves as current", () => {

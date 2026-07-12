@@ -54,6 +54,27 @@ test('canonical snapshot routes admin, carer and family surfaces', () => {
   assert.deepEqual(resolveAuthoritativeRoute('/today', ready('FAMILY')), { action: 'redirect', destination: '/family' })
 })
 
+test('restricted management snapshots route only to Settings', () => {
+  for (const effectiveRole of ['manager', 'care_manager', 'office']) {
+    const snapshot: AuthoritativeAccessSnapshot = {
+      ...ready('STAFF'),
+      effectiveRole,
+      linkedIdentityState: 'NOT_REQUIRED',
+    }
+    assert.deepEqual(resolveAuthoritativeRoute('/', snapshot), {
+      action: 'redirect',
+      destination: '/settings',
+    })
+    assert.deepEqual(resolveAuthoritativeRoute('/today', snapshot), {
+      action: 'redirect',
+      destination: '/settings',
+    })
+    assert.deepEqual(resolveAuthoritativeRoute('/settings', snapshot), {
+      action: 'allow',
+    })
+  }
+})
+
 test('ready access redirects stale denial-state URLs back to the canonical workspace', () => {
   assert.deepEqual(resolveAuthoritativeRoute('/access/disabled', ready('ADMIN')), {
     action: 'redirect', destination: '/today',
