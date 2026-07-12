@@ -11,7 +11,7 @@ export function FamilyVisitStoryList({ stories }: FamilyVisitStoryListProps) {
       <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
         <h3 className="font-heading text-xl font-semibold text-slate-900">No approved updates yet</h3>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Your agency has not published any proof-of-care stories to this Family Assurance Room yet.
+          The care team has not published any family updates yet.
         </p>
       </div>
     )

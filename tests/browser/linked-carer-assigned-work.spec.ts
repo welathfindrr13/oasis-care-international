@@ -3,6 +3,7 @@ import AxeBuilder from "@axe-core/playwright";
 
 const VISIT_ID = "55555555-5555-4555-8555-555555555555";
 const UNASSIGNED_VISIT_ID = "55555555-5555-4555-8555-666666666666";
+const CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
 async function signIn(
   page: import("playwright/test").Page,
@@ -182,6 +183,25 @@ test("account switching clears stale capabilities and follows each database memb
     page.getByRole("link", { name: "Workforce", exact: true }),
   ).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Schedule" })).toHaveCount(0);
+
+  await expect(
+    page.getByRole("heading", { name: "Stay up to date with their care" }),
+  ).toBeVisible();
+  await expect(page.getByText("A comfortable morning visit", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Family Assurance Room", { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/proof-of-care/i)).toHaveCount(0);
+
+  await page.getByRole("link", { name: "View updates" }).click();
+  await expect(page).toHaveURL(`/family/care-rooms/${CARE_ROOM_ID}`);
+  await expect(page.getByRole("heading", { name: "Assigned Fake Client" })).toBeVisible();
+  await expect(page.getByText("The morning visit went well and the planned support was completed.")).toBeVisible();
+  await page.getByLabel("What is this about?").selectOption("WELLBEING_CHANGE");
+  await page.getByLabel("How important is it?").selectOption("MEDIUM");
+  await page.getByLabel("Short summary").fill("A question about today");
+  await page.getByLabel("Tell us more (optional)").fill("Please call when someone is available.");
+  await page.getByRole("button", { name: "Send concern to the care team" }).click();
+  await expect(page.getByRole("heading", { name: "Your concern has been sent" })).toBeVisible();
+  await expect(page.getByText(/The care team has received “A question about today”/)).toBeVisible();
 });
 
 test("manager, care manager, and office memberships stay outside admin and Carer workspaces", async ({

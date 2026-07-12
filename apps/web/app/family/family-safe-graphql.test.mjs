@@ -15,6 +15,18 @@ const approvalQueueItem = readFileSync(
   new URL('../../components/carebridge/ApprovalQueueItem.tsx', import.meta.url),
   'utf8',
 );
+const concernForm = readFileSync(
+  new URL('../../components/carebridge/FamilyConcernForm.tsx', import.meta.url),
+  'utf8',
+);
+const familyVisitStoryList = readFileSync(
+  new URL('../../components/carebridge/FamilyVisitStoryList.tsx', import.meta.url),
+  'utf8',
+);
+const familyAssuranceRoom = readFileSync(
+  new URL('../../components/carebridge/FamilyAssuranceRoom.tsx', import.meta.url),
+  'utf8',
+);
 
 test('family pages use only the family-safe GraphQL operations', () => {
   assert.match(listPage, /FAMILY_CAREBRIDGE_ROOMS_QUERY/);
@@ -45,11 +57,24 @@ test('family pages distinguish unavailable data and expose an accessible breadcr
   assert.match(roomPage, /aria-hidden="true"/);
   assert.match(roomPage, /aria-current="page"/);
   assert.match(roomPage, /accessDenied/);
-  assert.match(roomPage, /Room temporarily unavailable/);
+  assert.match(roomPage, /Updates temporarily unavailable/);
   assert.match(roomPage, /!storiesUnavailable/);
   assert.match(roomPage, /storiesNotGranted/);
   assert.match(roomPage, /Approved updates are not included in your current family access/);
   assert.match(roomPage, /storiesNotGranted \?/);
+});
+
+test('family experience uses plain language and exposes the family-safe concern path', () => {
+  const renderedFamilySources = [listPage, roomPage, familyVisitStoryList, familyAssuranceRoom].join('\n');
+  assert.doesNotMatch(renderedFamilySources, /Family Assurance Room|proof-of-care/i);
+  assert.match(listPage, /Latest update/);
+  assert.match(listPage, /latestUpdate/);
+  assert.match(roomPage, /Tell us about a concern/);
+  assert.match(roomPage, /FamilyConcernForm/);
+  assert.match(concernForm, /FAMILY_CONCERN_CREATE/);
+  assert.match(concernForm, /RAISE_FAMILY_CONCERN_MUTATION/);
+  assert.match(roomPage, /call 999/i);
+  assert.doesNotMatch(concernForm, /CAREBRIDGE_CONCERN_INBOX_QUERY|UPDATE_CAREBRIDGE_CONCERN_MUTATION/);
 });
 
 test('staff approval shows and approves the exact versioned family preview', () => {
