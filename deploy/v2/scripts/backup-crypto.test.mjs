@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { readAuthenticatedBackupMetadata } from "./backup-crypto.mjs";
 
 const helper = fileURLToPath(new URL("./backup-crypto.mjs", import.meta.url));
 
@@ -45,6 +47,59 @@ test("encrypts and decrypts a custom-format stream without plaintext at rest", (
   });
   assert.equal(decrypted.status, 0, decrypted.stderr?.toString());
   assert.deepEqual(decrypted.stdout, plaintext);
+});
+
+test("authenticates the embedded backup creation time", async (t) => {
+  const { encryptedFile, keyFile } = fixture(t);
+  const createdAfterMs = Date.now() - 1000;
+  const encrypted = run(["encrypt", keyFile, encryptedFile], {
+    input: "synthetic archive",
+  });
+  assert.equal(encrypted.status, 0, encrypted.stderr);
+
+  const liveMetadata = await readAuthenticatedBackupMetadata({
+    inputFile: encryptedFile,
+    keyFile,
+  });
+  assert.equal(liveMetadata.formatVersion, 2);
+  assert.ok(liveMetadata.createdAtMs >= createdAfterMs);
+  assert.ok(liveMetadata.createdAtMs <= Date.now());
+
+  const modified = fs.readFileSync(encryptedFile);
+  modified[15] ^= 0x01;
+  fs.writeFileSync(encryptedFile, modified, { mode: 0o600 });
+  await assert.rejects(
+    readAuthenticatedBackupMetadata({ inputFile: encryptedFile, keyFile }),
+    { message: "BACKUP_DECRYPTION_FAILED" },
+  );
+});
+
+test("continues to decrypt legacy OASISB1 archives without freshness metadata", async (t) => {
+  const { encryptedFile, keyFile } = fixture(t);
+  const key = Buffer.from("ab".repeat(32), "hex");
+  const nonce = Buffer.alloc(12, 0x11);
+  const plaintext = Buffer.from("legacy synthetic archive");
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, nonce);
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  fs.writeFileSync(
+    encryptedFile,
+    Buffer.concat([
+      Buffer.from("OASISB1\n", "ascii"),
+      nonce,
+      ciphertext,
+      cipher.getAuthTag(),
+    ]),
+    { mode: 0o600 },
+  );
+
+  const decrypted = run(["decrypt", keyFile, encryptedFile], { encoding: null });
+  assert.equal(decrypted.status, 0, decrypted.stderr?.toString());
+  assert.deepEqual(decrypted.stdout, plaintext);
+  const metadata = await readAuthenticatedBackupMetadata({
+    inputFile: encryptedFile,
+    keyFile,
+  });
+  assert.deepEqual(metadata, { formatVersion: 1, createdAtMs: null });
 });
 
 test("rejects permissive key files before encryption", (t) => {

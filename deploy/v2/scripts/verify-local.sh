@@ -70,5 +70,7 @@ node --test deploy/v2/scripts/preflight-env.test.mjs
 node --test deploy/v2/scripts/smoke-test.test.mjs
 node --test deploy/v2/scripts/backup-crypto.test.mjs
 node --test deploy/v2/scripts/backup-restore.test.mjs
+node --test deploy/v2/scripts/production-signals.test.mjs
 node deploy/v2/scripts/preflight-env.mjs "$TEMP_ENV"
 deploy/v2/scripts/backup-restore.integration.sh
+node --check deploy/v2/scripts/production-signals.mjs
