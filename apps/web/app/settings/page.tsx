@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { InstallAppPrompt } from '../../components/pwa/InstallAppPrompt';
 import { useClientAccess } from '../../components/providers/ClientAccessProvider';
+import { hasRestrictedManagementRole } from '../../components/oasis/headerNavigation';
 import { resolveAuthMode } from '../../lib/auth/mode';
 
 function formatRole(role: string): string {
@@ -44,8 +45,10 @@ function NextAuthSettings() {
 }
 
 function SettingsContent({ userName, userEmail }: { userName: string; userEmail: string }) {
-  const { roles, isAdmin, isCarer } = useClientAccess();
+  const { roles, accessContext, isAdmin, isCarer } = useClientAccess();
   const primaryRole = roles[0] || 'Access pending';
+  const isRestrictedManagement =
+    accessContext.surface === 'staff' && hasRestrictedManagementRole(roles);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -111,9 +114,11 @@ function SettingsContent({ userName, userEmail }: { userName: string; userEmail:
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Button asChild variant="ghost">
-                  <Link href="/today">Open Today</Link>
-                </Button>
+                {!isRestrictedManagement && (
+                  <Button asChild variant="ghost">
+                    <Link href="/today">Open Today</Link>
+                  </Button>
+                )}
                 {isAdmin && (
                   <>
                     <Button asChild variant="ghost">

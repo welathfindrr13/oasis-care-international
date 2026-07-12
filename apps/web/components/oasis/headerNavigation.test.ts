@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  getHeaderHomePath,
   getHeaderNavigation,
   getHeaderSurfaceForViewer,
+  hasRestrictedManagementRole,
   isHeaderNavigationItemActive,
 } from "./headerNavigation";
 import { createHeaderViewer } from "./headerIdentity";
@@ -106,4 +108,16 @@ test("unsupported management roles receive no admin or Carer action links", () =
     getHeaderNavigation(surface, "/settings").map((item) => item.label),
     ["Settings"],
   );
+  assert.equal(
+    getHeaderHomePath(surface, viewer.accessContext.homePath),
+    "/settings",
+  );
+  assert.equal(hasRestrictedManagementRole(viewer.roles), true);
+});
+
+test("supported role home links retain their authoritative destinations", () => {
+  assert.equal(getHeaderHomePath("admin", "/today"), "/today");
+  assert.equal(getHeaderHomePath("staff", "/today"), "/today");
+  assert.equal(getHeaderHomePath("family", "/family"), "/family");
+  assert.equal(hasRestrictedManagementRole(["carer"]), false);
 });

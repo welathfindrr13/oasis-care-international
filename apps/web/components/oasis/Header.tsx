@@ -14,6 +14,7 @@ import {
   type HeaderViewer,
 } from "./headerIdentity";
 import {
+  getHeaderHomePath,
   getHeaderNavigation,
   getHeaderSurfaceForViewer,
   isHeaderNavigationItemActive,
@@ -120,6 +121,10 @@ function HeaderContent({
     accessContext.surface,
     viewer.roles,
   );
+  const homePath = getHeaderHomePath(
+    navigationSurface,
+    accessContext.homePath,
+  );
   const navItems = getHeaderNavigation(navigationSurface, pathname);
 
   useEffect(() => {
@@ -168,7 +173,7 @@ function HeaderContent({
       <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
         <div className="flex min-h-16 items-center justify-between gap-3">
           <Link
-            href={accessContext.homePath}
+            href={homePath}
             className="flex min-h-11 min-w-11 shrink-0 items-center gap-3 rounded-md text-oasis-ink hover:no-underline"
             aria-label={`Oasis Care, ${workspaceLabel}`}
           >

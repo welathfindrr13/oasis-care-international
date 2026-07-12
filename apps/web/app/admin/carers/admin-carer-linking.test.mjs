@@ -162,6 +162,17 @@ test("carer profile help exposes only carer-safe operational shortcuts", () => {
   assert.match(settings, /\{isCarer && \([\s\S]*?href="\/visits"/);
 });
 
+test("settings keep restricted management roles out of operational workspaces", () => {
+  assert.match(
+    settings,
+    /const isRestrictedManagement =[\s\S]*?accessContext\.surface === 'staff' && hasRestrictedManagementRole\(roles\)/,
+  );
+  assert.match(
+    settings,
+    /\{!isRestrictedManagement && \([\s\S]*?href="\/today"/,
+  );
+});
+
 test("family shell destinations and install help are truthful and reachable", () => {
   assert.match(family, /id="updates"[\s\S]*?>Updates</);
   assert.match(family, /id="concerns-help"[\s\S]*?>Concerns and help</);

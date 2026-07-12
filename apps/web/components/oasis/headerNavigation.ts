@@ -59,6 +59,12 @@ const managementNavigation: readonly HeaderNavigationItem[] = [
   { id: "settings", href: "/settings", label: "Settings" },
 ];
 
+const restrictedManagementRoles = new Set([
+  "manager",
+  "care_manager",
+  "office",
+]);
+
 const familyNavigation: readonly HeaderNavigationItem[] = [
   { id: "home", href: "/family", label: "Home", exact: true },
   {
@@ -107,13 +113,21 @@ export function getHeaderSurfaceForViewer(
   surface: Exclude<HeaderSurface, "management">,
   roles: readonly string[],
 ): HeaderSurface {
-  if (
-    surface === "staff" &&
-    roles.some((role) => ["manager", "care_manager", "office"].includes(role))
-  ) {
+  if (surface === "staff" && hasRestrictedManagementRole(roles)) {
     return "management";
   }
   return surface;
+}
+
+export function hasRestrictedManagementRole(roles: readonly string[]): boolean {
+  return roles.some((role) => restrictedManagementRoles.has(role));
+}
+
+export function getHeaderHomePath(
+  surface: HeaderSurface,
+  defaultHomePath: string,
+): string {
+  return surface === "management" ? "/settings" : defaultHomePath;
 }
 
 export function isHeaderNavigationItemActive(
