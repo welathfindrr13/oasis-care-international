@@ -32,6 +32,8 @@ test('pre-workspace and offline routes bypass authoritative workspace redirects'
   for (const pathname of [
     '/offline',
     '/offline/help',
+    '/request-access',
+    '/request-access/complete',
     '/accept-invitation',
     '/accept-invitation/complete',
     '/activate-invitation',

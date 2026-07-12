@@ -257,6 +257,27 @@ test("the offline shell renders without waiting for session resolution", async (
   releaseSession();
 });
 
+test("a signed-in family user can still open the public company access form", async ({
+  page,
+}) => {
+  await signIn(page, {
+    email: "family@local.dev",
+    name: "Local Family",
+    role: "user",
+    callbackUrl: "http://localhost:3002/request-access",
+  });
+
+  await page.goto("/request-access");
+
+  await expect(page).toHaveURL("/request-access");
+  await expect(
+    page.getByRole("heading", {
+      name: "Request a review for your care company",
+    }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Care company name")).toBeVisible();
+});
+
 test("an administrator sees lifecycle readiness and only identity-valid Carers are assignable", async ({
   page,
 }) => {
