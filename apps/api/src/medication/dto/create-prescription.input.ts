@@ -1,5 +1,21 @@
 import { InputType, Field, Int } from '@nestjs/graphql';
-import { IsString, IsNotEmpty, IsOptional, IsInt, IsArray, IsBoolean, IsDateString, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsInt,
+  IsArray,
+  ArrayMinSize,
+  ArrayUnique,
+  IsBoolean,
+  Matches,
+  Min,
+  Max,
+} from 'class-validator';
+import {
+  MEDICATION_WALL_TIME_PATTERN,
+  medicationWallTimeUniquenessKey,
+} from '../medication-wall-time';
 
 @InputType()
 export class CreatePrescriptionInput {
@@ -14,11 +30,11 @@ export class CreatePrescriptionInput {
   medicationId: string;
 
   @Field()
-  @IsDateString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
   startDate: string;
 
   @Field({ nullable: true })
-  @IsDateString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
   @IsOptional()
   endDate?: string;
 
@@ -37,7 +53,10 @@ export class CreatePrescriptionInput {
 
   @Field(() => [String])
   @IsArray()
+  @ArrayMinSize(1)
+  @ArrayUnique(medicationWallTimeUniquenessKey)
   @IsString({ each: true })
+  @Matches(MEDICATION_WALL_TIME_PATTERN, { each: true })
   administrationTimes: string[];
 
   @Field({ nullable: true })

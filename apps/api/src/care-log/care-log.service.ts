@@ -2,6 +2,7 @@ import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { CareLog, CareLogCategory, MedicationStatus, Prisma, PrismaService } from '@oasis/db';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import { organizationCalendarMonthUtcRange } from '@oasis/time';
 import { CreateCareLogInput } from './dto/create-care-log.input';
 import { CareLogFilterArgs } from './dto/care-log-filter.args';
 import { CareLogRepository } from './care-log.repository';
@@ -246,8 +247,11 @@ export class CareLogService {
 
     await this.assertClientAccess(clientId, userId, role, orgId);
 
-    const monthStart = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
-    const monthEndExclusive = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
+    const { start: monthStart, end: monthEndExclusive } = organizationCalendarMonthUtcRange(
+      year,
+      month,
+      orgId,
+    );
     const monthEnd = new Date(monthEndExclusive.getTime() - 1);
 
     const [logs, meds] = await Promise.all([

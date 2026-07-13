@@ -95,6 +95,9 @@ describe('MedicationService', () => {
       findDueMedicationsForVisit: jest.fn(),
       findTodaysMedicationsByClient: jest.fn(),
       createMedication: jest.fn(),
+      createPrescription: jest.fn(),
+      findMedicationAdministrationTimesForPrescriptionWindow: jest.fn(),
+      createMedicationAdministrationsBulk: jest.fn(),
       findMedicationById: jest.fn(),
       findClientInOrganization: jest.fn(),
       findOrganizationsForContext: jest.fn(),
@@ -421,7 +424,7 @@ describe('MedicationService', () => {
   describe('getTodaysMedicationsByClient', () => {
     it('should reject invalid dates before querying the repository', async () => {
       await expect(
-        service.getTodaysMedicationsByClient(new Date('invalid'), mockUser.id, mockUser.role, organizationId)
+        service.getTodaysMedicationsByClient('invalid', mockUser.id, mockUser.role, organizationId)
       ).rejects.toThrow(
         new BaseHttpException(
           ErrorCode.VALIDATION_FAILED,
@@ -444,7 +447,7 @@ describe('MedicationService', () => {
       ] as any);
 
       const result = await service.getTodaysMedicationsByClient(
-        new Date('2025-01-08T00:00:00Z'),
+        '2025-01-08',
         mockUser.id,
         mockUser.role,
         organizationId,
@@ -460,7 +463,7 @@ describe('MedicationService', () => {
       repository.findTodaysMedicationsByClient.mockResolvedValue(todaysMeds as any);
 
       const result = await service.getTodaysMedicationsByClient(
-        new Date(),
+        '2025-01-08',
         mockUser.id,
         mockUser.role,
         organizationId,
@@ -468,7 +471,7 @@ describe('MedicationService', () => {
 
       expect(result).toEqual(todaysMeds);
       expect(repository.findTodaysMedicationsByClient).toHaveBeenCalledWith(
-        expect.any(Date),
+        '2025-01-08',
         organizationId,
         mockUser.id,
       );
@@ -480,7 +483,7 @@ describe('MedicationService', () => {
       repository.findTodaysMedicationsByClient.mockResolvedValue(todaysMeds as any);
 
       const result = await service.getTodaysMedicationsByClient(
-        new Date(),
+        '2025-01-08',
         'office-user-123',
         'office',
         organizationId,
@@ -488,7 +491,7 @@ describe('MedicationService', () => {
 
       expect(result).toEqual(todaysMeds);
       expect(repository.findTodaysMedicationsByClient).toHaveBeenCalledWith(
-        expect.any(Date),
+        '2025-01-08',
         organizationId,
         undefined,
       );
@@ -500,7 +503,7 @@ describe('MedicationService', () => {
       repository.findTodaysMedicationsByClient.mockResolvedValue(todaysMeds as any);
 
       const result = await service.getTodaysMedicationsByClient(
-        new Date(),
+        '2025-01-08',
         mockAdminUser.id,
         mockAdminUser.role,
         organizationId,
@@ -508,7 +511,7 @@ describe('MedicationService', () => {
 
       expect(result).toEqual(todaysMeds);
       expect(repository.findTodaysMedicationsByClient).toHaveBeenCalledWith(
-        expect.any(Date),
+        '2025-01-08',
         organizationId,
         undefined,
       );
@@ -516,6 +519,246 @@ describe('MedicationService', () => {
   });
 
   describe('permission checks', () => {
+    it('materialises a normal BST medication wall time as a UTC instant', async () => {
+      const prescription = {
+        id: 'prescription-bst',
+        start_date: new Date('2026-07-12T00:00:00.000Z'),
+        end_date: new Date('2026-07-12T00:00:00.000Z'),
+        administration_times: ['08:00'],
+      } as any;
+      repository.findMedicationById.mockResolvedValue({ id: 'medication-123' } as any);
+      repository.findClientInOrganization.mockResolvedValue({ id: 'client-123' } as any);
+      repository.createPrescription.mockResolvedValue(prescription);
+      repository.findMedicationAdministrationTimesForPrescriptionWindow.mockResolvedValue([]);
+      repository.createMedicationAdministrationsBulk.mockResolvedValue(1);
+      repository.createMedicationAudit.mockResolvedValue({} as any);
+
+      await service.createPrescription(
+        {
+          clientId: 'client-123',
+          medicationId: 'medication-123',
+          startDate: '2026-07-12',
+          endDate: '2026-07-12',
+          frequencyPerDay: 1,
+          administrationTimes: ['08:00'],
+        },
+        mockAdminUser.id,
+        mockAdminUser.role,
+        organizationId,
+      );
+
+      expect(repository.createPrescription).toHaveBeenCalledWith(
+        expect.objectContaining({
+          start_date: new Date('2026-07-12T00:00:00.000Z'),
+          end_date: new Date('2026-07-12T00:00:00.000Z'),
+        }),
+      );
+      expect(repository.createMedicationAdministrationsBulk).toHaveBeenCalledWith([
+        expect.objectContaining({
+          prescription_id: 'prescription-bst',
+          scheduled_time: new Date('2026-07-12T07:00:00.000Z'),
+        }),
+      ]);
+    });
+
+    it('stores canonical dates and materialises a valid wall time on the spring BST boundary', async () => {
+      const prescription = {
+        id: 'prescription-spring-boundary',
+        start_date: new Date('2026-03-29T00:00:00.000Z'),
+        end_date: new Date('2026-03-29T00:00:00.000Z'),
+        administration_times: ['02:30'],
+      } as any;
+      repository.findMedicationById.mockResolvedValue({ id: 'medication-123' } as any);
+      repository.findClientInOrganization.mockResolvedValue({ id: 'client-123' } as any);
+      repository.createPrescription.mockResolvedValue(prescription);
+      repository.findMedicationAdministrationTimesForPrescriptionWindow.mockResolvedValue([]);
+      repository.createMedicationAdministrationsBulk.mockResolvedValue(1);
+      repository.createMedicationAudit.mockResolvedValue({} as any);
+
+      await service.createPrescription(
+        {
+          clientId: 'client-123',
+          medicationId: 'medication-123',
+          startDate: '2026-03-29',
+          endDate: '2026-03-29',
+          frequencyPerDay: 1,
+          administrationTimes: ['02:30'],
+        },
+        mockAdminUser.id,
+        mockAdminUser.role,
+        organizationId,
+      );
+
+      expect(repository.createPrescription).toHaveBeenCalledWith(
+        expect.objectContaining({
+          start_date: new Date('2026-03-29T00:00:00.000Z'),
+          end_date: new Date('2026-03-29T00:00:00.000Z'),
+        }),
+      );
+      expect(repository.createMedicationAdministrationsBulk).toHaveBeenCalledWith([
+        expect.objectContaining({
+          prescription_id: 'prescription-spring-boundary',
+          scheduled_time: new Date('2026-03-29T01:30:00.000Z'),
+        }),
+      ]);
+    });
+
+    it.each([
+      {
+        startDate: '2026-07-13T00:00:00.000Z',
+        endDate: '2026-07-13',
+      },
+      {
+        startDate: '2026-07-13',
+        endDate: '2026-07-13T00:00:00+01:00',
+      },
+    ])('rejects non-date-only prescription input before any write', async ({
+      startDate,
+      endDate,
+    }) => {
+      await expect(
+        service.createPrescription(
+          {
+            clientId: 'client-123',
+            medicationId: 'medication-123',
+            startDate,
+            endDate,
+            frequencyPerDay: 1,
+            administrationTimes: ['08:00'],
+          },
+          mockAdminUser.id,
+          mockAdminUser.role,
+          organizationId,
+        ),
+      ).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        response: { code: ErrorCode.VALIDATION_FAILED },
+      });
+
+      expect(repository.findMedicationById).not.toHaveBeenCalled();
+      expect(repository.createPrescription).not.toHaveBeenCalled();
+      expect(repository.createMedicationAdministrationsBulk).not.toHaveBeenCalled();
+      expect(repository.createMedicationAudit).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { administrationTimes: [], label: 'an empty schedule' },
+      { administrationTimes: ['not-a-time'], label: 'an invalid wall-time format' },
+      { administrationTimes: ['25:00'], label: 'an out-of-range wall time' },
+      { administrationTimes: ['08:00', '08:00'], label: 'a duplicate wall time' },
+      { administrationTimes: ['8:00', '08:00'], label: 'a canonical duplicate wall time' },
+    ])('rejects $label before any repository lookup or write', async ({ administrationTimes }) => {
+      await expect(
+        service.createPrescription(
+          {
+            clientId: 'client-123',
+            medicationId: 'medication-123',
+            startDate: '2026-07-13',
+            endDate: '2026-07-13',
+            frequencyPerDay: 1,
+            administrationTimes,
+          },
+          mockAdminUser.id,
+          mockAdminUser.role,
+          organizationId,
+        ),
+      ).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        response: { code: ErrorCode.VALIDATION_FAILED },
+      });
+
+      expect(repository.findMedicationById).not.toHaveBeenCalled();
+      expect(repository.findClientInOrganization).not.toHaveBeenCalled();
+      expect(repository.createPrescription).not.toHaveBeenCalled();
+      expect(
+        repository.findMedicationAdministrationTimesForPrescriptionWindow,
+      ).not.toHaveBeenCalled();
+      expect(repository.createMedicationAdministrationsBulk).not.toHaveBeenCalled();
+      expect(repository.createMedicationAudit).not.toHaveBeenCalled();
+    });
+
+    it('rejects a prescription end date before its start before any write', async () => {
+      await expect(
+        service.createPrescription(
+          {
+            clientId: 'client-123',
+            medicationId: 'medication-123',
+            startDate: '2026-07-14',
+            endDate: '2026-07-13',
+            frequencyPerDay: 1,
+            administrationTimes: ['08:00'],
+          },
+          mockAdminUser.id,
+          mockAdminUser.role,
+          organizationId,
+        ),
+      ).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        response: { code: ErrorCode.VALIDATION_FAILED },
+      });
+
+      expect(repository.findMedicationById).not.toHaveBeenCalled();
+      expect(repository.createPrescription).not.toHaveBeenCalled();
+      expect(repository.createMedicationAdministrationsBulk).not.toHaveBeenCalled();
+      expect(repository.createMedicationAudit).not.toHaveBeenCalled();
+    });
+
+    it('rejects a repeated autumn medication wall time before creating a prescription', async () => {
+      repository.findMedicationById.mockResolvedValue({ id: 'medication-123' } as any);
+      repository.findClientInOrganization.mockResolvedValue({ id: 'client-123' } as any);
+
+      await expect(
+        service.createPrescription(
+          {
+            clientId: 'client-123',
+            medicationId: 'medication-123',
+            startDate: '2026-10-25',
+            endDate: '2026-10-25',
+            frequencyPerDay: 1,
+            administrationTimes: ['01:30'],
+          },
+          mockAdminUser.id,
+          mockAdminUser.role,
+          organizationId,
+        ),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { code: ErrorCode.MEDICATION_SCHEDULE_TIME_UNRESOLVED },
+      });
+
+      expect(repository.createPrescription).not.toHaveBeenCalled();
+      expect(repository.createMedicationAdministrationsBulk).not.toHaveBeenCalled();
+      expect(repository.createMedicationAudit).not.toHaveBeenCalled();
+    });
+
+    it('rejects a missing spring medication wall time without writing care records', async () => {
+      repository.findMedicationById.mockResolvedValue({ id: 'medication-123' } as any);
+      repository.findClientInOrganization.mockResolvedValue({ id: 'client-123' } as any);
+
+      await expect(
+        service.createPrescription(
+          {
+            clientId: 'client-123',
+            medicationId: 'medication-123',
+            startDate: '2026-03-29',
+            endDate: '2026-03-29',
+            frequencyPerDay: 1,
+            administrationTimes: ['01:30'],
+          },
+          mockAdminUser.id,
+          mockAdminUser.role,
+          organizationId,
+        ),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { code: ErrorCode.MEDICATION_SCHEDULE_TIME_UNRESOLVED },
+      });
+
+      expect(repository.createPrescription).not.toHaveBeenCalled();
+      expect(repository.createMedicationAdministrationsBulk).not.toHaveBeenCalled();
+      expect(repository.createMedicationAudit).not.toHaveBeenCalled();
+    });
+
     it('should allow admin to create medications', async () => {
       const medicationData = {
         name: 'Test Med',

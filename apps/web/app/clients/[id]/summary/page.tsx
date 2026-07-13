@@ -7,6 +7,11 @@ import SummaryViewer from '../../../../components/HealthSummary/SummaryViewer';
 import ApprovalControls from '../../../../components/HealthSummary/ApprovalControls';
 import { Header } from '../../../../components/oasis/Header';
 import { clientQuery } from '../../../../lib/graphql/client-side';
+import {
+  formatDateTime,
+  formatStoredCalendarDate,
+  getOrganizationWeekStoredDateRange,
+} from '../../../../lib/time';
 
 interface HealthSummary {
   id: string;
@@ -117,14 +122,7 @@ export default function SummaryPage() {
       setIsGenerating(true);
       setError(null);
 
-      const now = new Date();
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - now.getDay());
-      weekStart.setHours(0, 0, 0, 0);
-
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
+      const week = getOrganizationWeekStoredDateRange();
 
       const response = await clientQuery<{ generateSummary: HealthSummary }>(`
         mutation GenerateSummary($input: GenerateSummaryInput!) {
@@ -151,8 +149,8 @@ export default function SummaryPage() {
       `, {
         input: {
           clientId,
-          periodStart: weekStart.toISOString(),
-          periodEnd: weekEnd.toISOString()
+          periodStart: week.start,
+          periodEnd: week.end
         }
       });
 
@@ -228,7 +226,7 @@ export default function SummaryPage() {
       const summaryText = `
 Health Summary Report
 ${currentSummary?.client?.fullName}
-Period: ${new Date(currentSummary?.periodStart || '').toLocaleDateString()} - ${new Date(currentSummary?.periodEnd || '').toLocaleDateString()}
+Period: ${currentSummary?.periodStart ? formatStoredCalendarDate(currentSummary.periodStart) : 'N/A'} - ${currentSummary?.periodEnd ? formatStoredCalendarDate(currentSummary.periodEnd) : 'N/A'}
 
 Overall Health: ${currentSummary?.summaryJson?.overall_health || 'N/A'}
 
@@ -238,7 +236,7 @@ ${currentSummary?.summaryJson?.key_observations?.map((obs: string, i: number) =>
 Recommendations:
 ${currentSummary?.summaryJson?.recommendations?.map((rec: string, i: number) => `${i + 1}. ${rec}`).join('\n') || 'None'}
 
-Generated: ${new Date(currentSummary?.generatedAt || '').toLocaleString()}
+Generated: ${currentSummary?.generatedAt ? formatDateTime(currentSummary.generatedAt) : 'N/A'}
 Status: ${currentSummary?.status}
       `;
 

@@ -1,5 +1,9 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '@oasis/db';
+import {
+  organizationCalendarDateToUtcStoredDate,
+  parseStoredCalendarDateInput,
+} from '@oasis/time';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
 import { assertTenantIdForSensitiveWrite } from '../common/tenant/tenant-ownership';
@@ -381,6 +385,22 @@ export class CarePlanningRepository {
 
   async createEvidencePack(organizationId: string, input: CreateEvidencePackInput): Promise<any> {
     const orgId = assertTenantIdForSensitiveWrite('EvidencePack', organizationId);
+    let periodStart: Date;
+    let periodEnd: Date;
+    try {
+      periodStart = organizationCalendarDateToUtcStoredDate(
+        parseStoredCalendarDateInput(input.periodStart),
+      );
+      periodEnd = organizationCalendarDateToUtcStoredDate(
+        parseStoredCalendarDateInput(input.periodEnd),
+      );
+    } catch {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Evidence pack dates must use YYYY-MM-DD or exact UTC-midnight transports',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     await this.assertClientInOrganization(orgId, input.clientId);
     if (input.carePlanId) {
       await this.assertCarePlanInOrganization(orgId, input.clientId, input.carePlanId);
@@ -388,6 +408,13 @@ export class CarePlanningRepository {
     await this.assertEvidenceSourcesInOrganization(orgId, input.clientId, input.items ?? []);
 
     const items = input.items ?? [];
+    if (periodStart > periodEnd) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Evidence pack start date must not be after its end date',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     return this.evidencePackModel().create({
       data: {
         organization_id: orgId,
@@ -395,8 +422,8 @@ export class CarePlanningRepository {
         care_plan_id: input.carePlanId ?? null,
         status: input.status,
         kind: input.kind ?? 'REGULATORY_REVIEW',
-        period_start: input.periodStart,
-        period_end: input.periodEnd,
+        period_start: periodStart,
+        period_end: periodEnd,
         summary: input.summary ?? null,
         source_refs: input.sourceRefs ?? {},
         generated_by: input.generatedBy ?? 'system',

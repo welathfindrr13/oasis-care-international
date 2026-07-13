@@ -21,7 +21,7 @@ describe('MedicationRepository', () => {
     const { prisma, repository } = createRepository();
 
     await repository.findTodaysMedicationsByClient(
-      new Date('2025-01-08T12:00:00Z'),
+      '2025-01-08',
       'org-123',
       'carer-123',
     );
@@ -51,7 +51,7 @@ describe('MedicationRepository', () => {
     const { prisma, repository } = createRepository();
 
     await repository.findTodaysMedicationsByClient(
-      new Date('2025-01-08T12:00:00Z'),
+      '2025-01-08',
       'org-123',
     );
 
@@ -59,6 +59,66 @@ describe('MedicationRepository', () => {
       expect.objectContaining({
         where: expect.not.objectContaining({
           visit: expect.anything(),
+        }),
+      }),
+    );
+  });
+
+  it('uses the 23-hour organization day for eMAR on the BST spring boundary', async () => {
+    const { prisma, repository } = createRepository();
+
+    await repository.findTodaysMedicationsByClient(
+      '2026-03-29',
+      'org-123',
+    );
+
+    expect(prisma.medicationAdministration.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          scheduled_time: {
+            gte: new Date('2026-03-29T00:00:00.000Z'),
+            lt: new Date('2026-03-29T23:00:00.000Z'),
+          },
+        }),
+      }),
+    );
+  });
+
+  it('uses the 25-hour organization day for eMAR on the BST autumn boundary', async () => {
+    const { prisma, repository } = createRepository();
+
+    await repository.findTodaysMedicationsByClient(
+      '2026-10-25',
+      'org-123',
+    );
+
+    expect(prisma.medicationAdministration.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          scheduled_time: {
+            gte: new Date('2026-10-24T23:00:00.000Z'),
+            lt: new Date('2026-10-26T00:00:00.000Z'),
+          },
+        }),
+      }),
+    );
+  });
+
+  it('treats a selected date as a calendar key rather than an instant', async () => {
+    const { prisma, repository } = createRepository();
+
+    await repository.findTodaysMedicationsByClient(
+      '2026-07-13',
+      'org-future',
+    );
+
+    expect(prisma.medicationAdministration.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          scheduled_time: {
+            gte: new Date('2026-07-12T23:00:00.000Z'),
+            lt: new Date('2026-07-13T23:00:00.000Z'),
+          },
         }),
       }),
     );

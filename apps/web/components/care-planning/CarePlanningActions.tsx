@@ -20,6 +20,10 @@ import {
   type CreateEvidencePackInput,
   type EvidenceSourceCandidateRecord,
 } from '../../lib/graphql/queries'
+import {
+  getOrganizationDateUtcRange,
+  organizationDateKeyToStoredDateIso,
+} from '../../lib/time'
 
 interface CarePlanningActionsProps {
   clientId: string
@@ -29,7 +33,12 @@ interface CarePlanningActionsProps {
 }
 
 function toIsoDateEnd(value: string): string {
-  return new Date(`${value}T23:59:59.000Z`).toISOString()
+  const range = getOrganizationDateUtcRange(value)
+  return new Date(new Date(range.end).getTime() - 1).toISOString()
+}
+
+function toStoredCalendarDate(value: string): string {
+  return organizationDateKeyToStoredDateIso(value)
 }
 
 export function CarePlanningActions({ clientId, assessments, carePlans, onCompleteRedirectPath }: CarePlanningActionsProps) {
@@ -212,8 +221,8 @@ export function CarePlanningActions({ clientId, assessments, carePlans, onComple
       carePlanId: evidencePlanId || undefined,
       status: 'DRAFT',
       kind: evidenceKind.trim() || 'INSPECTION',
-      periodStart: new Date(`${evidencePeriodStart}T00:00:00.000Z`).toISOString(),
-      periodEnd: toIsoDateEnd(evidencePeriodEnd),
+      periodStart: toStoredCalendarDate(evidencePeriodStart),
+      periodEnd: toStoredCalendarDate(evidencePeriodEnd),
       sourceRefs: { source: 'care-planning-ui' },
       summary: { note: 'Inspection-ready evidence pack draft.' },
       items: buildEvidenceItems(),

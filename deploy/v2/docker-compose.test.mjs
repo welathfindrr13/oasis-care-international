@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 const compose = fs.readFileSync(new URL('./docker-compose.yml', import.meta.url), 'utf8');
 const webDockerfile = fs.readFileSync(new URL('../../apps/web/Dockerfile', import.meta.url), 'utf8');
 const apiDockerfile = fs.readFileSync(new URL('../../apps/api/Dockerfile', import.meta.url), 'utf8');
+const verifyLocalScript = fs.readFileSync(new URL('./scripts/verify-local.sh', import.meta.url), 'utf8');
 const deployDir = path.dirname(fileURLToPath(import.meta.url));
 
 function serviceBlock(name) {
@@ -63,6 +64,11 @@ test('web Dockerfile promotes every Clerk public redirect build arg into build e
     assert.match(webDockerfile, new RegExp(`ARG ${name}=`));
     assert.match(webDockerfile, new RegExp(`ENV ${name}=\\$${name}`));
   }
+
+  assert.match(webDockerfile, /ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY\n/);
+  assert.doesNotMatch(webDockerfile, /ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=/);
+  assert.doesNotMatch(webDockerfile, /test -n "\$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"/);
+  assert.match(verifyLocalScript, /docker build -f apps\/web\/Dockerfile -t oasis-web:v2 \./);
 });
 
 test('web and api services expose only safe live revision metadata to health endpoints', () => {
@@ -82,6 +88,24 @@ test('web and api services expose only safe live revision metadata to health end
   assert.match(apiDockerfile, /ENV APP_VERSION=\$APP_VERSION/);
   assert.match(apiDockerfile, /ENV APP_COMMIT_SHA=\$APP_COMMIT_SHA/);
   assert.doesNotMatch(compose, /APP_COMMIT_SHA:\s*\$\{DATABASE_URL|APP_VERSION:\s*\$\{DATABASE_URL/);
+});
+
+test('api production image packages every compiled Oasis workspace dependency', () => {
+  assert.match(apiDockerfile, /COPY libs\/time\/package\.json \.\/libs\/time\//);
+  assert.match(apiDockerfile, /RUN cd libs\/time && pnpm build/);
+  assert.match(apiDockerfile, /sed -i[^\n]*libs\/time\/package\.json/);
+  assert.match(apiDockerfile, /ln -s \/app\/libs\/time node_modules\/@oasis\/time/);
+  assert.match(apiDockerfile, /COPY --from=build \/app\/libs\/time\/dist \.\/libs\/time\/dist/);
+  assert.match(apiDockerfile, /RUN node -e "require\('@oasis\/time'\)"/);
+});
+
+test('web production image packages the compiled time workspace dependency', () => {
+  assert.match(webDockerfile, /COPY libs\/time\/package\.json \.\/libs\/time\//);
+  assert.match(webDockerfile, /RUN cd libs\/time && pnpm build/);
+  assert.match(webDockerfile, /COPY --from=build \/app\/libs\/time\/package\.json \.\/libs\/time\/package\.json/);
+  assert.match(webDockerfile, /COPY --from=build \/app\/libs\/time\/dist \.\/libs\/time\/dist/);
+  assert.match(webDockerfile, /sed -i[^\n]*libs\/time\/package\.json/);
+  assert.match(webDockerfile, /cd apps\/web && node -e "require\('@oasis\/time'\)"/);
 });
 
 test('api service does not inject a default Clerk audience', () => {

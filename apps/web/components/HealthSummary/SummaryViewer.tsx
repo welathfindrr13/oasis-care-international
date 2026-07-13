@@ -1,6 +1,10 @@
 'use client';
 
 import RiskIndicator from './RiskIndicator';
+import {
+  formatDateTime as formatOrganizationDateTime,
+  formatStoredCalendarDate,
+} from '../../lib/time';
 
 interface HealthSummary {
   id: string;
@@ -38,21 +42,13 @@ interface SummaryViewerProps {
 
 export default function SummaryViewer({ summary, className = '' }: SummaryViewerProps) {
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
+    return formatStoredCalendarDate(dateString, {
       month: 'long',
-      day: 'numeric'
     });
   };
 
   const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatOrganizationDateTime(dateString);
   };
 
   const getRiskLevel = (level: string): 'green' | 'amber' | 'red' => {

@@ -8,6 +8,7 @@ import {
   type EvidenceSourceCandidatesQueryResponse,
   type OperationalEvidenceSourceType,
 } from '../../lib/graphql/queries'
+import { formatDateTime, getOrganizationDateUtcRange } from '../../lib/time'
 
 interface EvidenceSourcePickerProps {
   clientId: string
@@ -30,22 +31,18 @@ function sourceKey(source: Pick<EvidenceSourceCandidateRecord, 'sourceType' | 'i
 }
 
 function toIsoDateStart(value: string): string {
-  return new Date(`${value}T00:00:00.000Z`).toISOString()
+  return getOrganizationDateUtcRange(value).start
 }
 
 function toIsoDateEnd(value: string): string {
-  return new Date(`${value}T23:59:59.000Z`).toISOString()
+  const range = getOrganizationDateUtcRange(value)
+  return new Date(new Date(range.end).getTime() - 1).toISOString()
 }
 
 function formatDate(value?: string | null): string {
   if (!value) return 'Not dated'
 
-  return new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
+  return formatDateTime(value, { year: undefined })
 }
 
 function typeLabel(sourceType: OperationalEvidenceSourceType): string {
