@@ -155,7 +155,6 @@ export class CarebridgeResolver {
 
   @Mutation(() => CareRoomMembershipDTO)
   @Roles('admin')
-  @ManualAudit()
   async retryFamilyInvitationDelivery(
     @Args('input') input: FamilyInvitationActionInput,
     @Context() ctx: any,

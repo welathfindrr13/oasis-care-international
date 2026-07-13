@@ -222,12 +222,7 @@ export class ClientService {
       'deletion',
       async (tx) => {
         const deletedAt = new Date();
-        await tx.visit.updateMany({
-          where: { client_id: id, organization_id: orgId, deleted_at: null },
-          data: { deleted_at: deletedAt },
-        });
-
-        await tx.client.updateMany({
+        const transition = await tx.client.updateMany({
           where: { id, organization_id: orgId, deleted_at: null },
           data: { deleted_at: deletedAt },
         });
@@ -242,6 +237,14 @@ export class ClientService {
             HttpStatus.NOT_FOUND,
           );
         }
+        if (transition.count === 0) {
+          return deleted;
+        }
+
+        await tx.visit.updateMany({
+          where: { client_id: id, organization_id: orgId, deleted_at: null },
+          data: { deleted_at: deletedAt },
+        });
 
         // Audit only reviewed identifiers; do not duplicate client PII.
         await tx.auditLog.create({

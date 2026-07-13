@@ -16,7 +16,6 @@ describe('authoritative manual audit boundaries', () => {
       'updateFamilyAccessGrants',
       'revokeFamilyAccess',
       'revokeFamilyInvitation',
-      'retryFamilyInvitationDelivery',
       'updateCarebridgePolicy',
       'generateVerifiedVisitStory',
       'publishVerifiedVisitStory',
@@ -30,6 +29,7 @@ describe('authoritative manual audit boundaries', () => {
     for (const methodName of authoritativeMutations) {
       expect(hasManualAudit(prototype, methodName)).toBe(true);
     }
+    expect(hasManualAudit(prototype, 'retryFamilyInvitationDelivery')).toBe(false);
     expect(hasManualAudit(prototype, 'careRooms')).toBe(false);
     expect(hasManualAudit(prototype, 'carebridgeConcernInbox')).toBe(false);
   });

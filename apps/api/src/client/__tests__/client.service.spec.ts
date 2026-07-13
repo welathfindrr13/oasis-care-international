@@ -237,4 +237,42 @@ describe('ClientService', () => {
     expect(auditData.new_values).not.toHaveProperty('deletedAt');
     expect(JSON.stringify(auditData)).not.toContain('PRIVATE_');
   });
+
+  it('writes one delete audit when concurrent-style retries race on one state transition', async () => {
+    const existing = {
+      id: 'client-1',
+      full_name: 'PRIVATE_DELETED_NAME',
+      address_line1: 'PRIVATE_DELETED_ADDRESS',
+      address_line2: null,
+      city: 'PRIVATE_DELETED_CITY',
+      postcode: 'PRIVATE_DELETED_POSTCODE',
+    };
+    clientRepository.findById.mockResolvedValue(existing);
+    transactionClient.client.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    transactionClient.client.findFirst.mockResolvedValue({
+      ...existing,
+      deleted_at: new Date('2026-07-13T12:00:00.000Z'),
+    });
+    transactionClient.visit.updateMany.mockResolvedValue({ count: 1 });
+    transactionClient.auditLog.create.mockResolvedValue({ id: 'audit-3' });
+
+    const [winner, retry] = await Promise.all([
+      service.deleteClient('client-1', 'user-1', 'org-1'),
+      service.deleteClient('client-1', 'user-1', 'org-1'),
+    ]);
+
+    expect(winner.id).toBe('client-1');
+    expect(retry.id).toBe('client-1');
+    expect(transactionClient.client.updateMany).toHaveBeenCalledTimes(2);
+    expect(transactionClient.visit.updateMany).toHaveBeenCalledTimes(1);
+    expect(transactionClient.auditLog.create).toHaveBeenCalledTimes(1);
+    expect(transactionClient.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: 'DELETE_CLIENT',
+        resource_id: 'client-1',
+      }),
+    });
+  });
 });
