@@ -1,5 +1,7 @@
 # Tenant Isolation Gate 001
 
+> **Historical gate snapshot.** This document is preserved because it records the origin and scope of tenant-isolation work. Its individual claims may be superseded by later implementation and tests. [The canonical Oasis pilot readiness gate](production-readiness-gate.md) owns the current verdict; unresolved tenant/auth proof remains blocking until that gate records completion.
+
 ## Current Verdict
 
 Oasis is partially multi-tenant, but unsafe for external care-company SaaS use.
