@@ -84,6 +84,26 @@ describe('MedicationRepository', () => {
     );
   });
 
+  it('uses the 25-hour organization day for eMAR on the BST autumn boundary', async () => {
+    const { prisma, repository } = createRepository();
+
+    await repository.findTodaysMedicationsByClient(
+      '2026-10-25',
+      'org-123',
+    );
+
+    expect(prisma.medicationAdministration.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          scheduled_time: {
+            gte: new Date('2026-10-24T23:00:00.000Z'),
+            lt: new Date('2026-10-26T00:00:00.000Z'),
+          },
+        }),
+      }),
+    );
+  });
+
   it('treats a selected date as a calendar key rather than an instant', async () => {
     const { prisma, repository } = createRepository();
 

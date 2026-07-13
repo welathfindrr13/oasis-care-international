@@ -641,6 +641,40 @@ describe('MedicationService', () => {
       expect(repository.createMedicationAudit).not.toHaveBeenCalled();
     });
 
+    it.each([
+      { administrationTimes: [], label: 'an empty schedule' },
+      { administrationTimes: ['25:00'], label: 'an out-of-range wall time' },
+      { administrationTimes: ['08:00', '08:00'], label: 'a duplicate wall time' },
+    ])('rejects $label before any repository lookup or write', async ({ administrationTimes }) => {
+      await expect(
+        service.createPrescription(
+          {
+            clientId: 'client-123',
+            medicationId: 'medication-123',
+            startDate: '2026-07-13',
+            endDate: '2026-07-13',
+            frequencyPerDay: 1,
+            administrationTimes,
+          },
+          mockAdminUser.id,
+          mockAdminUser.role,
+          organizationId,
+        ),
+      ).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        response: { code: ErrorCode.VALIDATION_FAILED },
+      });
+
+      expect(repository.findMedicationById).not.toHaveBeenCalled();
+      expect(repository.findClientInOrganization).not.toHaveBeenCalled();
+      expect(repository.createPrescription).not.toHaveBeenCalled();
+      expect(
+        repository.findMedicationAdministrationTimesForPrescriptionWindow,
+      ).not.toHaveBeenCalled();
+      expect(repository.createMedicationAdministrationsBulk).not.toHaveBeenCalled();
+      expect(repository.createMedicationAudit).not.toHaveBeenCalled();
+    });
+
     it('rejects a prescription end date before its start before any write', async () => {
       await expect(
         service.createPrescription(

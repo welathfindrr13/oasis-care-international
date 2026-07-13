@@ -5,6 +5,8 @@ import {
   IsOptional,
   IsInt,
   IsArray,
+  ArrayMinSize,
+  ArrayUnique,
   IsBoolean,
   Matches,
   Min,
@@ -47,7 +49,10 @@ export class CreatePrescriptionInput {
 
   @Field(() => [String])
   @IsArray()
+  @ArrayMinSize(1)
+  @ArrayUnique()
   @IsString({ each: true })
+  @Matches(/^(?:[01]?\d|2[0-3]):[0-5]\d$/, { each: true })
   administrationTimes: string[];
 
   @Field({ nullable: true })

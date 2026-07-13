@@ -121,6 +121,7 @@ export class MedicationService {
     const endDate = endCalendarDate
       ? organizationCalendarDateToUtcStoredDate(endCalendarDate)
       : null;
+    this.validateAdministrationTimes(data.administrationTimes);
 
     const requestId = this.cls.get('requestId');
     this.logger.log(`Creating prescription for client ${data.clientId}`, { requestId });
@@ -465,6 +466,46 @@ export class MedicationService {
     return { hours, minutes };
   }
 
+  private validateAdministrationTimes(
+    administrationTimes: unknown,
+  ): Array<{ hours: number; minutes: number }> {
+    if (!Array.isArray(administrationTimes) || administrationTimes.length === 0) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Prescription administration times must contain at least one valid wall time',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const parsedTimes: Array<{ hours: number; minutes: number }> = [];
+    const uniqueTimes = new Set<string>();
+    for (const time of administrationTimes) {
+      const parsed = typeof time === 'string' ? this.parseTimeOfDay(time) : null;
+      if (!parsed) {
+        throw new BaseHttpException(
+          ErrorCode.VALIDATION_FAILED,
+          'Prescription administration times must use a valid HH:mm wall time',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const canonicalTime = `${String(parsed.hours).padStart(2, '0')}:${String(
+        parsed.minutes,
+      ).padStart(2, '0')}`;
+      if (uniqueTimes.has(canonicalTime)) {
+        throw new BaseHttpException(
+          ErrorCode.VALIDATION_FAILED,
+          'Prescription administration times must be unique',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      uniqueTimes.add(canonicalTime);
+      parsedTimes.push(parsed);
+    }
+
+    return parsedTimes;
+  }
+
   private parsePrescriptionDateKey(
     value: string,
     field: 'start' | 'end',
@@ -494,9 +535,7 @@ export class MedicationService {
     administrationTimes: string[],
     organizationId: string,
   ): { candidates: Date[]; windowStart: Date; windowEndExclusive: Date } {
-    const parsedTimes = administrationTimes
-      .map((time) => this.parseTimeOfDay(time))
-      .filter((value): value is { hours: number; minutes: number } => Boolean(value));
+    const parsedTimes = this.validateAdministrationTimes(administrationTimes);
 
     const startCalendarDate = utcStoredDateToCalendarDate(startDate);
     const endCalendarDate = endDate
