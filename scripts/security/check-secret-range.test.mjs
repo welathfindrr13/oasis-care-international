@@ -85,6 +85,59 @@ test('rejects a finding while emitting only the approved redacted fields', () =>
   assert.equal(result.stdout, '');
 });
 
+test('fails closed when the scanner exits one with empty stdout', () => {
+  const { directory, base, head } = fixtureRepository();
+  const scanner = fakeScanner(directory, 'process.exit(1);');
+  const result = run(process.execPath, [scriptPath, scanner, base, head], directory);
+
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /could not complete the scan/);
+  assert.equal(result.stdout, '');
+});
+
+test('fails closed when the scanner exits one with an empty finding array', () => {
+  const { directory, base, head } = fixtureRepository();
+  const scanner = fakeScanner(
+    directory,
+    "process.stdout.write('[]'); process.exit(1);",
+  );
+  const result = run(process.execPath, [scriptPath, scanner, base, head], directory);
+
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /could not complete the scan/);
+  assert.equal(result.stdout, '');
+});
+
+test('fails closed on non-array scanner JSON without surfacing raw values', () => {
+  const { directory, base, head } = fixtureRepository();
+  const rawValue = 'raw-scanner-value-must-not-surface';
+  const scanner = fakeScanner(
+    directory,
+    `process.stdout.write(JSON.stringify({UnsafeDiagnostic:'${rawValue}'})); process.exit(1);`,
+  );
+  const result = run(process.execPath, [scriptPath, scanner, base, head], directory);
+
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /could not complete the scan/);
+  assert.doesNotMatch(result.stderr, new RegExp(rawValue));
+  assert.doesNotMatch(result.stdout, new RegExp(rawValue));
+});
+
+test('fails closed on malformed finding rows without surfacing raw values', () => {
+  const { directory, base, head } = fixtureRepository();
+  const rawValue = 'malformed-scanner-value-must-not-surface';
+  const scanner = fakeScanner(
+    directory,
+    `process.stdout.write(JSON.stringify([null,'${rawValue}'])); process.exit(1);`,
+  );
+  const result = run(process.execPath, [scriptPath, scanner, base, head], directory);
+
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /could not complete the scan/);
+  assert.doesNotMatch(result.stderr, new RegExp(rawValue));
+  assert.doesNotMatch(result.stdout, new RegExp(rawValue));
+});
+
 test('rejects an invalid commit identifier before invoking the scanner', () => {
   const { directory, head } = fixtureRepository();
   const scanner = fakeScanner(directory, 'process.exit(0);');
@@ -214,6 +267,7 @@ test('pinned scanner rejects a detector introduced only in a commit message', pi
   assert.equal(result.status, 1, result.stderr);
   assert.match(result.stderr, /<commit-message>/);
   assert.match(result.stderr, new RegExp(head));
+  assert.match(result.stderr, /Disable and rotate the credential/);
   assert.doesNotMatch(result.stderr, new RegExp(marker));
   assert.doesNotMatch(result.stdout, new RegExp(marker));
 });

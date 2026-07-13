@@ -143,12 +143,36 @@ function scanContent(content, repositoryPath, commit) {
     fail('Secret leak prevention rejected the range but could not safely classify the finding.');
   }
 
-  for (const row of rows) {
+  if (!Array.isArray(rows)) {
+    fail('Secret leak prevention could not complete the scan. No scanner output was retained.');
+  }
+
+  const classifiedRows = rows.map((row) => {
+    if (
+      !row ||
+      typeof row !== 'object' ||
+      Array.isArray(row) ||
+      typeof row.RuleID !== 'string'
+    ) {
+      fail('Secret leak prevention could not complete the scan. No scanner output was retained.');
+    }
+    const credentialCategory = safeText(row.RuleID, '').trim();
+    if (!credentialCategory) {
+      fail('Secret leak prevention could not complete the scan. No scanner output was retained.');
+    }
+    return { credentialCategory };
+  });
+
+  if (scan.status === 1 && classifiedRows.length === 0) {
+    fail('Secret leak prevention could not complete the scan. No scanner output was retained.');
+  }
+
+  for (const row of classifiedRows) {
     const finding = {
-      credentialCategory: safeText(row.RuleID, 'unclassified-credential'),
+      credentialCategory: row.credentialCategory,
       repositoryPath: safeText(repositoryPath, 'unknown-path'),
       commit,
-      rotationRecommendation: recommendation(row.RuleID),
+      rotationRecommendation: recommendation(row.credentialCategory),
     };
     const key = JSON.stringify(finding);
     if (!seen.has(key)) {
