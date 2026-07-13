@@ -12,16 +12,43 @@ const dockerComposeLines = workflow
   .split('\n')
   .filter((line) => /docker compose/.test(line))
   .join('\n');
+const fixedSshOptions =
+  '-i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10';
 
-test('tenant nullability dry-run workflow is manual and uses fixed production SSH secrets', () => {
+test('tenant nullability dry-run workflow is manual and uses protected production SSH secrets', () => {
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /if: github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /environment:\s*\n\s*name: production/);
   assert.match(workflow, /OASIS_PRODUCTION_VPS_SSH_KEY/);
   assert.match(workflow, /OASIS_PRODUCTION_VPS_HOST/);
   assert.match(workflow, /OASIS_PRODUCTION_VPS_USER/);
+  assert.match(workflow, /OASIS_PRODUCTION_VPS_KNOWN_HOSTS/);
   assert.match(workflow, /~\/\.ssh\/oasis_production_vps/);
+  assert.match(workflow, /printf '%s\\n' "\$OASIS_PRODUCTION_VPS_KNOWN_HOSTS" > ~\/\.ssh\/known_hosts/);
+  assert.match(workflow, /chmod 600 ~\/\.ssh\/known_hosts/);
+  assert.doesNotMatch(workflow, /ssh-keyscan/);
   assert.doesNotMatch(workflow, /OASIS_VPS_SSH_KEY|OASIS_VPS_HOST|OASIS_VPS_USER/);
   assert.doesNotMatch(workflow, /~\/\.ssh\/oasis_vps/);
   assert.doesNotMatch(workflow, /inputs:/);
+  assert.match(
+    workflow,
+    /uses: actions\/checkout@v4\s*\n\s*with:\s*\n\s*ref: \$\{\{ github\.sha \}\}\s*\n\s*persist-credentials: false/,
+  );
+});
+
+test('tenant nullability dry-run fixes SSH identity host-key and timeout policy on every remote command', () => {
+  const remoteCommandLines = workflow
+    .split('\n')
+    .filter((line) => /\b(?:ssh|scp) -i ~\/\.ssh\/oasis_production_vps/.test(line));
+
+  assert.equal(remoteCommandLines.length, 7);
+  for (const line of remoteCommandLines) {
+    assert.match(line, /-o BatchMode=yes/);
+    assert.match(line, /-o StrictHostKeyChecking=yes/);
+    assert.match(line, /-o UserKnownHostsFile=~\/\.ssh\/known_hosts/);
+    assert.match(line, /-o IdentitiesOnly=yes/);
+    assert.match(line, /-o ConnectTimeout=10/);
+  }
 });
 
 test('tenant nullability dry-run workflow proves production target before remote temp or compose access', () => {
@@ -71,8 +98,8 @@ test('tenant nullability dry-run workflow runs only the fixed eligible-table gat
 test('tenant nullability dry-run workflow uses the reviewed checkout script', () => {
   const checkoutIndex = workflow.indexOf('uses: actions/checkout@');
   const localCheckIndex = workflow.indexOf('test -f scripts/release/tenant-nullability-dry-run.mjs');
-  const remoteDirIndex = workflow.indexOf('remote_script_dir="$(ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST"');
-  const scpIndex = workflow.indexOf('scp -i ~/.ssh/oasis_production_vps -o BatchMode=yes scripts/release/tenant-nullability-dry-run.mjs');
+  const remoteDirIndex = workflow.indexOf(`remote_script_dir="$(ssh ${fixedSshOptions} "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST"`);
+  const scpIndex = workflow.indexOf(`scp ${fixedSshOptions} scripts/release/tenant-nullability-dry-run.mjs`);
   const composeIndex = workflow.indexOf('docker compose --env-file deploy/v2/.env');
 
   assert.notEqual(checkoutIndex, -1);
@@ -89,7 +116,9 @@ test('tenant nullability dry-run workflow uses the reviewed checkout script', ()
 test('tenant nullability dry-run workflow copies only the reviewed dry-run script', () => {
   assert.match(
     workflow,
-    /scp -i ~\/\.ssh\/oasis_production_vps -o BatchMode=yes scripts\/release\/tenant-nullability-dry-run\.mjs "\$OASIS_PRODUCTION_VPS_USER@\$OASIS_PRODUCTION_VPS_HOST:\$remote_script_dir\/tenant-nullability-dry-run\.mjs"/,
+    new RegExp(
+      `scp ${fixedSshOptions.replaceAll('/', '\\/').replaceAll('.', '\\.')} scripts\\/release\\/tenant-nullability-dry-run\\.mjs "\\$OASIS_PRODUCTION_VPS_USER@\\$OASIS_PRODUCTION_VPS_HOST:\\$remote_script_dir\\/tenant-nullability-dry-run\\.mjs"`,
+    ),
   );
   assert.match(workflow, /chmod 0444 '\$remote_script_dir\/tenant-nullability-dry-run\.mjs'/);
   assert.match(workflow, /chmod 0555 '\$remote_script_dir'/);
