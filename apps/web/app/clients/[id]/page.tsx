@@ -6,6 +6,7 @@ import { Button } from '../../../components/ui/Button'
 import { DeleteClientButton } from '../../../components/oasis/DeleteClientButton'
 import { getServerAuthContext } from '../../../lib/auth/server-auth'
 import { query } from '../../../lib/graphql/client'
+import { formatDateTime, formatDate, formatTime } from '../../../lib/time'
 import {
   CARE_PLANNING_QUERY,
   CLIENT_QUERY,
@@ -82,24 +83,12 @@ function formatAddress(client: {
 
 function formatShortDateTime(value?: string | null): string {
   if (!value) return 'Not set'
-
-  return new Intl.DateTimeFormat('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
+  return formatDateTime(value, { weekday: 'short' })
 }
 
 function formatShortDate(value?: string | null): string {
   if (!value) return 'Not set'
-
-  return new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(value))
+  return formatDate(value)
 }
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
@@ -325,12 +314,8 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
                         <div key={visit.id} className="py-3 flex items-center justify-between">
                           <div>
                             <p className="text-sm font-medium text-slate-900">
-                              {new Date(visit.scheduledStart).toLocaleString('en-GB', {
+                              {formatDateTime(visit.scheduledStart, {
                                 weekday: 'short',
-                                day: 'numeric',
-                                month: 'short',
-                                hour: '2-digit',
-                                minute: '2-digit',
                               })}
                             </p>
                             <p className="text-sm text-slate-500">Carer: {carerName}</p>
@@ -359,17 +344,13 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
                 {nextVisit ? (
                   <div className="bg-teal-50 rounded-xl p-4">
                     <p className="text-lg font-semibold text-teal-900">
-                      {new Date(nextVisit.scheduledStart).toLocaleDateString('en-GB', {
+                      {formatDate(nextVisit.scheduledStart, {
                         weekday: 'long',
-                        day: 'numeric',
                         month: 'long',
                       })}
                     </p>
                     <p className="text-teal-700">
-                      {new Date(nextVisit.scheduledStart).toLocaleTimeString('en-GB', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatTime(nextVisit.scheduledStart)}
                     </p>
                   </div>
                 ) : (

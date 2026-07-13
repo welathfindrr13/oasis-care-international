@@ -91,7 +91,7 @@ export class MedicationResolver {
   ): Promise<MedicationAdministrationDto[]> {
     const { userId, userRole, organizationId } = this.getUserContext(req);
     const administrations = await this.medicationService.getTodaysMedicationsByClient(
-      new Date(date),
+      date,
       userId,
       userRole,
       organizationId,

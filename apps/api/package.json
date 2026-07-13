@@ -13,6 +13,7 @@
     "test:e2e": "cross-env NODE_ENV=test jest --config ./test/jest-e2e.json --runInBand"
   },
   "dependencies": {
+    "@oasis/time": "workspace:*",
     "@apollo/server": "4.10.0",
     "@aws-sdk/client-bedrock-runtime": "^3.859.0",
     "@aws-sdk/client-secrets-manager": "^3.859.0",

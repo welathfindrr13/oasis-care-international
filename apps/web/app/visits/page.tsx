@@ -18,7 +18,12 @@ import {
   type VisitsQueryResponse,
   type Visit,
 } from '../../lib/graphql/queries'
-import { formatTime, formatDate, getLondonDayUtcRange } from '../../lib/time'
+import {
+  formatTime,
+  formatDate,
+  getOrganizationDateUtcRange,
+  organizationDateKey,
+} from '../../lib/time'
 
 export const metadata: Metadata = {
   title: 'Visits - Oasis Care',
@@ -45,9 +50,7 @@ async function getVisits(
   let scheduledStartFrom: string | undefined
   let scheduledStartTo: string | undefined
   if (searchParams.date) {
-    const range = getLondonDayUtcRange(
-      new Date(`${searchParams.date}T12:00:00.000Z`),
-    )
+    const range = getOrganizationDateUtcRange(searchParams.date)
     scheduledStartFrom = range.start
     scheduledStartTo = new Date(new Date(range.end).getTime() - 1).toISOString()
   }
@@ -255,7 +258,7 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
     accessSnapshot.capabilities,
     'TENANT_ADMIN',
   )
-  const todayKey = new Date().toISOString().slice(0, 10)
+  const todayKey = organizationDateKey()
   const showTodayHeading = searchParams.date === todayKey
 
   let visits: Visit[]

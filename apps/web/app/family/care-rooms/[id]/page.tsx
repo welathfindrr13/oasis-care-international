@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Header } from '../../../../components/oasis/Header'
 import { FamilyConcernForm } from '../../../../components/carebridge/FamilyConcernForm'
 import { query } from '../../../../lib/graphql/client'
+import { formatDate } from '../../../../lib/time'
 import {
   FAMILY_CAREBRIDGE_ROOM_QUERY,
   FAMILY_VERIFIED_VISIT_STORIES_QUERY,
@@ -170,7 +171,7 @@ export default async function FamilyCareRoomPage({ params }: { params: { id: str
                 className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
               >
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  {new Date(story.publishedAt).toLocaleDateString('en-GB')}
+                  {formatDate(story.publishedAt)}
                 </p>
                 <h3 className="mt-2 font-heading text-lg font-semibold text-slate-900">{story.title}</h3>
                 <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-700">{story.body}</p>

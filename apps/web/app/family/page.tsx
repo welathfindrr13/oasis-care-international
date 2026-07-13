@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Header } from '../../components/oasis/Header'
 import { InstallAppPrompt } from '../../components/pwa/InstallAppPrompt'
 import { query } from '../../lib/graphql/client'
+import { formatDate } from '../../lib/time'
 import {
   FAMILY_CAREBRIDGE_ROOMS_QUERY,
   FAMILY_VERIFIED_VISIT_STORIES_QUERY,
@@ -97,7 +98,7 @@ export default async function FamilyPage() {
                           ) : room.latestUpdate ? (
                             <>
                               <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                                Latest · {new Date(room.latestUpdate.publishedAt).toLocaleDateString('en-GB')}
+                                Latest · {formatDate(room.latestUpdate.publishedAt)}
                               </p>
                               <p className="mt-1 text-sm font-medium text-slate-800">{room.latestUpdate.title}</p>
                               <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-600">{room.latestUpdate.body}</p>
@@ -140,7 +141,7 @@ export default async function FamilyPage() {
           ) : latestUpdate ? (
             <div className="mt-3">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                {new Date(latestUpdate.publishedAt).toLocaleDateString('en-GB')}
+                {formatDate(latestUpdate.publishedAt)}
               </p>
               <h3 className="mt-1 font-semibold text-slate-900">{latestUpdate.title}</h3>
               <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{latestUpdate.body}</p>

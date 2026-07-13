@@ -22,7 +22,8 @@
     "paths": {
       "@oasis/api": ["apps/api/src"],
       "@oasis/db": ["libs/db/src"],
-      "@oasis/auth": ["libs/auth/src"]
+      "@oasis/auth": ["libs/auth/src"],
+      "@oasis/time": ["libs/time/src"]
     }
   },
   "exclude": ["node_modules", "dist"]

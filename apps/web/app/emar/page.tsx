@@ -6,6 +6,11 @@ import { useSearchParams } from 'next/navigation';
 import { Header } from '../../components/oasis/Header';
 import { useClientAccess } from '../../components/providers/ClientAccessProvider';
 import { clientQuery } from '../../lib/graphql/client-side';
+import {
+  formatDate as formatOrganizationDate,
+  formatTime as formatOrganizationTime,
+  organizationDateKey,
+} from '../../lib/time';
 
 interface MedicationAdministration {
   id: string;
@@ -140,8 +145,7 @@ function EmarPageContent() {
   } = useClientAccess();
 
   const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+    return organizationDateKey();
   });
 
   const [loading, setLoading] = useState(true);
@@ -257,18 +261,12 @@ function EmarPageContent() {
   };
 
   const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
+    return formatOrganizationTime(dateString);
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return formatOrganizationDate(dateString, {
       weekday: 'short',
-      month: 'short',
-      day: 'numeric',
     });
   };
 
@@ -359,10 +357,8 @@ function EmarPageContent() {
           input: {
             clientId: newPrescription.clientId,
             medicationId: newPrescription.medicationId,
-            startDate: `${newPrescription.startDate}T00:00:00.000Z`,
-            endDate: newPrescription.endDate
-              ? `${newPrescription.endDate}T23:59:59.999Z`
-              : null,
+            startDate: newPrescription.startDate,
+            endDate: newPrescription.endDate || null,
             frequencyPerDay: Number(newPrescription.frequencyPerDay || '1'),
             administrationTimes: times,
             specialInstructions: newPrescription.specialInstructions.trim() || null,

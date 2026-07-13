@@ -11,6 +11,7 @@ import {
   type CanonicalCapabilityActor,
   hasCanonicalActorCapability,
 } from '../auth/access-capability';
+import { organizationDayUtcRange } from '@oasis/time';
 
 @Injectable()
 export class ShiftService {
@@ -113,7 +114,7 @@ export class ShiftService {
   async analytics(from: string | undefined, to: string | undefined, userId: string, userRole: string, organizationId?: string, accessContext?: CanonicalCapabilityActor): Promise<ShiftAnalyticsDto> {
     const orgId = await this.requireOrganizationId(organizationId);
     this.assertActorCapability(accessContext, 'WORKFORCE_MANAGE', orgId, userId, userRole);
-    const range = this.getRange(from, to);
+    const range = this.getRange(from, to, orgId);
 
     const [
       activeCarersNow,
@@ -184,19 +185,13 @@ export class ShiftService {
     return Math.round((totalMinutes / shifts.length) * 10) / 10;
   }
 
-  private getRange(from?: string, to?: string): { from: Date; to: Date } {
+  private getRange(from: string | undefined, to: string | undefined, organizationId: string): { from: Date; to: Date } {
     if (from && to) {
       return { from: new Date(from), to: new Date(to) };
     }
 
-    const now = new Date();
-    const start = new Date(now);
-    start.setUTCHours(0, 0, 0, 0);
-
-    const end = new Date(now);
-    end.setUTCHours(23, 59, 59, 999);
-
-    return { from: start, to: end };
+    const range = organizationDayUtcRange(new Date(), organizationId);
+    return { from: range.start, to: new Date(range.end.getTime() - 1) };
   }
 
   private assertActorCapability(

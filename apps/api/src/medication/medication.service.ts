@@ -17,6 +17,15 @@ import {
   type CanonicalCapabilityActor,
   hasCanonicalActorCapability,
 } from '../auth/access-capability';
+import {
+  addCalendarDays,
+  organizationCalendarDateToUtcStoredDate,
+  parseOrganizationDateKey,
+  resolveOrganizationWallClock,
+  utcStoredDateToCalendarDate,
+  type OrganizationCalendarDate,
+} from '@oasis/time';
+import { normalizeMedicationWallTime } from './medication-wall-time';
 
 // Inline types for now
 interface CreatePrescriptionInput {
@@ -94,7 +103,27 @@ export class MedicationService {
     const orgId = await this.requireOrganizationId(organizationId);
     const normalizedRole = this.normalizeRole(userRole);
     this.checkAdminAccess(normalizedRole);
-    
+
+    const startCalendarDate = this.parsePrescriptionDateKey(data.startDate, 'start');
+    const endCalendarDate = data.endDate
+      ? this.parsePrescriptionDateKey(data.endDate, 'end')
+      : null;
+    if (
+      endCalendarDate &&
+      this.compareCalendarDates(startCalendarDate, endCalendarDate) > 0
+    ) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Prescription start date must not be after its end date',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const startDate = organizationCalendarDateToUtcStoredDate(startCalendarDate);
+    const endDate = endCalendarDate
+      ? organizationCalendarDateToUtcStoredDate(endCalendarDate)
+      : null;
+    this.validateAdministrationTimes(data.administrationTimes);
+
     const requestId = this.cls.get('requestId');
     this.logger.log(`Creating prescription for client ${data.clientId}`, { requestId });
 
@@ -117,11 +146,20 @@ export class MedicationService {
       );
     }
 
+    // Resolve every local schedule time before writing the prescription so a
+    // DST ambiguity cannot leave a partially materialised care record.
+    this.buildSchedulePlan(
+      startDate,
+      endDate,
+      data.administrationTimes,
+      orgId,
+    );
+
     const prescription = await this.medicationRepository.createPrescription({
       client: { connect: { id: data.clientId } },
       medication: { connect: { id: data.medicationId } },
-      start_date: new Date(data.startDate),
-      end_date: data.endDate ? new Date(data.endDate) : null,
+      start_date: startDate,
+      end_date: endDate,
       frequency_per_day: data.frequencyPerDay,
       frequency_interval_hours: data.frequencyIntervalHours,
       administration_times: data.administrationTimes,
@@ -281,12 +319,14 @@ export class MedicationService {
   }
 
   async getTodaysMedicationsByClient(
-    date: Date,
+    dateKey: string,
     userId: string,
     userRole: string,
     organizationId?: string,
   ): Promise<MedicationAdministration[]> {
-    if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    try {
+      parseOrganizationDateKey(dateKey);
+    } catch {
       throw new BaseHttpException(
         ErrorCode.VALIDATION_FAILED,
         'A valid medication date is required',
@@ -299,10 +339,10 @@ export class MedicationService {
     this.checkClinicalAccess(normalizedRole);
     
     const requestId = this.cls.get('requestId');
-    this.logger.log(`Fetching today's medications for date ${date.toISOString()}`, { requestId });
+    this.logger.log(`Fetching today's medications for organization date ${dateKey}`, { requestId });
 
     const administrations = await this.medicationRepository.findTodaysMedicationsByClient(
-      date,
+      dateKey,
       orgId,
       normalizedRole === 'carer' ? userId : undefined,
     );
@@ -416,68 +456,121 @@ export class MedicationService {
     }
   }
 
-  private materializationWindowEnd(startDate: Date, endDate?: Date | null): Date {
-    if (endDate) {
-      const bounded = new Date(endDate);
-      bounded.setUTCHours(23, 59, 59, 999);
-      return bounded;
+  private validateAdministrationTimes(
+    administrationTimes: unknown,
+  ): Array<{ hours: number; minutes: number }> {
+    if (!Array.isArray(administrationTimes) || administrationTimes.length === 0) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Prescription administration times must contain at least one valid wall time',
+        HttpStatus.BAD_REQUEST,
+      );
     }
-    const fallback = new Date(startDate);
-    fallback.setUTCDate(fallback.getUTCDate() + 30);
-    fallback.setUTCHours(23, 59, 59, 999);
-    return fallback;
-  }
 
-  private parseTimeOfDay(time: string): { hours: number; minutes: number } | null {
-    const normalized = String(time || '').trim();
-    const match = normalized.match(/^(\d{1,2}):(\d{2})$/);
-    if (!match) return null;
-    const hours = Number(match[1]);
-    const minutes = Number(match[2]);
-    if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
-    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
-    return { hours, minutes };
-  }
-
-  private buildScheduleCandidates(
-    startDate: Date,
-    endDate: Date,
-    administrationTimes: string[],
-  ): Date[] {
-    const parsedTimes = administrationTimes
-      .map((time) => this.parseTimeOfDay(time))
-      .filter((value): value is { hours: number; minutes: number } => Boolean(value));
-
-    const candidates: Date[] = [];
-    const cursor = new Date(Date.UTC(
-      startDate.getUTCFullYear(),
-      startDate.getUTCMonth(),
-      startDate.getUTCDate(),
-      0,
-      0,
-      0,
-      0,
-    ));
-
-    while (cursor <= endDate) {
-      for (const t of parsedTimes) {
-        const scheduled = new Date(Date.UTC(
-          cursor.getUTCFullYear(),
-          cursor.getUTCMonth(),
-          cursor.getUTCDate(),
-          t.hours,
-          t.minutes,
-          0,
-          0,
-        ));
-        if (scheduled >= startDate && scheduled <= endDate) {
-          candidates.push(scheduled);
-        }
+    const parsedTimes: Array<{ hours: number; minutes: number }> = [];
+    const uniqueTimes = new Set<string>();
+    for (const time of administrationTimes) {
+      const normalized = normalizeMedicationWallTime(time);
+      if (!normalized) {
+        throw new BaseHttpException(
+          ErrorCode.VALIDATION_FAILED,
+          'Prescription administration times must use a valid HH:mm wall time',
+          HttpStatus.BAD_REQUEST,
+        );
       }
-      cursor.setUTCDate(cursor.getUTCDate() + 1);
+
+      if (uniqueTimes.has(normalized.canonical)) {
+        throw new BaseHttpException(
+          ErrorCode.VALIDATION_FAILED,
+          'Prescription administration times must be unique',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      uniqueTimes.add(normalized.canonical);
+      parsedTimes.push({ hours: normalized.hours, minutes: normalized.minutes });
     }
 
-    return candidates;
+    return parsedTimes;
+  }
+
+  private parsePrescriptionDateKey(
+    value: string,
+    field: 'start' | 'end',
+  ): OrganizationCalendarDate {
+    try {
+      return parseOrganizationDateKey(value);
+    } catch {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        `Prescription ${field} date must use YYYY-MM-DD`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  private compareCalendarDates(
+    left: OrganizationCalendarDate,
+    right: OrganizationCalendarDate,
+  ): number {
+    return Date.UTC(left.year, left.month - 1, left.day)
+      - Date.UTC(right.year, right.month - 1, right.day);
+  }
+
+  private buildSchedulePlan(
+    startDate: Date,
+    endDate: Date | null | undefined,
+    administrationTimes: string[],
+    organizationId: string,
+  ): { candidates: Date[]; windowStart: Date; windowEndExclusive: Date } {
+    const parsedTimes = this.validateAdministrationTimes(administrationTimes);
+
+    const startCalendarDate = utcStoredDateToCalendarDate(startDate);
+    const endCalendarDate = endDate
+      ? utcStoredDateToCalendarDate(endDate)
+      : addCalendarDays(startCalendarDate, 30);
+    const candidates: Date[] = [];
+    let cursor = startCalendarDate;
+
+    while (this.compareCalendarDates(cursor, endCalendarDate) <= 0) {
+      for (const t of parsedTimes) {
+        const resolution = resolveOrganizationWallClock(
+          { ...cursor, hour: t.hours, minute: t.minutes },
+          organizationId,
+        );
+        if (resolution.kind !== 'unique') {
+          throw new BaseHttpException(
+            ErrorCode.MEDICATION_SCHEDULE_TIME_UNRESOLVED,
+            'Medication schedule includes a local time affected by daylight saving. Clinical scheduling approval is required before materialisation.',
+            HttpStatus.CONFLICT,
+          );
+        }
+        candidates.push(resolution.instant);
+      }
+      cursor = addCalendarDays(cursor, 1);
+    }
+
+    const windowStartResolution = resolveOrganizationWallClock(
+      { ...startCalendarDate, hour: 0, minute: 0 },
+      organizationId,
+    );
+    const dayAfterEnd = addCalendarDays(endCalendarDate, 1);
+    const windowEndResolution = resolveOrganizationWallClock(
+      { ...dayAfterEnd, hour: 0, minute: 0 },
+      organizationId,
+    );
+    if (windowStartResolution.kind !== 'unique' || windowEndResolution.kind !== 'unique') {
+      throw new BaseHttpException(
+        ErrorCode.MEDICATION_SCHEDULE_TIME_UNRESOLVED,
+        'Medication schedule calendar boundary could not be resolved safely.',
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    return {
+      candidates,
+      windowStart: windowStartResolution.instant,
+      windowEndExclusive: windowEndResolution.instant,
+    };
   }
 
   private async materializePrescriptionAdministrations(
@@ -485,26 +578,26 @@ export class MedicationService {
     organizationId: string,
   ): Promise<number> {
     const startDate = new Date(prescription.start_date);
-    const endDate = this.materializationWindowEnd(startDate, prescription.end_date);
-    const candidates = this.buildScheduleCandidates(
+    const plan = this.buildSchedulePlan(
       startDate,
-      endDate,
+      prescription.end_date,
       Array.isArray(prescription.administration_times) ? prescription.administration_times : [],
+      organizationId,
     );
 
-    if (!candidates.length) {
+    if (!plan.candidates.length) {
       return 0;
     }
 
     const existing = await this.medicationRepository.findMedicationAdministrationTimesForPrescriptionWindow(
       prescription.id,
-      startDate,
-      endDate,
+      plan.windowStart,
+      new Date(plan.windowEndExclusive.getTime() - 1),
       organizationId,
     );
     const existingSet = new Set(existing.map((d) => d.toISOString()));
 
-    const createPayload = candidates
+    const createPayload = plan.candidates
       .filter((scheduled) => !existingSet.has(scheduled.toISOString()))
       .map((scheduled) => ({
         prescription_id: prescription.id,

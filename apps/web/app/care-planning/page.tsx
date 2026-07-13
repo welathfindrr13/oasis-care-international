@@ -3,6 +3,10 @@ import { Header } from '../../components/oasis/Header'
 import { CarePlanningActions } from '../../components/care-planning/CarePlanningActions'
 import { query } from '../../lib/graphql/client'
 import {
+  formatDate as formatOrganizationDate,
+  formatStoredCalendarDate,
+} from '../../lib/time'
+import {
   CARE_PLANNING_QUERY,
   CLIENTS_QUERY,
   type AssessmentRecord,
@@ -40,12 +44,7 @@ async function getCarePlanningSafe(clientId: string): Promise<CarePlanningQueryR
 
 function formatDate(value?: string | null): string {
   if (!value) return 'Not set'
-
-  return new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(value))
+  return formatOrganizationDate(value)
 }
 
 function countKeys(value?: Record<string, unknown> | null): number {
@@ -198,7 +197,7 @@ function EvidencePackList({ evidencePacks }: { evidencePacks: EvidencePackRecord
                 {pack.kind.replace(/_/g, ' ').toLowerCase()}
               </h3>
               <p className="mt-1 text-sm text-slate-500">
-                {formatDate(pack.periodStart)} to {formatDate(pack.periodEnd)} · {pack.items.length} source items
+                {formatStoredCalendarDate(pack.periodStart)} to {formatStoredCalendarDate(pack.periodEnd)} · {pack.items.length} source items
               </p>
             </div>
             <StatusPill status={pack.status} />

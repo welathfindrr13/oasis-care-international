@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { fetcher } from '../lib/api';
+import { formatTime as formatOrganizationTime } from '../lib/time';
 
 interface MedicationAdministration {
   id: string;
@@ -129,11 +130,7 @@ export default function MedsTab({ visitId, userId, userRole }: MedsTabProps) {
   };
 
   const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
+    return formatOrganizationTime(dateString);
   };
 
   const getStatusColor = (status: string) => {

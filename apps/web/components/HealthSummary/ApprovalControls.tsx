@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { formatDate } from '../../lib/time';
 
 interface ApprovalControlsProps {
   summaryId: string;
@@ -60,7 +61,7 @@ export default function ApprovalControls({
           <div className="text-sm text-gray-600">
             {approvedBy && approvedAt && (
               <>
-                by {approvedBy} on {new Date(approvedAt).toLocaleDateString()}
+                by {approvedBy} on {formatDate(approvedAt)}
               </>
             )}
           </div>

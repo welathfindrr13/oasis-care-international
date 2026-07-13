@@ -7,6 +7,7 @@ import { Header } from '../../components/oasis/Header';
 import { Button } from '../../components/ui/Button';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { clientQuery } from '../../lib/graphql/client-side';
+import { formatDateTime as formatOrganizationDateTime } from '../../lib/time';
 import {
   CLOCK_IN_MUTATION,
   CLOCK_OUT_MUTATION,
@@ -30,13 +31,7 @@ type LocationPayload = {
 
 function formatDateTime(value?: string | null): string {
   if (!value) return '—';
-  return new Date(value).toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatOrganizationDateTime(value);
 }
 
 function formatDuration(clockInAt: string, clockOutAt?: string | null): string {

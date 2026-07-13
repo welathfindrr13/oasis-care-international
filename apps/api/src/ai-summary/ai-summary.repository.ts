@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService, HealthSummary, Prisma } from '@oasis/db';
+import {
+  organizationCalendarDateToUtcStoredDate,
+  organizationWeekCalendarPeriod,
+} from '@oasis/time';
 
 @Injectable()
 export class AiSummaryRepository {
@@ -126,20 +130,13 @@ export class AiSummaryRepository {
   }
 
   async findCurrentWeekSummary(clientId: string, organizationId: string): Promise<HealthSummary | null> {
-    const now = new Date();
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - now.getDay()); // Start of current week
-    weekStart.setHours(0, 0, 0, 0);
-
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6); // End of current week
-    weekEnd.setHours(23, 59, 59, 999);
+    const week = organizationWeekCalendarPeriod(new Date(), organizationId);
 
     return this.prisma.healthSummary.findFirst({
       where: {
         client_id: clientId,
-        period_start: { gte: weekStart },
-        period_end: { lte: weekEnd },
+        period_start: { gte: organizationCalendarDateToUtcStoredDate(week.start) },
+        period_end: { lte: organizationCalendarDateToUtcStoredDate(week.end) },
         client: {
           organization_id: organizationId,
           deleted_at: null,
