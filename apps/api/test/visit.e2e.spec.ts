@@ -36,10 +36,12 @@ import { MedicationResolver } from '../src/medication/medication.resolver';
 import { MedicationService } from '../src/medication/medication.service';
 import { MedicationRepository } from '../src/medication/medication.repository';
 import { AuthAccessModule } from '../src/auth/auth-access.module';
+import type { CanonicalAccessContext } from '../src/auth/access-context.service';
 
 describe('Visit E2E Tests', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let visitService: VisitService;
   let postgresContainer: StartedPostgreSqlContainer;
   let fixtures: any;
 
@@ -131,6 +133,7 @@ describe('Visit E2E Tests', () => {
 
     app = moduleFixture.createNestApplication();
     prisma = app.get<PrismaService>(PrismaService);
+    visitService = app.get<VisitService>(VisitService);
 
     // Apply global filters
     app.useGlobalFilters(new HttpExceptionFilter(), new GraphqlExceptionFilter());
@@ -187,9 +190,9 @@ describe('Visit E2E Tests', () => {
                 id
                 carerId
                 clientId
-                scheduledStart
-                scheduledEnd
-                status
+              scheduledStart
+              scheduledEnd
+              status
                 notes
                 carer {
                   id
@@ -443,6 +446,21 @@ describe('Visit E2E Tests', () => {
   });
 
   describe('Guided Visit Workflow Commands', () => {
+    const admittedCarerAccess = (): CanonicalAccessContext => ({
+      authenticated: true as const,
+      identityProvider: 'cognito',
+      membershipId: fixtures.memberships.carerMembership.id,
+      surface: 'STAFF' as const,
+      effectiveRole: 'carer',
+      organizationId: fixtures.organization.id,
+      membershipState: 'ACTIVE',
+      onboardingState: 'READY',
+      rawRole: 'carer',
+      linkedIdentityState: 'LINKED',
+      domainIdentityId: fixtures.carers.carer.id,
+      authSubject: TEST_USERS.carer.sub,
+    });
+
     const completeVisitMutation = `
       mutation CompleteVisit($input: CompleteVisitInput!) {
         completeVisit(input: $input) {
@@ -695,6 +713,8 @@ describe('Visit E2E Tests', () => {
         actorRole: 'carer',
         notesAppended: true,
         actualEndWasProvided: true,
+        previousNotesLength: 'Initial handover note.'.length,
+        completionNoteLength: input.notes.length,
       });
       expect(JSON.stringify(audits)).not.toContain(input.notes);
     });
@@ -740,6 +760,33 @@ describe('Visit E2E Tests', () => {
         completionNotes.filter((note) => persisted.notes?.includes(note)),
       ).toHaveLength(1);
       expect(completionAuditCount).toBe(1);
+    });
+
+    it('requires exact audit-bounded note evidence instead of a matching suffix', async () => {
+      const completionNote = 'Repeated suffix.';
+      const actualEnd = '2024-03-01T09:57:00.000Z';
+      const visit = await createCompletionVisit({
+        notes: `Original note ending in the same text.\n${completionNote}`,
+      });
+      const completed = await completeVisit({
+        visitId: visit.id,
+        notes: completionNote,
+        actualEnd,
+      });
+      expect(completed.body.errors).toBeUndefined();
+
+      await prisma.visit.update({
+        where: { id: visit.id },
+        data: { notes: `Tampered replacement.\n${completionNote}` },
+      });
+      const retry = await completeVisit({
+        visitId: visit.id,
+        notes: completionNote,
+        actualEnd,
+      });
+      expect(retry.body.errors?.[0]?.extensions?.code).toBe(
+        'VISIT_COMPLETION_CONFLICT',
+      );
     });
 
     it('preserves a recorded actual end and rejects cancelled or conflicting terminal changes', async () => {
@@ -808,6 +855,225 @@ describe('Visit E2E Tests', () => {
       expect(legacyPersisted.notes).toBe(
         'Legacy completion without transactional audit metadata.',
       );
+    });
+
+    it('rejects a conflicting actual end before a non-terminal visit is completed', async () => {
+      const recordedActualEnd = new Date('2024-03-01T09:45:00.000Z');
+      const visit = await createCompletionVisit({
+        actual_end: recordedActualEnd,
+      });
+
+      await expect(
+        visitService.completeVisit(
+          {
+            visitId: visit.id,
+            notes: 'Must not replace the recorded end.',
+            actualEnd: '2024-03-01T09:55:00.000Z',
+          },
+          fixtures.carers.carer.id,
+          'carer',
+          fixtures.organization.id,
+          admittedCarerAccess(),
+        ),
+      ).rejects.toMatchObject({
+        response: { code: 'VISIT_COMPLETION_CONFLICT' },
+      });
+
+      await expect(
+        prisma.visit.findUniqueOrThrow({ where: { id: visit.id } }),
+      ).resolves.toMatchObject({
+        status: 'IN_PROGRESS',
+        actual_end: recordedActualEnd,
+        notes: 'Initial handover note.',
+      });
+    });
+
+    it('never lets a concurrent start reopen a completed visit', async () => {
+      const visit = await createCompletionVisit({ status: 'SCHEDULED' });
+      const access = admittedCarerAccess();
+      const [startResult, completionResult] = await Promise.allSettled([
+        visitService.startVisit(
+          visit.id,
+          fixtures.carers.carer.id,
+          'carer',
+          fixtures.organization.id,
+          access,
+        ),
+        visitService.completeVisit(
+          {
+            visitId: visit.id,
+            notes: 'Concurrent completion evidence.',
+            actualEnd: '2024-03-01T09:55:00.000Z',
+          },
+          fixtures.carers.carer.id,
+          'carer',
+          fixtures.organization.id,
+          access,
+        ),
+      ]);
+
+      expect(completionResult.status).toBe('fulfilled');
+      expect(['fulfilled', 'rejected']).toContain(startResult.status);
+      const persisted = await prisma.visit.findUniqueOrThrow({
+        where: { id: visit.id },
+      });
+      expect(persisted.status).toBe('COMPLETED');
+      expect(persisted.actual_end?.toISOString()).toBe(
+        '2024-03-01T09:55:00.000Z',
+      );
+      expect(persisted.notes).toContain('Concurrent completion evidence.');
+    });
+
+    it('revalidates an admitted request after a queued membership revocation wins', async () => {
+      const visit = await createCompletionVisit();
+      const membershipId = fixtures.memberships.carerMembership.id;
+      const organizationId = fixtures.organization.id;
+      const carerId = fixtures.carers.carer.id;
+      const access = admittedCarerAccess();
+      let releaseLock!: () => void;
+      let markLocked!: () => void;
+      const locked = new Promise<void>((resolve) => {
+        markLocked = resolve;
+      });
+      const hold = new Promise<void>((resolve) => {
+        releaseLock = resolve;
+      });
+      const lockHolder = prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`carer-membership:${membershipId}`}, 0))`;
+        markLocked();
+        await hold;
+      });
+      await locked;
+
+      const revoking = prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`carer-membership:${membershipId}`}, 0))`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`carer-identity:${organizationId}:${carerId}`}, 0))`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`carer-assignment:${organizationId}:${carerId}`}, 0))`;
+        await tx.organizationMembership.update({
+          where: { id: membershipId },
+          data: { status: 'REVOKED', revoked_at: new Date() },
+        });
+        await tx.carer.update({
+          where: { id: carerId },
+          data: { is_active: false },
+        });
+      });
+
+      let revocationQueued = false;
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const rows = await prisma.$queryRaw<Array<{ waiting: bigint }>>`
+          SELECT count(*)::bigint AS waiting
+          FROM pg_locks
+          WHERE locktype = 'advisory' AND granted = false
+        `;
+        if (Number(rows[0]?.waiting || 0) >= 1) {
+          revocationQueued = true;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      if (!revocationQueued) {
+        releaseLock();
+        await lockHolder;
+        await revoking;
+      }
+      expect(revocationQueued).toBe(true);
+
+      const completing = visitService.completeVisit(
+        { visitId: visit.id, notes: 'Must be denied after revocation.' },
+        carerId,
+        'carer',
+        organizationId,
+        access,
+      );
+      const completionDenied = expect(completing).rejects.toMatchObject({
+        response: {
+          code: 'FORBIDDEN',
+          message: 'Access is unavailable for this account',
+        },
+      });
+      releaseLock();
+      await lockHolder;
+      await revoking;
+      await completionDenied;
+
+      const [persisted, auditCount] = await Promise.all([
+        prisma.visit.findUniqueOrThrow({ where: { id: visit.id } }),
+        prisma.auditLog.count({
+          where: { resource_type: 'Visit', resource_id: visit.id },
+        }),
+      ]);
+      expect(persisted.status).toBe('IN_PROGRESS');
+      expect(persisted.actual_end).toBeNull();
+      expect(persisted.notes).toBe('Initial handover note.');
+      expect(auditCount).toBe(0);
+    });
+
+    it('rolls back the visit mutation when the completion audit insert fails', async () => {
+      const visit = await createCompletionVisit();
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE test_visit_audit_failure (
+          resource_id text PRIMARY KEY
+        )
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE FUNCTION fail_selected_visit_audit() RETURNS trigger AS $$
+        BEGIN
+          IF NEW.action = 'VISIT_COMPLETED' AND EXISTS (
+            SELECT 1 FROM test_visit_audit_failure
+            WHERE resource_id = NEW.resource_id
+          ) THEN
+            RAISE EXCEPTION 'forced completion audit failure';
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TRIGGER fail_selected_visit_audit_trigger
+        BEFORE INSERT ON audit_log
+        FOR EACH ROW EXECUTE FUNCTION fail_selected_visit_audit()
+      `);
+      await prisma.$executeRaw`
+        INSERT INTO test_visit_audit_failure (resource_id) VALUES (${visit.id})
+      `;
+
+      try {
+        await expect(
+          visitService.completeVisit(
+            {
+              visitId: visit.id,
+              notes: 'This write must roll back with its audit.',
+              actualEnd: '2024-03-01T09:55:00.000Z',
+            },
+            fixtures.carers.carer.id,
+            'carer',
+            fixtures.organization.id,
+            admittedCarerAccess(),
+          ),
+        ).rejects.toThrow();
+
+        const [persisted, auditCount] = await Promise.all([
+          prisma.visit.findUniqueOrThrow({ where: { id: visit.id } }),
+          prisma.auditLog.count({
+            where: { resource_type: 'Visit', resource_id: visit.id },
+          }),
+        ]);
+        expect(persisted.status).toBe('IN_PROGRESS');
+        expect(persisted.actual_end).toBeNull();
+        expect(persisted.notes).toBe('Initial handover note.');
+        expect(auditCount).toBe(0);
+      } finally {
+        await prisma.$executeRawUnsafe(
+          'DROP TRIGGER IF EXISTS fail_selected_visit_audit_trigger ON audit_log',
+        );
+        await prisma.$executeRawUnsafe(
+          'DROP FUNCTION IF EXISTS fail_selected_visit_audit()',
+        );
+        await prisma.$executeRawUnsafe(
+          'DROP TABLE IF EXISTS test_visit_audit_failure',
+        );
+      }
     });
 
     it('denies every guided workflow write to a different linked Carer', async () => {
@@ -1127,7 +1393,6 @@ describe('Visit E2E Tests', () => {
               id: visitId,
               scheduledStart: '2024-02-01T11:00:00Z',
               scheduledEnd: '2024-02-01T12:00:00Z',
-              status: 'IN_PROGRESS',
             },
           },
         })
@@ -1135,8 +1400,110 @@ describe('Visit E2E Tests', () => {
 
       expect(response.body.data.updateVisit).toMatchObject({
         id: visitId,
-        status: 'IN_PROGRESS',
+        status: 'SCHEDULED',
       });
+    });
+
+    it('rejects generic writes to completion-owned status, times, and notes', async () => {
+      const visitId = fixtures.visits.scheduledVisit.id;
+      const response = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('admin'))
+        .send({
+          query: `
+            mutation UpdateVisit($input: UpdateVisitInput!) {
+              updateVisit(input: $input) { id }
+            }
+          `,
+          variables: {
+            input: {
+              id: visitId,
+              status: 'COMPLETED',
+              actualStart: '2024-02-01T09:01:00Z',
+              actualEnd: '2024-02-01T09:59:00Z',
+              notes: 'Unsafe generic completion overwrite.',
+            },
+          },
+        })
+        .expect(200);
+
+      expect(response.body.errors?.[0]?.extensions?.code).toBe(
+        'VALIDATION_FAILED',
+      );
+      await expect(
+        prisma.visit.findUniqueOrThrow({ where: { id: visitId } }),
+      ).resolves.toMatchObject({
+        status: 'SCHEDULED',
+        actual_start: null,
+        actual_end: null,
+      });
+    });
+
+    it('does not overwrite completion-owned fields when rescheduling races completion', async () => {
+      const visit = await prisma.visit.create({
+        data: {
+          organization_id: fixtures.organization.id,
+          carer_id: fixtures.carers.carer.id,
+          client_id: fixtures.clients.client.id,
+          scheduled_start: new Date('2024-03-01T09:00:00.000Z'),
+          scheduled_end: new Date('2024-03-01T10:00:00.000Z'),
+          actual_start: new Date('2024-03-01T09:02:00.000Z'),
+          status: 'IN_PROGRESS',
+          notes: 'Original completion evidence.',
+        },
+      });
+      const access: CanonicalAccessContext = {
+        authenticated: true as const,
+        identityProvider: 'cognito',
+        membershipId: fixtures.memberships.carerMembership.id,
+        surface: 'STAFF' as const,
+        effectiveRole: 'carer',
+        organizationId: fixtures.organization.id,
+        membershipState: 'ACTIVE',
+        onboardingState: 'READY',
+        rawRole: 'carer',
+        linkedIdentityState: 'LINKED',
+        domainIdentityId: fixtures.carers.carer.id,
+        authSubject: TEST_USERS.carer.sub,
+      };
+
+      const [scheduleResult, completionResult] = await Promise.allSettled([
+        visitService.updateVisit(
+          visit.id,
+          {
+            id: visit.id,
+            scheduledStart: '2024-03-01T15:00:00.000Z',
+            scheduledEnd: '2024-03-01T16:00:00.000Z',
+          },
+          TEST_USERS.admin.sub,
+          'admin',
+          fixtures.organization.id,
+        ),
+        visitService.completeVisit(
+          {
+            visitId: visit.id,
+            notes: 'Atomic completion note.',
+            actualEnd: '2024-03-01T09:55:00.000Z',
+          },
+          fixtures.carers.carer.id,
+          'carer',
+          fixtures.organization.id,
+          access,
+        ),
+      ]);
+
+      expect(completionResult.status).toBe('fulfilled');
+      expect(['fulfilled', 'rejected']).toContain(scheduleResult.status);
+      const persisted = await prisma.visit.findUniqueOrThrow({
+        where: { id: visit.id },
+      });
+      expect(persisted.status).toBe('COMPLETED');
+      expect(persisted.actual_end?.toISOString()).toBe(
+        '2024-03-01T09:55:00.000Z',
+      );
+      expect(persisted.notes).toBe(
+        'Original completion evidence.\nAtomic completion note.',
+      );
     });
 
     it('should prevent update if it creates overlap', async () => {

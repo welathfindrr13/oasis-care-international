@@ -25,6 +25,7 @@ import {
   type CanonicalCapabilityActor,
   hasCanonicalActorCapability,
 } from "../auth/access-capability";
+import { ACCESS_UNAVAILABLE_MESSAGE } from "../auth/access-context.service";
 
 @Injectable()
 export class VisitService {
@@ -117,6 +118,16 @@ export class VisitService {
   ): Promise<Visit> {
     const orgId = await this.requireOrganizationId(organizationId);
     const requestId = this.cls.get("requestId");
+    const unsafeFields = ["actualStart", "actualEnd", "status", "notes"].filter(
+      (field) => Object.prototype.hasOwnProperty.call(data, field),
+    );
+    if (unsafeFields.length > 0) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        "Visit oversight can only change scheduled start and end times",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     const visit = await this.visitRepository.findById(id, orgId);
 
     if (!visit) {
@@ -130,45 +141,54 @@ export class VisitService {
     // Check permissions
     this.checkVisitAccess(visit, userId, userRole, "update");
 
-    // If updating schedule, check for overlaps
-    if (data.scheduledStart || data.scheduledEnd) {
-      const scheduledStart = data.scheduledStart
-        ? new Date(data.scheduledStart)
-        : visit.scheduled_start;
-      const scheduledEnd = data.scheduledEnd
-        ? new Date(data.scheduledEnd)
-        : visit.scheduled_end;
-
-      const overlappingVisits =
-        await this.visitRepository.findOverlappingVisits(
-          visit.carer_id,
-          scheduledStart,
-          scheduledEnd,
-          orgId,
-          visit.id,
-        );
-
-      if (overlappingVisits.length > 0) {
-        throw new BaseHttpException(
-          ErrorCode.VISIT_OVERLAP,
-          "Carer already has a visit scheduled during this time period",
-          HttpStatus.CONFLICT,
-        );
-      }
+    const scheduledStart = data.scheduledStart
+      ? new Date(data.scheduledStart)
+      : null;
+    const scheduledEnd = data.scheduledEnd ? new Date(data.scheduledEnd) : null;
+    const effectiveStart = scheduledStart || visit.scheduled_start;
+    const effectiveEnd = scheduledEnd || visit.scheduled_end;
+    if (
+      Number.isNaN(effectiveStart.getTime()) ||
+      Number.isNaN(effectiveEnd.getTime()) ||
+      effectiveStart >= effectiveEnd
+    ) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        "Scheduled start must be before scheduled end",
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
-    const updateData: any = {};
-    if (data.scheduledStart)
-      updateData.scheduled_start = new Date(data.scheduledStart);
-    if (data.scheduledEnd)
-      updateData.scheduled_end = new Date(data.scheduledEnd);
-    if (data.actualStart) updateData.actual_start = new Date(data.actualStart);
-    if (data.actualEnd) updateData.actual_end = new Date(data.actualEnd);
-    if (data.status) updateData.status = data.status;
-    if (data.notes !== undefined) updateData.notes = data.notes;
-
-    this.logger.log(`Updating visit ${id}`, { requestId, updateData });
-    return this.visitRepository.update(id, updateData, orgId);
+    const result = await this.visitRepository.updateScheduleAtomically({
+      visitId: id,
+      organizationId: orgId,
+      expectedCarerId: visit.carer_id,
+      scheduledStart,
+      scheduledEnd,
+    });
+    if (result.status === "UPDATED") {
+      this.logger.log(`Updated visit schedule ${id}`, { requestId });
+      return result.visit;
+    }
+    if (result.status === "OVERLAP") {
+      throw new BaseHttpException(
+        ErrorCode.VISIT_OVERLAP,
+        "Carer already has a visit scheduled during this time period",
+        HttpStatus.CONFLICT,
+      );
+    }
+    if (result.status === "TERMINAL") {
+      throw new BaseHttpException(
+        ErrorCode.VISIT_COMPLETION_CONFLICT,
+        "Completed or cancelled visits cannot be rescheduled",
+        HttpStatus.CONFLICT,
+      );
+    }
+    throw new BaseHttpException(
+      ErrorCode.VISIT_NOT_FOUND,
+      "Visit not found",
+      HttpStatus.NOT_FOUND,
+    );
   }
 
   async findVisitById(
@@ -317,36 +337,48 @@ export class VisitService {
   ): Promise<Visit> {
     this.assertFrontlineExecution(accessContext, userId, userRole, organizationId);
     const orgId = await this.requireOrganizationId(organizationId);
-    const visit = await this.visitRepository.findById(visitId, orgId);
-    if (!visit) {
+    const membershipId = this.requireRuntimeMembership(accessContext);
+    const result = await this.visitRepository.startAtomically({
+      visitId,
+      organizationId: orgId,
+      expectedCarerId: userId,
+      actor: {
+        authSubject: accessContext!.authSubject,
+        membershipId,
+      },
+    });
+    if (result.status === "STARTED" || result.status === "IDEMPOTENT") {
+      return result.visit;
+    }
+    if (result.status === "NOT_FOUND") {
       throw new BaseHttpException(
         ErrorCode.VISIT_NOT_FOUND,
         "Visit not found",
         HttpStatus.NOT_FOUND,
       );
     }
-
-    this.checkVisitAccess(visit, userId, userRole, "update");
-
-    if (
-      visit.status === VisitStatus.CANCELLED ||
-      visit.status === VisitStatus.COMPLETED
-    ) {
+    if (result.status === "ACCESS_UNAVAILABLE") {
+      this.denyRuntimeAccess();
+    }
+    if (result.status === "FORBIDDEN") {
+      throw new BaseHttpException(
+        ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
+        "You can only access your own visits",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    if (result.status === "CONFLICT") {
       throw new BaseHttpException(
         ErrorCode.VALIDATION_FAILED,
         "Only scheduled or in-progress visits can be started",
         HttpStatus.BAD_REQUEST,
       );
     }
-
-    const updateData: any = {
-      status: VisitStatus.IN_PROGRESS,
-    };
-    if (!visit.actual_start) {
-      updateData.actual_start = new Date();
-    }
-
-    return this.visitRepository.update(visitId, updateData, orgId);
+    throw new BaseHttpException(
+      ErrorCode.INTERNAL_ERROR,
+      "Visit start returned an unexpected result",
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
   }
 
   async recordVisitTaskOutcome(
@@ -454,6 +486,7 @@ export class VisitService {
   ): Promise<Visit> {
     this.assertFrontlineExecution(accessContext, userId, userRole, organizationId);
     const orgId = await this.requireOrganizationId(organizationId);
+    const membershipId = this.requireRuntimeMembership(accessContext);
     const visitNote = this.toNonEmpty(input.notes);
     const requestedActualEnd = input.actualEnd
       ? new Date(input.actualEnd)
@@ -474,7 +507,7 @@ export class VisitService {
       actualEndWasProvided: Boolean(input.actualEnd),
       actor: {
         authSubject: accessContext!.authSubject,
-        membershipId: accessContext!.membershipId,
+        membershipId,
         role: accessContext!.rawRole || userRole,
       },
     });
@@ -495,6 +528,9 @@ export class VisitService {
         "You can only access your own visits",
         HttpStatus.FORBIDDEN,
       );
+    }
+    if (result.status === "ACCESS_UNAVAILABLE") {
+      this.denyRuntimeAccess();
     }
     if (result.status === "EVIDENCE_REQUIRED") {
       throw new BaseHttpException(
@@ -585,6 +621,22 @@ export class VisitService {
     throw new BaseHttpException(
       ErrorCode.FORBIDDEN_ROLE_REQUIRED,
       "Only the assigned Carer can record visit care",
+      HttpStatus.FORBIDDEN,
+    );
+  }
+
+  private requireRuntimeMembership(
+    accessContext: CanonicalCapabilityActor | undefined,
+  ): string {
+    const membershipId = accessContext?.membershipId?.trim();
+    if (!membershipId) this.denyRuntimeAccess();
+    return membershipId;
+  }
+
+  private denyRuntimeAccess(): never {
+    throw new BaseHttpException(
+      ErrorCode.FORBIDDEN,
+      ACCESS_UNAVAILABLE_MESSAGE,
       HttpStatus.FORBIDDEN,
     );
   }

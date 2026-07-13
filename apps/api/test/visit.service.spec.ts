@@ -21,6 +21,8 @@ describe("VisitService", () => {
     findById: jest.fn(),
     findMany: jest.fn(),
     update: jest.fn(),
+    updateScheduleAtomically: jest.fn(),
+    startAtomically: jest.fn(),
     completeAtomically: jest.fn(),
     delete: jest.fn(),
     findOverlappingVisits: jest.fn(),
@@ -230,15 +232,17 @@ describe("VisitService", () => {
       id: "visit-123",
       scheduledStart: "2024-01-01T10:00:00Z",
       scheduledEnd: "2024-01-01T11:00:00Z",
-      status: VisitStatus.IN_PROGRESS,
     };
 
-    it("should update a visit successfully", async () => {
+    it("should route only scheduling fields through the atomic repository path", async () => {
       mockVisitRepository.findById.mockResolvedValue(mockVisit);
-      mockVisitRepository.findOverlappingVisits.mockResolvedValue([]);
-      mockVisitRepository.update.mockResolvedValue({
-        ...mockVisit,
-        status: VisitStatus.IN_PROGRESS,
+      mockVisitRepository.updateScheduleAtomically.mockResolvedValue({
+        status: "UPDATED",
+        visit: {
+          ...mockVisit,
+          scheduled_start: new Date(updateVisitInput.scheduledStart),
+          scheduled_end: new Date(updateVisitInput.scheduledEnd),
+        },
       });
 
       const result = await service.updateVisit(
@@ -249,12 +253,60 @@ describe("VisitService", () => {
         organizationId,
       );
 
-      expect(repository.update).toHaveBeenCalledWith(
-        "visit-123",
-        expect.any(Object),
+      expect(repository.updateScheduleAtomically).toHaveBeenCalledWith({
+        visitId: "visit-123",
         organizationId,
+        expectedCarerId: "carer-123",
+        scheduledStart: new Date(updateVisitInput.scheduledStart),
+        scheduledEnd: new Date(updateVisitInput.scheduledEnd),
+      });
+      expect(repository.update).not.toHaveBeenCalled();
+      expect(result.scheduled_start).toEqual(
+        new Date(updateVisitInput.scheduledStart),
       );
-      expect(result.status).toBe(VisitStatus.IN_PROGRESS);
+    });
+
+    it.each(["status", "actualStart", "actualEnd", "notes"])(
+      "should reject direct generic updates to completion-owned %s",
+      async (field) => {
+        await expect(
+          service.updateVisit(
+            "visit-123",
+            {
+              id: "visit-123",
+              [field]: field === "status" ? VisitStatus.SCHEDULED : "unsafe",
+            } as any,
+            "user-123",
+            "admin",
+            organizationId,
+          ),
+        ).rejects.toMatchObject({
+          status: HttpStatus.BAD_REQUEST,
+          response: { code: ErrorCode.VALIDATION_FAILED },
+        });
+        expect(repository.findById).not.toHaveBeenCalled();
+        expect(repository.updateScheduleAtomically).not.toHaveBeenCalled();
+      },
+    );
+
+    it("should reject scheduling changes after a terminal transition wins", async () => {
+      mockVisitRepository.findById.mockResolvedValue(mockVisit);
+      mockVisitRepository.updateScheduleAtomically.mockResolvedValue({
+        status: "TERMINAL",
+      });
+
+      await expect(
+        service.updateVisit(
+          "visit-123",
+          updateVisitInput,
+          "user-123",
+          "admin",
+          organizationId,
+        ),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { code: ErrorCode.VISIT_COMPLETION_CONFLICT },
+      });
     });
 
     it("should throw BaseHttpException if visit not found", async () => {
@@ -523,11 +575,14 @@ describe("VisitService", () => {
 
   describe("startVisit", () => {
     it("should set status to IN_PROGRESS and set actual_start when missing", async () => {
-      mockVisitRepository.findById.mockResolvedValue(mockVisit);
-      mockVisitRepository.update.mockResolvedValue({
+      const started = {
         ...mockVisit,
         status: VisitStatus.IN_PROGRESS,
         actual_start: new Date("2024-01-01T09:02:00Z"),
+      };
+      mockVisitRepository.startAtomically.mockResolvedValue({
+        status: "STARTED",
+        visit: started,
       });
 
       const result = await service.startVisit(
@@ -538,15 +593,35 @@ describe("VisitService", () => {
         frontlineAccess,
       );
 
-      expect(repository.update).toHaveBeenCalledWith(
-        "visit-123",
-        expect.objectContaining({
-          status: VisitStatus.IN_PROGRESS,
-          actual_start: expect.any(Date),
-        }),
+      expect(repository.startAtomically).toHaveBeenCalledWith({
+        visitId: "visit-123",
         organizationId,
-      );
+        expectedCarerId: "carer-123",
+        actor: {
+          authSubject: "auth-carer-123",
+          membershipId: "membership-carer-123",
+        },
+      });
       expect(result.status).toBe(VisitStatus.IN_PROGRESS);
+    });
+
+    it("should reject a terminal state reported by the atomic start", async () => {
+      mockVisitRepository.startAtomically.mockResolvedValue({
+        status: "CONFLICT",
+      });
+
+      await expect(
+        service.startVisit(
+          "visit-123",
+          "carer-123",
+          "carer",
+          organizationId,
+          frontlineAccess,
+        ),
+      ).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        response: { code: ErrorCode.VALIDATION_FAILED },
+      });
     });
 
     it("should deny family role from starting a visit", async () => {

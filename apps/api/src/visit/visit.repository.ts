@@ -17,7 +17,13 @@ export type CompleteVisitConflictReason =
 
 export type CompleteVisitAtomicResult =
   | { status: "COMPLETED" | "IDEMPOTENT"; visit: Visit }
-  | { status: "NOT_FOUND" | "FORBIDDEN" | "EVIDENCE_REQUIRED" }
+  | {
+      status:
+        | "NOT_FOUND"
+        | "FORBIDDEN"
+        | "ACCESS_UNAVAILABLE"
+        | "EVIDENCE_REQUIRED";
+    }
   | { status: "CONFLICT"; reason: CompleteVisitConflictReason };
 
 export type CompleteVisitAtomicInput = {
@@ -29,10 +35,20 @@ export type CompleteVisitAtomicInput = {
   actualEndWasProvided: boolean;
   actor: {
     authSubject: string;
-    membershipId: string | null;
+    membershipId: string;
     role: string;
   };
 };
+
+export type StartVisitAtomicResult =
+  | { status: "STARTED" | "IDEMPOTENT"; visit: Visit }
+  | {
+      status: "NOT_FOUND" | "FORBIDDEN" | "ACCESS_UNAVAILABLE" | "CONFLICT";
+    };
+
+export type UpdateVisitScheduleAtomicResult =
+  | { status: "UPDATED"; visit: Visit }
+  | { status: "NOT_FOUND" | "OVERLAP" | "TERMINAL" };
 
 @Injectable()
 export class VisitRepository {
@@ -191,28 +207,60 @@ export class VisitRepository {
     return this.findById(id, organizationId) as Promise<Visit>;
   }
 
-  async completeAtomically(
-    input: CompleteVisitAtomicInput,
-  ): Promise<CompleteVisitAtomicResult> {
+  async updateScheduleAtomically(input: {
+    visitId: string;
+    organizationId: string;
+    expectedCarerId: string;
+    scheduledStart: Date | null;
+    scheduledEnd: Date | null;
+  }): Promise<UpdateVisitScheduleAtomicResult> {
     return (this.prisma as any).$transaction(
       async (tx: Prisma.TransactionClient) => {
-        const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
-          SELECT id
-          FROM visit
-          WHERE id = ${input.visitId}
-            AND organization_id = ${input.organizationId}
-            AND deleted_at IS NULL
-          FOR UPDATE
-        `;
-        if (lockedRows.length === 0) {
+        await this.lockCarerLifecycle(
+          tx,
+          input.organizationId,
+          input.expectedCarerId,
+        );
+        const visit = await this.lockVisit(
+          tx,
+          input.visitId,
+          input.organizationId,
+        );
+        if (!visit || visit.carer_id !== input.expectedCarerId) {
           return { status: "NOT_FOUND" } as const;
         }
+        if (
+          visit.status === VisitStatus.COMPLETED ||
+          visit.status === VisitStatus.CANCELLED
+        ) {
+          return { status: "TERMINAL" } as const;
+        }
 
-        const visit = await tx.visit.findFirst({
+        const scheduledStart = input.scheduledStart || visit.scheduled_start;
+        const scheduledEnd = input.scheduledEnd || visit.scheduled_end;
+        const overlap = await tx.visit.findFirst({
           where: {
-            id: input.visitId,
             organization_id: input.organizationId,
+            carer_id: visit.carer_id,
+            id: { not: visit.id },
             deleted_at: null,
+            status: { not: VisitStatus.CANCELLED },
+            scheduled_start: { lt: scheduledEnd },
+            scheduled_end: { gt: scheduledStart },
+          },
+          select: { id: true },
+        });
+        if (overlap) return { status: "OVERLAP" } as const;
+
+        const updated = await tx.visit.update({
+          where: { id: visit.id },
+          data: {
+            ...(input.scheduledStart
+              ? { scheduled_start: input.scheduledStart }
+              : {}),
+            ...(input.scheduledEnd
+              ? { scheduled_end: input.scheduledEnd }
+              : {}),
           },
           include: {
             carer: true,
@@ -220,9 +268,84 @@ export class VisitRepository {
             tasks: { where: { deleted_at: null } },
           },
         });
-        if (!visit) {
-          return { status: "NOT_FOUND" } as const;
+        return { status: "UPDATED", visit: updated } as const;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+    );
+  }
+
+  async startAtomically(input: {
+    visitId: string;
+    organizationId: string;
+    expectedCarerId: string;
+    actor: { authSubject: string; membershipId: string };
+  }): Promise<StartVisitAtomicResult> {
+    return (this.prisma as any).$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const active = await this.lockAndValidateCarerAccess(tx, {
+          organizationId: input.organizationId,
+          carerId: input.expectedCarerId,
+          membershipId: input.actor.membershipId,
+          authSubject: input.actor.authSubject,
+        });
+        if (!active) return { status: "ACCESS_UNAVAILABLE" } as const;
+
+        const visit = await this.lockVisit(
+          tx,
+          input.visitId,
+          input.organizationId,
+        );
+        if (!visit) return { status: "NOT_FOUND" } as const;
+        if (visit.carer_id !== input.expectedCarerId) {
+          return { status: "FORBIDDEN" } as const;
         }
+        if (
+          visit.status === VisitStatus.COMPLETED ||
+          visit.status === VisitStatus.CANCELLED
+        ) {
+          return { status: "CONFLICT" } as const;
+        }
+        if (visit.status === VisitStatus.IN_PROGRESS) {
+          return { status: "IDEMPOTENT", visit } as const;
+        }
+
+        const updated = await tx.visit.update({
+          where: { id: visit.id },
+          data: {
+            status: VisitStatus.IN_PROGRESS,
+            actual_start: visit.actual_start || new Date(),
+          },
+          include: {
+            carer: true,
+            client: true,
+            tasks: { where: { deleted_at: null } },
+          },
+        });
+        return { status: "STARTED", visit: updated } as const;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+    );
+  }
+
+  async completeAtomically(
+    input: CompleteVisitAtomicInput,
+  ): Promise<CompleteVisitAtomicResult> {
+    return (this.prisma as any).$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const active = await this.lockAndValidateCarerAccess(tx, {
+          organizationId: input.organizationId,
+          carerId: input.expectedCarerId,
+          membershipId: input.actor.membershipId,
+          authSubject: input.actor.authSubject,
+        });
+        if (!active) return { status: "ACCESS_UNAVAILABLE" } as const;
+
+        const visit = await this.lockVisit(
+          tx,
+          input.visitId,
+          input.organizationId,
+        );
+        if (!visit) return { status: "NOT_FOUND" } as const;
         if (visit.carer_id !== input.expectedCarerId) {
           return { status: "FORBIDDEN" } as const;
         }
@@ -253,13 +376,11 @@ export class VisitRepository {
                   input.requestedActualEnd.getTime()));
           const noteMatches = Boolean(
             completionMetadata &&
-              completionMetadata.notesAppended ===
-                Boolean(input.completionNote) &&
-              (!completionMetadata.notesAppended ||
-                this.completionNoteAlreadyPresent(
-                  visit.notes,
-                  input.completionNote,
-                )),
+              this.completionNoteMatchesAudit(
+                visit.notes,
+                input.completionNote,
+                completionMetadata,
+              ),
           );
           if (!actualEndMatches || !noteMatches) {
             return {
@@ -275,6 +396,8 @@ export class VisitRepository {
             previousActualEnd: visit.actual_end,
             effectiveActualEnd: visit.actual_end,
             notesAppended: false,
+            previousNotesLength: completionMetadata.previousNotesLength,
+            completionNoteLength: completionMetadata.completionNoteLength,
           });
           return { status: "IDEMPOTENT", visit } as const;
         }
@@ -350,6 +473,8 @@ export class VisitRepository {
           previousActualEnd: visit.actual_end,
           effectiveActualEnd,
           notesAppended: Boolean(input.completionNote),
+          previousNotesLength: (visit.notes || "").length,
+          completionNoteLength: (input.completionNote || "").length,
           timestamp: recordedAt,
         });
 
@@ -545,6 +670,79 @@ export class VisitRepository {
     return `carer-identity:${organizationId}:${carerId}`;
   }
 
+  private membershipLockKey(membershipId: string): string {
+    return `carer-membership:${membershipId}`;
+  }
+
+  private async lockCarerLifecycle(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    carerId: string,
+  ): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${this.carerIdentityLockKey(organizationId, carerId)}, 0))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${this.assignmentLockKey(organizationId, carerId)}, 0))`;
+  }
+
+  private async lockAndValidateCarerAccess(
+    tx: Prisma.TransactionClient,
+    input: {
+      organizationId: string;
+      carerId: string;
+      membershipId: string;
+      authSubject: string;
+    },
+  ): Promise<boolean> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${this.membershipLockKey(input.membershipId)}, 0))`;
+    await this.lockCarerLifecycle(tx, input.organizationId, input.carerId);
+    const membership = await tx.organizationMembership.findFirst({
+      where: {
+        id: input.membershipId,
+        organization_id: input.organizationId,
+        identity_provider: this.identityProvider(),
+        auth_subject: input.authSubject,
+        carer_id: input.carerId,
+        role: { in: ["carer", "staff"] },
+        status: "ACTIVE",
+        revoked_at: null,
+        carer: {
+          organization_id: input.organizationId,
+          is_active: true,
+          deleted_at: null,
+        },
+      } as any,
+      select: { id: true },
+    });
+    return Boolean(membership);
+  }
+
+  private async lockVisit(
+    tx: Prisma.TransactionClient,
+    visitId: string,
+    organizationId: string,
+  ) {
+    const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM visit
+      WHERE id = ${visitId}
+        AND organization_id = ${organizationId}
+        AND deleted_at IS NULL
+      FOR UPDATE
+    `;
+    if (lockedRows.length === 0) return null;
+    return tx.visit.findFirst({
+      where: {
+        id: visitId,
+        organization_id: organizationId,
+        deleted_at: null,
+      },
+      include: {
+        carer: true,
+        client: true,
+        tasks: { where: { deleted_at: null } },
+      },
+    });
+  }
+
   private nonEmpty(value: string | null | undefined): string | null {
     const normalized = (value || "").trim();
     return normalized || null;
@@ -557,21 +755,11 @@ export class VisitRepository {
     return current ? `${current}\n${completionNote}` : completionNote;
   }
 
-  private completionNoteAlreadyPresent(
-    current: string | null,
-    completionNote: string | null,
-  ): boolean {
-    if (!completionNote) return true;
-    const normalized = this.nonEmpty(current);
-    return Boolean(
-      normalized === completionNote ||
-        normalized?.endsWith(`\n${completionNote}`),
-    );
-  }
-
   private completionMetadata(value: Prisma.JsonValue | null | undefined): {
     actualEndWasProvided: boolean;
     notesAppended: boolean;
+    previousNotesLength: number;
+    completionNoteLength: number;
   } | null {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return null;
@@ -579,14 +767,52 @@ export class VisitRepository {
     const metadata = value as Prisma.JsonObject;
     if (
       typeof metadata.actualEndWasProvided !== "boolean" ||
-      typeof metadata.notesAppended !== "boolean"
+      typeof metadata.notesAppended !== "boolean" ||
+      typeof metadata.previousNotesLength !== "number" ||
+      typeof metadata.completionNoteLength !== "number" ||
+      !Number.isSafeInteger(metadata.previousNotesLength) ||
+      !Number.isSafeInteger(metadata.completionNoteLength) ||
+      metadata.previousNotesLength < 0 ||
+      metadata.completionNoteLength < 0 ||
+      metadata.notesAppended !== (metadata.completionNoteLength > 0)
     ) {
       return null;
     }
     return {
       actualEndWasProvided: metadata.actualEndWasProvided,
       notesAppended: metadata.notesAppended,
+      previousNotesLength: metadata.previousNotesLength,
+      completionNoteLength: metadata.completionNoteLength,
     };
+  }
+
+  private completionNoteMatchesAudit(
+    currentNotes: string | null,
+    completionNote: string | null,
+    metadata: {
+      notesAppended: boolean;
+      previousNotesLength: number;
+      completionNoteLength: number;
+    },
+  ): boolean {
+    const current = currentNotes || "";
+    const requested = completionNote || "";
+    if (
+      metadata.notesAppended !== Boolean(completionNote) ||
+      metadata.completionNoteLength !== requested.length
+    ) {
+      return false;
+    }
+    if (!metadata.notesAppended) {
+      return current.length === metadata.previousNotesLength;
+    }
+    const separatorLength = metadata.previousNotesLength > 0 ? 1 : 0;
+    const noteStart = metadata.previousNotesLength + separatorLength;
+    return (
+      current.length === noteStart + metadata.completionNoteLength &&
+      current.slice(noteStart) === requested &&
+      (separatorLength === 0 || current[metadata.previousNotesLength] === "\n")
+    );
   }
 
   private async createCompletionAudit(
@@ -598,6 +824,8 @@ export class VisitRepository {
       previousActualEnd: Date | null;
       effectiveActualEnd: Date | null;
       notesAppended: boolean;
+      previousNotesLength: number;
+      completionNoteLength: number;
       timestamp?: Date;
     },
   ): Promise<void> {
@@ -619,6 +847,8 @@ export class VisitRepository {
           actorRole: options.input.actor.role,
           notesAppended: options.notesAppended,
           actualEndWasProvided: options.input.actualEndWasProvided,
+          previousNotesLength: options.previousNotesLength,
+          completionNoteLength: options.completionNoteLength,
         },
         timestamp: options.timestamp || new Date(),
       },
