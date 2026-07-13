@@ -92,6 +92,7 @@ jobs:
 
           test -f scripts/release/tenant-nullability-dry-run.mjs
           MIGRATION_GATE_APPROVED=""
+          MIGRATION_GATE_STATE=""
 
           validate_tenant_report() {
             local report_file="$1"
@@ -103,6 +104,8 @@ jobs:
             local malformed_count_line=0
             local saw_header=0
             local saw_no_data_changed=0
+            local saw_applied_migration=0
+            local saw_not_null_schema=0
 
             if [ ! -s "$report_file" ]; then
               printf 'Tenant nullability dry-run diagnostic class: empty report output.\n' >&2
@@ -131,6 +134,16 @@ jobs:
                   ;;
                 "No data changed.")
                   saw_no_data_changed=1
+                  sanitized_report="${sanitized_report}${line}"$'\n'
+                  sanitized_report_lines=$((sanitized_report_lines + 1))
+                  ;;
+                "TARGET_MIGRATION_APPLIED_CONFIRMED: 20260707090000_tenant_organization_not_null")
+                  saw_applied_migration=1
+                  sanitized_report="${sanitized_report}${line}"$'\n'
+                  sanitized_report_lines=$((sanitized_report_lines + 1))
+                  ;;
+                "TENANT_NOT_NULL_SCHEMA_CONFIRMED: 11")
+                  saw_not_null_schema=1
                   sanitized_report="${sanitized_report}${line}"$'\n'
                   sanitized_report_lines=$((sanitized_report_lines + 1))
                   ;;
@@ -169,6 +182,16 @@ jobs:
             if [ "$saw_no_data_changed" -ne 1 ]; then
               printf 'Tenant nullability dry-run diagnostic class: report missing completion marker.\n' >&2
               printf 'Tenant nullability dry-run failed before report generation.\n' >&2
+              return 1
+            fi
+
+            if [ "$phase" = "post" ] && { [ "$saw_applied_migration" -ne 1 ] || [ "$saw_not_null_schema" -ne 1 ]; }; then
+              printf 'Tenant migration applied proof incomplete.\n' >&2
+              return 1
+            fi
+
+            if [ "$phase" != "post" ] && { [ "$saw_applied_migration" -ne 0 ] || [ "$saw_not_null_schema" -ne 0 ]; }; then
+              printf 'Tenant migration applied proof appeared before post-check.\n' >&2
               return 1
             fi
 
@@ -215,9 +238,11 @@ jobs:
             ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" "chmod 0444 '$remote_script_dir/tenant-nullability-dry-run.mjs'; chmod 0555 '$remote_script_dir'" 2>> "$diagnostic_file"
 
             set +e
-            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- "$remote_script_dir" <<'REMOTE' > "$report_file" 2>> "$diagnostic_file"
+            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- "$remote_script_dir" "$phase" "$MIGRATION_NAME" <<'REMOTE' > "$report_file" 2>> "$diagnostic_file"
           set -euo pipefail
           remote_script_dir="$1"
+          phase="$2"
+          MIGRATION_NAME="$3"
           cd /opt/oasis-care
           remote_tmp="$(mktemp -d)"
           trap 'rm -rf "$remote_tmp"' EXIT
@@ -238,6 +263,8 @@ jobs:
           set +e
           docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml exec -T api sh -lc '
               set -u
+              phase="$1"
+              MIGRATION_NAME="$2"
               container_work_dir="$(mktemp -d /tmp/tenant-nullability-work.XXXXXX)" || exit 1
               mkdir -p "$container_work_dir/scripts/release" || { rm -rf "$container_work_dir"; exit 1; }
               ln -s /app/libs "$container_work_dir/libs" || { rm -rf "$container_work_dir"; exit 1; }
@@ -246,7 +273,11 @@ jobs:
               chmod 0444 "$container_script_file" || { rm -rf "$container_work_dir"; exit 1; }
               container_report_file="$(mktemp /tmp/tenant-nullability-report.XXXXXX)" || { rm -rf "$container_work_dir"; exit 1; }
               set +e
-              node "$container_script_file" --fail-on-null --exclude AuditLog > "$container_report_file"
+              if [ "$phase" = "post" ]; then
+                node "$container_script_file" --fail-on-null --exclude AuditLog --prove-applied-migration "$MIGRATION_NAME" > "$container_report_file"
+              else
+                node "$container_script_file" --fail-on-null --exclude AuditLog > "$container_report_file"
+              fi
               node_status="$?"
               set -e
               rm -rf "$container_work_dir"
@@ -255,7 +286,7 @@ jobs:
               fi
               rm -f "$container_report_file"
               exit "$node_status"
-            ' < "$remote_script_dir/tenant-nullability-dry-run.mjs" > "$remote_tmp/report.out" 2> "$remote_tmp/transport.err"
+            ' sh "$phase" "$MIGRATION_NAME" < "$remote_script_dir/tenant-nullability-dry-run.mjs" > "$remote_tmp/report.out" 2> "$remote_tmp/transport.err"
           status=$?
           set -e
           if [ -s "$remote_tmp/report.out" ]; then
@@ -364,6 +395,7 @@ jobs:
             local proof_file
             local diagnostic_file
             MIGRATION_GATE_APPROVED=""
+            MIGRATION_GATE_STATE=""
             proof_file="$(mktemp)"
             diagnostic_file="$(mktemp)"
             trap 'rm -f "$proof_file" "$diagnostic_file"; trap - RETURN' RETURN
@@ -402,7 +434,7 @@ jobs:
               printf "PENDING_MIGRATION_NPX_UNAVAILABLE\n"
               exit 1
             fi
-            if ! npx --no-install prisma --version >/dev/null 2>&1; then
+            if ! NO_UPDATE_NOTIFIER=1 PRISMA_HIDE_UPDATE_MESSAGE=true npx --no-install prisma --version >/dev/null 2>&1; then
               printf "PRISMA_CLI_UNAVAILABLE\n"
               printf "PENDING_MIGRATION_PRISMA_UNAVAILABLE\n"
               exit 1
@@ -410,7 +442,7 @@ jobs:
             printf "PRISMA_CLI_AVAILABLE\n"
             status_file="$(mktemp /tmp/production-migration-status.XXXXXX)"
             set +e
-            npx prisma migrate status --schema prisma/schema.prisma > "$status_file" 2>&1
+            NO_UPDATE_NOTIFIER=1 PRISMA_HIDE_UPDATE_MESSAGE=true npx prisma migrate status --schema prisma/schema.prisma > "$status_file" 2>&1
             status="$?"
             set -e
             if [ ! -s "$status_file" ]; then
@@ -507,7 +539,7 @@ jobs:
 
           if grep -qx 'PRISMA_MIGRATION_STATUS_UP_TO_DATE' "$remote_tmp/pending.out" && [ "$pending_count" -eq 0 ]; then
             printf 'PENDING_MIGRATION_SET_ZERO\n'
-            exit 1
+            exit 0
           fi
 
           if [ "$pending_count" -eq 1 ] && [ "$pending_name" = "$MIGRATION_NAME" ]; then
@@ -534,11 +566,18 @@ jobs:
             if grep -Eq '^PENDING_MIGRATION_SET_EXACT: 20260707090000_tenant_organization_not_null$' "$proof_file"; then
               printf 'PENDING_MIGRATION_SET_EXACT: %s\n' "$MIGRATION_NAME"
               MIGRATION_GATE_APPROVED="20260707090000_tenant_organization_not_null"
+              MIGRATION_GATE_STATE="pending"
               return 0
             fi
 
-            if grep -Eq '^PENDING_MIGRATION_(COMMAND_UNAVAILABLE|NPX_UNAVAILABLE|PRISMA_UNAVAILABLE|WORKDIR_INVALID|SCHEMA_MISSING|DIR_MISSING|FILE_NOT_VISIBLE|STATUS_EMPTY|STATUS_NONZERO_NO_PARSE|STATUS_UNSAFE|STATUS_UNPARSEABLE|HISTORY_DIVERGED|SET_ZERO|SET_MULTIPLE|SET_UNKNOWN|SET_UNSAFE)$' "$proof_file"; then
-              grep -E '^PENDING_MIGRATION_(COMMAND_UNAVAILABLE|NPX_UNAVAILABLE|PRISMA_UNAVAILABLE|WORKDIR_INVALID|SCHEMA_MISSING|DIR_MISSING|FILE_NOT_VISIBLE|STATUS_EMPTY|STATUS_NONZERO_NO_PARSE|STATUS_UNSAFE|STATUS_UNPARSEABLE|HISTORY_DIVERGED|SET_ZERO|SET_MULTIPLE|SET_UNKNOWN|SET_UNSAFE)$' "$proof_file" >&2
+            if grep -qx 'PENDING_MIGRATION_SET_ZERO' "$proof_file" && [ "$status" -eq 0 ]; then
+              printf 'MIGRATION_ALREADY_APPLIED_CANDIDATE: %s\n' "$MIGRATION_NAME"
+              MIGRATION_GATE_STATE="already_applied"
+              return 0
+            fi
+
+            if grep -Eq '^PENDING_MIGRATION_(COMMAND_UNAVAILABLE|NPX_UNAVAILABLE|PRISMA_UNAVAILABLE|WORKDIR_INVALID|SCHEMA_MISSING|DIR_MISSING|FILE_NOT_VISIBLE|STATUS_EMPTY|STATUS_NONZERO_NO_PARSE|STATUS_UNSAFE|STATUS_UNPARSEABLE|HISTORY_DIVERGED|SET_MULTIPLE|SET_UNKNOWN|SET_UNSAFE)$' "$proof_file"; then
+              grep -E '^PENDING_MIGRATION_(COMMAND_UNAVAILABLE|NPX_UNAVAILABLE|PRISMA_UNAVAILABLE|WORKDIR_INVALID|SCHEMA_MISSING|DIR_MISSING|FILE_NOT_VISIBLE|STATUS_EMPTY|STATUS_NONZERO_NO_PARSE|STATUS_UNSAFE|STATUS_UNPARSEABLE|HISTORY_DIVERGED|SET_MULTIPLE|SET_UNKNOWN|SET_UNSAFE)$' "$proof_file" >&2
               return 1
             fi
 
@@ -576,7 +615,7 @@ jobs:
             cd /app/libs/db
             deploy_file="$(mktemp /tmp/production-migration-deploy.XXXXXX)"
             set +e
-            npx prisma migrate deploy --schema prisma/schema.prisma > "$deploy_file" 2>&1
+            NO_UPDATE_NOTIFIER=1 PRISMA_HIDE_UPDATE_MESSAGE=true npx prisma migrate deploy --schema prisma/schema.prisma > "$deploy_file" 2>&1
             status="$?"
             set -e
             rm -f "$deploy_file"
@@ -620,7 +659,7 @@ jobs:
             cd /app/libs/db
             status_file="$(mktemp /tmp/production-migration-status.XXXXXX)"
             set +e
-            npx prisma migrate status --schema prisma/schema.prisma > "$status_file" 2>&1
+            NO_UPDATE_NOTIFIER=1 PRISMA_HIDE_UPDATE_MESSAGE=true npx prisma migrate status --schema prisma/schema.prisma > "$status_file" 2>&1
             status="$?"
             set -e
             if [ "$status" -eq 0 ]; then
@@ -653,6 +692,13 @@ jobs:
           run_remote_gate
           run_tenant_dry_run pre
           prove_pending_migration_set
-          run_single_migration
-          prove_migration_applied
+          if [ "$MIGRATION_GATE_STATE" = "pending" ]; then
+            run_single_migration
+            prove_migration_applied
+          elif [ "$MIGRATION_GATE_STATE" = "already_applied" ]; then
+            printf 'MIGRATION_PRODUCTION_SKIPPED_ALREADY_APPLIED: %s\n' "$MIGRATION_NAME"
+          else
+            printf 'MIGRATION_GATE_STATE_UNKNOWN\n' >&2
+            exit 1
+          fi
           run_tenant_dry_run post

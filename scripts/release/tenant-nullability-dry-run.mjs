@@ -15,6 +15,13 @@ export const SENSITIVE_TENANT_TABLES = Object.freeze([
   { model: 'ErasureQueue', table: 'erasure_queue', delegate: 'erasureQueue' },
 ]);
 
+export const TENANT_NOT_NULL_MIGRATION =
+  '20260707090000_tenant_organization_not_null';
+
+export const TENANT_NOT_NULL_TABLES = Object.freeze(
+  SENSITIVE_TENANT_TABLES.filter((table) => table.model !== 'AuditLog'),
+);
+
 export function formatTenantNullabilityReport(results, { excludedModels = [] } = {}) {
   const lines = ['Tenant nullability dry-run'];
   if (excludedModels.length > 0) {
@@ -29,6 +36,7 @@ export function formatTenantNullabilityReport(results, { excludedModels = [] } =
 
 export function parseTenantNullabilityArgs(argv) {
   const excludeModels = [];
+  let proveAppliedMigration;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -44,12 +52,32 @@ export function parseTenantNullabilityArgs(argv) {
 
     if (arg.startsWith('--exclude=')) {
       excludeModels.push(...parseModelList(arg.slice('--exclude='.length)));
+      continue;
+    }
+
+    if (arg === '--prove-applied-migration') {
+      const value = argv[index + 1];
+      if (!value || value.startsWith('--')) {
+        throw new Error('Missing value for --prove-applied-migration');
+      }
+      proveAppliedMigration = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--prove-applied-migration=')) {
+      const value = arg.slice('--prove-applied-migration='.length);
+      if (!value) {
+        throw new Error('Missing value for --prove-applied-migration');
+      }
+      proveAppliedMigration = value;
     }
   }
 
   return {
     failOnNull: argv.includes('--fail-on-null'),
     excludeModels,
+    proveAppliedMigration,
   };
 }
 
@@ -107,10 +135,57 @@ export async function collectTenantNullabilityCounts(prisma, { tables = SENSITIV
   return results;
 }
 
+export function tenantMigrationAppliedSql() {
+  return `SELECT COUNT(*)::int AS count FROM "_prisma_migrations" WHERE migration_name = $1 AND finished_at IS NOT NULL AND rolled_back_at IS NULL`;
+}
+
+export function tenantNotNullSchemaSql() {
+  const tables = TENANT_NOT_NULL_TABLES.map((table) => `'${table.table}'`).join(', ');
+  return `SELECT table_name, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'organization_id' AND table_name IN (${tables}) ORDER BY table_name`;
+}
+
+export async function proveTenantNotNullMigrationApplied(prisma, migrationName) {
+  if (migrationName !== TENANT_NOT_NULL_MIGRATION) {
+    throw new Error('Unsupported tenant NOT NULL migration proof');
+  }
+  if (!prisma || typeof prisma.$queryRawUnsafe !== 'function') {
+    throw new Error('Prisma raw query client missing for tenant migration proof');
+  }
+
+  const migrationRows = await prisma.$queryRawUnsafe(
+    tenantMigrationAppliedSql(),
+    migrationName,
+  );
+  const appliedCount = Number(migrationRows?.[0]?.count ?? 0);
+  if (appliedCount !== 1) {
+    throw new Error('Target tenant migration is not applied exactly once');
+  }
+
+  const columnRows = await prisma.$queryRawUnsafe(tenantNotNullSchemaSql());
+  const expectedTables = new Set(TENANT_NOT_NULL_TABLES.map((table) => table.table));
+  const confirmedTables = new Set();
+
+  for (const row of columnRows ?? []) {
+    const tableName = String(row?.table_name ?? '');
+    const isNullable = String(row?.is_nullable ?? '');
+    if (!expectedTables.has(tableName) || isNullable !== 'NO') {
+      throw new Error('Tenant NOT NULL schema proof mismatch');
+    }
+    confirmedTables.add(tableName);
+  }
+
+  if (confirmedTables.size !== expectedTables.size) {
+    throw new Error('Tenant NOT NULL schema proof incomplete');
+  }
+
+  return { migrationName, tableCount: confirmedTables.size };
+}
+
 export async function runTenantNullabilityDryRun({
   prisma,
   failOnNull = false,
   excludeModels = [],
+  proveAppliedMigration,
   tables: selectedTables,
   log = console.log,
 } = {}) {
@@ -132,6 +207,15 @@ export async function runTenantNullabilityDryRun({
     if (failOnNull && nullTenantTables.length > 0) {
       return 1;
     }
+
+    if (proveAppliedMigration) {
+      const proof = await proveTenantNotNullMigrationApplied(
+        client,
+        proveAppliedMigration,
+      );
+      log(`TARGET_MIGRATION_APPLIED_CONFIRMED: ${proof.migrationName}`);
+      log(`TENANT_NOT_NULL_SCHEMA_CONFIRMED: ${proof.tableCount}`);
+    }
     return 0;
   } finally {
     if (shouldDisconnect && typeof client.$disconnect === 'function') {
@@ -142,9 +226,14 @@ export async function runTenantNullabilityDryRun({
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   try {
-    const { failOnNull, excludeModels } = parseTenantNullabilityArgs(process.argv.slice(2));
+    const { failOnNull, excludeModels, proveAppliedMigration } =
+      parseTenantNullabilityArgs(process.argv.slice(2));
 
-    runTenantNullabilityDryRun({ failOnNull, excludeModels })
+    runTenantNullabilityDryRun({
+      failOnNull,
+      excludeModels,
+      proveAppliedMigration,
+    })
       .then((exitCode) => {
         process.exitCode = exitCode;
       })
