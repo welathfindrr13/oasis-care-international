@@ -1,6 +1,7 @@
 import { GraphQLError } from 'graphql';
 import { ErrorCode } from '../errors/error-codes';
 import { formatGraphQLError } from './graphql-error.filter';
+import { GRAPHQL_OPERATION_REJECTED } from '../../security/graphql-operation-guards';
 
 describe('formatGraphQLError', () => {
   it('replaces unknown exception details with a fixed internal error', () => {
@@ -40,5 +41,39 @@ describe('formatGraphQLError', () => {
 
     expect(formatted.message).toBe('Forbidden for p***@example.test');
     expect(formatted.extensions.code).toBe('FORBIDDEN');
+  });
+
+  it('maps native parser token-limit errors to a stable redacted response', () => {
+    const parserError = new GraphQLError(
+      'Document contains more that 2000 tokens. Parsing aborted.',
+    );
+    const apolloError = new GraphQLError(parserError.message, {
+      originalError: parserError,
+      extensions: { code: 'GRAPHQL_PARSE_FAILED' },
+    });
+
+    const formatted = formatGraphQLError(apolloError, apolloError);
+
+    expect(formatted.message).toBe('GraphQL operation rejected');
+    expect(formatted.extensions).toEqual({
+      code: GRAPHQL_OPERATION_REJECTED,
+    });
+    expect(JSON.stringify(formatted)).not.toContain('2000');
+    expect(JSON.stringify(formatted)).not.toContain('Parsing aborted');
+  });
+
+  it('does not classify a token-shaped BAD_USER_INPUT message as a parser limit', () => {
+    const message = 'Document contains more than 2000 tokens. Parsing aborted.';
+    const formatted = formatGraphQLError(
+      new GraphQLError(message, {
+        extensions: { code: 'BAD_USER_INPUT' },
+      }),
+    );
+
+    expect(formatted.message).toBe(message);
+    expect(formatted.extensions).toEqual({
+      code: 'BAD_USER_INPUT',
+      originalError: undefined,
+    });
   });
 });

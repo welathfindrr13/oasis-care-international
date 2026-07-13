@@ -60,14 +60,19 @@ class HardeningTestModule {}
 
 describe('API hardening', () => {
   it('disables GraphQL introspection only in production', () => {
-    expect(getGraphQLSecurityOptions('production')).toEqual({
+    expect(getGraphQLSecurityOptions('production')).toMatchObject({
       introspection: false,
       playground: false,
+      parseOptions: { maxTokens: 2_000 },
     });
-    expect(getGraphQLSecurityOptions('test')).toEqual({
+    expect(getGraphQLSecurityOptions('test')).toMatchObject({
       introspection: true,
       playground: true,
+      parseOptions: { maxTokens: 2_000 },
     });
+    expect(
+      getGraphQLSecurityOptions('production').validationRules,
+    ).toHaveLength(1);
   });
 
   it('enables Helmet headers and disables x-powered-by', async () => {

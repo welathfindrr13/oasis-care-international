@@ -9,6 +9,11 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import {
+  createGraphQLOperationGuardPlugin,
+  createGraphQLOperationGuardRule,
+  GRAPHQL_OPERATION_LIMITS,
+} from './graphql-operation-guards';
 
 interface RateLimitConfig {
   windowMs: number;
@@ -48,6 +53,11 @@ export function getGraphQLSecurityOptions(nodeEnv = process.env.NODE_ENV) {
   return {
     introspection: enabled,
     playground: enabled,
+    parseOptions: {
+      maxTokens: GRAPHQL_OPERATION_LIMITS.maxTokens,
+    },
+    validationRules: [createGraphQLOperationGuardRule()],
+    plugins: [createGraphQLOperationGuardPlugin()],
   };
 }
 
