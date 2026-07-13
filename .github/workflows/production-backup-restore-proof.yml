@@ -312,7 +312,7 @@ jobs:
             BACKUP_ENCRYPTION_KEY_FILE="$key_file" \
             CRYPTO_HELPER="$helper_dir/backup-crypto.mjs" \
             NODE_BINARY=node \
-            "$helper_dir/backup-postgres.sh" >"$backup_output" 2>"$backup_diagnostic"
+            "$helper_dir/backup-postgres.sh" </dev/null >"$backup_output" 2>"$backup_diagnostic"
           backup_status=$?
           set -e
           [ "$backup_status" -eq 0 ] || fail PRODUCTION_BACKUP_CREATION_FAILED
@@ -329,7 +329,7 @@ jobs:
           BACKUP_ENCRYPTION_KEY_FILE="$key_file" \
             CRYPTO_HELPER="$helper_dir/backup-crypto.mjs" \
             NODE_BINARY=node \
-            "$helper_dir/rehearse-backup-restore.sh" "$backup_file" >"$rehearsal_output" 2>"$rehearsal_diagnostic"
+            "$helper_dir/rehearse-backup-restore.sh" "$backup_file" </dev/null >"$rehearsal_output" 2>"$rehearsal_diagnostic"
           rehearsal_status=$?
           set -e
           [ "$rehearsal_status" -eq 0 ] || fail PRODUCTION_BACKUP_DISPOSABLE_RESTORE_FAILED
