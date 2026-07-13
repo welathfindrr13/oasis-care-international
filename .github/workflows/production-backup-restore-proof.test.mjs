@@ -339,6 +339,7 @@ test("remote proof creates restores rotates and fails closed on SHA mismatch", (
     path.join(helperDir, "backup-postgres.sh"),
     `#!/bin/bash
 set -euo pipefail
+cat >/dev/null
 printf 'synthetic encrypted archive\\n' > "$BACKUP_FILE"
 chmod 0600 "$BACKUP_FILE"
 printf 'BACKUP_ENCRYPTION_READY\\nBACKUP_CREATED_ENCRYPTED\\n'
@@ -348,6 +349,7 @@ printf 'BACKUP_ENCRYPTION_READY\\nBACKUP_CREATED_ENCRYPTED\\n'
     path.join(helperDir, "rehearse-backup-restore.sh"),
     `#!/bin/bash
 set -euo pipefail
+cat >/dev/null
 printf '%s\\n' \\
   ENCRYPTED_BACKUP_AUTHENTICATED \\
   DISPOSABLE_POSTGRES_READY \\
@@ -464,6 +466,34 @@ printf '%064d  %s\\n' 0 "\${1:-synthetic}"
   assert.equal(fs.existsSync(retrievalFile), false);
   assert.equal(fs.existsSync(keyFile), true);
   assert.equal(fs.existsSync(path.join(helperDir, "retrieval.sha256")), true);
+  fs.rmSync(path.join(helperDir, "retrieval.sha256"));
+
+  const streamedBackupFile = path.join(
+    backups,
+    ".proof-staging",
+    "oasis-proof-12345-3.dump.enc",
+  );
+  const streamed = spawnSync(
+    "/bin/bash",
+    [
+      "-se",
+      "--",
+      targetSha,
+      helperDir,
+      streamedBackupFile,
+      keyFile,
+      retrievalFile,
+    ],
+    {
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${bin}:/usr/bin:/bin` },
+      input: remoteProof,
+    },
+  );
+  assert.equal(streamed.status, 0, streamed.stderr || streamed.stdout);
+  assert.match(streamed.stdout, /PRODUCTION_BACKUP_STAGED_READY/);
+  assert.equal(fs.existsSync(streamedBackupFile), true);
+  fs.rmSync(streamedBackupFile);
 
   const promotion = spawnSync(
     "/bin/bash",
