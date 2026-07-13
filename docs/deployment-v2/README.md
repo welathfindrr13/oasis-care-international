@@ -314,6 +314,34 @@ discards raw restore diagnostics, and verifies container destruction.
 CI also creates a synthetic migrated database and exercises this complete backup,
 restore, query, and destruction path against real PostgreSQL and Docker.
 
+For the controlled production gate, use the protected `Production Backup Restore
+Proof` workflow. It requires the exact currently deployed production SHA and the
+per-SHA approval token
+`APPROVE_PRODUCTION_BACKUP_RESTORE_PROOF_<sha>`. The workflow serializes with
+other production mutations, verifies the production marker, live repository SHA,
+repository cleanliness, and healthy Postgres before creating an archive.
+
+The workflow transfers only reviewed backup helpers, verifies their SHA-256
+manifest on the server, and creates or reuses a private root-owned encryption key.
+The durable key never leaves the production trust boundary. The encrypted archive
+is restored into a network-isolated tmpfs-backed disposable Postgres container on
+the production host, queried through the bounded schema proof, and destroyed. Only
+after that succeeds does the workflow retrieve the encrypted archive and checksum
+into a private ephemeral runner directory to prove off-host retrieval integrity.
+Those runner copies are destroyed before the proof can pass and are never uploaded
+as workflow artifacts. Raw database, transport, Docker, and restore diagnostics
+remain suppressed.
+
+This gate requires a root-owned `0600` controlled-data marker containing exactly
+`synthetic-only`; it refuses to retrieve an archive without that classification.
+It uses the same host mutation lock as deployment, requires capacity for twice the
+reported database size plus one GiB, and retains at most the latest and previous
+verified archives. It may create the private production backup key, but it never
+deploys code, runs migrations, restores production, or changes application records.
+A separate operator-controlled copy of the key and encrypted archive is still
+required before real client data. The controlled fake-data canary does not satisfy
+that later real-data retention decision.
+
 Provider-level droplet backups complement this database archive; they do not
 replace it. Confirm the provider policy and a current private backup image before
 launch. Restoring a provider image is a separate, explicitly approved recovery

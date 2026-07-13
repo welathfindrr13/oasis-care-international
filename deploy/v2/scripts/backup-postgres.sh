@@ -59,7 +59,13 @@ echo "BACKUP_ENCRYPTION_READY"
 
 cd "$REPO_ROOT"
 
-if ! docker compose -f "$COMPOSE_FILE" exec -T postgres \
+compose=(docker compose)
+if [[ -f "$ENV_FILE" ]]; then
+  compose+=(--env-file "$ENV_FILE")
+fi
+compose+=(-f "$COMPOSE_FILE")
+
+if ! "${compose[@]}" exec -T postgres \
     pg_dump \
     --username "$POSTGRES_USER" \
     --dbname "$POSTGRES_DB" \

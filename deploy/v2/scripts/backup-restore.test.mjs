@@ -143,12 +143,17 @@ test("backup writes only an encrypted archive through the isolated Postgres serv
   const harness = createHarness(t);
   const backupFile = path.join(harness.tempDir, "backups", "recovery.dump.enc");
   const composeFile = path.join(harness.tempDir, "synthetic-compose.yml");
+  const envFile = path.join(harness.tempDir, "production.env");
   const dockerArgumentsLog = path.join(harness.tempDir, "backup-arguments.log");
+  writeFileSync(envFile, "POSTGRES_USER=ignored-by-explicit-test-env\n", {
+    mode: 0o600,
+  });
 
   const result = runScript("backup-postgres.sh", [], harness, {
     BACKUP_DIR: path.dirname(backupFile),
     BACKUP_FILE: backupFile,
     COMPOSE_FILE: composeFile,
+    ENV_FILE: envFile,
     DOCKER_ARGUMENTS_LOG: dockerArgumentsLog,
     FAKE_DOCKER_MODE: "backup",
     POSTGRES_DB: "recovery_test",
@@ -162,6 +167,8 @@ test("backup writes only an encrypted archive through the isolated Postgres serv
   assert.equal(result.stdout, "BACKUP_ENCRYPTION_READY\nBACKUP_CREATED_ENCRYPTED\n");
   assert.deepEqual(readArguments(dockerArgumentsLog), [
     "compose",
+    "--env-file",
+    envFile,
     "-f",
     composeFile,
     "exec",
@@ -220,12 +227,17 @@ test("confirmed restore authenticates then streams decrypted data to pg_restore"
   const harness = createHarness(t);
   const backupFile = path.join(harness.tempDir, "synthetic.dump.enc");
   const composeFile = path.join(harness.tempDir, "synthetic-compose.yml");
+  const envFile = path.join(harness.tempDir, "production.env");
   const dockerArgumentsLog = path.join(harness.tempDir, "restore-arguments.log");
   const restoreInputLog = path.join(harness.tempDir, "restore-input.dump");
+  writeFileSync(envFile, "POSTGRES_USER=ignored-by-explicit-test-env\n", {
+    mode: 0o600,
+  });
   encryptFixture(harness, backupFile);
 
   const result = runScript("restore-postgres.sh", [backupFile], harness, {
     COMPOSE_FILE: composeFile,
+    ENV_FILE: envFile,
     DOCKER_ARGUMENTS_LOG: dockerArgumentsLog,
     FAKE_DOCKER_MODE: "restore",
     NON_INTERACTIVE: "true",
@@ -243,6 +255,8 @@ test("confirmed restore authenticates then streams decrypted data to pg_restore"
   assert.equal(readFileSync(restoreInputLog, "utf8"), "synthetic custom archive\n");
   assert.deepEqual(readArguments(dockerArgumentsLog), [
     "compose",
+    "--env-file",
+    envFile,
     "-f",
     composeFile,
     "exec",

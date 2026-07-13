@@ -83,9 +83,15 @@ fi
 
 cd "$REPO_ROOT"
 
+compose=(docker compose)
+if [[ -f "$ENV_FILE" ]]; then
+  compose+=(--env-file "$ENV_FILE")
+fi
+compose+=(-f "$COMPOSE_FILE")
+
 if ! "$NODE_BINARY" "$CRYPTO_HELPER" decrypt-pinned \
     "$BACKUP_ENCRYPTION_KEY_FILE" "$restore_session/archive.dump.enc" | \
-    docker compose -f "$COMPOSE_FILE" exec -T postgres \
+    "${compose[@]}" exec -T postgres \
       pg_restore \
       --username "$POSTGRES_USER" \
       --dbname "$POSTGRES_DB" \
