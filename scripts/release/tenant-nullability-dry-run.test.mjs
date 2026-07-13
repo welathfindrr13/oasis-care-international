@@ -5,8 +5,14 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
   formatTenantNullabilityReport,
+  parseTenantNullabilityArgs,
+  proveTenantNotNullMigrationApplied,
   runTenantNullabilityDryRun,
   SENSITIVE_TENANT_TABLES,
+  TENANT_NOT_NULL_MIGRATION,
+  TENANT_NOT_NULL_TABLES,
+  tenantMigrationAppliedSql,
+  tenantNotNullSchemaSql,
 } from './tenant-nullability-dry-run.mjs';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -37,6 +43,34 @@ function createPrismaWithCounts(countsByModel = {}) {
       const tableMatch = sql.match(/FROM "([^"]+)"/);
       const table = SENSITIVE_TENANT_TABLES.find((entry) => entry.table === tableMatch?.[1]);
       return [{ count: table ? countsByModel[table.model] ?? 0 : 0 }];
+    },
+  };
+}
+
+function createPrismaWithMigrationProof({
+  appliedCount = 1,
+  nullableTables = [],
+  omittedTables = [],
+} = {}) {
+  const queries = [];
+  const nullable = new Set(nullableTables);
+  const omitted = new Set(omittedTables);
+
+  return {
+    queries,
+    $queryRawUnsafe: async (sql, ...parameters) => {
+      queries.push({ sql, parameters });
+      if (sql.includes('WHERE organization_id IS NULL')) return [{ count: 0 }];
+      if (sql.includes('FROM "_prisma_migrations"')) return [{ count: appliedCount }];
+      if (sql.includes('FROM information_schema.columns')) {
+        return TENANT_NOT_NULL_TABLES.filter((table) => !omitted.has(table.table)).map(
+          (table) => ({
+            table_name: table.table,
+            is_nullable: nullable.has(table.table) ? 'YES' : 'NO',
+          }),
+        );
+      }
+      throw new Error('Unexpected proof query');
     },
   };
 }
@@ -123,6 +157,98 @@ test('tenant nullability dry-run rejects unknown excluded models safely', async 
       }),
     /Unknown model in --exclude: DefinitelyNotAModel/,
   );
+});
+
+test('tenant migration proof arguments require an explicit migration name', () => {
+  assert.deepEqual(
+    parseTenantNullabilityArgs([
+      '--fail-on-null',
+      '--exclude',
+      'AuditLog',
+      '--prove-applied-migration',
+      TENANT_NOT_NULL_MIGRATION,
+    ]),
+    {
+      failOnNull: true,
+      excludeModels: ['AuditLog'],
+      proveAppliedMigration: TENANT_NOT_NULL_MIGRATION,
+    },
+  );
+  assert.throws(
+    () => parseTenantNullabilityArgs(['--prove-applied-migration']),
+    /Missing value for --prove-applied-migration/,
+  );
+  assert.throws(
+    () => parseTenantNullabilityArgs(['--prove-applied-migration=']),
+    /Missing value for --prove-applied-migration/,
+  );
+});
+
+test('tenant migration proof confirms the exact applied record and all eligible constraints', async () => {
+  const prisma = createPrismaWithMigrationProof();
+  const lines = [];
+  const exitCode = await runTenantNullabilityDryRun({
+    prisma,
+    failOnNull: true,
+    excludeModels: ['AuditLog'],
+    proveAppliedMigration: TENANT_NOT_NULL_MIGRATION,
+    log: (line) => lines.push(line),
+  });
+
+  assert.equal(exitCode, 0);
+  assert.match(
+    lines.join('\n'),
+    new RegExp(`TARGET_MIGRATION_APPLIED_CONFIRMED: ${TENANT_NOT_NULL_MIGRATION}`),
+  );
+  assert.match(
+    lines.join('\n'),
+    new RegExp(`TENANT_NOT_NULL_SCHEMA_CONFIRMED: ${TENANT_NOT_NULL_TABLES.length}`),
+  );
+  const migrationQuery = prisma.queries.find(({ sql }) =>
+    sql.includes('FROM "_prisma_migrations"'),
+  );
+  assert.deepEqual(migrationQuery.parameters, [TENANT_NOT_NULL_MIGRATION]);
+  assert.equal(
+    prisma.queries.filter(({ sql }) => sql.includes('FROM information_schema.columns')).length,
+    1,
+  );
+});
+
+test('tenant migration proof fails closed for missing history or nullable constraints', async () => {
+  await assert.rejects(
+    () =>
+      proveTenantNotNullMigrationApplied(
+        createPrismaWithMigrationProof({ appliedCount: 0 }),
+        TENANT_NOT_NULL_MIGRATION,
+      ),
+    /Target tenant migration is not applied exactly once/,
+  );
+  await assert.rejects(
+    () =>
+      proveTenantNotNullMigrationApplied(
+        createPrismaWithMigrationProof({ nullableTables: ['client'] }),
+        TENANT_NOT_NULL_MIGRATION,
+      ),
+    /Tenant NOT NULL schema proof mismatch/,
+  );
+  await assert.rejects(
+    () =>
+      proveTenantNotNullMigrationApplied(
+        createPrismaWithMigrationProof({ omittedTables: ['client'] }),
+        TENANT_NOT_NULL_MIGRATION,
+      ),
+    /Tenant NOT NULL schema proof incomplete/,
+  );
+});
+
+test('tenant migration metadata queries are static and read-only', () => {
+  assert.match(tenantMigrationAppliedSql(), /^SELECT COUNT\(\*\)::int AS count FROM/);
+  assert.match(tenantMigrationAppliedSql(), /migration_name = \$1/);
+  assert.match(tenantNotNullSchemaSql(), /^SELECT table_name, is_nullable FROM information_schema\.columns/);
+  assert.doesNotMatch(tenantNotNullSchemaSql(), /audit_log/);
+  for (const sql of [tenantMigrationAppliedSql(), tenantNotNullSchemaSql()]) {
+    assert.doesNotMatch(sql, /\b(?:UPDATE|DELETE|INSERT|TRUNCATE|DROP|CREATE|ALTER)\b/i);
+  }
 });
 
 test('tenant nullability dry-run uses raw SQL counts from static table inventory', async () => {

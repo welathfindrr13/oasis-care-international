@@ -79,7 +79,7 @@ test('production target and SHA proof happen before dry-run pending proof and mi
   const gateCallIndex = workflow.lastIndexOf('\n          run_remote_gate');
   const preDryRunCallIndex = workflow.lastIndexOf('\n          run_tenant_dry_run pre');
   const pendingProofCallIndex = workflow.lastIndexOf('\n          prove_pending_migration_set');
-  const migrateCallIndex = workflow.lastIndexOf('\n          run_single_migration');
+  const migrateCallIndex = workflow.lastIndexOf('\n            run_single_migration');
 
   assert.notEqual(markerIndex, -1);
   assert.notEqual(productionLabelIndex, -1);
@@ -105,7 +105,7 @@ test('production gate proves running API container migration content before migr
   const containerProofIndex = remoteGate.indexOf('API_MIGRATION_CONTENT_OK');
   const preDryRunIndex = workflow.lastIndexOf('\n          run_tenant_dry_run pre');
   const pendingProofIndex = workflow.lastIndexOf('\n          prove_pending_migration_set');
-  const migrateIndex = workflow.lastIndexOf('\n          run_single_migration');
+  const migrateIndex = workflow.lastIndexOf('\n            run_single_migration');
 
   assert.notEqual(containerProofIndex, -1, 'running API migration content proof is required');
   assert.match(remoteGate, /sha256sum "\$migration_path"/);
@@ -139,8 +139,8 @@ test('production gate proves running API container migration content before migr
 test('production migration file and tenant dry-runs are gated safely', () => {
   const preDryRunIndex = workflow.lastIndexOf('\n          run_tenant_dry_run pre');
   const pendingProofIndex = workflow.lastIndexOf('\n          prove_pending_migration_set');
-  const migrateIndex = workflow.lastIndexOf('\n          run_single_migration');
-  const appliedIndex = workflow.lastIndexOf('\n          prove_migration_applied');
+  const migrateIndex = workflow.lastIndexOf('\n            run_single_migration');
+  const appliedIndex = workflow.lastIndexOf('\n            prove_migration_applied');
   const postDryRunIndex = workflow.lastIndexOf('\n          run_tenant_dry_run post');
 
   assert.match(workflow, new RegExp(`test -f ${migrationPath.replaceAll('/', '\\/')}`));
@@ -168,6 +168,10 @@ test('pending migration proof and approval token gate production migration', () 
 
   assert.match(pendingProof, new RegExp(`PENDING_MIGRATION_SET_EXACT: ${migrationName}`));
   assert.match(pendingProof, new RegExp(`MIGRATION_GATE_APPROVED="${migrationName}"`));
+  assert.match(pendingProof, /MIGRATION_GATE_STATE="pending"/);
+  assert.match(pendingProof, /MIGRATION_GATE_STATE="already_applied"/);
+  assert.match(pendingProof, /MIGRATION_ALREADY_APPLIED_CANDIDATE/);
+  assert.match(pendingProof, /NO_UPDATE_NOTIFIER=1 PRISMA_HIDE_UPDATE_MESSAGE=true npx/);
   assert.match(workflow, new RegExp(`REQUIRED_APPROVAL_TOKEN: ${approvalToken}`));
   assert.match(workflow, /\[ "\$PRODUCTION_MIGRATION_APPROVAL" != "\$REQUIRED_APPROVAL_TOKEN" \]/);
   assert.match(workflow, /PRODUCTION_MIGRATION_APPROVAL_MISMATCH/);
@@ -178,6 +182,29 @@ test('pending migration proof and approval token gate production migration', () 
   );
 });
 
+test('already-applied production state skips deploy only after exact metadata proof', () => {
+  const preDryRunIndex = workflow.lastIndexOf('\n          run_tenant_dry_run pre');
+  const pendingProofIndex = workflow.lastIndexOf('\n          prove_pending_migration_set');
+  const stateBranchIndex = workflow.lastIndexOf(
+    '\n          if [ "$MIGRATION_GATE_STATE" = "pending" ]; then',
+  );
+  const migrateIndex = workflow.lastIndexOf('\n            run_single_migration');
+  const skipIndex = workflow.lastIndexOf('MIGRATION_PRODUCTION_SKIPPED_ALREADY_APPLIED');
+  const postDryRunIndex = workflow.lastIndexOf('\n          run_tenant_dry_run post');
+
+  assert(preDryRunIndex < pendingProofIndex);
+  assert(pendingProofIndex < stateBranchIndex);
+  assert(stateBranchIndex < migrateIndex);
+  assert(migrateIndex < skipIndex);
+  assert(skipIndex < postDryRunIndex);
+  assert.equal(workflow.match(/\n            run_single_migration/g)?.length, 1);
+  assert.match(workflow, /--prove-applied-migration "\$MIGRATION_NAME"/);
+  assert.match(workflow, new RegExp(`TARGET_MIGRATION_APPLIED_CONFIRMED: ${migrationName}`));
+  assert.match(workflow, /TENANT_NOT_NULL_SCHEMA_CONFIRMED: 11/);
+  assert.match(workflow, /Tenant migration applied proof incomplete/);
+  assert.match(workflow, /MIGRATION_GATE_STATE_UNKNOWN/);
+});
+
 test('production migration runs once and proves applied status before post dry-run', () => {
   assert.match(workflow, /MIGRATION_PRODUCTION_STARTED/);
   assert.match(workflow, /MIGRATION_PRODUCTION_SUCCEEDED/);
@@ -185,6 +212,10 @@ test('production migration runs once and proves applied status before post dry-r
   assert.match(workflow, new RegExp(`MIGRATION_STATUS_APPLIED: ${migrationName}`));
   assert.match(workflow, /npx prisma migrate deploy --schema prisma\/schema\.prisma/);
   assert.match(workflow, /npx prisma migrate status --schema prisma\/schema\.prisma/);
+  assert.equal(
+    [...workflow.matchAll(/NO_UPDATE_NOTIFIER=1 PRISMA_HIDE_UPDATE_MESSAGE=true npx/g)].length,
+    4,
+  );
 });
 
 test('production workflow cannot deploy rebuild restart backfill or trigger other workflows', () => {
