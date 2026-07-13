@@ -1,20 +1,129 @@
-import { Injectable, NestInterceptor, ExecutionContext, CallHandler, Inject, Optional } from '@nestjs/common';
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+  Inject,
+  Optional,
+} from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
+import { isIP } from 'node:net';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { Reflector } from '@nestjs/core';
-import { PrismaService } from '@oasis/db';
-import { Masker } from '../utils/masker';
+import { Prisma, PrismaService } from '@oasis/db';
 import { MANUAL_AUDIT_KEY } from '../decorators/manual-audit.decorator';
 
-// PII patterns to detect and mask
-const PII_PATTERNS = {
-  email: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
-  phone: /(\+?44\s?7\d{3}|\(?07\d{3}\)?)\s?\d{3}\s?\d{3}/g,
-  nino: /[A-Z]{2}\d{6}[A-Z]/gi,
-  postcode: /[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}/gi,
-  dob: /\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g,
+const AUDIT_METADATA_LIMITS = {
+  depth: 4,
+  entries: 24,
+  identifier: 255,
+  workflowArray: 20,
+} as const;
+
+const EXCLUDED_AUDIT_DOMAIN =
+  /(clinical|safeguard|medicat|medicine|prescription|dose|e-?mar|concern)/i;
+
+const EXCLUDED_METADATA_FIELD =
+  /(address|allerg|api.?key|birth|body|care.?note|clinical|comment|concern|condition|diagnos|dob|dosage|email|instruction|medicat|message|nino|note|password|phone|postcode|reason|safeguard|secret|symptom|text|token)/i;
+
+const INTERNAL_UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const IDENTIFIER_FIELDS: Readonly<Record<string, string>> = {
+  id: 'id',
+  accessgrantid: 'accessGrantId',
+  actorid: 'actorId',
+  assessmentid: 'assessmentId',
+  careplanid: 'carePlanId',
+  carerid: 'carerId',
+  careroomid: 'careRoomId',
+  clientid: 'clientId',
+  evidenceitemid: 'evidenceItemId',
+  evidencepackid: 'evidencePackId',
+  familycontactid: 'familyContactId',
+  invitationid: 'invitationId',
+  membershipid: 'membershipId',
+  organizationid: 'organizationId',
+  organizationmembershipid: 'organizationMembershipId',
+  requestid: 'requestId',
+  shiftid: 'shiftId',
+  sourcerequestid: 'sourceRequestId',
+  storyid: 'storyId',
+  taskid: 'taskId',
+  userid: 'userId',
+  verifiedvisitstoryid: 'verifiedVisitStoryId',
+  visitid: 'visitId',
+  visittaskid: 'visitTaskId',
 };
+
+const WORKFLOW_FIELDS: Readonly<Record<string, string>> = {
+  active: 'active',
+  approved: 'approved',
+  count: 'count',
+  enabled: 'enabled',
+  eventtype: 'eventType',
+  granttype: 'grantType',
+  isactive: 'isActive',
+  limit: 'limit',
+  nextstate: 'nextState',
+  nextstatus: 'nextStatus',
+  offset: 'offset',
+  operation: 'operation',
+  page: 'page',
+  previousstate: 'previousState',
+  previousstatus: 'previousStatus',
+  published: 'published',
+  revoked: 'revoked',
+  role: 'role',
+  roles: 'roles',
+  scope: 'scope',
+  scopes: 'scopes',
+  state: 'state',
+  status: 'status',
+  version: 'version',
+};
+
+const SAFE_WORKFLOW_TOKENS = new Set([
+  'ACCEPTED',
+  'ACTIVE',
+  'ADMIN',
+  'APPROVED',
+  'ARCHIVED',
+  'CARER',
+  'CARE_WORKER',
+  'CANCELLED',
+  'COMPILED',
+  'COMPLETED',
+  'DELIVERED',
+  'DISABLED',
+  'DRAFT',
+  'EXPIRED',
+  'FAMILY',
+  'FAMILY_CONTRIBUTOR',
+  'FAMILY_VIEWER',
+  'INACTIVE',
+  'IN_PROGRESS',
+  'IN_REVIEW',
+  'INVITED',
+  'MANAGER',
+  'NEEDS_ATTENTION',
+  'PENDING',
+  'PENDING_APPROVAL',
+  'PROCESSING',
+  'PUBLISHED',
+  'REJECTED',
+  'RETRYABLE',
+  'REVOKED',
+  'SCHEDULED',
+  'SUBMIT_PULSE',
+  'SUPERSEDED',
+  'SUSPENDED',
+  'VIEW_TASK_SUMMARY',
+  'VIEW_UPDATES',
+  'VIEW_VISIT_TIMES',
+  'VIEW_WEEKLY_SUMMARIES',
+]);
 
 interface AuditLogEntry {
   organizationId?: string | null;
@@ -22,10 +131,9 @@ interface AuditLogEntry {
   action: string;
   resourceType: string;
   resourceId?: string;
-  oldValues?: Record<string, any>;
-  newValues?: Record<string, any>;
+  oldValues?: Record<string, unknown>;
+  newValues?: Record<string, unknown>;
   ipAddress?: string;
-  userAgent?: string;
 }
 
 type AuditLogCreateData = {
@@ -34,10 +142,9 @@ type AuditLogCreateData = {
   action: string;
   resource_type: string;
   resource_id?: string;
-  old_values: Record<string, any>;
-  new_values: Record<string, any>;
+  old_values: Prisma.InputJsonValue;
+  new_values: Prisma.InputJsonValue;
   ip_address?: string;
-  user_agent?: string;
   timestamp: Date;
 };
 
@@ -45,7 +152,6 @@ const AUDIT_FIELD_LIMITS = {
   action: 50,
   resourceType: 50,
   ipAddress: 45,
-  userAgent: 500,
   resourceId: 255,
 } as const;
 
@@ -76,19 +182,24 @@ export class AuditLogInterceptor implements NestInterceptor {
       const info = gqlContext.getInfo();
       const args = gqlContext.getArgs();
       const req = gqlCtx.req;
+      const parentType =
+        this.sanitizeSchemaName(info?.parentType?.name) || 'GraphQL';
+      const fieldName = this.sanitizeSchemaName(info?.fieldName) || 'unknown';
 
       auditInfo = {
         userId: req?.user?.sub || req?.user?.id || 'anonymous',
         organizationId: req?.user?.organizationId ?? null,
-        action: `GraphQL ${info?.parentType?.name || ''}.${info?.fieldName || 'unknown'}`,
-        resourceType: info?.parentType?.name || 'GraphQL',
-        resourceId: args?.id || args?.input?.id,
-        ipAddress: req?.ip || req?.headers?.['x-forwarded-for'] || req?.headers?.['x-real-ip'],
-        userAgent: req?.headers?.['user-agent'],
+        action: `GraphQL ${parentType}.${fieldName}`,
+        resourceType: parentType,
+        resourceId: this.extractGraphqlResourceId(args),
+        ipAddress:
+          req?.ip ||
+          req?.headers?.['x-forwarded-for'] ||
+          req?.headers?.['x-real-ip'],
       };
 
-      if (args) {
-        auditInfo.newValues = this.maskPII(args);
+      if (args && !this.isExcludedAuditDomain(auditInfo)) {
+        auditInfo.newValues = this.extractAllowedMetadata(args);
       }
     } else {
       // Handle HTTP context
@@ -97,20 +208,30 @@ export class AuditLogInterceptor implements NestInterceptor {
         // Skip audit logging if no request context
         return next.handle();
       }
-      const { method, url, user, ip, headers, body } = request;
+      const { method, url, user, ip, headers, body, route } = request;
+      const resourceType = this.extractResourceType(url);
+      const safeMethod = this.sanitizeHttpMethod(method);
 
       auditInfo = {
         userId: user?.id || 'anonymous',
         organizationId: user?.organizationId ?? null,
-        action: `${method} ${url}`,
-        resourceType: this.extractResourceType(url),
+        action: this.createHttpAction(
+          context,
+          safeMethod,
+          resourceType,
+          route?.path,
+        ),
+        resourceType,
         resourceId: this.extractResourceId(url),
         ipAddress: ip || headers?.['x-forwarded-for'] || headers?.['x-real-ip'],
-        userAgent: headers?.['user-agent'],
       };
 
-      if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
-        auditInfo.newValues = this.maskPII(body);
+      if (
+        body &&
+        ['POST', 'PUT', 'PATCH'].includes(safeMethod) &&
+        !this.isExcludedAuditDomain(auditInfo)
+      ) {
+        auditInfo.newValues = this.extractAllowedMetadata(body);
       }
     }
 
@@ -130,9 +251,10 @@ export class AuditLogInterceptor implements NestInterceptor {
           await this.logToDatabase({
             ...auditInfo,
             action: `${auditInfo.action} [ERROR ${duration}ms]`,
-            newValues: this.mergeAuditNewValues(auditInfo.newValues, {
-              error: this.truncate(this.maskString(String(error?.message || 'unknown error')), 2000),
-            }),
+            newValues: this.mergeAuditNewValues(
+              auditInfo.newValues,
+              this.extractSafeErrorMetadata(error),
+            ),
           });
         },
       }),
@@ -141,7 +263,14 @@ export class AuditLogInterceptor implements NestInterceptor {
 
   private async logToDatabase(entry: AuditLogEntry): Promise<void> {
     if (!this.prisma) {
-      console.log('AUDIT LOG (no DB):', JSON.stringify(entry, null, 2));
+      const data = this.createAuditLogData(entry);
+      console.log('AUDIT LOG (no DB):', {
+        userId: data.user_id,
+        organizationId: data.organization_id,
+        action: data.action,
+        resourceType: data.resource_type,
+        resourceId: data.resource_id,
+      });
       return;
     }
 
@@ -151,7 +280,10 @@ export class AuditLogInterceptor implements NestInterceptor {
       try {
         await this.prisma.auditLog.create({ data });
       } catch (error) {
-        if (this.isAuditOrganizationForeignKeyError(error) && data.organization_id) {
+        if (
+          this.isAuditOrganizationForeignKeyError(error) &&
+          data.organization_id
+        ) {
           console.warn(
             'Audit log organization FK failed; retrying without organization_id',
             this.safePrismaErrorSummary(error),
@@ -168,29 +300,38 @@ export class AuditLogInterceptor implements NestInterceptor {
         throw error;
       }
     } catch (error) {
-      console.error('Failed to write audit log:', this.safePrismaErrorSummary(error));
+      console.error(
+        'Failed to write audit log:',
+        this.safePrismaErrorSummary(error),
+      );
     }
   }
 
   private createAuditLogData(entry: AuditLogEntry): AuditLogCreateData {
     const ipAddress = this.extractFirstIp(entry.ipAddress);
-    const userAgent = this.truncate(entry.userAgent, AUDIT_FIELD_LIMITS.userAgent);
+    const userId =
+      this.sanitizeTrustedProvenanceIdentifier(entry.userId) || 'anonymous';
+    const organizationId =
+      this.sanitizeTrustedProvenanceIdentifier(entry.organizationId) || null;
     const action =
-      this.truncate(entry.action, AUDIT_FIELD_LIMITS.action) || 'UNKNOWN_ACTION';
+      this.truncate(entry.action, AUDIT_FIELD_LIMITS.action) ||
+      'UNKNOWN_ACTION';
     const resourceType =
-      this.truncate(entry.resourceType, AUDIT_FIELD_LIMITS.resourceType) || 'UNKNOWN_RESOURCE';
-    const resourceId = this.truncate(entry.resourceId, AUDIT_FIELD_LIMITS.resourceId);
+      this.truncate(entry.resourceType, AUDIT_FIELD_LIMITS.resourceType) ||
+      'UNKNOWN_RESOURCE';
+    const resourceId = this.sanitizeInternalResourceId(
+      this.truncate(entry.resourceId, AUDIT_FIELD_LIMITS.resourceId),
+    );
 
     return {
-      user_id: entry.userId,
-      organization_id: entry.organizationId ?? null,
+      user_id: userId,
+      organization_id: organizationId,
       action,
       resource_type: resourceType,
       resource_id: resourceId,
-      old_values: entry.oldValues || {},
-      new_values: entry.newValues || {},
+      old_values: (entry.oldValues || {}) as Prisma.InputJsonObject,
+      new_values: (entry.newValues || {}) as Prisma.InputJsonObject,
       ip_address: ipAddress,
-      user_agent: userAgent,
       timestamp: new Date(),
     };
   }
@@ -214,20 +355,26 @@ export class AuditLogInterceptor implements NestInterceptor {
   }
 
   private safePrismaErrorSummary(error: unknown): Record<string, unknown> {
-    const err = error as { code?: unknown; meta?: Record<string, unknown>; name?: string };
+    const err = error as {
+      code?: unknown;
+      meta?: Record<string, unknown>;
+      name?: string;
+    };
     const meta = err?.meta || {};
     const fieldHints = this.extractPrismaMetaFieldHints(meta);
 
     return {
-      name: err?.name || 'Error',
-      code: typeof err?.code === 'string' ? err.code : undefined,
-      modelName: typeof meta.modelName === 'string' ? meta.modelName : undefined,
-      fieldName:
+      name: this.sanitizeErrorToken(err?.name, 64) || 'Error',
+      code: this.sanitizeErrorToken(err?.code, 100),
+      modelName: this.sanitizeErrorToken(meta.modelName, 64),
+      fieldName: this.sanitizeErrorToken(
         typeof meta.field_name === 'string'
           ? meta.field_name
           : typeof meta.fieldName === 'string'
             ? meta.fieldName
             : fieldHints[0],
+        100,
+      ),
     };
   }
 
@@ -271,96 +418,266 @@ export class AuditLogInterceptor implements NestInterceptor {
     );
   }
 
-  private extractResourceType(url: string): string {
-    const pathSegments = url.split('?')[0].split('/').filter(Boolean);
-    return pathSegments[0] || 'unknown';
+  private extractResourceType(url: unknown): string {
+    const pathSegments = String(url || '')
+      .split('?')[0]
+      .split('/')
+      .filter(Boolean);
+    return this.sanitizeSchemaName(pathSegments[0]) || 'unknown';
   }
 
-  private extractResourceId(url: string): string | undefined {
-    const pathSegments = url.split('?')[0].split('/').filter(Boolean);
-    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    
+  private extractResourceId(url: unknown): string | undefined {
+    const pathSegments = String(url || '')
+      .split('?')[0]
+      .split('/')
+      .filter(Boolean);
     for (const segment of pathSegments) {
-      if (uuidPattern.test(segment)) {
-        return segment;
-      }
+      const resourceId = this.sanitizeInternalResourceId(segment);
+      if (resourceId) return resourceId;
     }
-    
-    if (pathSegments.length > 1 && /^\d+$/.test(pathSegments[1])) {
-      return pathSegments[1];
-    }
-    
+
     return undefined;
   }
 
-  private maskPII(data: any): any {
-    if (!data) return data;
-    
-    if (typeof data === 'string') {
-      return this.maskString(data);
-    }
-    
-    if (Array.isArray(data)) {
-      return data.map(item => this.maskPII(item));
-    }
-    
-    if (typeof data === 'object') {
-      const masked: Record<string, any> = {};
-      
-      for (const [key, value] of Object.entries(data)) {
-        const sensitiveFields = ['password', 'secret', 'token', 'apiKey', 'api_key', 'ssn', 'nino'];
-        
-        if (sensitiveFields.some(f => key.toLowerCase().includes(f.toLowerCase()))) {
-          masked[key] = '[REDACTED]';
-        } else if (typeof value === 'string') {
-          masked[key] = this.maskString(value, key);
-        } else if (typeof value === 'object' && value !== null) {
-          masked[key] = this.maskPII(value);
-        } else {
-          masked[key] = value;
-        }
-      }
-      
-      return masked;
-    }
-    
-    return data;
+  private extractGraphqlResourceId(args: unknown): string | undefined {
+    if (!args || typeof args !== 'object' || Array.isArray(args))
+      return undefined;
+    const values = args as Record<string, unknown>;
+    const input =
+      values.input &&
+      typeof values.input === 'object' &&
+      !Array.isArray(values.input)
+        ? (values.input as Record<string, unknown>)
+        : undefined;
+    return (
+      this.sanitizeInternalResourceId(values.id) ||
+      this.sanitizeInternalResourceId(input?.id)
+    );
   }
 
-  private maskString(value: string, fieldName?: string): string {
-    let masked = value;
-    
-    if (fieldName) {
-      const lowerField = fieldName.toLowerCase();
-      
-      if (lowerField.includes('email') || lowerField.includes('phone') || lowerField.includes('mobile')) {
-        return Masker.mask(value);
+  private isExcludedAuditDomain(
+    entry: Pick<AuditLogEntry, 'action' | 'resourceType'>,
+  ): boolean {
+    return EXCLUDED_AUDIT_DOMAIN.test(`${entry.action} ${entry.resourceType}`);
+  }
+
+  private extractAllowedMetadata(data: unknown): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    let entryCount = 0;
+
+    const visit = (value: unknown, depth: number): void => {
+      if (
+        entryCount >= AUDIT_METADATA_LIMITS.entries ||
+        depth > AUDIT_METADATA_LIMITS.depth ||
+        !value ||
+        typeof value !== 'object'
+      ) {
+        return;
       }
-      
-      if (lowerField.includes('address') || lowerField.includes('postcode')) {
-        return '[ADDRESS REDACTED]';
-      }
-      
-      if (lowerField.includes('dob') || lowerField.includes('birth') || lowerField.includes('date_of_birth')) {
-        return '[DOB REDACTED]';
-      }
-    }
-    
-    for (const [type, pattern] of Object.entries(PII_PATTERNS)) {
-      if (pattern.test(masked)) {
-        if (type === 'email' || type === 'phone') {
-          masked = Masker.mask(masked);
-        } else if (type === 'nino') {
-          masked = masked.replace(pattern, '[NINO REDACTED]');
-        } else if (type === 'postcode') {
-          masked = masked.replace(pattern, '[POSTCODE]');
-        } else if (type === 'dob') {
-          masked = masked.replace(pattern, '[DATE]');
+
+      if (Array.isArray(value)) {
+        for (const item of value.slice(
+          0,
+          AUDIT_METADATA_LIMITS.workflowArray,
+        )) {
+          visit(item, depth + 1);
         }
+        return;
       }
+
+      for (const [key, item] of Object.entries(value)) {
+        if (entryCount >= AUDIT_METADATA_LIMITS.entries) return;
+        const normalizedKey = this.normalizeMetadataKey(key);
+        if (!normalizedKey || EXCLUDED_METADATA_FIELD.test(normalizedKey))
+          continue;
+
+        const identifierField = IDENTIFIER_FIELDS[normalizedKey];
+        if (identifierField) {
+          const identifier = this.sanitizeInternalResourceId(item);
+          if (identifier && result[identifierField] === undefined) {
+            result[identifierField] = identifier;
+            entryCount += 1;
+          }
+          continue;
+        }
+
+        const workflowField = WORKFLOW_FIELDS[normalizedKey];
+        if (workflowField) {
+          const workflowValue = this.sanitizeWorkflowValue(item);
+          if (
+            workflowValue !== undefined &&
+            result[workflowField] === undefined
+          ) {
+            result[workflowField] = workflowValue;
+            entryCount += 1;
+          }
+          continue;
+        }
+
+        visit(item, depth + 1);
+      }
+    };
+
+    visit(data, 0);
+    return result;
+  }
+
+  private normalizeMetadataKey(value: string): string {
+    return value.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+  }
+
+  /**
+   * Actor and tenant values are supplied by the authenticated access context,
+   * not copied from request arguments. They may use provider subjects as well
+   * as UUIDs, so keep their proven identifier grammar separate from resource IDs.
+   */
+  private sanitizeTrustedProvenanceIdentifier(
+    value: unknown,
+  ): string | undefined {
+    if (typeof value !== 'string' && typeof value !== 'number')
+      return undefined;
+    const text = String(value).trim();
+    if (
+      !text ||
+      text.length > AUDIT_METADATA_LIMITS.identifier ||
+      !/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/.test(text)
+    ) {
+      return undefined;
     }
-    
-    return masked;
+    return text;
+  }
+
+  /** Request-controlled record identifiers must match the Prisma UUID grammar. */
+  private sanitizeInternalResourceId(value: unknown): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    const text = value.trim();
+    if (
+      !text ||
+      text.length > AUDIT_METADATA_LIMITS.identifier ||
+      !INTERNAL_UUID_PATTERN.test(text)
+    ) {
+      return undefined;
+    }
+    return text;
+  }
+
+  private sanitizeWorkflowValue(value: unknown): unknown {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') {
+      return Number.isSafeInteger(value) && Math.abs(value) <= 1_000_000
+        ? value
+        : undefined;
+    }
+    if (typeof value === 'string') {
+      const normalized = value.trim().toUpperCase();
+      return SAFE_WORKFLOW_TOKENS.has(normalized) ? normalized : undefined;
+    }
+    if (Array.isArray(value)) {
+      const safe = value
+        .slice(0, AUDIT_METADATA_LIMITS.workflowArray)
+        .map((item) => this.sanitizeWorkflowValue(item))
+        .filter((item): item is string => typeof item === 'string');
+      return safe.length ? safe : undefined;
+    }
+    return undefined;
+  }
+
+  private extractSafeErrorMetadata(error: unknown): Record<string, unknown> {
+    const err = error as { code?: unknown; name?: unknown };
+    return {
+      errorName: this.sanitizeErrorToken(err?.name, 64) || 'Error',
+      ...(this.sanitizeErrorToken(err?.code, 100)
+        ? { errorCode: this.sanitizeErrorToken(err?.code, 100) }
+        : {}),
+    };
+  }
+
+  private sanitizeErrorToken(
+    value: unknown,
+    maxLength: number,
+  ): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    const text = value.trim();
+    if (!text || text.length > maxLength || !/^[A-Za-z0-9_.:-]+$/.test(text)) {
+      return undefined;
+    }
+    return text;
+  }
+
+  private sanitizeSchemaName(value: unknown): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    const text = value.trim();
+    if (!/^[A-Za-z][A-Za-z0-9_-]{0,49}$/.test(text)) return undefined;
+    return text;
+  }
+
+  private sanitizeHttpMethod(value: unknown): string {
+    const method = typeof value === 'string' ? value.trim().toUpperCase() : '';
+    return /^[A-Z]{1,10}$/.test(method) ? method : 'UNKNOWN';
+  }
+
+  private createHttpAction(
+    context: ExecutionContext,
+    method: string,
+    resourceType: string,
+    routePath: unknown,
+  ): string {
+    const controllerName = this.extractControllerName(context);
+    const routeTemplate = this.sanitizeRouteTemplate(routePath);
+    if (routeTemplate) {
+      const routeIdentity = controllerName
+        ? `${controllerName}/${routeTemplate}`
+        : routeTemplate;
+      return `HTTP ${method} ${routeIdentity}`;
+    }
+
+    const handlerName = this.extractHandlerName(context);
+    if (handlerName) {
+      const handlerIdentity = controllerName
+        ? `${controllerName}#${handlerName}`
+        : handlerName;
+      return `HTTP ${method} ${handlerIdentity}`;
+    }
+
+    return `HTTP ${method} ${resourceType}`;
+  }
+
+  private sanitizeRouteTemplate(value: unknown): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    const segments = value.split('/').filter(Boolean);
+    if (!segments.length || segments.length > 8) return undefined;
+
+    const safeSegments: string[] = [];
+    for (const segment of segments) {
+      if (segment.startsWith(':')) {
+        safeSegments.push(':id');
+        continue;
+      }
+
+      const safeSegment = this.sanitizeSchemaName(segment);
+      if (!safeSegment) return undefined;
+      safeSegments.push(safeSegment);
+    }
+
+    return safeSegments.join('/');
+  }
+
+  private extractHandlerName(context: ExecutionContext): string | undefined {
+    try {
+      return this.sanitizeSchemaName(context.getHandler()?.name);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private extractControllerName(context: ExecutionContext): string | undefined {
+    try {
+      const name = context.getClass()?.name;
+      if (typeof name !== 'string') return undefined;
+      return this.sanitizeSchemaName(name.replace(/Controller$/, ''));
+    } catch {
+      return undefined;
+    }
   }
 
   private truncate(value: unknown, maxLength: number): string | undefined {
@@ -375,13 +692,14 @@ export class AuditLogInterceptor implements NestInterceptor {
     const text = this.truncate(value, 1000);
     if (!text) return undefined;
     const first = text.split(',')[0]?.trim();
+    if (!first || !isIP(first)) return undefined;
     return this.truncate(first, AUDIT_FIELD_LIMITS.ipAddress);
   }
 
   private mergeAuditNewValues(
-    current: Record<string, any> | undefined,
-    extra: Record<string, any>,
-  ): Record<string, any> {
+    current: Record<string, unknown> | undefined,
+    extra: Record<string, unknown>,
+  ): Record<string, unknown> {
     return {
       ...(current || {}),
       ...extra,
