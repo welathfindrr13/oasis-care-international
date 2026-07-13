@@ -104,7 +104,64 @@ const commits = git(['rev-list', '--reverse', logOptions])
   .split('\n')
   .filter(Boolean);
 
+function scanContent(content, repositoryPath, commit) {
+  const scan = spawnSync(
+    gitleaksPath,
+    [
+      'stdin',
+      '--no-banner',
+      '--no-color',
+      '--log-level',
+      'fatal',
+      '--redact=100',
+      '--ignore-gitleaks-allow',
+      '--config',
+      trustedConfigPath,
+      '--gitleaks-ignore-path',
+      trustedIgnorePath,
+      '--report-format',
+      'json',
+      '--report-path',
+      '-',
+    ],
+    {
+      input: content,
+      encoding: 'utf8',
+      maxBuffer: 128 * 1024 * 1024,
+      cwd: trustedConfigDirectory,
+    },
+  );
+
+  if (scan.error || (scan.status !== 0 && scan.status !== 1)) {
+    fail('Secret leak prevention could not complete the scan. No scanner output was retained.');
+  }
+
+  let rows;
+  try {
+    rows = scan.stdout.trim() ? JSON.parse(scan.stdout) : [];
+  } catch {
+    fail('Secret leak prevention rejected the range but could not safely classify the finding.');
+  }
+
+  for (const row of rows) {
+    const finding = {
+      credentialCategory: safeText(row.RuleID, 'unclassified-credential'),
+      repositoryPath: safeText(repositoryPath, 'unknown-path'),
+      commit,
+      rotationRecommendation: recommendation(row.RuleID),
+    };
+    const key = JSON.stringify(finding);
+    if (!seen.has(key)) {
+      seen.add(key);
+      safeFindings.push(finding);
+    }
+  }
+}
+
 for (const commit of commits) {
+  const commitMessage = git(['show', '-s', '--format=%B', commit]).stdout;
+  scanContent(commitMessage, '<commit-message>', commit);
+
   const commitLine = git(['rev-list', '--parents', '-n', '1', commit])
     .stdout.trim()
     .split(/\s+/);
@@ -141,57 +198,7 @@ for (const commit of commits) {
       fail('Secret leak prevention could not read a changed file safely.');
     }
 
-    const scan = spawnSync(
-      gitleaksPath,
-      [
-        'stdin',
-        '--no-banner',
-        '--no-color',
-        '--log-level',
-        'fatal',
-        '--redact=100',
-        '--ignore-gitleaks-allow',
-        '--config',
-        trustedConfigPath,
-        '--gitleaks-ignore-path',
-        trustedIgnorePath,
-        '--report-format',
-        'json',
-        '--report-path',
-        '-',
-      ],
-      {
-        input: blob.stdout,
-        encoding: 'utf8',
-        maxBuffer: 128 * 1024 * 1024,
-        cwd: trustedConfigDirectory,
-      },
-    );
-
-    if (scan.error || (scan.status !== 0 && scan.status !== 1)) {
-      fail('Secret leak prevention could not complete the scan. No scanner output was retained.');
-    }
-
-    let rows;
-    try {
-      rows = scan.stdout.trim() ? JSON.parse(scan.stdout) : [];
-    } catch {
-      fail('Secret leak prevention rejected the range but could not safely classify the finding.');
-    }
-
-    for (const row of rows) {
-      const finding = {
-        credentialCategory: safeText(row.RuleID, 'unclassified-credential'),
-        repositoryPath: safeText(repositoryPath, 'unknown-path'),
-        commit,
-        rotationRecommendation: recommendation(row.RuleID),
-      };
-      const key = JSON.stringify(finding);
-      if (!seen.has(key)) {
-        seen.add(key);
-        safeFindings.push(finding);
-      }
-    }
+    scanContent(blob.stdout, repositoryPath, commit);
   }
 }
 

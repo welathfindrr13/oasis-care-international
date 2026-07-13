@@ -200,3 +200,20 @@ test('pinned scanner rejects a detector introduced only by a merge result', pinn
   assert.match(result.stderr, new RegExp(head));
   assert.doesNotMatch(result.stderr, new RegExp(marker));
 });
+
+test('pinned scanner rejects a detector introduced only in a commit message', pinnedTest, (t) => {
+  const directory = initializeRepository();
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  writeFileSync(path.join(directory, 'baseline.txt'), 'baseline\n');
+  const base = commitAll(directory, 'baseline');
+  writeFileSync(path.join(directory, 'safe-change.txt'), 'safe change\n');
+  const marker = generatedDetectorMarker();
+  const head = commitAll(directory, `message-only detector ${marker}`);
+
+  const result = run(process.execPath, [scriptPath, pinnedBinary, base, head], directory);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /<commit-message>/);
+  assert.match(result.stderr, new RegExp(head));
+  assert.doesNotMatch(result.stderr, new RegExp(marker));
+  assert.doesNotMatch(result.stdout, new RegExp(marker));
+});
