@@ -32,6 +32,11 @@ test('CI keeps the maintained accessibility browser command after Chromium insta
   );
 });
 
+test('CI derives its local JWT fixture from the public commit SHA', () => {
+  assert.match(workflow, /JWT_SECRET: ci-fixture-\$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(workflow, /test-secret-key-for-oasis-testing-only/);
+});
+
 test('Deployment V2 CI compose verification uses the generated env file', () => {
   assert.match(workflow, /docker compose --env-file "\$TEMP_ENV" -f deploy\/v2\/docker-compose\.yml config/);
 });

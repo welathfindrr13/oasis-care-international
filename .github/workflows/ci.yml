@@ -99,7 +99,7 @@ jobs:
       run: pnpm --filter @oasis/api test:e2e
       env:
         DATABASE_URL: postgresql://test:test@localhost:5432/oasis_test
-        JWT_SECRET: test-secret-key-for-oasis-testing-only
+        JWT_SECRET: ci-fixture-${{ github.sha }}
         TESTCONTAINERS_RYUK_DISABLED: true
 
     - name: Install Chromium for browser journeys
