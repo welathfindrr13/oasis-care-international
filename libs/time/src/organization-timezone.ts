@@ -257,12 +257,36 @@ export function organizationWeekUtcRange(
   organizationId?: string,
   resolver: OrganizationTimezoneResolver = organizationTimezoneResolver,
 ): { start: Date; end: Date } {
+  // Calendar-week views retain the application's established Sunday start.
   const current = organizationCalendarDate(instant, organizationId, resolver);
   const dayOfWeek = new Date(Date.UTC(current.year, current.month - 1, current.day)).getUTCDay();
   const weekStart = addCalendarDays(current, -dayOfWeek);
   return organizationCalendarRangeUtc(
     weekStart,
     addCalendarDays(weekStart, 7),
+    organizationId,
+    resolver,
+  );
+}
+
+/**
+ * Return the most recently completed Friday-to-Friday reporting window.
+ * The end is exclusive, so the included organization calendar days are
+ * Friday through Thursday. This is deliberately separate from calendar-week
+ * views, which use Sunday through Saturday.
+ */
+export function organizationCompletedReportingPeriodUtcRange(
+  instant: Date,
+  organizationId?: string,
+  resolver: OrganizationTimezoneResolver = organizationTimezoneResolver,
+): { start: Date; end: Date } {
+  const current = organizationCalendarDate(instant, organizationId, resolver);
+  const dayOfWeek = new Date(Date.UTC(current.year, current.month - 1, current.day)).getUTCDay();
+  const daysSinceFriday = (dayOfWeek - 5 + 7) % 7;
+  const completedPeriodEnd = addCalendarDays(current, -daysSinceFriday);
+  return organizationCalendarRangeUtc(
+    addCalendarDays(completedPeriodEnd, -7),
+    completedPeriodEnd,
     organizationId,
     resolver,
   );

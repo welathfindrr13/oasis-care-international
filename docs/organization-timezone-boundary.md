@@ -13,6 +13,11 @@ Local wall-clock conversion has three explicit outcomes: unique, repeated or
 missing. Repeated and missing times occur around daylight-saving transitions.
 Visit inputs reject both rather than selecting an instant silently.
 
+Calendar-week views retain the existing Sunday-to-Saturday boundary. The AI
+batch has a separate, explicitly named completed reporting period covering
+Friday through Thursday. Both resolve calendar boundaries through the
+organization timezone; neither relies on the host timezone.
+
 Medication schedule materialization also rejects repeated or missing local
 times before the prescription is written. Choosing which repeated occurrence
 represents a scheduled dose is a clinical policy decision and remains outside

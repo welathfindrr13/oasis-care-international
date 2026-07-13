@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Header } from '../../components/oasis/Header'
 import { CarePlanningActions } from '../../components/care-planning/CarePlanningActions'
 import { query } from '../../lib/graphql/client'
+import { formatDate as formatOrganizationDate } from '../../lib/time'
 import {
   CARE_PLANNING_QUERY,
   CLIENTS_QUERY,
@@ -40,12 +41,7 @@ async function getCarePlanningSafe(clientId: string): Promise<CarePlanningQueryR
 
 function formatDate(value?: string | null): string {
   if (!value) return 'Not set'
-
-  return new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(value))
+  return formatOrganizationDate(value)
 }
 
 function countKeys(value?: Record<string, unknown> | null): number {

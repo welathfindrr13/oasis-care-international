@@ -4,6 +4,10 @@ import { DateTime } from 'luxon';
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import * as fs from 'fs';
 import * as path from 'path';
+import {
+  organizationCompletedReportingPeriodUtcRange,
+  resolveOrganizationTimezone,
+} from '@oasis/time';
 
 interface BatchMetrics {
   startTime: DateTime;
@@ -71,9 +75,6 @@ export class EmbeddingBatchService {
         return;
       }
 
-      const { periodStart, periodEnd } = this.calculateWeeklyPeriod();
-      this.logger.log(`Generating summaries for period: ${periodStart.toISODate()} to ${periodEnd.toISODate()}`);
-
       // Get all clients with AI summary enabled  
       const clients = await this.prisma.client.findMany({
         where: {
@@ -87,10 +88,21 @@ export class EmbeddingBatchService {
       });
 
       this.logger.log(`Found ${clients.length} clients with AI summarization enabled`);
+      const batchInstant = new Date();
 
       for (const client of clients) {
         try {
           const clientStartTime = DateTime.now();
+          if (!client.organization_id) {
+            throw new Error('AI summary client has no organization context');
+          }
+          const { periodStart, periodEnd } = this.calculateCompletedReportingPeriod(
+            batchInstant,
+            client.organization_id,
+          );
+          this.logger.log(
+            `Generating summary for client ${client.id} for period: ${periodStart.toISODate()} to ${periodEnd.toISODate()}`,
+          );
           await this.generateClientSummary(client.id, periodStart, periodEnd);
           
           const processingTime = DateTime.now().diff(clientStartTime).milliseconds;
@@ -120,15 +132,16 @@ export class EmbeddingBatchService {
    * Calculate the previous week's Friday-Thursday period
    * Called on Friday 02:00 AM to process the completed week
    */
-  private calculateWeeklyPeriod(): { periodStart: DateTime; periodEnd: DateTime } {
-    const now = DateTime.now().setZone('Europe/London');
-    
-    // Current execution should be Friday 02:00 AM
-    // We want the previous 7 days: Friday to Thursday
-    const periodEnd = now.startOf('day'); // Thursday 00:00 (end of period)
-    const periodStart = periodEnd.minus({ days: 7 }); // Previous Friday 00:00 (start of period)
-    
-    return { periodStart, periodEnd };
+  private calculateCompletedReportingPeriod(
+    now: Date,
+    organizationId: string,
+  ): { periodStart: DateTime; periodEnd: DateTime } {
+    const period = organizationCompletedReportingPeriodUtcRange(now, organizationId);
+    const zone = resolveOrganizationTimezone(organizationId);
+    return {
+      periodStart: DateTime.fromJSDate(period.start, { zone }),
+      periodEnd: DateTime.fromJSDate(period.end, { zone }),
+    };
   }
 
   private async generateClientSummary(

@@ -9,6 +9,7 @@ import { clientQuery } from '../../../../lib/graphql/client-side';
 import {
   formatDateTime,
   formatOrganizationDateTimeInput,
+  getOrganizationMonthUtcRange,
   organizationDateKey,
   organizationDateTimeInputToIso,
 } from '../../../../lib/time';
@@ -167,9 +168,9 @@ export default function ClientCareLogsPage() {
     const [yearStr, monthStr] = selectedMonth.split('-');
     const year = Number(yearStr);
     const month = Number(monthStr);
-    const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
-    const endExclusive = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
-    const end = new Date(endExclusive.getTime() - 1);
+    const range = getOrganizationMonthUtcRange(year, month);
+    const start = new Date(range.start);
+    const end = new Date(new Date(range.end).getTime() - 1);
     return { year, month, start, end };
   }, [selectedMonth]);
 

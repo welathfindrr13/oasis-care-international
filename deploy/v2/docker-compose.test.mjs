@@ -84,6 +84,15 @@ test('web and api services expose only safe live revision metadata to health end
   assert.doesNotMatch(compose, /APP_COMMIT_SHA:\s*\$\{DATABASE_URL|APP_VERSION:\s*\$\{DATABASE_URL/);
 });
 
+test('api production image packages every compiled Oasis workspace dependency', () => {
+  assert.match(apiDockerfile, /COPY libs\/time\/package\.json \.\/libs\/time\//);
+  assert.match(apiDockerfile, /RUN cd libs\/time && pnpm build/);
+  assert.match(apiDockerfile, /sed -i[^\n]*libs\/time\/package\.json/);
+  assert.match(apiDockerfile, /ln -s \/app\/libs\/time node_modules\/@oasis\/time/);
+  assert.match(apiDockerfile, /COPY --from=build \/app\/libs\/time\/dist \.\/libs\/time\/dist/);
+  assert.match(apiDockerfile, /RUN node -e "require\('@oasis\/time'\)"/);
+});
+
 test('api service does not inject a default Clerk audience', () => {
   const apiBlock = serviceBlock('api');
 

@@ -5,6 +5,7 @@ import {
   organizationDateKey,
   organizationDayUtcRange,
   organizationCalendarMonthUtcRange,
+  organizationCompletedReportingPeriodUtcRange,
   organizationWeekUtcRange,
   resolveOrganizationTimezone,
   resolveOrganizationWallClock,
@@ -80,4 +81,24 @@ test('constructs organization month and week ranges across a BST transition', ()
   const week = organizationWeekUtcRange(new Date('2026-03-29T12:00:00.000Z'));
   assert.equal(week.start.toISOString(), '2026-03-29T00:00:00.000Z');
   assert.equal(week.end.toISOString(), '2026-04-04T23:00:00.000Z');
+});
+
+test('keeps completed Friday-Thursday reporting periods separate from calendar weeks', () => {
+  const reporting = organizationCompletedReportingPeriodUtcRange(
+    new Date('2026-04-03T01:00:00.000Z'),
+  );
+  assert.equal(reporting.start.toISOString(), '2026-03-27T00:00:00.000Z');
+  assert.equal(reporting.end.toISOString(), '2026-04-02T23:00:00.000Z');
+
+  const resolver: OrganizationTimezoneResolver = {
+    resolve: (organizationId) =>
+      organizationId === 'org-new-york' ? 'America/New_York' : 'Europe/London',
+  };
+  const newYork = organizationCompletedReportingPeriodUtcRange(
+    new Date('2026-04-03T12:00:00.000Z'),
+    'org-new-york',
+    resolver,
+  );
+  assert.equal(newYork.start.toISOString(), '2026-03-27T04:00:00.000Z');
+  assert.equal(newYork.end.toISOString(), '2026-04-03T04:00:00.000Z');
 });

@@ -579,6 +579,36 @@ describe('MedicationService', () => {
       });
 
       expect(repository.createPrescription).not.toHaveBeenCalled();
+      expect(repository.createMedicationAdministrationsBulk).not.toHaveBeenCalled();
+      expect(repository.createMedicationAudit).not.toHaveBeenCalled();
+    });
+
+    it('rejects a missing spring medication wall time without writing care records', async () => {
+      repository.findMedicationById.mockResolvedValue({ id: 'medication-123' } as any);
+      repository.findClientInOrganization.mockResolvedValue({ id: 'client-123' } as any);
+
+      await expect(
+        service.createPrescription(
+          {
+            clientId: 'client-123',
+            medicationId: 'medication-123',
+            startDate: '2026-03-29',
+            endDate: '2026-03-29',
+            frequencyPerDay: 1,
+            administrationTimes: ['01:30'],
+          },
+          mockAdminUser.id,
+          mockAdminUser.role,
+          organizationId,
+        ),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { code: ErrorCode.MEDICATION_SCHEDULE_TIME_UNRESOLVED },
+      });
+
+      expect(repository.createPrescription).not.toHaveBeenCalled();
+      expect(repository.createMedicationAdministrationsBulk).not.toHaveBeenCalled();
+      expect(repository.createMedicationAudit).not.toHaveBeenCalled();
     });
 
     it('should allow admin to create medications', async () => {

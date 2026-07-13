@@ -83,24 +83,12 @@ function formatAddress(client: {
 
 function formatShortDateTime(value?: string | null): string {
   if (!value) return 'Not set'
-
-  return new Intl.DateTimeFormat('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
+  return formatDateTime(value, { weekday: 'short' })
 }
 
 function formatShortDate(value?: string | null): string {
   if (!value) return 'Not set'
-
-  return new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(value))
+  return formatDate(value)
 }
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {

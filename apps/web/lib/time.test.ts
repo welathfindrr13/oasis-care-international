@@ -7,6 +7,7 @@ import {
   formatOrganizationDateTimeInput,
   formatTime,
   getOrganizationDateUtcRange,
+  getOrganizationMonthUtcRange,
   getOrganizationWeekUtcRange,
   getLondonDayUtcRange,
   organizationDateKey,
@@ -52,6 +53,10 @@ test('keeps Manager and Family rendering on the organization calendar', () => {
   assert.deepEqual(getOrganizationWeekUtcRange(new Date('2026-03-29T12:00:00.000Z')), {
     start: '2026-03-29T00:00:00.000Z',
     end: '2026-04-04T23:00:00.000Z',
+  })
+  assert.deepEqual(getOrganizationMonthUtcRange(2026, 7), {
+    start: '2026-06-30T23:00:00.000Z',
+    end: '2026-07-31T23:00:00.000Z',
   })
 })
 

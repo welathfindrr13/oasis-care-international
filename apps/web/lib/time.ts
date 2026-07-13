@@ -1,6 +1,7 @@
 import {
   formatInOrganizationTimezone,
   organizationCalendarDayUtcRange,
+  organizationCalendarMonthUtcRange,
   organizationDateKey as dateKeyInOrganizationTimezone,
   organizationDayUtcRange,
   organizationWallClock,
@@ -89,6 +90,14 @@ export function getOrganizationDateUtcRange(dateKey: string): OrganizationDayRan
 
 export function getOrganizationWeekUtcRange(now: Date = new Date()): OrganizationDayRange {
   const range = organizationWeekUtcRange(now);
+  return { start: range.start.toISOString(), end: range.end.toISOString() };
+}
+
+export function getOrganizationMonthUtcRange(
+  year: number,
+  month: number,
+): OrganizationDayRange {
+  const range = organizationCalendarMonthUtcRange(year, month);
   return { start: range.start.toISOString(), end: range.end.toISOString() };
 }
 

@@ -9,6 +9,7 @@ import { clientQuery } from '../../lib/graphql/client-side';
 import {
   formatDate as formatOrganizationDate,
   formatTime as formatOrganizationTime,
+  organizationDateKey,
 } from '../../lib/time';
 
 interface MedicationAdministration {
@@ -144,8 +145,7 @@ function EmarPageContent() {
   } = useClientAccess();
 
   const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+    return organizationDateKey();
   });
 
   const [loading, setLoading] = useState(true);
