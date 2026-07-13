@@ -37,11 +37,13 @@ import { MedicationService } from '../src/medication/medication.service';
 import { MedicationRepository } from '../src/medication/medication.repository';
 import { AuthAccessModule } from '../src/auth/auth-access.module';
 import type { CanonicalAccessContext } from '../src/auth/access-context.service';
+import { CarerInvitationService } from '../src/carer/carer-invitation.service';
 
 describe('Visit E2E Tests', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let visitService: VisitService;
+  let carerInvitations: CarerInvitationService;
   let postgresContainer: StartedPostgreSqlContainer;
   let fixtures: any;
 
@@ -134,6 +136,12 @@ describe('Visit E2E Tests', () => {
     app = moduleFixture.createNestApplication();
     prisma = app.get<PrismaService>(PrismaService);
     visitService = app.get<VisitService>(VisitService);
+    carerInvitations = new CarerInvitationService(prisma, {
+      ensureOrganizationInvitation: jest.fn(),
+      revokeOrganizationInvitation: jest.fn(),
+      revokeOrganizationInvitationByInternalId: jest.fn(),
+      removeOrganizationMembership: jest.fn(),
+    } as any);
 
     // Apply global filters
     app.useGlobalFilters(new HttpExceptionFilter(), new GraphqlExceptionFilter());
@@ -713,8 +721,9 @@ describe('Visit E2E Tests', () => {
         actorRole: 'carer',
         notesAppended: true,
         actualEndWasProvided: true,
-        previousNotesLength: 'Initial handover note.'.length,
-        completionNoteLength: input.notes.length,
+        completionFingerprintVersion: 1,
+        completionRequestFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+        completionRecordFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
       });
       expect(JSON.stringify(audits)).not.toContain(input.notes);
     });
@@ -775,9 +784,15 @@ describe('Visit E2E Tests', () => {
       });
       expect(completed.body.errors).toBeUndefined();
 
+      const persisted = await prisma.visit.findUniqueOrThrow({
+        where: { id: visit.id },
+      });
+      const equalLengthReplacement = `X${persisted.notes!.slice(1)}`;
+      expect(equalLengthReplacement).toHaveLength(persisted.notes!.length);
+      expect(equalLengthReplacement.endsWith(completionNote)).toBe(true);
       await prisma.visit.update({
         where: { id: visit.id },
-        data: { notes: `Tampered replacement.\n${completionNote}` },
+        data: { notes: equalLengthReplacement },
       });
       const retry = await completeVisit({
         visitId: visit.id,
@@ -785,6 +800,51 @@ describe('Visit E2E Tests', () => {
         actualEnd,
       });
       expect(retry.body.errors?.[0]?.extensions?.code).toBe(
+        'VISIT_COMPLETION_CONFLICT',
+      );
+    });
+
+    it('rejects an identical request after the persisted actual end is mutated', async () => {
+      const visit = await createCompletionVisit();
+      const input = {
+        visitId: visit.id,
+        notes: 'Audited completion request.',
+        actualEnd: '2024-03-01T09:55:00.000Z',
+      };
+      const completed = await completeVisit(input);
+      expect(completed.body.errors).toBeUndefined();
+
+      await prisma.visit.update({
+        where: { id: visit.id },
+        data: { actual_end: new Date('2024-03-01T09:56:00.000Z') },
+      });
+      const retry = await completeVisit(input);
+      expect(retry.body.errors?.[0]?.extensions?.code).toBe(
+        'VISIT_COMPLETION_CONFLICT',
+      );
+    });
+
+    it('distinguishes omitted actual end semantics from an explicit audited value', async () => {
+      const visit = await createCompletionVisit();
+      const input = {
+        visitId: visit.id,
+        notes: 'End time intentionally omitted.',
+      };
+      const completed = await completeVisit(input);
+      expect(completed.body.errors).toBeUndefined();
+      const auditedActualEnd = completed.body.data.completeVisit.actualEnd;
+
+      const omittedRetry = await completeVisit(input);
+      expect(omittedRetry.body.errors).toBeUndefined();
+      expect(omittedRetry.body.data.completeVisit.actualEnd).toBe(
+        auditedActualEnd,
+      );
+
+      const explicitRetry = await completeVisit({
+        ...input,
+        actualEnd: auditedActualEnd,
+      });
+      expect(explicitRetry.body.errors?.[0]?.extensions?.code).toBe(
         'VISIT_COMPLETION_CONFLICT',
       );
     });
@@ -828,6 +888,21 @@ describe('Visit E2E Tests', () => {
         status: 'COMPLETED',
         actual_end: originalActualEnd,
         notes: 'Legacy completion without transactional audit metadata.',
+      });
+      await prisma.auditLog.create({
+        data: {
+          organization_id: fixtures.organization.id,
+          user_id: TEST_USERS.carer.sub,
+          action: 'VISIT_COMPLETED',
+          resource_type: 'Visit',
+          resource_id: legacyCompleted.id,
+          new_values: {
+            status: 'COMPLETED',
+            actualEnd: originalActualEnd.toISOString(),
+            notesAppended: true,
+            actualEndWasProvided: true,
+          },
+        },
       });
       const unprovableRetry = await completeVisit({
         visitId: legacyCompleted.id,
@@ -924,8 +999,14 @@ describe('Visit E2E Tests', () => {
       expect(persisted.notes).toContain('Concurrent completion evidence.');
     });
 
-    it('revalidates an admitted request after a queued membership revocation wins', async () => {
-      const visit = await createCompletionVisit();
+    it.each(['complete', 'start'] as const)(
+      'revalidates an admitted %s request after real deactivation wins the lifecycle lock',
+      async (action) => {
+      const visit = await createCompletionVisit(
+        action === 'start'
+          ? { status: 'SCHEDULED', actual_start: null }
+          : undefined,
+      );
       const membershipId = fixtures.memberships.carerMembership.id;
       const organizationId = fixtures.organization.id;
       const carerId = fixtures.carers.carer.id;
@@ -945,18 +1026,10 @@ describe('Visit E2E Tests', () => {
       });
       await locked;
 
-      const revoking = prisma.$transaction(async (tx) => {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`carer-membership:${membershipId}`}, 0))`;
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`carer-identity:${organizationId}:${carerId}`}, 0))`;
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`carer-assignment:${organizationId}:${carerId}`}, 0))`;
-        await tx.organizationMembership.update({
-          where: { id: membershipId },
-          data: { status: 'REVOKED', revoked_at: new Date() },
-        });
-        await tx.carer.update({
-          where: { id: carerId },
-          data: { is_active: false },
-        });
+      const deactivating = carerInvitations.deactivateMembership(membershipId, {
+        organizationId,
+        organizationMembershipId: fixtures.memberships.adminMembership.id,
+        authSubject: TEST_USERS.admin.sub,
       });
 
       let revocationQueued = false;
@@ -975,18 +1048,27 @@ describe('Visit E2E Tests', () => {
       if (!revocationQueued) {
         releaseLock();
         await lockHolder;
-        await revoking;
+        await deactivating;
       }
       expect(revocationQueued).toBe(true);
 
-      const completing = visitService.completeVisit(
-        { visitId: visit.id, notes: 'Must be denied after revocation.' },
-        carerId,
-        'carer',
-        organizationId,
-        access,
-      );
-      const completionDenied = expect(completing).rejects.toMatchObject({
+      const admittedWrite =
+        action === 'complete'
+          ? visitService.completeVisit(
+              { visitId: visit.id, notes: 'Must be denied after revocation.' },
+              carerId,
+              'carer',
+              organizationId,
+              access,
+            )
+          : visitService.startVisit(
+              visit.id,
+              carerId,
+              'carer',
+              organizationId,
+              access,
+            );
+      const writeDenied = expect(admittedWrite).rejects.toMatchObject({
         response: {
           code: 'FORBIDDEN',
           message: 'Access is unavailable for this account',
@@ -994,20 +1076,29 @@ describe('Visit E2E Tests', () => {
       });
       releaseLock();
       await lockHolder;
-      await revoking;
-      await completionDenied;
+      await deactivating;
+      await writeDenied;
 
-      const [persisted, auditCount] = await Promise.all([
+      const [persisted, membership, auditCount] = await Promise.all([
         prisma.visit.findUniqueOrThrow({ where: { id: visit.id } }),
+        prisma.organizationMembership.findUniqueOrThrow({
+          where: { id: membershipId },
+        }),
         prisma.auditLog.count({
           where: { resource_type: 'Visit', resource_id: visit.id },
         }),
       ]);
-      expect(persisted.status).toBe('IN_PROGRESS');
+      expect(membership.status).toBe('REVOKED');
+      expect(membership.revoked_at).not.toBeNull();
+      expect(persisted.status).toBe(
+        action === 'complete' ? 'IN_PROGRESS' : 'SCHEDULED',
+      );
       expect(persisted.actual_end).toBeNull();
       expect(persisted.notes).toBe('Initial handover note.');
+      if (action === 'start') expect(persisted.actual_start).toBeNull();
       expect(auditCount).toBe(0);
-    });
+      },
+    );
 
     it('rolls back the visit mutation when the completion audit insert fails', async () => {
       const visit = await createCompletionVisit();

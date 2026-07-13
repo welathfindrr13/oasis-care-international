@@ -9,6 +9,7 @@ import {
 } from "@oasis/db";
 import { VISIT_TASK_OUTCOME_PREFIX } from "./visit.constants";
 import { assertTenantOwnershipForSensitiveWrite } from "../common/tenant/tenant-ownership";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 export type CompleteVisitConflictReason =
   | "CANCELLED"
@@ -189,24 +190,6 @@ export class VisitRepository {
     return { items, total };
   }
 
-  async update(
-    id: string,
-    data: Prisma.VisitUpdateInput,
-    organizationId: string,
-  ): Promise<Visit> {
-    const updated = await this.prisma.visit.updateMany({
-      where: this.prisma.whereNotDeleted({
-        id,
-        organization_id: organizationId,
-      }),
-      data,
-    });
-    if (updated.count === 0) {
-      throw new Error("Visit not found in organization");
-    }
-    return this.findById(id, organizationId) as Promise<Visit>;
-  }
-
   async updateScheduleAtomically(input: {
     visitId: string;
     organizationId: string;
@@ -366,23 +349,25 @@ export class VisitRepository {
           const completionMetadata = this.completionMetadata(
             completionAudit?.new_values,
           );
-          const actualEndMatches =
-            completionMetadata?.actualEndWasProvided ===
-              input.actualEndWasProvided &&
-            (!input.actualEndWasProvided ||
-              (visit.actual_end !== null &&
-                input.requestedActualEnd !== null &&
-                visit.actual_end.getTime() ===
-                  input.requestedActualEnd.getTime()));
-          const noteMatches = Boolean(
+          const requestFingerprint = this.completionRequestFingerprint(input);
+          const recordFingerprint = this.completionRecordFingerprint(
+            visit.notes,
+            visit.actual_end,
+          );
+          const proofMatches = Boolean(
             completionMetadata &&
-              this.completionNoteMatchesAudit(
-                visit.notes,
-                input.completionNote,
-                completionMetadata,
+              visit.actual_end?.toISOString() ===
+                completionMetadata.auditedActualEnd &&
+              this.fingerprintsMatch(
+                requestFingerprint,
+                completionMetadata.requestFingerprint,
+              ) &&
+              this.fingerprintsMatch(
+                recordFingerprint,
+                completionMetadata.recordFingerprint,
               ),
           );
-          if (!actualEndMatches || !noteMatches) {
+          if (!proofMatches) {
             return {
               status: "CONFLICT",
               reason: "COMPLETED_DETAILS",
@@ -396,8 +381,7 @@ export class VisitRepository {
             previousActualEnd: visit.actual_end,
             effectiveActualEnd: visit.actual_end,
             notesAppended: false,
-            previousNotesLength: completionMetadata.previousNotesLength,
-            completionNoteLength: completionMetadata.completionNoteLength,
+            persistedNotes: visit.notes,
           });
           return { status: "IDEMPOTENT", visit } as const;
         }
@@ -473,8 +457,7 @@ export class VisitRepository {
           previousActualEnd: visit.actual_end,
           effectiveActualEnd,
           notesAppended: Boolean(input.completionNote),
-          previousNotesLength: (visit.notes || "").length,
-          completionNoteLength: (input.completionNote || "").length,
+          persistedNotes: notes,
           timestamp: recordedAt,
         });
 
@@ -756,63 +739,79 @@ export class VisitRepository {
   }
 
   private completionMetadata(value: Prisma.JsonValue | null | undefined): {
-    actualEndWasProvided: boolean;
-    notesAppended: boolean;
-    previousNotesLength: number;
-    completionNoteLength: number;
+    auditedActualEnd: string;
+    requestFingerprint: string;
+    recordFingerprint: string;
   } | null {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return null;
     }
     const metadata = value as Prisma.JsonObject;
     if (
-      typeof metadata.actualEndWasProvided !== "boolean" ||
-      typeof metadata.notesAppended !== "boolean" ||
-      typeof metadata.previousNotesLength !== "number" ||
-      typeof metadata.completionNoteLength !== "number" ||
-      !Number.isSafeInteger(metadata.previousNotesLength) ||
-      !Number.isSafeInteger(metadata.completionNoteLength) ||
-      metadata.previousNotesLength < 0 ||
-      metadata.completionNoteLength < 0 ||
-      metadata.notesAppended !== (metadata.completionNoteLength > 0)
+      metadata.completionFingerprintVersion !== 1 ||
+      !this.isCanonicalInstant(metadata.actualEnd) ||
+      !this.isFingerprint(metadata.completionRequestFingerprint) ||
+      !this.isFingerprint(metadata.completionRecordFingerprint)
     ) {
       return null;
     }
     return {
-      actualEndWasProvided: metadata.actualEndWasProvided,
-      notesAppended: metadata.notesAppended,
-      previousNotesLength: metadata.previousNotesLength,
-      completionNoteLength: metadata.completionNoteLength,
+      auditedActualEnd: metadata.actualEnd,
+      requestFingerprint: metadata.completionRequestFingerprint as string,
+      recordFingerprint: metadata.completionRecordFingerprint as string,
     };
   }
 
-  private completionNoteMatchesAudit(
-    currentNotes: string | null,
-    completionNote: string | null,
-    metadata: {
-      notesAppended: boolean;
-      previousNotesLength: number;
-      completionNoteLength: number;
-    },
-  ): boolean {
-    const current = currentNotes || "";
-    const requested = completionNote || "";
-    if (
-      metadata.notesAppended !== Boolean(completionNote) ||
-      metadata.completionNoteLength !== requested.length
-    ) {
-      return false;
-    }
-    if (!metadata.notesAppended) {
-      return current.length === metadata.previousNotesLength;
-    }
-    const separatorLength = metadata.previousNotesLength > 0 ? 1 : 0;
-    const noteStart = metadata.previousNotesLength + separatorLength;
-    return (
-      current.length === noteStart + metadata.completionNoteLength &&
-      current.slice(noteStart) === requested &&
-      (separatorLength === 0 || current[metadata.previousNotesLength] === "\n")
+  private completionRequestFingerprint(input: CompleteVisitAtomicInput): string {
+    return this.fingerprint([
+      "visit-completion-request-v1",
+      input.actualEndWasProvided,
+      input.actualEndWasProvided
+        ? input.requestedActualEnd?.toISOString() ?? null
+        : null,
+      input.completionNote,
+    ]);
+  }
+
+  private completionRecordFingerprint(
+    notes: string | null,
+    actualEnd: Date | null,
+  ): string {
+    return this.fingerprint([
+      "visit-completion-record-v1",
+      notes,
+      actualEnd?.toISOString() ?? null,
+    ]);
+  }
+
+  private fingerprint(value: unknown): string {
+    const rootSecret = String(
+      process.env.AUDIT_FINGERPRINT_SECRET || process.env.JWT_SECRET || "",
     );
+    if (!rootSecret) {
+      throw new Error("Audit fingerprint secret is required");
+    }
+    const domainKey = createHmac("sha256", rootSecret)
+      .update("oasis:audit-fingerprint:v1", "utf8")
+      .digest();
+    return createHmac("sha256", domainKey)
+      .update(JSON.stringify(value), "utf8")
+      .digest("hex");
+  }
+
+  private isFingerprint(value: unknown): value is string {
+    return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+  }
+
+  private isCanonicalInstant(value: unknown): value is string {
+    if (typeof value !== "string") return false;
+    const parsed = new Date(value);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
+  }
+
+  private fingerprintsMatch(left: string, right: string): boolean {
+    if (!this.isFingerprint(left) || !this.isFingerprint(right)) return false;
+    return timingSafeEqual(Buffer.from(left, "hex"), Buffer.from(right, "hex"));
   }
 
   private async createCompletionAudit(
@@ -824,8 +823,7 @@ export class VisitRepository {
       previousActualEnd: Date | null;
       effectiveActualEnd: Date | null;
       notesAppended: boolean;
-      previousNotesLength: number;
-      completionNoteLength: number;
+      persistedNotes: string | null;
       timestamp?: Date;
     },
   ): Promise<void> {
@@ -847,8 +845,14 @@ export class VisitRepository {
           actorRole: options.input.actor.role,
           notesAppended: options.notesAppended,
           actualEndWasProvided: options.input.actualEndWasProvided,
-          previousNotesLength: options.previousNotesLength,
-          completionNoteLength: options.completionNoteLength,
+          completionFingerprintVersion: 1,
+          completionRequestFingerprint: this.completionRequestFingerprint(
+            options.input,
+          ),
+          completionRecordFingerprint: this.completionRecordFingerprint(
+            options.persistedNotes,
+            options.effectiveActualEnd,
+          ),
         },
         timestamp: options.timestamp || new Date(),
       },

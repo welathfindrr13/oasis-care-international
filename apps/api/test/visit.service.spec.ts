@@ -20,7 +20,6 @@ describe("VisitService", () => {
     createIfAssignable: jest.fn(),
     findById: jest.fn(),
     findMany: jest.fn(),
-    update: jest.fn(),
     updateScheduleAtomically: jest.fn(),
     startAtomically: jest.fn(),
     completeAtomically: jest.fn(),
@@ -260,7 +259,6 @@ describe("VisitService", () => {
         scheduledStart: new Date(updateVisitInput.scheduledStart),
         scheduledEnd: new Date(updateVisitInput.scheduledEnd),
       });
-      expect(repository.update).not.toHaveBeenCalled();
       expect(result.scheduled_start).toEqual(
         new Date(updateVisitInput.scheduledStart),
       );
