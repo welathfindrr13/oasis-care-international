@@ -138,6 +138,21 @@ function HeaderContent({
   }, [pathname]);
 
   useEffect(() => {
+    const main = document.querySelector("main");
+    if (!(main instanceof HTMLElement)) return;
+
+    const addedId = !main.id;
+    const addedTabIndex = !main.hasAttribute("tabindex");
+    if (addedId) main.id = "main-content";
+    if (addedTabIndex) main.tabIndex = -1;
+
+    return () => {
+      if (addedId && main.id === "main-content") main.removeAttribute("id");
+      if (addedTabIndex && main.tabIndex === -1) main.removeAttribute("tabindex");
+    };
+  }, [pathname]);
+
+  useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         if (profileOpen) {
@@ -175,6 +190,12 @@ function HeaderContent({
         className,
       )}
     >
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-[60] focus:rounded-md focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-oasis-teal-dark focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-oasis-teal focus:ring-offset-2"
+      >
+        Skip to main content
+      </a>
       <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
         <div className="flex min-h-16 items-center justify-between gap-3">
           <Link
