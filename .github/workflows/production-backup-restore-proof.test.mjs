@@ -152,6 +152,14 @@ test("durable production key and archive are regular root-only files", () => {
   assert.match(workflow, /openssl rand -hex 32/);
   assert.match(workflow, /ln "\$temporary_key" "\$key_file"/);
   assert.match(workflow, /stat -c '%u:%g:%a'.*= 0:0:600/);
+  assert.match(
+    workflow,
+    /stat -c '%u:%g:%a' \/etc\/oasis.*= 0:0:700.*PRODUCTION_BACKUP_STORAGE_INVALID/,
+  );
+  assert.match(
+    workflow,
+    /stat -c '%u:%g:%a' \/var\/backups\/oasis.*= 0:0:700.*PRODUCTION_BACKUP_STORAGE_INVALID/,
+  );
   assert.match(workflow, /validate-key "\$key_file"/);
   assert.match(workflow, /PRODUCTION_BACKUP_KEY_READY/);
   assert.match(workflow, /PRODUCTION_BACKUP_ARCHIVE_READY/);
@@ -346,6 +354,10 @@ esac
 set -euo pipefail
 target="\${!#}"
 if [[ -d "$target" ]]; then
+  if [[ "\${BAD_STORAGE_OWNER:-false}" == true ]] && { [[ "$target" == "${etc}" ]] || [[ "$target" == "${backups}" ]]; }; then
+    printf '1000:1000:700\\n'
+    exit 0
+  fi
   printf '0:0:700\\n'
 else
   printf '0:0:600\\n'
@@ -423,6 +435,30 @@ printf '%064d  %s\\n' 0 "\${1:-synthetic}"
   assert.equal(fs.existsSync(retrievalFile), true);
   assert.equal(fs.existsSync(keyFile), true);
   assert.equal(fs.existsSync(path.join(helperDir, "retrieval.sha256")), true);
+
+  const wrongStorageOwner = spawnSync(
+    "/bin/bash",
+    [
+      "-c",
+      remoteProof,
+      "remote-proof",
+      targetSha,
+      helperDir,
+      backupFile,
+      keyFile,
+      retrievalFile,
+    ],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        BAD_STORAGE_OWNER: "true",
+        PATH: `${bin}:/usr/bin:/bin`,
+      },
+    },
+  );
+  assert.notEqual(wrongStorageOwner.status, 0);
+  assert.match(wrongStorageOwner.stderr, /PRODUCTION_BACKUP_STORAGE_INVALID/);
 
   const mismatchFile = path.join(backups, "oasis-proof-12345-2.dump.enc");
   const mismatch = spawnSync(
