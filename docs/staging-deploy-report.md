@@ -1,3 +1,4 @@
+> **Historical evidence — superseded operational direction.** This report is preserved as an audit trail of the 2025 AWS staging experiments. It is not a current deployment runbook or readiness verdict. Use [the canonical Oasis pilot readiness gate](production-readiness-gate.md) and [Deployment V2 runbook](deployment-v2/README.md) for current decisions. Do not repeat the recorded production or staging actions without a new explicit approval.
 
 ---
 
