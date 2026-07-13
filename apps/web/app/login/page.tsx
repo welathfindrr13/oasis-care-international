@@ -52,7 +52,7 @@ function LoginContent() {
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col">
       {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8">
+      <main className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8">
         <div className="w-full max-w-md">
           {/* Logo & Branding */}
           <div className="text-center mb-12">
@@ -63,7 +63,7 @@ function LoginContent() {
               Oasis Care
             </h1>
             <p className="mt-2 text-slate-500 font-light">
-              Private Care Management
+              Care records for your organisation
             </p>
           </div>
 
@@ -77,8 +77,8 @@ function LoginContent() {
                 {localAuthEnabled
                   ? 'Choose a local workspace for product testing'
                   : authMode === 'clerk'
-                  ? 'Sign in with the configured Clerk workspace'
-                  : 'Sign in to access your care command centre'}
+                  ? 'Sign in with your organisation account'
+                  : 'Sign in to open your care workspace'}
               </p>
             </div>
 
@@ -101,7 +101,7 @@ function LoginContent() {
                     onChange={(event) => setRole(event.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
                   >
-                    <option value="admin">Today Command Centre</option>
+                    <option value="admin">Manager Today</option>
                     <option value="carer">Carer workspace</option>
                     <option value="user">Family view</option>
                   </select>
@@ -139,7 +139,7 @@ function LoginContent() {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
                 </svg>
-                Sign in securely
+                Sign in
               </button>
             )}
 
@@ -149,42 +149,30 @@ function LoginContent() {
                 <div className="w-full border-t border-slate-100"></div>
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="px-4 bg-white text-slate-400 uppercase tracking-wider">
-                  Secure access
+                <span className="px-4 bg-white text-slate-600 uppercase tracking-wider">
+                  Organisation access
                 </span>
               </div>
             </div>
 
-            {/* Trust Indicators */}
-            <div className="flex items-center justify-center gap-6 text-slate-400">
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-                </svg>
-                <span className="text-xs">256-bit SSL</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                </svg>
-                <span className="text-xs">GDPR Compliant</span>
-              </div>
-            </div>
+            <p className="text-center text-xs leading-5 text-slate-500">
+              Use the account provided by your organisation. What you can open depends on your assigned access.
+            </p>
           </div>
 
           {/* Footer */}
-          <p className="mt-8 text-center text-xs text-slate-400">
-            By signing in, you agree to our Terms of Service and Privacy Policy
+          <p className="mt-8 text-center text-xs text-slate-600">
+            Need help signing in? Contact your organisation administrator.
           </p>
         </div>
-      </div>
+      </main>
 
       {/* Bottom Bar */}
-      <div className="py-6 text-center">
-        <p className="text-xs text-slate-400">
+      <footer className="py-6 text-center">
+        <p className="text-xs text-slate-600">
           &copy; {new Date().getFullYear()} Oasis Care. All rights reserved.
         </p>
-      </div>
+      </footer>
     </div>
   );
 }

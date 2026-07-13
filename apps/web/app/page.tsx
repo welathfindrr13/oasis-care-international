@@ -19,7 +19,7 @@ const pillars = [
   },
   {
     name: 'Improve',
-    text: 'The command centre surfaces exceptions, overdue reviews, and trust risks before they drift.',
+    text: 'Manager Today brings together exceptions, overdue reviews, and records that need attention.',
   },
 ]
 
@@ -36,13 +36,13 @@ export default function Home() {
             <div>
               <p className="font-heading text-lg font-black tracking-tight">Oasis Care</p>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-800">
-                Proof-led care OS
+                Care records for home-care teams
               </p>
             </div>
           </div>
           <Link
             href="/login"
-            className="rounded-full border border-slate-300 bg-white/80 px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm backdrop-blur hover:border-teal-500 hover:text-teal-800"
+            className="whitespace-nowrap rounded-full border border-slate-300 bg-white/80 px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm backdrop-blur hover:border-teal-500 hover:text-teal-800"
           >
             Sign in
           </Link>
@@ -51,14 +51,14 @@ export default function Home() {
         <div className="grid flex-1 items-center gap-10 py-16 lg:grid-cols-[1.08fr_0.92fr]">
           <div>
             <p className="mb-5 inline-flex rounded-full border border-teal-200 bg-white/70 px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] text-teal-800 shadow-sm">
-              Domiciliary care, made provable
+              Clear records for home care
             </p>
             <h1 className="font-heading text-5xl font-black leading-[0.95] tracking-[-0.05em] text-slate-950 sm:text-6xl lg:text-7xl">
-              Plan care clearly. Deliver it once. Prove it when trust matters.
+              Keep care plans, visits and updates clear.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-700">
-              Oasis is becoming a proof-led care operating system: assessment-led care plans, guided visits,
-              medication support, family-safe updates, concern resolution, and inspection-ready evidence trails.
+              Oasis brings care planning, visit records, approved family updates and concern tracking into one
+              workspace. Available features depend on your organisation&apos;s setup.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
@@ -71,13 +71,13 @@ export default function Home() {
                 href="/today"
                 className="rounded-full border border-slate-300 bg-white/80 px-6 py-3 text-sm font-bold text-slate-800 shadow-sm backdrop-blur hover:border-teal-500 hover:text-teal-800"
               >
-                Open Today Command Centre
+                Open Manager Today
               </Link>
               <Link
                 href="/family-updates"
                 className="rounded-full border border-slate-300 bg-white/80 px-6 py-3 text-sm font-bold text-slate-800 shadow-sm backdrop-blur hover:border-sky-400 hover:text-sky-800"
               >
-                Review Family Updates
+                Review family updates
               </Link>
             </div>
           </div>
@@ -86,7 +86,7 @@ export default function Home() {
             <div className="rounded-[1.5rem] bg-slate-950 p-5 text-white">
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-teal-200">Core loop</p>
               <div className="mt-5 space-y-3">
-                {['Assess need', 'Approve care plan', 'Guide visit', 'Record once', 'Publish approved reassurance', 'Resolve concern', 'Preserve evidence'].map((step, index) => (
+                {['Assess need', 'Approve care plan', 'Guide visit', 'Record once', 'Publish approved update', 'Resolve concern', 'Preserve evidence'].map((step, index) => (
                   <div key={step} className="flex items-center gap-3 rounded-2xl bg-white/8 p-3">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-400/20 text-sm font-black text-teal-100">
                       {index + 1}

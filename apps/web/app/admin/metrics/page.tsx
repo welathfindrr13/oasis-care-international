@@ -2,7 +2,6 @@ import { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { Header } from '../../../components/oasis/Header'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
-import { Button } from '../../../components/ui/Button'
 import { hasRole } from '../../../lib/auth/roles'
 import { getServerAuthContext } from '../../../lib/auth/server-auth'
 
@@ -60,76 +59,42 @@ export default async function MetricsPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          {/* Quick Stats */}
           <Card>
             <CardHeader>
               <h3 className="text-lg font-semibold text-text-primary">
-                API Status
+                Source
               </h3>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Status:</span>
-                  <span className="text-green-600 font-medium">✅ Online</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Port:</span>
-                  <span className="text-text-primary font-mono">4000</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Environment:</span>
-                  <span className="text-text-primary">{process.env.NODE_ENV || 'unknown'}</span>
-                </div>
-              </div>
+              <p className="text-sm leading-6 text-text-secondary">
+                The authenticated API metrics endpoint. This page shows its response without inferring service health.
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
               <h3 className="text-lg font-semibold text-text-primary">
-                Database
+                Environment
               </h3>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Status:</span>
-                  <span className="text-green-600 font-medium">✅ Connected</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Type:</span>
-                  <span className="text-text-primary">PostgreSQL + pgvector</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Port:</span>
-                  <span className="text-text-primary font-mono">5434</span>
-                </div>
-              </div>
+              <p className="text-sm leading-6 text-text-secondary">
+                Runtime label: <span className="font-mono text-text-primary">{process.env.NODE_ENV || 'unknown'}</span>
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
               <h3 className="text-lg font-semibold text-text-primary">
-                Demo Mode
+                Access
               </h3>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Auth Mode:</span>
-                  <span className="text-green-600 font-medium">✅ JWT + RBAC</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Metrics Endpoint:</span>
-                  <span className="text-text-primary">/metrics</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Access:</span>
-                  <span className="text-green-600 font-medium">✅ Admin only</span>
-                </div>
-              </div>
+              <p className="text-sm leading-6 text-text-secondary">
+                An administrator account is required. Reload this page to request a fresh response.
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -146,9 +111,6 @@ export default async function MetricsPage() {
                   Prometheus-style metrics from the API server
                 </p>
               </div>
-              <Button variant="ghost" size="sm">
-                Refresh
-              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -171,7 +133,7 @@ export default async function MetricsPage() {
                     Admin Access Required
                   </h3>
                   <div className="mt-2 text-sm text-blue-700">
-                    <p>This page shows system metrics and is typically restricted to administrators. In demo mode, some metrics may be unavailable or simulated.</p>
+                    <p>An unavailable response is shown as unavailable. This page does not prove API or database health.</p>
                   </div>
                 </div>
               </div>
