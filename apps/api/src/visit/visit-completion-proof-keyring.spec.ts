@@ -21,6 +21,7 @@ function context() {
     visitId: "visit-1",
     expectedCarerId: "carer-1",
     authSubject: "subject-1",
+    identityProvider: "clerk",
     membershipId: "membership-1",
     actorRole: "carer",
     actorSurface: "STAFF",
@@ -75,8 +76,6 @@ describe("VisitCompletionProofKeyring", () => {
     });
     const payload = visitCompletionRequestProofPayload({
       context: context(),
-      actualEndWasProvided: true,
-      requestedActualEnd: "2026-07-13T10:00:00.000Z",
       completionNote: "Client comfortable.",
     });
     const oldProof = previous.sign("request", payload);
@@ -123,6 +122,7 @@ describe("VisitCompletionProofKeyring", () => {
     ["visitId", "visit-2"],
     ["expectedCarerId", "carer-2"],
     ["authSubject", "subject-2"],
+    ["identityProvider", "legacy"],
     ["membershipId", "membership-2"],
     ["actorRole", "staff"],
     ["actorSurface", "FAMILY"],
@@ -133,8 +133,6 @@ describe("VisitCompletionProofKeyring", () => {
     });
     const originalPayload = visitCompletionRequestProofPayload({
       context: context(),
-      actualEndWasProvided: false,
-      requestedActualEnd: null,
       completionNote: "Client comfortable.",
     });
     const proof = ring.sign("request", originalPayload);

@@ -19,7 +19,7 @@ import {
 export type CompleteVisitConflictReason =
   | "CANCELLED"
   | "COMPLETED_DETAILS"
-  | "ACTUAL_END";
+  | "NOT_STARTED";
 
 export type CompleteVisitAtomicResult =
   | { status: "COMPLETED" | "IDEMPOTENT"; visit: Visit }
@@ -37,10 +37,9 @@ export type CompleteVisitAtomicInput = {
   organizationId: string;
   expectedCarerId: string;
   completionNote: string | null;
-  requestedActualEnd: Date | null;
-  actualEndWasProvided: boolean;
   actor: {
     authSubject: string;
+    identityProvider: string;
     membershipId: string;
     role: string;
     surface: string;
@@ -270,7 +269,11 @@ export class VisitRepository {
     visitId: string;
     organizationId: string;
     expectedCarerId: string;
-    actor: { authSubject: string; membershipId: string };
+    actor: {
+      authSubject: string;
+      identityProvider: string;
+      membershipId: string;
+    };
   }): Promise<StartVisitAtomicResult> {
     return (this.prisma as any).$transaction(
       async (tx: Prisma.TransactionClient) => {
@@ -279,6 +282,7 @@ export class VisitRepository {
           carerId: input.expectedCarerId,
           membershipId: input.actor.membershipId,
           authSubject: input.actor.authSubject,
+          identityProvider: input.actor.identityProvider,
         });
         if (!active) return { status: "ACCESS_UNAVAILABLE" } as const;
 
@@ -329,6 +333,7 @@ export class VisitRepository {
           carerId: input.expectedCarerId,
           membershipId: input.actor.membershipId,
           authSubject: input.actor.authSubject,
+          identityProvider: input.actor.identityProvider,
         });
         if (!active) return { status: "ACCESS_UNAVAILABLE" } as const;
 
@@ -412,13 +417,8 @@ export class VisitRepository {
           return { status: "IDEMPOTENT", visit } as const;
         }
 
-        if (
-          visit.actual_end &&
-          input.actualEndWasProvided &&
-          input.requestedActualEnd &&
-          visit.actual_end.getTime() !== input.requestedActualEnd.getTime()
-        ) {
-          return { status: "CONFLICT", reason: "ACTUAL_END" } as const;
+        if (visit.status !== VisitStatus.IN_PROGRESS) {
+          return { status: "CONFLICT", reason: "NOT_STARTED" } as const;
         }
 
         const [taskOutcomeCount, careLogCount, medicationOutcomeCount] =
@@ -457,8 +457,7 @@ export class VisitRepository {
         }
 
         const recordedAt = new Date();
-        const effectiveActualEnd =
-          visit.actual_end || input.requestedActualEnd || recordedAt;
+        const effectiveActualEnd = visit.actual_end || recordedAt;
         const notes = input.completionNote
           ? this.appendCompletionNote(visit.notes, input.completionNote)
           : visit.notes;
@@ -666,7 +665,7 @@ export class VisitRepository {
   }
 
   private identityProvider(): string {
-    return String(process.env.AUTH_IDENTITY_PROVIDER || "cognito")
+    return String(process.env.AUTH_IDENTITY_PROVIDER || "clerk")
       .trim()
       .toLowerCase();
   }
@@ -699,6 +698,7 @@ export class VisitRepository {
       carerId: string;
       membershipId: string;
       authSubject: string;
+      identityProvider: string;
     },
   ): Promise<boolean> {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${this.membershipLockKey(input.membershipId)}, 0))`;
@@ -707,7 +707,7 @@ export class VisitRepository {
       where: {
         id: input.membershipId,
         organization_id: input.organizationId,
-        identity_provider: this.identityProvider(),
+        identity_provider: input.identityProvider,
         auth_subject: input.authSubject,
         carer_id: input.carerId,
         role: { in: ["carer", "staff"] },
@@ -806,6 +806,7 @@ export class VisitRepository {
       visitId: input.visitId,
       expectedCarerId: input.expectedCarerId,
       authSubject: input.actor.authSubject,
+      identityProvider: input.actor.identityProvider,
       membershipId: input.actor.membershipId,
       actorRole: input.actor.role,
       actorSurface: input.actor.surface,
@@ -815,10 +816,6 @@ export class VisitRepository {
   private completionRequestPayload(input: CompleteVisitAtomicInput) {
     return visitCompletionRequestProofPayload({
       context: this.completionProofContext(input),
-      actualEndWasProvided: input.actualEndWasProvided,
-      requestedActualEnd: input.actualEndWasProvided
-        ? input.requestedActualEnd?.toISOString() ?? null
-        : null,
       completionNote: input.completionNote,
     });
   }
@@ -902,7 +899,6 @@ export class VisitRepository {
           actorRole: options.input.actor.role,
           actorSurface: options.input.actor.surface,
           notesAppended: options.notesAppended,
-          actualEndWasProvided: options.input.actualEndWasProvided,
           completionFingerprintVersion: VISIT_COMPLETION_PROOF_VERSION,
           completionProofKeyId: requestProof.keyId,
           completionRequestFingerprint: requestProof.fingerprint,

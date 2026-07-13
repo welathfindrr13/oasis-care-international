@@ -338,12 +338,14 @@ export class VisitService {
     this.assertFrontlineExecution(accessContext, userId, userRole, organizationId);
     const orgId = await this.requireOrganizationId(organizationId);
     const membershipId = this.requireRuntimeMembership(accessContext);
+    const identityProvider = this.requireClerkIdentityProvider(accessContext);
     const result = await this.visitRepository.startAtomically({
       visitId,
       organizationId: orgId,
       expectedCarerId: userId,
       actor: {
         authSubject: accessContext!.authSubject,
+        identityProvider,
         membershipId,
       },
     });
@@ -487,26 +489,16 @@ export class VisitService {
     this.assertFrontlineExecution(accessContext, userId, userRole, organizationId);
     const orgId = await this.requireOrganizationId(organizationId);
     const membershipId = this.requireRuntimeMembership(accessContext);
+    const identityProvider = this.requireClerkIdentityProvider(accessContext);
     const visitNote = this.toNonEmpty(input.notes);
-    const requestedActualEnd = input.actualEnd
-      ? new Date(input.actualEnd)
-      : null;
-    if (requestedActualEnd && Number.isNaN(requestedActualEnd.getTime())) {
-      throw new BaseHttpException(
-        ErrorCode.VALIDATION_FAILED,
-        "Actual end must be a valid date and time",
-        HttpStatus.BAD_REQUEST,
-      );
-    }
     const result = await this.visitRepository.completeAtomically({
       visitId: input.visitId,
       organizationId: orgId,
       expectedCarerId: userId,
       completionNote: visitNote,
-      requestedActualEnd,
-      actualEndWasProvided: Boolean(input.actualEnd),
       actor: {
         authSubject: accessContext!.authSubject,
+        identityProvider,
         membershipId,
         role: accessContext!.effectiveRole || userRole,
         surface: accessContext!.surface,
@@ -551,8 +543,8 @@ export class VisitService {
     const message =
       result.reason === "CANCELLED"
         ? "Cancelled visits cannot be completed"
-        : result.reason === "ACTUAL_END"
-          ? "Visit already has a different actual end time"
+        : result.reason === "NOT_STARTED"
+          ? "Visit must be started before it can be completed"
           : "Visit is already completed with different completion details";
     throw new BaseHttpException(
       ErrorCode.VISIT_COMPLETION_CONFLICT,
@@ -660,6 +652,15 @@ export class VisitService {
   private toNonEmpty(value?: string | null): string | null {
     const trimmed = (value || "").trim();
     return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private requireClerkIdentityProvider(
+    accessContext?: CanonicalCapabilityActor,
+  ): "clerk" {
+    if (accessContext?.identityProvider !== "clerk") {
+      this.denyRuntimeAccess();
+    }
+    return "clerk";
   }
 
   private mergeTaskNotes(

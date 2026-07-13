@@ -37,7 +37,7 @@ describe('VisitResolver', () => {
         accessContext: {
           authenticated: true,
           authSubject: 'user-123',
-          identityProvider: 'cognito',
+          identityProvider: 'clerk',
           organizationId: 'org-123',
           membershipId: 'membership-admin',
           membershipState: 'ACTIVE',
@@ -66,7 +66,7 @@ describe('VisitResolver', () => {
         accessContext: {
           authenticated: true,
           authSubject: 'carer-123',
-          identityProvider: 'cognito',
+          identityProvider: 'clerk',
           organizationId: 'org-123',
           membershipId: 'membership-carer',
           membershipState: 'ACTIVE',
@@ -94,7 +94,7 @@ describe('VisitResolver', () => {
         accessContext: {
           authenticated: true,
           authSubject: 'client-123',
-          identityProvider: 'cognito',
+          identityProvider: 'clerk',
           organizationId: 'org-123',
           membershipId: 'membership-client',
           membershipState: 'ACTIVE',

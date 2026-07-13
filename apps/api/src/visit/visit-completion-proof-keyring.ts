@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-export const VISIT_COMPLETION_PROOF_VERSION = 2;
+export const VISIT_COMPLETION_PROOF_VERSION = 3;
 
 export type VisitCompletionProofDomain = "request" | "record";
 
@@ -16,6 +16,7 @@ export type VisitCompletionProofContext = {
   visitId: string;
   expectedCarerId: string;
   authSubject: string;
+  identityProvider: string;
   membershipId: string;
   actorRole: string;
   actorSurface: string;
@@ -23,17 +24,11 @@ export type VisitCompletionProofContext = {
 
 export function visitCompletionRequestProofPayload(input: {
   context: VisitCompletionProofContext;
-  actualEndWasProvided: boolean;
-  requestedActualEnd: string | null;
   completionNote: string | null;
 }) {
   return {
     version: VISIT_COMPLETION_PROOF_VERSION,
     context: input.context,
-    actualEndWasProvided: input.actualEndWasProvided,
-    requestedActualEnd: input.actualEndWasProvided
-      ? input.requestedActualEnd
-      : null,
     completionNote: input.completionNote,
   };
 }

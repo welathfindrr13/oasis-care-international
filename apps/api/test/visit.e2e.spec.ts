@@ -63,7 +63,7 @@ describe('Visit E2E Tests', () => {
     process.env.VISIT_COMPLETION_PROOF_ACTIVE_KEY_ID = 'test-v1';
     process.env.VISIT_COMPLETION_PROOF_ACTIVE_SECRET =
       'visit-completion-proof-test-secret-32-bytes-minimum';
-    process.env.AUTH_IDENTITY_PROVIDER = 'cognito';
+    process.env.AUTH_IDENTITY_PROVIDER = 'clerk';
     process.env.TENANT_MEMBERSHIP_REQUIRED = 'true';
 
     // Run migrations
@@ -464,7 +464,7 @@ describe('Visit E2E Tests', () => {
   describe('Guided Visit Workflow Commands', () => {
     const admittedCarerAccess = (): CanonicalAccessContext => ({
       authenticated: true as const,
-      identityProvider: 'cognito',
+      identityProvider: 'clerk',
       membershipId: fixtures.memberships.carerMembership.id,
       surface: 'STAFF' as const,
       effectiveRole: 'carer',
@@ -491,7 +491,6 @@ describe('Visit E2E Tests', () => {
     async function completeVisit(input: {
       visitId: string;
       notes?: string;
-      actualEnd?: string;
     }) {
       return request(app.getHttpServer())
         .post('/graphql')
@@ -631,7 +630,6 @@ describe('Visit E2E Tests', () => {
             input: {
               visitId,
               notes: 'Visit complete. Proof-of-care source records are available for later review.',
-              actualEnd: '2024-02-01T09:55:00Z',
             },
           },
         })
@@ -641,7 +639,9 @@ describe('Visit E2E Tests', () => {
         id: visitId,
         status: 'COMPLETED',
       });
-      expect(completeResponse.body.data.completeVisit.actualEnd).toBe('2024-02-01T09:55:00.000Z');
+      expect(completeResponse.body.data.completeVisit.actualEnd).toEqual(
+        expect.any(String),
+      );
 
       const [visit, careLogCount, storyTableRows] = await Promise.all([
         prisma.visit.findUnique({ where: { id: visitId } }),
@@ -668,7 +668,6 @@ describe('Visit E2E Tests', () => {
       const input = {
         visitId: visit.id,
         notes: 'Client settled before the Carer left.',
-        actualEnd: '2024-03-01T09:55:00.000Z',
       };
 
       const responses = await Promise.all([
@@ -681,18 +680,16 @@ describe('Visit E2E Tests', () => {
         expect(response.body.data.completeVisit).toMatchObject({
           id: visit.id,
           status: 'COMPLETED',
-          actualEnd: input.actualEnd,
         });
       }
-
-      const [omittedNote, omittedActualEnd] = await Promise.all([
-        completeVisit({ visitId: visit.id, actualEnd: input.actualEnd }),
-        completeVisit({ visitId: visit.id, notes: input.notes }),
-      ]);
-      expect(omittedNote.body.errors?.[0]?.extensions?.code).toBe(
-        'VISIT_COMPLETION_CONFLICT',
+      const actualEnds = new Set(
+        responses.map((response) => response.body.data.completeVisit.actualEnd),
       );
-      expect(omittedActualEnd.body.errors?.[0]?.extensions?.code).toBe(
+      expect(actualEnds.size).toBe(1);
+      const recordedActualEnd = responses[0].body.data.completeVisit.actualEnd;
+
+      const omittedNote = await completeVisit({ visitId: visit.id });
+      expect(omittedNote.body.errors?.[0]?.extensions?.code).toBe(
         'VISIT_COMPLETION_CONFLICT',
       );
 
@@ -703,7 +700,7 @@ describe('Visit E2E Tests', () => {
           orderBy: { timestamp: 'asc' },
         }),
       ]);
-      expect(persisted.actual_end?.toISOString()).toBe(input.actualEnd);
+      expect(persisted.actual_end?.toISOString()).toBe(recordedActualEnd);
       expect(persisted.notes).toBe(
         `Initial handover note.\n${input.notes}`,
       );
@@ -724,13 +721,12 @@ describe('Visit E2E Tests', () => {
       });
       expect(completionAudit?.new_values).toMatchObject({
         status: 'COMPLETED',
-        actualEnd: input.actualEnd,
+        actualEnd: recordedActualEnd,
         membershipId: fixtures.memberships.carerMembership.id,
         actorRole: 'carer',
         notesAppended: true,
-        actualEndWasProvided: true,
         actorSurface: 'STAFF',
-        completionFingerprintVersion: 2,
+        completionFingerprintVersion: 3,
         completionProofKeyId: 'test-v1',
         completionRequestFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
         completionRecordFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
@@ -743,7 +739,6 @@ describe('Visit E2E Tests', () => {
       const input = {
         visitId: visit.id,
         notes: 'Client comfortable when the Carer left.',
-        actualEnd: '2024-03-01T09:55:00.000Z',
       };
       await expect(
         visitService.completeVisit(
@@ -758,7 +753,7 @@ describe('Visit E2E Tests', () => {
       const secondMembership = await prisma.organizationMembership.create({
         data: {
           organization_id: fixtures.organization.id,
-          identity_provider: 'cognito',
+          identity_provider: 'clerk',
           auth_subject: 'second-subject-for-same-carer',
           role: 'carer',
           status: 'ACTIVE',
@@ -796,7 +791,6 @@ describe('Visit E2E Tests', () => {
     it('fails closed for an unknown proof key or metadata copied to another visit', async () => {
       const input = {
         notes: 'Client settled before departure.',
-        actualEnd: '2024-03-01T09:55:00.000Z',
       };
       const source = await createCompletionVisit();
       await completeVisit({ visitId: source.id, ...input });
@@ -807,6 +801,9 @@ describe('Visit E2E Tests', () => {
           action: 'VISIT_COMPLETED',
         },
       });
+      const sourceActualEnd = new Date(
+        String((sourceAudit.new_values as Record<string, unknown>).actualEnd),
+      );
 
       await prisma.auditLog.update({
         where: { id: sourceAudit.id },
@@ -824,7 +821,7 @@ describe('Visit E2E Tests', () => {
 
       const copied = await createCompletionVisit({
         status: 'COMPLETED',
-        actual_end: new Date(input.actualEnd),
+        actual_end: sourceActualEnd,
         notes: `Initial handover note.\n${input.notes}`,
       });
       await prisma.auditLog.create({
@@ -846,7 +843,6 @@ describe('Visit E2E Tests', () => {
 
     it('allows only one conflicting concurrent completion and never loses the prior note', async () => {
       const visit = await createCompletionVisit();
-      const actualEnd = '2024-03-01T09:58:00.000Z';
       const completionNotes = [
         'First concurrent completion detail.',
         'Second concurrent completion detail.',
@@ -854,7 +850,7 @@ describe('Visit E2E Tests', () => {
 
       const responses = await Promise.all(
         completionNotes.map((notes) =>
-          completeVisit({ visitId: visit.id, notes, actualEnd }),
+          completeVisit({ visitId: visit.id, notes }),
         ),
       );
       const successes = responses.filter(
@@ -879,7 +875,7 @@ describe('Visit E2E Tests', () => {
         }),
       ]);
       expect(persisted.status).toBe('COMPLETED');
-      expect(persisted.actual_end?.toISOString()).toBe(actualEnd);
+      expect(persisted.actual_end).not.toBeNull();
       expect(persisted.notes).toMatch(/^Initial handover note\.\n/);
       expect(
         completionNotes.filter((note) => persisted.notes?.includes(note)),
@@ -889,14 +885,12 @@ describe('Visit E2E Tests', () => {
 
     it('requires exact audit-bounded note evidence instead of a matching suffix', async () => {
       const completionNote = 'Repeated suffix.';
-      const actualEnd = '2024-03-01T09:57:00.000Z';
       const visit = await createCompletionVisit({
         notes: `Original note ending in the same text.\n${completionNote}`,
       });
       const completed = await completeVisit({
         visitId: visit.id,
         notes: completionNote,
-        actualEnd,
       });
       expect(completed.body.errors).toBeUndefined();
 
@@ -913,7 +907,6 @@ describe('Visit E2E Tests', () => {
       const retry = await completeVisit({
         visitId: visit.id,
         notes: completionNote,
-        actualEnd,
       });
       expect(retry.body.errors?.[0]?.extensions?.code).toBe(
         'VISIT_COMPLETION_CONFLICT',
@@ -925,7 +918,6 @@ describe('Visit E2E Tests', () => {
       const input = {
         visitId: visit.id,
         notes: 'Audited completion request.',
-        actualEnd: '2024-03-01T09:55:00.000Z',
       };
       const completed = await completeVisit(input);
       expect(completed.body.errors).toBeUndefined();
@@ -940,29 +932,31 @@ describe('Visit E2E Tests', () => {
       );
     });
 
-    it('distinguishes omitted actual end semantics from an explicit audited value', async () => {
+    it('rejects caller-selected completion time before any visit mutation', async () => {
       const visit = await createCompletionVisit();
-      const input = {
-        visitId: visit.id,
-        notes: 'End time intentionally omitted.',
-      };
-      const completed = await completeVisit(input);
-      expect(completed.body.errors).toBeUndefined();
-      const auditedActualEnd = completed.body.data.completeVisit.actualEnd;
+      const response = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('carer'))
+        .send({
+          query: completeVisitMutation,
+          variables: {
+            input: {
+              visitId: visit.id,
+              notes: 'Caller-selected time must not be accepted.',
+              actualEnd: '2024-03-01T09:55:00.000Z',
+            },
+          },
+        })
+        .expect(200);
 
-      const omittedRetry = await completeVisit(input);
-      expect(omittedRetry.body.errors).toBeUndefined();
-      expect(omittedRetry.body.data.completeVisit.actualEnd).toBe(
-        auditedActualEnd,
-      );
-
-      const explicitRetry = await completeVisit({
-        ...input,
-        actualEnd: auditedActualEnd,
+      expect(response.body.errors).toHaveLength(1);
+      await expect(
+        prisma.visit.findUniqueOrThrow({ where: { id: visit.id } }),
+      ).resolves.toMatchObject({
+        status: 'IN_PROGRESS',
+        actual_end: null,
+        notes: 'Initial handover note.',
       });
-      expect(explicitRetry.body.errors?.[0]?.extensions?.code).toBe(
-        'VISIT_COMPLETION_CONFLICT',
-      );
     });
 
     it('preserves a recorded actual end and rejects cancelled or conflicting terminal changes', async () => {
@@ -982,7 +976,6 @@ describe('Visit E2E Tests', () => {
       const conflictingRetry = await completeVisit({
         visitId: visit.id,
         notes: 'Different completion detail.',
-        actualEnd: '2024-03-01T09:59:00.000Z',
       });
       expect(conflictingRetry.body.errors?.[0]?.extensions?.code).toBe(
         'VISIT_COMPLETION_CONFLICT',
@@ -1016,14 +1009,12 @@ describe('Visit E2E Tests', () => {
             status: 'COMPLETED',
             actualEnd: originalActualEnd.toISOString(),
             notesAppended: true,
-            actualEndWasProvided: true,
           },
         },
       });
       const unprovableRetry = await completeVisit({
         visitId: legacyCompleted.id,
         notes: 'Legacy completion without transactional audit metadata.',
-        actualEnd: originalActualEnd.toISOString(),
       });
       expect(unprovableRetry.body.errors?.[0]?.extensions?.code).toBe(
         'VISIT_COMPLETION_CONFLICT',
@@ -1048,18 +1039,18 @@ describe('Visit E2E Tests', () => {
       );
     });
 
-    it('rejects a conflicting actual end before a non-terminal visit is completed', async () => {
-      const recordedActualEnd = new Date('2024-03-01T09:45:00.000Z');
+    it('rejects direct completion until a scheduled visit has started', async () => {
       const visit = await createCompletionVisit({
-        actual_end: recordedActualEnd,
+        status: 'SCHEDULED',
+        actual_start: null,
+        notes: 'Scheduled visit evidence.',
       });
 
       await expect(
         visitService.completeVisit(
           {
             visitId: visit.id,
-            notes: 'Must not replace the recorded end.',
-            actualEnd: '2024-03-01T09:55:00.000Z',
+            notes: 'Must not complete before start.',
           },
           fixtures.carers.carer.id,
           'carer',
@@ -1073,14 +1064,18 @@ describe('Visit E2E Tests', () => {
       await expect(
         prisma.visit.findUniqueOrThrow({ where: { id: visit.id } }),
       ).resolves.toMatchObject({
-        status: 'IN_PROGRESS',
-        actual_end: recordedActualEnd,
-        notes: 'Initial handover note.',
+        status: 'SCHEDULED',
+        actual_start: null,
+        actual_end: null,
+        notes: 'Scheduled visit evidence.',
       });
     });
 
-    it('never lets a concurrent start reopen a completed visit', async () => {
-      const visit = await createCompletionVisit({ status: 'SCHEDULED' });
+    it('serializes concurrent start before completion and never skips actual start', async () => {
+      const visit = await createCompletionVisit({
+        status: 'SCHEDULED',
+        actual_start: null,
+      });
       const access = admittedCarerAccess();
       const [startResult, completionResult] = await Promise.allSettled([
         visitService.startVisit(
@@ -1094,7 +1089,6 @@ describe('Visit E2E Tests', () => {
           {
             visitId: visit.id,
             notes: 'Concurrent completion evidence.',
-            actualEnd: '2024-03-01T09:55:00.000Z',
           },
           fixtures.carers.carer.id,
           'carer',
@@ -1103,15 +1097,31 @@ describe('Visit E2E Tests', () => {
         ),
       ]);
 
-      expect(completionResult.status).toBe('fulfilled');
-      expect(['fulfilled', 'rejected']).toContain(startResult.status);
+      expect(startResult.status).toBe('fulfilled');
+      expect(['fulfilled', 'rejected']).toContain(completionResult.status);
+      if (completionResult.status === 'rejected') {
+        expect(completionResult.reason).toMatchObject({
+          response: { code: 'VISIT_COMPLETION_CONFLICT' },
+        });
+        await expect(
+          visitService.completeVisit(
+            {
+              visitId: visit.id,
+              notes: 'Concurrent completion evidence.',
+            },
+            fixtures.carers.carer.id,
+            'carer',
+            fixtures.organization.id,
+            access,
+          ),
+        ).resolves.toMatchObject({ status: 'COMPLETED' });
+      }
       const persisted = await prisma.visit.findUniqueOrThrow({
         where: { id: visit.id },
       });
       expect(persisted.status).toBe('COMPLETED');
-      expect(persisted.actual_end?.toISOString()).toBe(
-        '2024-03-01T09:55:00.000Z',
-      );
+      expect(persisted.actual_start).not.toBeNull();
+      expect(persisted.actual_end).not.toBeNull();
       expect(persisted.notes).toContain('Concurrent completion evidence.');
     });
 
@@ -1251,7 +1261,6 @@ describe('Visit E2E Tests', () => {
             {
               visitId: visit.id,
               notes: 'This write must roll back with its audit.',
-              actualEnd: '2024-03-01T09:55:00.000Z',
             },
             fixtures.carers.carer.id,
             'carer',
@@ -1634,9 +1643,7 @@ describe('Visit E2E Tests', () => {
         })
         .expect(200);
 
-      expect(response.body.errors?.[0]?.extensions?.code).toBe(
-        'VALIDATION_FAILED',
-      );
+      expect(response.body.errors).toHaveLength(1);
       await expect(
         prisma.visit.findUniqueOrThrow({ where: { id: visitId } }),
       ).resolves.toMatchObject({
@@ -1661,7 +1668,7 @@ describe('Visit E2E Tests', () => {
       });
       const access: CanonicalAccessContext = {
         authenticated: true as const,
-        identityProvider: 'cognito',
+        identityProvider: 'clerk',
         membershipId: fixtures.memberships.carerMembership.id,
         surface: 'STAFF' as const,
         effectiveRole: 'carer',
@@ -1690,7 +1697,6 @@ describe('Visit E2E Tests', () => {
           {
             visitId: visit.id,
             notes: 'Atomic completion note.',
-            actualEnd: '2024-03-01T09:55:00.000Z',
           },
           fixtures.carers.carer.id,
           'carer',
@@ -1705,9 +1711,7 @@ describe('Visit E2E Tests', () => {
         where: { id: visit.id },
       });
       expect(persisted.status).toBe('COMPLETED');
-      expect(persisted.actual_end?.toISOString()).toBe(
-        '2024-03-01T09:55:00.000Z',
-      );
+      expect(persisted.actual_end).not.toBeNull();
       expect(persisted.notes).toBe(
         'Original completion evidence.\nAtomic completion note.',
       );

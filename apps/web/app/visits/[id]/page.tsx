@@ -218,18 +218,6 @@ const COMPLETE_VISIT_MUTATION = `
   }
 `;
 
-const UPDATE_VISIT_MUTATION = `
-  mutation UpdateVisit($input: UpdateVisitInput!) {
-    updateVisit(input: $input) {
-      id
-      status
-      notes
-      actualStart
-      actualEnd
-    }
-  }
-`;
-
 const RECORD_ADMINISTRATION_MUTATION = `
   mutation RecordAdministration($input: RecordAdministrationInput!) {
     recordAdministration(input: $input) {
@@ -271,11 +259,6 @@ function formatDateTime(date?: string | null): string {
 function formatTime(date?: string | null): string {
   if (!date) return 'Not recorded';
   return formatOrganizationTime(date);
-}
-
-function formatDateInput(date?: string | null): string {
-  if (!date) return '';
-  return formatOrganizationDateTimeInput(date);
 }
 
 function nowLocalDatetime(): string {
@@ -355,11 +338,6 @@ export default function VisitDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const [visitStatus, setVisitStatus] = useState<VisitStatus>('SCHEDULED');
-  const [visitNotes, setVisitNotes] = useState('');
-  const [actualStart, setActualStart] = useState('');
-  const [actualEnd, setActualEnd] = useState('');
-  const [savingVisit, setSavingVisit] = useState(false);
 
   const [startingVisit, setStartingVisit] = useState(false);
   const [recordingTaskId, setRecordingTaskId] = useState<string | null>(null);
@@ -374,7 +352,6 @@ export default function VisitDetailPage() {
   const [careNoteEscalatedTo, setCareNoteEscalatedTo] = useState('');
 
   const [visitCompletionNotes, setVisitCompletionNotes] = useState('');
-  const [visitCompletionAt, setVisitCompletionAt] = useState(nowLocalDatetime());
   const [medicationNotes, setMedicationNotes] = useState<Record<string, string>>({});
 
   const loadWorkspace = useCallback(async () => {
@@ -414,11 +391,6 @@ export default function VisitDetailPage() {
       setVisit(visitResult.visit);
       setCareLogs(careLogResult.careLogs?.items || []);
       setMedications(medicationResult.listDueMeds || []);
-      setVisitStatus(visitResult.visit.status);
-      setVisitNotes(visitResult.visit.notes || '');
-      setActualStart(formatDateInput(visitResult.visit.actualStart));
-      setActualEnd(formatDateInput(visitResult.visit.actualEnd));
-      setVisitCompletionAt(formatDateInput(visitResult.visit.actualEnd) || nowLocalDatetime());
       setMedicationNotes(
         (medicationResult.listDueMeds || []).reduce<Record<string, string>>((acc, medication) => {
           acc[medication.id] = medication.notes || '';
@@ -615,9 +587,6 @@ export default function VisitDetailPage() {
           input: {
             visitId: visit.id,
             notes: visitCompletionNotes.trim() || undefined,
-            actualEnd: visitCompletionAt
-              ? organizationDateTimeInputToIso(visitCompletionAt)
-              : undefined,
           },
         },
         { getBearerToken },
@@ -628,36 +597,6 @@ export default function VisitDetailPage() {
       setError(err?.message || 'Failed to complete visit');
     } finally {
       setCompletingVisit(false);
-    }
-  }
-
-  async function saveVisit() {
-    if (!visit || !isAdmin) return;
-
-    setSavingVisit(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      await clientQuery(
-        UPDATE_VISIT_MUTATION,
-        {
-          input: {
-            id: visit.id,
-            status: visitStatus,
-            notes: visitNotes.trim() || null,
-            actualStart: actualStart ? organizationDateTimeInputToIso(actualStart) : null,
-            actualEnd: actualEnd ? organizationDateTimeInputToIso(actualEnd) : null,
-          },
-        },
-        { getBearerToken },
-      );
-      setMessage('Visit oversight updated.');
-      await loadWorkspace();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to update visit oversight');
-    } finally {
-      setSavingVisit(false);
     }
   }
 
@@ -1092,15 +1031,9 @@ export default function VisitDetailPage() {
                           placeholder="Add optional handover details for completion."
                         />
                       </div>
-                      <div>
-                        <label className="mb-1 block text-sm text-slate-600">Actual end</label>
-                        <input
-                          type="datetime-local"
-                          value={visitCompletionAt}
-                          onChange={(event) => setVisitCompletionAt(event.target.value)}
-                          className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                        />
-                      </div>
+                      <p className="text-sm text-slate-600">
+                        The completion time is recorded automatically when this action succeeds.
+                      </p>
                       <Button type="button" onClick={completeVisit} disabled={completingVisit}>
                         {completingVisit ? 'Completing...' : 'Complete visit'}
                       </Button>
@@ -1165,53 +1098,25 @@ export default function VisitDetailPage() {
                 <Card className="border-amber-200 bg-amber-50/40">
                   <CardHeader>
                     <h2 className="text-xl font-semibold text-slate-900">Admin visit oversight</h2>
-                    <p className="text-sm text-slate-600">Coordinator-only controls for status, timings, and official notes.</p>
+                    <p className="text-sm text-slate-600">Recorded visit details are read-only on this page.</p>
                   </CardHeader>
-                  <CardContent className="mb-0 space-y-4">
-                    <div>
-                      <label className="mb-1 block text-sm text-slate-600">Status</label>
-                      <select
-                        value={visitStatus}
-                        onChange={(event) => setVisitStatus(event.target.value as VisitStatus)}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                      >
-                        <option value="SCHEDULED">Scheduled</option>
-                        <option value="IN_PROGRESS">In progress</option>
-                        <option value="COMPLETED">Completed</option>
-                        <option value="CANCELLED">Cancelled</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm text-slate-600">Actual start</label>
-                      <input
-                        type="datetime-local"
-                        value={actualStart}
-                        onChange={(event) => setActualStart(event.target.value)}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm text-slate-600">Actual end</label>
-                      <input
-                        type="datetime-local"
-                        value={actualEnd}
-                        onChange={(event) => setActualEnd(event.target.value)}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm text-slate-600">Coordinator note</label>
-                      <textarea
-                        value={visitNotes}
-                        onChange={(event) => setVisitNotes(event.target.value)}
-                        rows={4}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                        placeholder="Record any shift handover or oversight note"
-                      />
-                    </div>
-                    <Button type="button" onClick={saveVisit} disabled={savingVisit} className="w-full justify-center">
-                      {savingVisit ? 'Saving...' : 'Save visit oversight'}
-                    </Button>
+                  <CardContent className="mb-0 space-y-3 text-sm text-slate-700">
+                    <p>
+                      Status:{' '}
+                      <span className="font-medium text-slate-900">
+                        {visit.status.replace('_', ' ').toLowerCase()}
+                      </span>
+                    </p>
+                    <p>
+                      Actual start: <span className="font-medium text-slate-900">{formatDateTime(visit.actualStart)}</span>
+                    </p>
+                    <p>
+                      Actual end: <span className="font-medium text-slate-900">{formatDateTime(visit.actualEnd)}</span>
+                    </p>
+                    {visit.notes && <p className="whitespace-pre-wrap">Recorded note: {visit.notes}</p>}
+                    <p className="rounded-lg bg-amber-100 p-3 text-amber-900">
+                      Corrections, cancellation, reopening and on-behalf recording require a separate reviewed workflow.
+                    </p>
                   </CardContent>
                 </Card>
               )}

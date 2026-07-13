@@ -63,7 +63,7 @@ describe("VisitRepository tenant write safety", () => {
         organization_memberships: {
           some: {
             organization_id: "org-1",
-            identity_provider: "cognito",
+            identity_provider: "clerk",
             auth_subject: { not: "" },
             role: { in: ["carer", "staff"] },
             status: "ACTIVE",

@@ -81,7 +81,7 @@ describe("VisitService", () => {
   const organizationId = "org-123";
   const frontlineAccess = {
     authenticated: true as const,
-    identityProvider: "test",
+    identityProvider: "clerk",
     membershipId: "membership-carer-123",
     surface: "STAFF" as const,
     effectiveRole: "carer",
@@ -597,6 +597,7 @@ describe("VisitService", () => {
         expectedCarerId: "carer-123",
         actor: {
           authSubject: "auth-carer-123",
+          identityProvider: "clerk",
           membershipId: "membership-carer-123",
         },
       });
@@ -855,10 +856,9 @@ describe("VisitService", () => {
         organizationId,
         expectedCarerId: "carer-123",
         completionNote: "Finished visit and client comfortable.",
-        requestedActualEnd: null,
-        actualEndWasProvided: false,
         actor: {
           authSubject: "auth-carer-123",
+          identityProvider: "clerk",
           membershipId: "membership-carer-123",
           role: "carer",
           surface: "STAFF",
@@ -882,7 +882,6 @@ describe("VisitService", () => {
         {
           visitId: "visit-123",
           notes: "same completion note",
-          actualEnd: "2024-01-01T10:00:00.000Z",
         },
         "carer-123",
         "carer",
@@ -899,7 +898,7 @@ describe("VisitService", () => {
         "COMPLETED_DETAILS",
         "Visit is already completed with different completion details",
       ],
-      ["ACTUAL_END", "Visit already has a different actual end time"],
+      ["NOT_STARTED", "Visit must be started before it can be completed"],
     ] as const)(
       "should map %s completion conflicts to a stable domain error",
       async (reason, message) => {
@@ -926,17 +925,17 @@ describe("VisitService", () => {
       },
     );
 
-    it("should reject an invalid actual end before starting the transaction", async () => {
+    it("should reject a non-Clerk completion before starting the transaction", async () => {
       await expect(
         service.completeVisit(
-          { visitId: "visit-123", actualEnd: "not-a-date" },
+          { visitId: "visit-123" },
           "carer-123",
           "carer",
           organizationId,
-          frontlineAccess,
+          { ...frontlineAccess, identityProvider: "legacy" },
         ),
       ).rejects.toMatchObject({
-        response: { code: ErrorCode.VALIDATION_FAILED },
+        response: { code: ErrorCode.FORBIDDEN },
       });
       expect(repository.completeAtomically).not.toHaveBeenCalled();
     });
