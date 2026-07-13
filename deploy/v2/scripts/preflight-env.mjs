@@ -26,6 +26,8 @@ const REQUIRED = [
   'JWT_SECRET',
   'SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID',
   'SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET',
+  'VISIT_COMPLETION_PROOF_ACTIVE_KEY_ID',
+  'VISIT_COMPLETION_PROOF_ACTIVE_SECRET',
   'NEXTAUTH_SECRET',
   'NEXTAUTH_URL',
   'NEXT_PUBLIC_API_URL',
@@ -56,6 +58,8 @@ const SECRET_NAMES = new Set([
   'POSTGRES_PASSWORD',
   'JWT_SECRET',
   'SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET',
+  'VISIT_COMPLETION_PROOF_ACTIVE_SECRET',
+  'VISIT_COMPLETION_PROOF_PREVIOUS_SECRET',
   'NEXTAUTH_SECRET',
   'COGNITO_CLIENT_SECRET',
   'LOCAL_AUTH_JWT_SECRET',
@@ -91,6 +95,8 @@ const AUDITED_OPTIONAL_NAMES = new Set([
   'COGNITO_CLIENT_SECRET',
   'LOCAL_AUTH_ISSUER',
   'LOCAL_AUTH_JWT_SECRET',
+  'VISIT_COMPLETION_PROOF_PREVIOUS_KEY_ID',
+  'VISIT_COMPLETION_PROOF_PREVIOUS_SECRET',
   'CLERK_AUDIENCE',
   'SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON',
 ]);
@@ -270,6 +276,27 @@ function validate(values) {
   const proof = authModeProof(values);
   const authProvider = normalizeProvider(values.AUTH_IDENTITY_PROVIDER);
   validateShiftIdempotencyKeyRing(values, errors);
+  const activeProofKeyId = String(values.VISIT_COMPLETION_PROOF_ACTIVE_KEY_ID || '').trim();
+  const previousProofKeyId = String(values.VISIT_COMPLETION_PROOF_PREVIOUS_KEY_ID || '').trim();
+  const previousProofSecret = String(values.VISIT_COMPLETION_PROOF_PREVIOUS_SECRET || '').trim();
+  if (activeProofKeyId && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(activeProofKeyId)) {
+    add(errors, 'VISIT_COMPLETION_PROOF_ACTIVE_KEY_ID is invalid');
+  }
+  if (Boolean(previousProofKeyId) !== Boolean(previousProofSecret)) {
+    add(errors, 'VISIT_COMPLETION_PROOF_PREVIOUS_KEY_ID and VISIT_COMPLETION_PROOF_PREVIOUS_SECRET must be configured together');
+  }
+  if (previousProofKeyId && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(previousProofKeyId)) {
+    add(errors, 'VISIT_COMPLETION_PROOF_PREVIOUS_KEY_ID is invalid');
+  }
+  if (previousProofKeyId && previousProofKeyId === activeProofKeyId) {
+    add(errors, 'Visit completion proof key identifiers must be unique');
+  }
+  if (
+    previousProofSecret &&
+    previousProofSecret === String(values.VISIT_COMPLETION_PROOF_ACTIVE_SECRET || '').trim()
+  ) {
+    add(errors, 'Visit completion proof keys must use distinct secrets');
+  }
   if (isProductionLike && !proof.authProviderIsClerk) {
     add(errors, 'AUTH_IDENTITY_PROVIDER=clerk is required for production Deployment V2 auth');
   }

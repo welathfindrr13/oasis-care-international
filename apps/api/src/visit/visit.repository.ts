@@ -9,7 +9,12 @@ import {
 } from "@oasis/db";
 import { VISIT_TASK_OUTCOME_PREFIX } from "./visit.constants";
 import { assertTenantOwnershipForSensitiveWrite } from "../common/tenant/tenant-ownership";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import {
+  VISIT_COMPLETION_PROOF_VERSION,
+  VisitCompletionProofKeyring,
+  visitCompletionRecordProofPayload,
+  visitCompletionRequestProofPayload,
+} from "./visit-completion-proof-keyring";
 
 export type CompleteVisitConflictReason =
   | "CANCELLED"
@@ -38,6 +43,7 @@ export type CompleteVisitAtomicInput = {
     authSubject: string;
     membershipId: string;
     role: string;
+    surface: string;
   };
 };
 
@@ -53,7 +59,10 @@ export type UpdateVisitScheduleAtomicResult =
 
 @Injectable()
 export class VisitRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly completionProofKeyring: VisitCompletionProofKeyring,
+  ) {}
 
   async create(data: Prisma.VisitCreateInput): Promise<Visit> {
     assertTenantOwnershipForSensitiveWrite("Visit", data as any);
@@ -345,25 +354,42 @@ export class VisitRepository {
               action: "VISIT_COMPLETED",
             },
             orderBy: { timestamp: "desc" },
+            select: {
+              organization_id: true,
+              user_id: true,
+              resource_type: true,
+              resource_id: true,
+              new_values: true,
+            },
           });
           const completionMetadata = this.completionMetadata(
             completionAudit?.new_values,
           );
-          const requestFingerprint = this.completionRequestFingerprint(input);
-          const recordFingerprint = this.completionRecordFingerprint(
-            visit.notes,
-            visit.actual_end,
-          );
           const proofMatches = Boolean(
             completionMetadata &&
+              completionAudit?.organization_id === input.organizationId &&
+              completionAudit.user_id === input.actor.authSubject &&
+              completionAudit.resource_type === "Visit" &&
+              completionAudit.resource_id === input.visitId &&
+              completionMetadata.membershipId === input.actor.membershipId &&
+              completionMetadata.actorRole === input.actor.role &&
+              completionMetadata.actorSurface === input.actor.surface &&
               visit.actual_end?.toISOString() ===
                 completionMetadata.auditedActualEnd &&
-              this.fingerprintsMatch(
-                requestFingerprint,
+              this.completionProofKeyring.verify(
+                completionMetadata.keyId,
+                "request",
+                this.completionRequestPayload(input),
                 completionMetadata.requestFingerprint,
               ) &&
-              this.fingerprintsMatch(
-                recordFingerprint,
+              this.completionProofKeyring.verify(
+                completionMetadata.keyId,
+                "record",
+                this.completionRecordPayload(
+                  input,
+                  visit.notes,
+                  visit.actual_end,
+                ),
                 completionMetadata.recordFingerprint,
               ),
           );
@@ -740,6 +766,10 @@ export class VisitRepository {
 
   private completionMetadata(value: Prisma.JsonValue | null | undefined): {
     auditedActualEnd: string;
+    keyId: string;
+    membershipId: string;
+    actorRole: string;
+    actorSurface: string;
     requestFingerprint: string;
     recordFingerprint: string;
   } | null {
@@ -748,8 +778,12 @@ export class VisitRepository {
     }
     const metadata = value as Prisma.JsonObject;
     if (
-      metadata.completionFingerprintVersion !== 1 ||
+      metadata.completionFingerprintVersion !== VISIT_COMPLETION_PROOF_VERSION ||
       !this.isCanonicalInstant(metadata.actualEnd) ||
+      !this.isProofKeyId(metadata.completionProofKeyId) ||
+      !this.isBoundIdentifier(metadata.membershipId) ||
+      !this.isBoundIdentifier(metadata.actorRole) ||
+      !this.isBoundIdentifier(metadata.actorSurface) ||
       !this.isFingerprint(metadata.completionRequestFingerprint) ||
       !this.isFingerprint(metadata.completionRecordFingerprint)
     ) {
@@ -757,46 +791,48 @@ export class VisitRepository {
     }
     return {
       auditedActualEnd: metadata.actualEnd,
+      keyId: metadata.completionProofKeyId,
+      membershipId: metadata.membershipId,
+      actorRole: metadata.actorRole,
+      actorSurface: metadata.actorSurface,
       requestFingerprint: metadata.completionRequestFingerprint as string,
       recordFingerprint: metadata.completionRecordFingerprint as string,
     };
   }
 
-  private completionRequestFingerprint(input: CompleteVisitAtomicInput): string {
-    return this.fingerprint([
-      "visit-completion-request-v1",
-      input.actualEndWasProvided,
-      input.actualEndWasProvided
+  private completionProofContext(input: CompleteVisitAtomicInput) {
+    return {
+      organizationId: input.organizationId,
+      visitId: input.visitId,
+      expectedCarerId: input.expectedCarerId,
+      authSubject: input.actor.authSubject,
+      membershipId: input.actor.membershipId,
+      actorRole: input.actor.role,
+      actorSurface: input.actor.surface,
+    };
+  }
+
+  private completionRequestPayload(input: CompleteVisitAtomicInput) {
+    return visitCompletionRequestProofPayload({
+      context: this.completionProofContext(input),
+      actualEndWasProvided: input.actualEndWasProvided,
+      requestedActualEnd: input.actualEndWasProvided
         ? input.requestedActualEnd?.toISOString() ?? null
         : null,
-      input.completionNote,
-    ]);
+      completionNote: input.completionNote,
+    });
   }
 
-  private completionRecordFingerprint(
+  private completionRecordPayload(
+    input: CompleteVisitAtomicInput,
     notes: string | null,
     actualEnd: Date | null,
-  ): string {
-    return this.fingerprint([
-      "visit-completion-record-v1",
+  ) {
+    return visitCompletionRecordProofPayload({
+      context: this.completionProofContext(input),
       notes,
-      actualEnd?.toISOString() ?? null,
-    ]);
-  }
-
-  private fingerprint(value: unknown): string {
-    const rootSecret = String(
-      process.env.AUDIT_FINGERPRINT_SECRET || process.env.JWT_SECRET || "",
-    );
-    if (!rootSecret) {
-      throw new Error("Audit fingerprint secret is required");
-    }
-    const domainKey = createHmac("sha256", rootSecret)
-      .update("oasis:audit-fingerprint:v1", "utf8")
-      .digest();
-    return createHmac("sha256", domainKey)
-      .update(JSON.stringify(value), "utf8")
-      .digest("hex");
+      actualEnd: actualEnd?.toISOString() ?? null,
+    });
   }
 
   private isFingerprint(value: unknown): value is string {
@@ -809,9 +845,15 @@ export class VisitRepository {
     return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
   }
 
-  private fingerprintsMatch(left: string, right: string): boolean {
-    if (!this.isFingerprint(left) || !this.isFingerprint(right)) return false;
-    return timingSafeEqual(Buffer.from(left, "hex"), Buffer.from(right, "hex"));
+  private isProofKeyId(value: unknown): value is string {
+    return (
+      typeof value === "string" &&
+      /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value)
+    );
+  }
+
+  private isBoundIdentifier(value: unknown): value is string {
+    return typeof value === "string" && value.trim().length > 0;
   }
 
   private async createCompletionAudit(
@@ -827,6 +869,21 @@ export class VisitRepository {
       timestamp?: Date;
     },
   ): Promise<void> {
+    const requestProof = this.completionProofKeyring.sign(
+      "request",
+      this.completionRequestPayload(options.input),
+    );
+    const recordProof = this.completionProofKeyring.sign(
+      "record",
+      this.completionRecordPayload(
+        options.input,
+        options.persistedNotes,
+        options.effectiveActualEnd,
+      ),
+    );
+    if (requestProof.keyId !== recordProof.keyId) {
+      throw new Error("Visit completion proof key changed during audit creation");
+    }
     await tx.auditLog.create({
       data: {
         organization_id: options.input.organizationId,
@@ -843,16 +900,13 @@ export class VisitRepository {
           actualEnd: options.effectiveActualEnd?.toISOString() ?? null,
           membershipId: options.input.actor.membershipId,
           actorRole: options.input.actor.role,
+          actorSurface: options.input.actor.surface,
           notesAppended: options.notesAppended,
           actualEndWasProvided: options.input.actualEndWasProvided,
-          completionFingerprintVersion: 1,
-          completionRequestFingerprint: this.completionRequestFingerprint(
-            options.input,
-          ),
-          completionRecordFingerprint: this.completionRecordFingerprint(
-            options.persistedNotes,
-            options.effectiveActualEnd,
-          ),
+          completionFingerprintVersion: VISIT_COMPLETION_PROOF_VERSION,
+          completionProofKeyId: requestProof.keyId,
+          completionRequestFingerprint: requestProof.fingerprint,
+          completionRecordFingerprint: recordProof.fingerprint,
         },
         timestamp: options.timestamp || new Date(),
       },

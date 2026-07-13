@@ -861,6 +861,7 @@ describe("VisitService", () => {
           authSubject: "auth-carer-123",
           membershipId: "membership-carer-123",
           role: "carer",
+          surface: "STAFF",
         },
       });
       expect(result.status).toBe(VisitStatus.COMPLETED);

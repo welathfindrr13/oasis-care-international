@@ -1,3 +1,5 @@
+import { ConfigService } from "@nestjs/config";
+import { VisitCompletionProofKeyring } from "./visit-completion-proof-keyring";
 import { VisitRepository } from "./visit.repository";
 
 describe("VisitRepository tenant write safety", () => {
@@ -17,7 +19,16 @@ describe("VisitRepository tenant write safety", () => {
 
     return {
       prisma,
-      repository: new VisitRepository(prisma),
+      repository: new VisitRepository(
+        prisma,
+        new VisitCompletionProofKeyring(
+          new ConfigService({
+            VISIT_COMPLETION_PROOF_ACTIVE_KEY_ID: "test-v1",
+            VISIT_COMPLETION_PROOF_ACTIVE_SECRET:
+              "visit-completion-proof-test-secret-32-bytes-minimum",
+          }),
+        ),
+      ),
     };
   }
 

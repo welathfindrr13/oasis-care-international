@@ -1,4 +1,5 @@
 import { ConflictException, ForbiddenException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService, VisitStatus } from "@oasis/db";
 import { StartedTestContainer } from "testcontainers";
 import { AccessContextService } from "../src/auth/access-context.service";
@@ -7,6 +8,7 @@ import { CarerInvitationService } from "../src/carer/carer-invitation.service";
 import { CarerMembershipService } from "../src/carer/carer-membership.service";
 import { ClerkProvisioningError } from "../src/company-access/clerk-provisioning.adapter";
 import { VisitRepository } from "../src/visit/visit.repository";
+import { VisitCompletionProofKeyring } from "../src/visit/visit-completion-proof-keyring";
 import { startPostgres } from "./utils/test-container";
 
 describe("Carer invitation lifecycle database integration", () => {
@@ -37,7 +39,16 @@ describe("Carer invitation lifecycle database integration", () => {
     await prisma.$connect();
     invitations = new CarerInvitationService(prisma, clerk as any);
     memberships = new CarerMembershipService(prisma);
-    visits = new VisitRepository(prisma);
+    visits = new VisitRepository(
+      prisma,
+      new VisitCompletionProofKeyring(
+        new ConfigService({
+          VISIT_COMPLETION_PROOF_ACTIVE_KEY_ID: "test-v1",
+          VISIT_COMPLETION_PROOF_ACTIVE_SECRET:
+            "visit-completion-proof-test-secret-32-bytes-minimum",
+        }),
+      ),
+    );
   }, 180_000);
 
   afterAll(async () => {

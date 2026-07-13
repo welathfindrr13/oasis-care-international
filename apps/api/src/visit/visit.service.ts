@@ -508,7 +508,8 @@ export class VisitService {
       actor: {
         authSubject: accessContext!.authSubject,
         membershipId,
-        role: accessContext!.rawRole || userRole,
+        role: accessContext!.effectiveRole || userRole,
+        surface: accessContext!.surface,
       },
     });
 

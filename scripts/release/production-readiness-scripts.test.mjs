@@ -23,7 +23,7 @@ function writeExecutable(filePath, contents) {
   writeFileSync(filePath, contents, { mode: 0o755 });
 }
 
-test('secret parity checker includes JWT_SECRET for staging and production', () => {
+test('secret parity checker includes authentication and visit-proof secrets', () => {
   const tempDir = mkdtempSync(path.join(tmpdir(), 'oasis-secrets-'));
   const secretLog = path.join(tempDir, 'secret-ids.log');
 
@@ -65,6 +65,14 @@ exit 2
 
   assert.match(checkedSecrets, /oasis\/staging\/JWT_SECRET/);
   assert.match(checkedSecrets, /oasis\/production\/JWT_SECRET/);
+  assert.match(
+    checkedSecrets,
+    /oasis\/staging\/VISIT_COMPLETION_PROOF_ACTIVE_SECRET/,
+  );
+  assert.match(
+    checkedSecrets,
+    /oasis\/production\/VISIT_COMPLETION_PROOF_ACTIVE_SECRET/,
+  );
 });
 
 test('migration runner supports a parameterised dry run without Terraform or AWS calls', () => {

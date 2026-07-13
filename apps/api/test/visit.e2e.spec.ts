@@ -7,6 +7,7 @@ import { VisitModule } from '../src/visit/visit.module';
 import { VisitService } from '../src/visit/visit.service';
 import { VisitResolver } from '../src/visit/visit.resolver';
 import { VisitRepository } from '../src/visit/visit.repository';
+import { VisitCompletionProofKeyring } from '../src/visit/visit-completion-proof-keyring';
 import { CareLogService } from '../src/care-log/care-log.service';
 import { CareLogRepository } from '../src/care-log/care-log.repository';
 import { MetricsModule } from '../src/metrics/metrics.module';
@@ -59,6 +60,9 @@ describe('Visit E2E Tests', () => {
     const databaseUrl = `postgresql://test:test@${postgresContainer.getHost()}:${postgresContainer.getMappedPort(5432)}/oasis_test`;
     process.env.DATABASE_URL = databaseUrl;
     process.env.JWT_SECRET = getTestJwtSecret();
+    process.env.VISIT_COMPLETION_PROOF_ACTIVE_KEY_ID = 'test-v1';
+    process.env.VISIT_COMPLETION_PROOF_ACTIVE_SECRET =
+      'visit-completion-proof-test-secret-32-bytes-minimum';
     process.env.AUTH_IDENTITY_PROVIDER = 'cognito';
     process.env.TENANT_MEMBERSHIP_REQUIRED = 'true';
 
@@ -77,6 +81,9 @@ describe('Visit E2E Tests', () => {
             () => ({
               DATABASE_URL: databaseUrl,
               JWT_SECRET: getTestJwtSecret(),
+              VISIT_COMPLETION_PROOF_ACTIVE_KEY_ID: 'test-v1',
+              VISIT_COMPLETION_PROOF_ACTIVE_SECRET:
+                'visit-completion-proof-test-secret-32-bytes-minimum',
               NODE_ENV: 'test',
             }),
           ],
@@ -109,6 +116,7 @@ describe('Visit E2E Tests', () => {
         VisitService,
         VisitResolver,
         VisitRepository,
+        VisitCompletionProofKeyring,
         CareLogService,
         CareLogRepository,
         CarerAccessService,
@@ -721,11 +729,119 @@ describe('Visit E2E Tests', () => {
         actorRole: 'carer',
         notesAppended: true,
         actualEndWasProvided: true,
-        completionFingerprintVersion: 1,
+        actorSurface: 'STAFF',
+        completionFingerprintVersion: 2,
+        completionProofKeyId: 'test-v1',
         completionRequestFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
         completionRecordFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
       });
       expect(JSON.stringify(audits)).not.toContain(input.notes);
+    });
+
+    it('rejects identical completion details from a different linked membership', async () => {
+      const visit = await createCompletionVisit();
+      const input = {
+        visitId: visit.id,
+        notes: 'Client comfortable when the Carer left.',
+        actualEnd: '2024-03-01T09:55:00.000Z',
+      };
+      await expect(
+        visitService.completeVisit(
+          input,
+          fixtures.carers.carer.id,
+          'carer',
+          fixtures.organization.id,
+          admittedCarerAccess(),
+        ),
+      ).resolves.toMatchObject({ status: 'COMPLETED' });
+
+      const secondMembership = await prisma.organizationMembership.create({
+        data: {
+          organization_id: fixtures.organization.id,
+          identity_provider: 'cognito',
+          auth_subject: 'second-subject-for-same-carer',
+          role: 'carer',
+          status: 'ACTIVE',
+          carer_id: fixtures.carers.carer.id,
+        },
+      });
+      const secondAccess: CanonicalAccessContext = {
+        ...admittedCarerAccess(),
+        authSubject: secondMembership.auth_subject,
+        membershipId: secondMembership.id,
+      };
+
+      await expect(
+        visitService.completeVisit(
+          input,
+          fixtures.carers.carer.id,
+          'carer',
+          fixtures.organization.id,
+          secondAccess,
+        ),
+      ).rejects.toMatchObject({
+        response: { code: 'VISIT_COMPLETION_CONFLICT' },
+      });
+      await expect(
+        prisma.auditLog.count({
+          where: {
+            resource_type: 'Visit',
+            resource_id: visit.id,
+            action: 'VISIT_COMPLETION_IDEMPOTENT',
+          },
+        }),
+      ).resolves.toBe(0);
+    });
+
+    it('fails closed for an unknown proof key or metadata copied to another visit', async () => {
+      const input = {
+        notes: 'Client settled before departure.',
+        actualEnd: '2024-03-01T09:55:00.000Z',
+      };
+      const source = await createCompletionVisit();
+      await completeVisit({ visitId: source.id, ...input });
+      const sourceAudit = await prisma.auditLog.findFirstOrThrow({
+        where: {
+          resource_type: 'Visit',
+          resource_id: source.id,
+          action: 'VISIT_COMPLETED',
+        },
+      });
+
+      await prisma.auditLog.update({
+        where: { id: sourceAudit.id },
+        data: {
+          new_values: {
+            ...(sourceAudit.new_values as Record<string, unknown>),
+            completionProofKeyId: 'unknown-key',
+          } as any,
+        },
+      });
+      const unknownKeyRetry = await completeVisit({ visitId: source.id, ...input });
+      expect(unknownKeyRetry.body.errors?.[0]?.extensions?.code).toBe(
+        'VISIT_COMPLETION_CONFLICT',
+      );
+
+      const copied = await createCompletionVisit({
+        status: 'COMPLETED',
+        actual_end: new Date(input.actualEnd),
+        notes: `Initial handover note.\n${input.notes}`,
+      });
+      await prisma.auditLog.create({
+        data: {
+          organization_id: fixtures.organization.id,
+          user_id: TEST_USERS.carer.sub,
+          action: 'VISIT_COMPLETED',
+          resource_type: 'Visit',
+          resource_id: copied.id,
+          old_values: sourceAudit.old_values as any,
+          new_values: sourceAudit.new_values as any,
+        },
+      });
+      const copiedRetry = await completeVisit({ visitId: copied.id, ...input });
+      expect(copiedRetry.body.errors?.[0]?.extensions?.code).toBe(
+        'VISIT_COMPLETION_CONFLICT',
+      );
     });
 
     it('allows only one conflicting concurrent completion and never loses the prior note', async () => {

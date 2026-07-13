@@ -151,6 +151,8 @@ test('production deployment config fails fast for required env instead of using 
     'JWT_SECRET',
     'SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID',
     'SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET',
+    'VISIT_COMPLETION_PROOF_ACTIVE_KEY_ID',
+    'VISIT_COMPLETION_PROOF_ACTIVE_SECRET',
   ]) {
     assert.match(compose, new RegExp(`\\$\\{${name}:\\?`), `${name} should use required interpolation`);
   }

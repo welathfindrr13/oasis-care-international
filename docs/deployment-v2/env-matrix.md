@@ -16,6 +16,8 @@ This matrix is generated from current code references and Deployment V2 template
 | `SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID` | API | Yes | No | shift idempotency key-ring | lowercase stable key id | Shift clock-out fails closed if missing or malformed. |
 | `SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET` | API | Yes | No | shift idempotency key-ring | base64-encoded 32+ random bytes | Shift clock-out fails closed; this key is independent from JWT rotation. |
 | `SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON` | API | No | No | shift idempotency key-ring | bounded JSON key array | Previous keys verify historical proofs only; they never sign new proofs. |
+| `VISIT_COMPLETION_PROOF_ACTIVE_KEY_ID` | API | Yes | No | API config, visit completion proof key ring, Compose | stable version label such as `production-v1` | API startup fails if missing or malformed. |
+| `VISIT_COMPLETION_PROOF_ACTIVE_SECRET` | API | Yes | No | API config, visit completion proof key ring, Compose | independent 32+ char random secret | API startup fails if missing/short; never reuse or fall back to `JWT_SECRET`. |
 | `NEXTAUTH_SECRET` | Web/API proxy | Yes | No | web auth/proxy routes, Compose | 32+ char random secret | Sessions/proxy token extraction fail. |
 | `NEXTAUTH_URL` | Web/auth | Yes | No | NextAuth config, Compose | `https://care.example.com` | Auth callbacks and cookies can fail; preflight blocks localhost. |
 | `NEXT_PUBLIC_API_URL` | Web | Yes | Yes | web GraphQL clients and route proxy | `https://care.example.com/graphql` | Web routes proxy to wrong API; build may bake wrong public URL. |
@@ -57,6 +59,7 @@ silently accepts or overwrites the historical close.
 | `BEDROCK_MODEL` | API AI only | No for core runtime | No | AI summary service | Required only if AI summary generation is enabled. |
 | `BEDROCK_MODEL_FALLBACKS` | API AI only | No | No | AI summary service | Optional comma-separated fallback model ids. |
 | `JWT_JWKS_TIMEOUT_MS` | API auth | No | No | JWT strategy | Optional JWKS timeout override. |
+| `VISIT_COMPLETION_PROOF_PREVIOUS_KEY_ID` / `VISIT_COMPLETION_PROOF_PREVIOUS_SECRET` | API | Only during controlled proof-key rotation | No | API config, visit completion proof key ring, Compose | Configure both together. The previous secret verifies existing proof records but never signs new ones; provisioning and rotation require separate approval. |
 | `COGNITO_LOGOUT_URL` | Legacy web auth | No | No | logout route | Legacy Cognito-only logout support. Not part of Deployment V2 production auth. |
 | `COGNITO_DOMAIN` | Legacy web auth | No | No | logout route | Legacy Cognito-only hosted UI domain. Not part of Deployment V2 production auth. |
 | `COGNITO_HOSTED_UI_DOMAIN` | Legacy web auth | No | No | logout route | Legacy Cognito-only hosted UI domain alias. Not part of Deployment V2 production auth. |
