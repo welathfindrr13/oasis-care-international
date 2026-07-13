@@ -12,6 +12,7 @@ import {
   organizationWeekUtcRange,
   organizationWeekCalendarPeriod,
   parseOrganizationDateKey,
+  parseStoredCalendarDateInput,
   resolveOrganizationTimezone,
   resolveOrganizationWallClock,
   type OrganizationTimezoneResolver,
@@ -140,5 +141,31 @@ test('keeps date-only storage keys separate from BST boundary instants', () => {
       start: { year: 2026, month: 3, day: 27 },
       end: { year: 2026, month: 4, day: 2 },
     },
+  );
+});
+
+test('accepts only date keys or exact UTC-midnight transports for stored dates', () => {
+  assert.deepEqual(parseStoredCalendarDateInput('2026-05-01'), {
+    year: 2026,
+    month: 5,
+    day: 1,
+  });
+  assert.deepEqual(parseStoredCalendarDateInput('2026-05-01T00:00:00.000Z'), {
+    year: 2026,
+    month: 5,
+    day: 1,
+  });
+  assert.deepEqual(parseStoredCalendarDateInput(new Date('2026-05-01T00:00:00.000Z')), {
+    year: 2026,
+    month: 5,
+    day: 1,
+  });
+  assert.throws(
+    () => parseStoredCalendarDateInput('2026-04-30T23:00:00.000Z'),
+    /exact UTC-midnight/,
+  );
+  assert.throws(
+    () => parseStoredCalendarDateInput('2026-05-01T01:00:00+01:00'),
+    /exact UTC-midnight/,
   );
 });

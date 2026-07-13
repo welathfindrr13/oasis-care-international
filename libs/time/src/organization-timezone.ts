@@ -164,6 +164,39 @@ export function organizationCalendarDateToUtcStoredDate(
   return new Date(Date.UTC(validated.year, validated.month - 1, validated.day));
 }
 
+/** Parse the deliberately narrow wire formats accepted for date-only fields. */
+export function parseStoredCalendarDateInput(
+  value: string | Date,
+): OrganizationCalendarDate {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return parseOrganizationDateKey(value);
+  }
+
+  if (
+    typeof value === 'string' &&
+    !/^\d{4}-\d{2}-\d{2}T00:00:00(?:\.000)?Z$/.test(value)
+  ) {
+    throw new RangeError(
+      'Stored calendar date must use YYYY-MM-DD or an exact UTC-midnight transport',
+    );
+  }
+
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (
+    !(date instanceof Date) ||
+    Number.isNaN(date.getTime()) ||
+    date.getUTCHours() !== 0 ||
+    date.getUTCMinutes() !== 0 ||
+    date.getUTCSeconds() !== 0 ||
+    date.getUTCMilliseconds() !== 0
+  ) {
+    throw new RangeError(
+      'Stored calendar date must use YYYY-MM-DD or an exact UTC-midnight transport',
+    );
+  }
+  return utcStoredDateToCalendarDate(date);
+}
+
 export function utcStoredDateToCalendarDate(date: Date): OrganizationCalendarDate {
   if (Number.isNaN(date.getTime())) {
     throw new RangeError('Stored date must be valid');
@@ -375,12 +408,24 @@ export function formatInOrganizationTimezone(
   organizationId?: string,
   resolver: OrganizationTimezoneResolver = organizationTimezoneResolver,
 ): string {
+  return formatInResolvedTimezone(
+    instant,
+    options,
+    resolveOrganizationTimezone(organizationId, resolver),
+  );
+}
+
+export function formatInResolvedTimezone(
+  instant: Date | string,
+  options: Intl.DateTimeFormatOptions,
+  timezone: string,
+): string {
   const date = typeof instant === 'string' ? new Date(instant) : instant;
   if (Number.isNaN(date.getTime())) {
     throw new RangeError('Instant must be a valid date');
   }
   return new Intl.DateTimeFormat('en-GB', {
     ...options,
-    timeZone: resolveOrganizationTimezone(organizationId, resolver),
+    timeZone: assertIanaTimezone(timezone),
   }).format(date);
 }

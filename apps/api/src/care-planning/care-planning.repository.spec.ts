@@ -148,8 +148,8 @@ describe('CarePlanningRepository', () => {
     await repository.createEvidencePack('org-1', {
       clientId: 'client-1',
       status: 'DRAFT' as any,
-      periodStart: new Date('2026-05-01T00:00:00.000Z'),
-      periodEnd: new Date('2026-05-07T00:00:00.000Z'),
+      periodStart: '2026-05-01' as any,
+      periodEnd: '2026-05-07' as any,
     });
     await repository.createEvidencePack('org-1', {
       clientId: 'client-1',
@@ -176,6 +176,22 @@ describe('CarePlanningRepository', () => {
         }),
       }),
     );
+  });
+
+  it('rejects a BST organization-midnight instant for a date-only evidence period', async () => {
+    const { prisma, repository } = createRepository();
+
+    await expect(
+      repository.createEvidencePack('org-1', {
+        clientId: 'client-1',
+        status: 'DRAFT' as any,
+        periodStart: new Date('2026-04-30T23:00:00.000Z'),
+        periodEnd: new Date('2026-05-07T00:00:00.000Z'),
+      }),
+    ).rejects.toBeInstanceOf(BaseHttpException);
+
+    expect(prisma.client.findFirst).not.toHaveBeenCalled();
+    expect(prisma.evidencePack.create).not.toHaveBeenCalled();
   });
 
   it('rejects evidence pack creation before lookup when tenant ownership is missing', async () => {

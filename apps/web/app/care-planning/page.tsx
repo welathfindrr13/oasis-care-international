@@ -2,7 +2,10 @@ import Link from 'next/link'
 import { Header } from '../../components/oasis/Header'
 import { CarePlanningActions } from '../../components/care-planning/CarePlanningActions'
 import { query } from '../../lib/graphql/client'
-import { formatDate as formatOrganizationDate } from '../../lib/time'
+import {
+  formatDate as formatOrganizationDate,
+  formatStoredCalendarDate,
+} from '../../lib/time'
 import {
   CARE_PLANNING_QUERY,
   CLIENTS_QUERY,
@@ -194,7 +197,7 @@ function EvidencePackList({ evidencePacks }: { evidencePacks: EvidencePackRecord
                 {pack.kind.replace(/_/g, ' ').toLowerCase()}
               </h3>
               <p className="mt-1 text-sm text-slate-500">
-                {formatDate(pack.periodStart)} to {formatDate(pack.periodEnd)} · {pack.items.length} source items
+                {formatStoredCalendarDate(pack.periodStart)} to {formatStoredCalendarDate(pack.periodEnd)} · {pack.items.length} source items
               </p>
             </div>
             <StatusPill status={pack.status} />

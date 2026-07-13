@@ -19,9 +19,12 @@ import {
 } from '../auth/access-capability';
 import {
   addCalendarDays,
+  formatInResolvedTimezone,
   organizationCalendarDateToUtcStoredDate,
   organizationCalendarRangeUtc,
-  utcStoredDateToCalendarDate,
+  parseStoredCalendarDateInput,
+  resolveOrganizationTimezone,
+  type OrganizationCalendarDate,
 } from '@oasis/time';
 
 type RiskLevel = 'green' | 'amber' | 'red';
@@ -97,20 +100,18 @@ export class AiSummaryService {
       );
     }
 
-    const requestedPeriodStart = new Date(data.periodStart);
-    const requestedPeriodEnd = new Date(data.periodEnd);
-    if (
-      Number.isNaN(requestedPeriodStart.getTime()) ||
-      Number.isNaN(requestedPeriodEnd.getTime())
-    ) {
+    let periodStartCalendar: OrganizationCalendarDate;
+    let periodEndCalendar: OrganizationCalendarDate;
+    try {
+      periodStartCalendar = parseStoredCalendarDateInput(data.periodStart);
+      periodEndCalendar = parseStoredCalendarDateInput(data.periodEnd);
+    } catch {
       throw new BaseHttpException(
         ErrorCode.VALIDATION_FAILED,
-        'A valid summary calendar period is required',
+        'Summary dates must use YYYY-MM-DD or exact UTC-midnight transports',
         HttpStatus.BAD_REQUEST,
       );
     }
-    const periodStartCalendar = utcStoredDateToCalendarDate(requestedPeriodStart);
-    const periodEndCalendar = utcStoredDateToCalendarDate(requestedPeriodEnd);
     const periodStart = organizationCalendarDateToUtcStoredDate(periodStartCalendar);
     const periodEnd = organizationCalendarDateToUtcStoredDate(periodEndCalendar);
     if (periodStart > periodEnd) {
@@ -142,13 +143,20 @@ export class AiSummaryService {
       return existingSummary;
     }
 
+    const timezone = resolveOrganizationTimezone(orgId);
     const logs = await this.collectCareLogs(
       data.clientId,
       queryPeriod.start,
       queryPeriod.end,
       orgId,
+      timezone,
     );
-    const generatedSummary = await this.generateSummaryFromModel(periodStart, periodEnd, logs);
+    const generatedSummary = await this.generateSummaryFromModel(
+      periodStart,
+      periodEnd,
+      logs,
+      timezone,
+    );
     const riskLevels = this.calculateRiskLevels(generatedSummary);
 
     const summary = await this.aiSummaryRepository.create({
@@ -538,6 +546,7 @@ export class AiSummaryService {
     periodStart: Date,
     periodEndExclusive: Date,
     organizationId: string,
+    timezone = resolveOrganizationTimezone(organizationId),
   ): Promise<CareLogForModel[]> {
     const visits = await this.prisma.visit.findMany({
       where: this.prisma.whereNotDeleted({
@@ -566,31 +575,47 @@ export class AiSummaryService {
       orderBy: { scheduled_start: 'asc' },
     });
 
+    const formatInstant = (instant: Date): string =>
+      formatInResolvedTimezone(
+        instant,
+        {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hourCycle: 'h23',
+          timeZoneName: 'short',
+        },
+        timezone,
+      );
+
     return visits.flatMap((visit) => [
       {
-        timestamp: visit.scheduled_start.toISOString(),
+        timestamp: formatInstant(visit.scheduled_start),
         type: 'visit' as const,
         data: {
           status: visit.status,
           notes: visit.notes,
-          scheduledStart: visit.scheduled_start.toISOString(),
-          scheduledEnd: visit.scheduled_end.toISOString(),
-          actualStart: visit.actual_start?.toISOString() ?? null,
-          actualEnd: visit.actual_end?.toISOString() ?? null,
+          scheduledStart: formatInstant(visit.scheduled_start),
+          scheduledEnd: formatInstant(visit.scheduled_end),
+          actualStart: visit.actual_start ? formatInstant(visit.actual_start) : null,
+          actualEnd: visit.actual_end ? formatInstant(visit.actual_end) : null,
         },
       },
       ...visit.tasks.map((task) => ({
-        timestamp: (task.completed_at || visit.scheduled_start).toISOString(),
+        timestamp: formatInstant(task.completed_at || visit.scheduled_start),
         type: 'task' as const,
         data: {
           taskName: task.task_name,
           completed: task.is_completed,
           notes: task.notes,
-          completedAt: task.completed_at?.toISOString() ?? null,
+          completedAt: task.completed_at ? formatInstant(task.completed_at) : null,
         },
       })),
       ...visit.medication_administrations.map((med) => ({
-        timestamp: (med.administered_time || med.scheduled_time).toISOString(),
+        timestamp: formatInstant(med.administered_time || med.scheduled_time),
         type: 'medication' as const,
         data: {
           medication: med.prescription?.medication?.name ?? 'Unknown',
@@ -598,8 +623,10 @@ export class AiSummaryService {
             ? `${med.prescription.medication.dosage} ${med.prescription.medication.unit}`
             : null,
           status: med.status,
-          scheduledTime: med.scheduled_time.toISOString(),
-          administeredTime: med.administered_time?.toISOString() ?? null,
+          scheduledTime: formatInstant(med.scheduled_time),
+          administeredTime: med.administered_time
+            ? formatInstant(med.administered_time)
+            : null,
           notes: med.notes,
         },
       })),
@@ -610,11 +637,15 @@ export class AiSummaryService {
     periodStart: Date,
     periodEnd: Date,
     logs: CareLogForModel[],
+    timezone: string,
   ): Promise<Record<string, unknown>> {
+    const periodStartKey = periodStart.toISOString().slice(0, 10);
+    const periodEndKey = periodEnd.toISOString().slice(0, 10);
     const prompt = `${this.summaryPromptTemplate}
 
 ## Client Data for Analysis
-Period: ${periodStart.toISOString()} to ${periodEnd.toISOString()}
+Organization timezone: ${timezone}
+Period: ${periodStartKey} to ${periodEndKey} (inclusive organization calendar dates)
 Care Logs:
 ${JSON.stringify(logs, null, 2)}
 

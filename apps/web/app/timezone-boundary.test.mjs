@@ -44,6 +44,14 @@ test('evidence dashboard and PDF use central instant and stored-date formatters'
   assert.match(pdf, /formatDateTime\(value\)/)
 })
 
+test('care-planning evidence periods render date-only fields without host timezone shifts', () => {
+  const source = read('./care-planning/page.tsx')
+
+  assert.match(source, /formatStoredCalendarDate\(pack\.periodStart\)/)
+  assert.match(source, /formatStoredCalendarDate\(pack\.periodEnd\)/)
+  assert.doesNotMatch(source, /formatDate\(pack\.period(?:Start|End)\)/)
+})
+
 test('health summary generation sends inclusive stored calendar keys', () => {
   const source = read('./clients/[id]/summary/page.tsx')
 
