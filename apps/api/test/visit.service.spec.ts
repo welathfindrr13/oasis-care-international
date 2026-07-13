@@ -1,4 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import { HttpStatus } from "@nestjs/common";
 import { VisitService } from "../src/visit/visit.service";
 import { VisitRepository } from "../src/visit/visit.repository";
 import { ClsService } from "nestjs-cls";
@@ -20,6 +21,7 @@ describe("VisitService", () => {
     findById: jest.fn(),
     findMany: jest.fn(),
     update: jest.fn(),
+    completeAtomically: jest.fn(),
     delete: jest.fn(),
     findOverlappingVisits: jest.fn(),
     createTask: jest.fn(),
@@ -735,9 +737,8 @@ describe("VisitService", () => {
 
   describe("completeVisit", () => {
     it("should require at least one completion evidence input", async () => {
-      mockVisitRepository.findById.mockResolvedValue({
-        ...mockVisit,
-        notes: null,
+      mockVisitRepository.completeAtomically.mockResolvedValue({
+        status: "EVIDENCE_REQUIRED",
       });
 
       await expect(
@@ -754,12 +755,15 @@ describe("VisitService", () => {
     });
 
     it("should complete when visit note is provided and set actual_end when missing", async () => {
-      mockVisitRepository.findById.mockResolvedValue(mockVisit);
-      mockVisitRepository.update.mockResolvedValue({
+      const completedVisit = {
         ...mockVisit,
         status: VisitStatus.COMPLETED,
         actual_end: new Date(),
         notes: "Finished visit and client comfortable.",
+      };
+      mockVisitRepository.completeAtomically.mockResolvedValue({
+        status: "COMPLETED",
+        visit: completedVisit,
       });
 
       const result = await service.completeVisit(
@@ -773,38 +777,94 @@ describe("VisitService", () => {
         frontlineAccess,
       );
 
-      expect(repository.update).toHaveBeenCalledWith(
-        "visit-123",
-        expect.objectContaining({
-          status: VisitStatus.COMPLETED,
-          actual_end: expect.any(Date),
-          notes: expect.stringContaining(
-            "Finished visit and client comfortable.",
-          ),
-        }),
+      expect(repository.completeAtomically).toHaveBeenCalledWith({
+        visitId: "visit-123",
         organizationId,
-      );
+        expectedCarerId: "carer-123",
+        completionNote: "Finished visit and client comfortable.",
+        requestedActualEnd: null,
+        actualEndWasProvided: false,
+        actor: {
+          authSubject: "auth-carer-123",
+          membershipId: "membership-carer-123",
+          role: "carer",
+        },
+      });
       expect(result.status).toBe(VisitStatus.COMPLETED);
     });
 
-    it("should allow completion when medication outcomes exist even without visit note", async () => {
-      mockVisitRepository.findById.mockResolvedValue(mockVisit);
-      mockVisitRepository.countMedicationOutcomesForVisit.mockResolvedValue(1);
-      mockVisitRepository.update.mockResolvedValue({
+    it("should return the original record for an identical idempotent retry", async () => {
+      const completedVisit = {
         ...mockVisit,
         status: VisitStatus.COMPLETED,
-        actual_end: new Date(),
+        actual_end: new Date("2024-01-01T10:00:00.000Z"),
+      };
+      mockVisitRepository.completeAtomically.mockResolvedValue({
+        status: "IDEMPOTENT",
+        visit: completedVisit,
       });
 
       const result = await service.completeVisit(
-        { visitId: "visit-123" },
+        {
+          visitId: "visit-123",
+          notes: "same completion note",
+          actualEnd: "2024-01-01T10:00:00.000Z",
+        },
         "carer-123",
         "carer",
         organizationId,
         frontlineAccess,
       );
 
-      expect(result.status).toBe(VisitStatus.COMPLETED);
+      expect(result).toBe(completedVisit);
+    });
+
+    it.each([
+      ["CANCELLED", "Cancelled visits cannot be completed"],
+      [
+        "COMPLETED_DETAILS",
+        "Visit is already completed with different completion details",
+      ],
+      ["ACTUAL_END", "Visit already has a different actual end time"],
+    ] as const)(
+      "should map %s completion conflicts to a stable domain error",
+      async (reason, message) => {
+        mockVisitRepository.completeAtomically.mockResolvedValue({
+          status: "CONFLICT",
+          reason,
+        });
+
+        await expect(
+          service.completeVisit(
+            { visitId: "visit-123", notes: "Completion note" },
+            "carer-123",
+            "carer",
+            organizationId,
+            frontlineAccess,
+          ),
+        ).rejects.toMatchObject({
+          status: HttpStatus.CONFLICT,
+          response: {
+            code: ErrorCode.VISIT_COMPLETION_CONFLICT,
+            message,
+          },
+        });
+      },
+    );
+
+    it("should reject an invalid actual end before starting the transaction", async () => {
+      await expect(
+        service.completeVisit(
+          { visitId: "visit-123", actualEnd: "not-a-date" },
+          "carer-123",
+          "carer",
+          organizationId,
+          frontlineAccess,
+        ),
+      ).rejects.toMatchObject({
+        response: { code: ErrorCode.VALIDATION_FAILED },
+      });
+      expect(repository.completeAtomically).not.toHaveBeenCalled();
     });
   });
 

@@ -10,6 +10,30 @@ import {
 import { VISIT_TASK_OUTCOME_PREFIX } from "./visit.constants";
 import { assertTenantOwnershipForSensitiveWrite } from "../common/tenant/tenant-ownership";
 
+export type CompleteVisitConflictReason =
+  | "CANCELLED"
+  | "COMPLETED_DETAILS"
+  | "ACTUAL_END";
+
+export type CompleteVisitAtomicResult =
+  | { status: "COMPLETED" | "IDEMPOTENT"; visit: Visit }
+  | { status: "NOT_FOUND" | "FORBIDDEN" | "EVIDENCE_REQUIRED" }
+  | { status: "CONFLICT"; reason: CompleteVisitConflictReason };
+
+export type CompleteVisitAtomicInput = {
+  visitId: string;
+  organizationId: string;
+  expectedCarerId: string;
+  completionNote: string | null;
+  requestedActualEnd: Date | null;
+  actualEndWasProvided: boolean;
+  actor: {
+    authSubject: string;
+    membershipId: string | null;
+    role: string;
+  };
+};
+
 @Injectable()
 export class VisitRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -165,6 +189,174 @@ export class VisitRepository {
       throw new Error("Visit not found in organization");
     }
     return this.findById(id, organizationId) as Promise<Visit>;
+  }
+
+  async completeAtomically(
+    input: CompleteVisitAtomicInput,
+  ): Promise<CompleteVisitAtomicResult> {
+    return (this.prisma as any).$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT id
+          FROM visit
+          WHERE id = ${input.visitId}
+            AND organization_id = ${input.organizationId}
+            AND deleted_at IS NULL
+          FOR UPDATE
+        `;
+        if (lockedRows.length === 0) {
+          return { status: "NOT_FOUND" } as const;
+        }
+
+        const visit = await tx.visit.findFirst({
+          where: {
+            id: input.visitId,
+            organization_id: input.organizationId,
+            deleted_at: null,
+          },
+          include: {
+            carer: true,
+            client: true,
+            tasks: { where: { deleted_at: null } },
+          },
+        });
+        if (!visit) {
+          return { status: "NOT_FOUND" } as const;
+        }
+        if (visit.carer_id !== input.expectedCarerId) {
+          return { status: "FORBIDDEN" } as const;
+        }
+        if (visit.status === VisitStatus.CANCELLED) {
+          return { status: "CONFLICT", reason: "CANCELLED" } as const;
+        }
+
+        if (visit.status === VisitStatus.COMPLETED) {
+          const completionAudit = await tx.auditLog.findFirst({
+            where: {
+              organization_id: input.organizationId,
+              resource_type: "Visit",
+              resource_id: visit.id,
+              action: "VISIT_COMPLETED",
+            },
+            orderBy: { timestamp: "desc" },
+          });
+          const completionMetadata = this.completionMetadata(
+            completionAudit?.new_values,
+          );
+          const actualEndMatches =
+            completionMetadata?.actualEndWasProvided ===
+              input.actualEndWasProvided &&
+            (!input.actualEndWasProvided ||
+              (visit.actual_end !== null &&
+                input.requestedActualEnd !== null &&
+                visit.actual_end.getTime() ===
+                  input.requestedActualEnd.getTime()));
+          const noteMatches = Boolean(
+            completionMetadata &&
+              completionMetadata.notesAppended ===
+                Boolean(input.completionNote) &&
+              (!completionMetadata.notesAppended ||
+                this.completionNoteAlreadyPresent(
+                  visit.notes,
+                  input.completionNote,
+                )),
+          );
+          if (!actualEndMatches || !noteMatches) {
+            return {
+              status: "CONFLICT",
+              reason: "COMPLETED_DETAILS",
+            } as const;
+          }
+
+          await this.createCompletionAudit(tx, {
+            action: "VISIT_COMPLETION_IDEMPOTENT",
+            input,
+            previousStatus: visit.status,
+            previousActualEnd: visit.actual_end,
+            effectiveActualEnd: visit.actual_end,
+            notesAppended: false,
+          });
+          return { status: "IDEMPOTENT", visit } as const;
+        }
+
+        if (
+          visit.actual_end &&
+          input.actualEndWasProvided &&
+          input.requestedActualEnd &&
+          visit.actual_end.getTime() !== input.requestedActualEnd.getTime()
+        ) {
+          return { status: "CONFLICT", reason: "ACTUAL_END" } as const;
+        }
+
+        const [taskOutcomeCount, careLogCount, medicationOutcomeCount] =
+          await Promise.all([
+            tx.visitTask.count({
+              where: {
+                visit_id: visit.id,
+                deleted_at: null,
+                notes: { contains: VISIT_TASK_OUTCOME_PREFIX },
+              },
+            }),
+            tx.careLog.count({
+              where: {
+                visit_id: visit.id,
+                organization_id: input.organizationId,
+                deleted_at: null,
+              },
+            }),
+            tx.medicationAdministration.count({
+              where: {
+                visit_id: visit.id,
+                deleted_at: null,
+                status: { not: MedicationStatus.SCHEDULED },
+              },
+            }),
+          ]);
+        const hasCompletionEvidence = Boolean(
+          input.completionNote ||
+            this.nonEmpty(visit.notes) ||
+            taskOutcomeCount > 0 ||
+            careLogCount > 0 ||
+            medicationOutcomeCount > 0,
+        );
+        if (!hasCompletionEvidence) {
+          return { status: "EVIDENCE_REQUIRED" } as const;
+        }
+
+        const recordedAt = new Date();
+        const effectiveActualEnd =
+          visit.actual_end || input.requestedActualEnd || recordedAt;
+        const notes = input.completionNote
+          ? this.appendCompletionNote(visit.notes, input.completionNote)
+          : visit.notes;
+        const updated = await tx.visit.update({
+          where: { id: visit.id },
+          data: {
+            status: VisitStatus.COMPLETED,
+            actual_end: effectiveActualEnd,
+            ...(input.completionNote ? { notes } : {}),
+          },
+          include: {
+            carer: true,
+            client: true,
+            tasks: { where: { deleted_at: null } },
+          },
+        });
+
+        await this.createCompletionAudit(tx, {
+          action: "VISIT_COMPLETED",
+          input,
+          previousStatus: visit.status,
+          previousActualEnd: visit.actual_end,
+          effectiveActualEnd,
+          notesAppended: Boolean(input.completionNote),
+          timestamp: recordedAt,
+        });
+
+        return { status: "COMPLETED", visit: updated } as const;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+    );
   }
 
   async delete(id: string, organizationId: string): Promise<Visit> {
@@ -351,6 +543,86 @@ export class VisitRepository {
 
   private carerIdentityLockKey(organizationId: string, carerId: string): string {
     return `carer-identity:${organizationId}:${carerId}`;
+  }
+
+  private nonEmpty(value: string | null | undefined): string | null {
+    const normalized = (value || "").trim();
+    return normalized || null;
+  }
+
+  private appendCompletionNote(
+    current: string | null,
+    completionNote: string,
+  ): string {
+    return current ? `${current}\n${completionNote}` : completionNote;
+  }
+
+  private completionNoteAlreadyPresent(
+    current: string | null,
+    completionNote: string | null,
+  ): boolean {
+    if (!completionNote) return true;
+    const normalized = this.nonEmpty(current);
+    return Boolean(
+      normalized === completionNote ||
+        normalized?.endsWith(`\n${completionNote}`),
+    );
+  }
+
+  private completionMetadata(value: Prisma.JsonValue | null | undefined): {
+    actualEndWasProvided: boolean;
+    notesAppended: boolean;
+  } | null {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return null;
+    }
+    const metadata = value as Prisma.JsonObject;
+    if (
+      typeof metadata.actualEndWasProvided !== "boolean" ||
+      typeof metadata.notesAppended !== "boolean"
+    ) {
+      return null;
+    }
+    return {
+      actualEndWasProvided: metadata.actualEndWasProvided,
+      notesAppended: metadata.notesAppended,
+    };
+  }
+
+  private async createCompletionAudit(
+    tx: Prisma.TransactionClient,
+    options: {
+      action: "VISIT_COMPLETED" | "VISIT_COMPLETION_IDEMPOTENT";
+      input: CompleteVisitAtomicInput;
+      previousStatus: VisitStatus;
+      previousActualEnd: Date | null;
+      effectiveActualEnd: Date | null;
+      notesAppended: boolean;
+      timestamp?: Date;
+    },
+  ): Promise<void> {
+    await tx.auditLog.create({
+      data: {
+        organization_id: options.input.organizationId,
+        user_id: options.input.actor.authSubject,
+        action: options.action,
+        resource_type: "Visit",
+        resource_id: options.input.visitId,
+        old_values: {
+          status: options.previousStatus,
+          actualEnd: options.previousActualEnd?.toISOString() ?? null,
+        },
+        new_values: {
+          status: VisitStatus.COMPLETED,
+          actualEnd: options.effectiveActualEnd?.toISOString() ?? null,
+          membershipId: options.input.actor.membershipId,
+          actorRole: options.input.actor.role,
+          notesAppended: options.notesAppended,
+          actualEndWasProvided: options.input.actualEndWasProvided,
+        },
+        timestamp: options.timestamp || new Date(),
+      },
+    });
   }
 
   async findClientInOrganization(

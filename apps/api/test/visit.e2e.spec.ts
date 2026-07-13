@@ -443,6 +443,45 @@ describe('Visit E2E Tests', () => {
   });
 
   describe('Guided Visit Workflow Commands', () => {
+    const completeVisitMutation = `
+      mutation CompleteVisit($input: CompleteVisitInput!) {
+        completeVisit(input: $input) {
+          id
+          status
+          actualEnd
+          notes
+        }
+      }
+    `;
+
+    async function completeVisit(input: {
+      visitId: string;
+      notes?: string;
+      actualEnd?: string;
+    }) {
+      return request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('carer'))
+        .send({ query: completeVisitMutation, variables: { input } })
+        .expect(200);
+    }
+
+    async function createCompletionVisit(overrides: Record<string, unknown> = {}) {
+      return prisma.visit.create({
+        data: {
+          organization_id: fixtures.organization.id,
+          carer_id: fixtures.carers.carer.id,
+          client_id: fixtures.clients.client.id,
+          scheduled_start: new Date('2024-03-01T09:00:00.000Z'),
+          scheduled_end: new Date('2024-03-01T10:00:00.000Z'),
+          actual_start: new Date('2024-03-01T09:02:00.000Z'),
+          status: 'IN_PROGRESS',
+          notes: 'Initial handover note.',
+          ...overrides,
+        } as any,
+      });
+    }
+
     it('should start, record outcome, submit care note, complete visit, and not create a family update', async () => {
       const visitId = fixtures.visits.scheduledVisit.id;
       const task = await prisma.visitTask.findFirstOrThrow({
@@ -588,6 +627,187 @@ describe('Visit E2E Tests', () => {
       expect(visit?.status).toBe('COMPLETED');
       expect(careLogCount).toBe(1);
       expect(storyCount).toBe(0);
+    });
+
+    it('serializes identical concurrent completion retries and appends the note once', async () => {
+      const visit = await createCompletionVisit();
+      const input = {
+        visitId: visit.id,
+        notes: 'Client settled before the Carer left.',
+        actualEnd: '2024-03-01T09:55:00.000Z',
+      };
+
+      const responses = await Promise.all([
+        completeVisit(input),
+        completeVisit(input),
+      ]);
+
+      for (const response of responses) {
+        expect(response.body.errors).toBeUndefined();
+        expect(response.body.data.completeVisit).toMatchObject({
+          id: visit.id,
+          status: 'COMPLETED',
+          actualEnd: input.actualEnd,
+        });
+      }
+
+      const [omittedNote, omittedActualEnd] = await Promise.all([
+        completeVisit({ visitId: visit.id, actualEnd: input.actualEnd }),
+        completeVisit({ visitId: visit.id, notes: input.notes }),
+      ]);
+      expect(omittedNote.body.errors?.[0]?.extensions?.code).toBe(
+        'VISIT_COMPLETION_CONFLICT',
+      );
+      expect(omittedActualEnd.body.errors?.[0]?.extensions?.code).toBe(
+        'VISIT_COMPLETION_CONFLICT',
+      );
+
+      const [persisted, audits] = await Promise.all([
+        prisma.visit.findUniqueOrThrow({ where: { id: visit.id } }),
+        prisma.auditLog.findMany({
+          where: { resource_type: 'Visit', resource_id: visit.id },
+          orderBy: { timestamp: 'asc' },
+        }),
+      ]);
+      expect(persisted.actual_end?.toISOString()).toBe(input.actualEnd);
+      expect(persisted.notes).toBe(
+        `Initial handover note.\n${input.notes}`,
+      );
+      expect((persisted.notes ?? '').split(input.notes).length - 1).toBe(1);
+      expect(audits.map((audit) => audit.action).sort()).toEqual([
+        'VISIT_COMPLETED',
+        'VISIT_COMPLETION_IDEMPOTENT',
+      ]);
+
+      const completionAudit = audits.find(
+        (audit) => audit.action === 'VISIT_COMPLETED',
+      );
+      expect(completionAudit).toMatchObject({
+        organization_id: fixtures.organization.id,
+        user_id: TEST_USERS.carer.sub,
+        resource_type: 'Visit',
+        resource_id: visit.id,
+      });
+      expect(completionAudit?.new_values).toMatchObject({
+        status: 'COMPLETED',
+        actualEnd: input.actualEnd,
+        membershipId: fixtures.memberships.carerMembership.id,
+        actorRole: 'carer',
+        notesAppended: true,
+        actualEndWasProvided: true,
+      });
+      expect(JSON.stringify(audits)).not.toContain(input.notes);
+    });
+
+    it('allows only one conflicting concurrent completion and never loses the prior note', async () => {
+      const visit = await createCompletionVisit();
+      const actualEnd = '2024-03-01T09:58:00.000Z';
+      const completionNotes = [
+        'First concurrent completion detail.',
+        'Second concurrent completion detail.',
+      ];
+
+      const responses = await Promise.all(
+        completionNotes.map((notes) =>
+          completeVisit({ visitId: visit.id, notes, actualEnd }),
+        ),
+      );
+      const successes = responses.filter(
+        (response) => response.body.data?.completeVisit,
+      );
+      const conflicts = responses.filter(
+        (response) =>
+          response.body.errors?.[0]?.extensions?.code ===
+          'VISIT_COMPLETION_CONFLICT',
+      );
+      expect(successes).toHaveLength(1);
+      expect(conflicts).toHaveLength(1);
+
+      const [persisted, completionAuditCount] = await Promise.all([
+        prisma.visit.findUniqueOrThrow({ where: { id: visit.id } }),
+        prisma.auditLog.count({
+          where: {
+            resource_type: 'Visit',
+            resource_id: visit.id,
+            action: 'VISIT_COMPLETED',
+          },
+        }),
+      ]);
+      expect(persisted.status).toBe('COMPLETED');
+      expect(persisted.actual_end?.toISOString()).toBe(actualEnd);
+      expect(persisted.notes).toMatch(/^Initial handover note\.\n/);
+      expect(
+        completionNotes.filter((note) => persisted.notes?.includes(note)),
+      ).toHaveLength(1);
+      expect(completionAuditCount).toBe(1);
+    });
+
+    it('preserves a recorded actual end and rejects cancelled or conflicting terminal changes', async () => {
+      const originalActualEnd = new Date('2024-03-01T09:50:00.000Z');
+      const visit = await createCompletionVisit({
+        actual_end: originalActualEnd,
+      });
+      const completed = await completeVisit({
+        visitId: visit.id,
+        notes: 'Completion recorded after connectivity returned.',
+      });
+      expect(completed.body.errors).toBeUndefined();
+      expect(completed.body.data.completeVisit.actualEnd).toBe(
+        originalActualEnd.toISOString(),
+      );
+
+      const conflictingRetry = await completeVisit({
+        visitId: visit.id,
+        notes: 'Different completion detail.',
+        actualEnd: '2024-03-01T09:59:00.000Z',
+      });
+      expect(conflictingRetry.body.errors?.[0]?.extensions?.code).toBe(
+        'VISIT_COMPLETION_CONFLICT',
+      );
+
+      const cancelled = await createCompletionVisit({
+        status: 'CANCELLED',
+        notes: 'Visit cancelled by the office.',
+      });
+      const cancelledAttempt = await completeVisit({
+        visitId: cancelled.id,
+        notes: 'Must not complete a cancelled visit.',
+      });
+      expect(cancelledAttempt.body.errors?.[0]?.extensions?.code).toBe(
+        'VISIT_COMPLETION_CONFLICT',
+      );
+
+      const legacyCompleted = await createCompletionVisit({
+        status: 'COMPLETED',
+        actual_end: originalActualEnd,
+        notes: 'Legacy completion without transactional audit metadata.',
+      });
+      const unprovableRetry = await completeVisit({
+        visitId: legacyCompleted.id,
+        notes: 'Legacy completion without transactional audit metadata.',
+        actualEnd: originalActualEnd.toISOString(),
+      });
+      expect(unprovableRetry.body.errors?.[0]?.extensions?.code).toBe(
+        'VISIT_COMPLETION_CONFLICT',
+      );
+
+      const [preserved, cancelledPersisted, legacyPersisted] =
+        await Promise.all([
+          prisma.visit.findUniqueOrThrow({ where: { id: visit.id } }),
+          prisma.visit.findUniqueOrThrow({ where: { id: cancelled.id } }),
+          prisma.visit.findUniqueOrThrow({
+            where: { id: legacyCompleted.id },
+          }),
+        ]);
+      expect(preserved.actual_end?.toISOString()).toBe(
+        originalActualEnd.toISOString(),
+      );
+      expect(preserved.notes).not.toContain('Different completion detail.');
+      expect(cancelledPersisted.status).toBe('CANCELLED');
+      expect(cancelledPersisted.actual_end).toBeNull();
+      expect(legacyPersisted.notes).toBe(
+        'Legacy completion without transactional audit metadata.',
+      );
     });
 
     it('denies every guided workflow write to a different linked Carer', async () => {

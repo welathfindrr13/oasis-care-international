@@ -454,36 +454,49 @@ export class VisitService {
   ): Promise<Visit> {
     this.assertFrontlineExecution(accessContext, userId, userRole, organizationId);
     const orgId = await this.requireOrganizationId(organizationId);
-    const visit = await this.visitRepository.findById(input.visitId, orgId);
-    if (!visit) {
+    const visitNote = this.toNonEmpty(input.notes);
+    const requestedActualEnd = input.actualEnd
+      ? new Date(input.actualEnd)
+      : null;
+    if (requestedActualEnd && Number.isNaN(requestedActualEnd.getTime())) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        "Actual end must be a valid date and time",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const result = await this.visitRepository.completeAtomically({
+      visitId: input.visitId,
+      organizationId: orgId,
+      expectedCarerId: userId,
+      completionNote: visitNote,
+      requestedActualEnd,
+      actualEndWasProvided: Boolean(input.actualEnd),
+      actor: {
+        authSubject: accessContext!.authSubject,
+        membershipId: accessContext!.membershipId,
+        role: accessContext!.rawRole || userRole,
+      },
+    });
+
+    if (result.status === "COMPLETED" || result.status === "IDEMPOTENT") {
+      return result.visit;
+    }
+    if (result.status === "NOT_FOUND") {
       throw new BaseHttpException(
         ErrorCode.VISIT_NOT_FOUND,
         "Visit not found",
         HttpStatus.NOT_FOUND,
       );
     }
-
-    this.checkVisitAccess(visit, userId, userRole, "update");
-
-    const visitNote = this.toNonEmpty(input.notes);
-    const existingVisitNotes = this.toNonEmpty(visit.notes);
-
-    const [taskOutcomeCount, careLogCount, medicationOutcomeCount] =
-      await Promise.all([
-        this.visitRepository.countTaskOutcomeEntriesForVisit(visit.id, orgId),
-        this.visitRepository.countCareLogsForVisit(visit.id, orgId),
-        this.visitRepository.countMedicationOutcomesForVisit(visit.id, orgId),
-      ]);
-
-    const hasCompletionEvidence = Boolean(
-      visitNote ||
-      existingVisitNotes ||
-      taskOutcomeCount > 0 ||
-      careLogCount > 0 ||
-      medicationOutcomeCount > 0,
-    );
-
-    if (!hasCompletionEvidence) {
+    if (result.status === "FORBIDDEN") {
+      throw new BaseHttpException(
+        ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
+        "You can only access your own visits",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    if (result.status === "EVIDENCE_REQUIRED") {
       throw new BaseHttpException(
         ErrorCode.VALIDATION_FAILED,
         "Complete visit requires task outcome, care log, medication outcome, or visit note",
@@ -491,23 +504,24 @@ export class VisitService {
       );
     }
 
-    const updateData: any = {
-      status: VisitStatus.COMPLETED,
-    };
-
-    if (input.actualEnd) {
-      updateData.actual_end = new Date(input.actualEnd);
-    } else if (!visit.actual_end) {
-      updateData.actual_end = new Date();
+    if (result.status !== "CONFLICT") {
+      throw new BaseHttpException(
+        ErrorCode.INTERNAL_ERROR,
+        "Visit completion returned an unexpected result",
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
-
-    if (visitNote) {
-      updateData.notes = existingVisitNotes
-        ? `${existingVisitNotes}\n${visitNote}`
-        : visitNote;
-    }
-
-    return this.visitRepository.update(visit.id, updateData, orgId);
+    const message =
+      result.reason === "CANCELLED"
+        ? "Cancelled visits cannot be completed"
+        : result.reason === "ACTUAL_END"
+          ? "Visit already has a different actual end time"
+          : "Visit is already completed with different completion details";
+    throw new BaseHttpException(
+      ErrorCode.VISIT_COMPLETION_CONFLICT,
+      message,
+      HttpStatus.CONFLICT,
+    );
   }
 
   private checkVisitAccess(
