@@ -1,5 +1,4 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { createHash } from 'node:crypto';
 import {
   AccessGrantScope,
   CareRoomMembershipStatus,
@@ -10,6 +9,7 @@ import {
 } from '@oasis/db';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import { sanitizeAuditMetadata } from '../common/audit/audit-metadata.policy';
 import { CarebridgeRepository } from './carebridge.repository';
 import { CarebridgeAccessService } from './access/carebridge-access.service';
 import {
@@ -366,13 +366,6 @@ export class CarebridgeService {
         HttpStatus.CONFLICT,
       );
     }
-    const familySafeDigest = createHash('sha256')
-      .update(JSON.stringify({
-        version: story.family_safe_version,
-        title: familySafeTitle,
-        body: familySafeBody,
-      }))
-      .digest('hex');
     await this.createAudit({
       organizationId: story.organization_id,
       actorId: approvalActorUserId,
@@ -380,8 +373,7 @@ export class CarebridgeService {
       resourceType: 'VerifiedVisitStory',
       resourceId: storyId,
       newValues: {
-        familySafeVersion: story.family_safe_version,
-        familySafeDigest,
+        version: story.family_safe_version,
       },
     });
     return this.mapStory(published);
@@ -433,7 +425,7 @@ export class CarebridgeService {
       action: 'CAREBRIDGE_VISIT_STORY_REJECTED',
       resourceType: 'VerifiedVisitStory',
       resourceId: storyId,
-      newValues: { rejectionReason: reason },
+      newValues: { status: 'REJECTED' },
     });
     return this.mapStory(rejected);
   }
@@ -581,7 +573,6 @@ export class CarebridgeService {
       resourceId: input.concernId,
       newValues: {
         status: input.status,
-        outcome: input.outcome ?? null,
       },
     });
 
@@ -843,7 +834,9 @@ export class CarebridgeService {
         action: options.action,
         resource_type: options.resourceType,
         resource_id: options.resourceId,
-        new_values: options.newValues as any,
+        new_values: sanitizeAuditMetadata(options.newValues, {
+          identifierSource: 'trusted',
+        }),
       },
     });
   }

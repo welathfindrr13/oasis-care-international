@@ -695,10 +695,7 @@ describe('CarebridgeService', () => {
         organization_id: 'org-1',
         user_id: 'admin-1',
         action: 'CAREBRIDGE_VISIT_STORY_PUBLISHED',
-        new_values: {
-          familySafeVersion: 1,
-          familySafeDigest: expect.stringMatching(/^[a-f0-9]{64}$/),
-        },
+        new_values: { version: 1 },
       }),
     });
   });
@@ -776,9 +773,12 @@ describe('CarebridgeService', () => {
         organization_id: 'org-1',
         user_id: 'admin-1',
         action: 'CAREBRIDGE_VISIT_STORY_REJECTED',
-        new_values: { rejectionReason: 'Need clearer timeline details' },
+        new_values: { status: 'REJECTED' },
       }),
     });
+    expect(JSON.stringify(mockPrisma.auditLog.create.mock.calls)).not.toContain(
+      'Need clearer timeline details',
+    );
   });
 
   it('requires a rejection reason when rejecting a verified visit story', async () => {
@@ -972,7 +972,7 @@ describe('CarebridgeService', () => {
         organization_id: 'org-1',
         user_id: 'family-subject',
         action: 'CAREBRIDGE_PULSE_SUBMITTED',
-        new_values: { sentiment: FamilyPulseSentiment.CONFIDENT },
+        new_values: {},
       }),
     });
   });
@@ -1026,7 +1026,7 @@ describe('CarebridgeService', () => {
         organization_id: 'org-1',
         user_id: 'family-subject',
         action: 'CAREBRIDGE_PULSE_SUBMITTED',
-        new_values: { sentiment: FamilyPulseSentiment.CONCERNED },
+        new_values: {},
       }),
     });
     expect(mockPrisma.auditLog.create).toHaveBeenNthCalledWith(2, {
@@ -1121,11 +1121,16 @@ describe('CarebridgeService', () => {
       severity: 'MEDIUM',
       priority: 'ROUTINE',
       category: 'VISIT_DELIVERY',
-      status: 'ACKNOWLEDGED',
+      status: 'RESOLVED',
     } as any);
 
     await service.updateConcernStatus(
-      { concernId: 'concern-1', status: 'ACKNOWLEDGED' as any },
+      {
+        concernId: 'concern-1',
+        status: 'RESOLVED' as any,
+        outcome: 'ESCALATED_TO_SAFEGUARDING' as any,
+        message: 'PRIVATE_CONCERN_MESSAGE',
+      },
       'staff-1',
       'admin',
       'org-1',
@@ -1136,8 +1141,11 @@ describe('CarebridgeService', () => {
         organization_id: 'org-1',
         user_id: 'staff-1',
         action: 'CAREBRIDGE_CONCERN_UPDATED',
-        new_values: { status: 'ACKNOWLEDGED', outcome: null },
+        new_values: { status: 'RESOLVED' },
       }),
     });
+    const auditPayload = JSON.stringify(mockPrisma.auditLog.create.mock.calls);
+    expect(auditPayload).not.toContain('ESCALATED_TO_SAFEGUARDING');
+    expect(auditPayload).not.toContain('PRIVATE_CONCERN_MESSAGE');
   });
 });

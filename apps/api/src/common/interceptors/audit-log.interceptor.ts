@@ -13,117 +13,16 @@ import { GqlExecutionContext } from '@nestjs/graphql';
 import { Reflector } from '@nestjs/core';
 import { Prisma, PrismaService } from '@oasis/db';
 import { MANUAL_AUDIT_KEY } from '../decorators/manual-audit.decorator';
-
-const AUDIT_METADATA_LIMITS = {
-  depth: 4,
-  entries: 24,
-  identifier: 255,
-  workflowArray: 20,
-} as const;
+import {
+  extractSafeAuditErrorMetadata,
+  sanitizeAuditErrorToken,
+  sanitizeAuditMetadata,
+  sanitizeAuditResourceId,
+  sanitizeTrustedAuditIdentifier,
+} from '../audit/audit-metadata.policy';
 
 const EXCLUDED_AUDIT_DOMAIN =
   /(clinical|safeguard|medicat|medicine|prescription|dose|e-?mar|concern)/i;
-
-const EXCLUDED_METADATA_FIELD =
-  /(address|allerg|api.?key|birth|body|care.?note|clinical|comment|concern|condition|diagnos|dob|dosage|email|instruction|medicat|message|nino|note|password|phone|postcode|reason|safeguard|secret|symptom|text|token)/i;
-
-const INTERNAL_UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const IDENTIFIER_FIELDS: Readonly<Record<string, string>> = {
-  id: 'id',
-  accessgrantid: 'accessGrantId',
-  actorid: 'actorId',
-  assessmentid: 'assessmentId',
-  careplanid: 'carePlanId',
-  carerid: 'carerId',
-  careroomid: 'careRoomId',
-  clientid: 'clientId',
-  evidenceitemid: 'evidenceItemId',
-  evidencepackid: 'evidencePackId',
-  familycontactid: 'familyContactId',
-  invitationid: 'invitationId',
-  membershipid: 'membershipId',
-  organizationid: 'organizationId',
-  organizationmembershipid: 'organizationMembershipId',
-  requestid: 'requestId',
-  shiftid: 'shiftId',
-  sourcerequestid: 'sourceRequestId',
-  storyid: 'storyId',
-  taskid: 'taskId',
-  userid: 'userId',
-  verifiedvisitstoryid: 'verifiedVisitStoryId',
-  visitid: 'visitId',
-  visittaskid: 'visitTaskId',
-};
-
-const WORKFLOW_FIELDS: Readonly<Record<string, string>> = {
-  active: 'active',
-  approved: 'approved',
-  count: 'count',
-  enabled: 'enabled',
-  eventtype: 'eventType',
-  granttype: 'grantType',
-  isactive: 'isActive',
-  limit: 'limit',
-  nextstate: 'nextState',
-  nextstatus: 'nextStatus',
-  offset: 'offset',
-  operation: 'operation',
-  page: 'page',
-  previousstate: 'previousState',
-  previousstatus: 'previousStatus',
-  published: 'published',
-  revoked: 'revoked',
-  role: 'role',
-  roles: 'roles',
-  scope: 'scope',
-  scopes: 'scopes',
-  state: 'state',
-  status: 'status',
-  version: 'version',
-};
-
-const SAFE_WORKFLOW_TOKENS = new Set([
-  'ACCEPTED',
-  'ACTIVE',
-  'ADMIN',
-  'APPROVED',
-  'ARCHIVED',
-  'CARER',
-  'CARE_WORKER',
-  'CANCELLED',
-  'COMPILED',
-  'COMPLETED',
-  'DELIVERED',
-  'DISABLED',
-  'DRAFT',
-  'EXPIRED',
-  'FAMILY',
-  'FAMILY_CONTRIBUTOR',
-  'FAMILY_VIEWER',
-  'INACTIVE',
-  'IN_PROGRESS',
-  'IN_REVIEW',
-  'INVITED',
-  'MANAGER',
-  'NEEDS_ATTENTION',
-  'PENDING',
-  'PENDING_APPROVAL',
-  'PROCESSING',
-  'PUBLISHED',
-  'REJECTED',
-  'RETRYABLE',
-  'REVOKED',
-  'SCHEDULED',
-  'SUBMIT_PULSE',
-  'SUPERSEDED',
-  'SUSPENDED',
-  'VIEW_TASK_SUMMARY',
-  'VIEW_UPDATES',
-  'VIEW_VISIT_TIMES',
-  'VIEW_WEEKLY_SUMMARIES',
-]);
 
 interface AuditLogEntry {
   organizationId?: string | null;
@@ -462,68 +361,7 @@ export class AuditLogInterceptor implements NestInterceptor {
   }
 
   private extractAllowedMetadata(data: unknown): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    let entryCount = 0;
-
-    const visit = (value: unknown, depth: number): void => {
-      if (
-        entryCount >= AUDIT_METADATA_LIMITS.entries ||
-        depth > AUDIT_METADATA_LIMITS.depth ||
-        !value ||
-        typeof value !== 'object'
-      ) {
-        return;
-      }
-
-      if (Array.isArray(value)) {
-        for (const item of value.slice(
-          0,
-          AUDIT_METADATA_LIMITS.workflowArray,
-        )) {
-          visit(item, depth + 1);
-        }
-        return;
-      }
-
-      for (const [key, item] of Object.entries(value)) {
-        if (entryCount >= AUDIT_METADATA_LIMITS.entries) return;
-        const normalizedKey = this.normalizeMetadataKey(key);
-        if (!normalizedKey || EXCLUDED_METADATA_FIELD.test(normalizedKey))
-          continue;
-
-        const identifierField = IDENTIFIER_FIELDS[normalizedKey];
-        if (identifierField) {
-          const identifier = this.sanitizeInternalResourceId(item);
-          if (identifier && result[identifierField] === undefined) {
-            result[identifierField] = identifier;
-            entryCount += 1;
-          }
-          continue;
-        }
-
-        const workflowField = WORKFLOW_FIELDS[normalizedKey];
-        if (workflowField) {
-          const workflowValue = this.sanitizeWorkflowValue(item);
-          if (
-            workflowValue !== undefined &&
-            result[workflowField] === undefined
-          ) {
-            result[workflowField] = workflowValue;
-            entryCount += 1;
-          }
-          continue;
-        }
-
-        visit(item, depth + 1);
-      }
-    };
-
-    visit(data, 0);
-    return result;
-  }
-
-  private normalizeMetadataKey(value: string): string {
-    return value.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+    return sanitizeAuditMetadata(data);
   }
 
   /**
@@ -534,74 +372,23 @@ export class AuditLogInterceptor implements NestInterceptor {
   private sanitizeTrustedProvenanceIdentifier(
     value: unknown,
   ): string | undefined {
-    if (typeof value !== 'string' && typeof value !== 'number')
-      return undefined;
-    const text = String(value).trim();
-    if (
-      !text ||
-      text.length > AUDIT_METADATA_LIMITS.identifier ||
-      !/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/.test(text)
-    ) {
-      return undefined;
-    }
-    return text;
+    return sanitizeTrustedAuditIdentifier(value);
   }
 
   /** Request-controlled record identifiers must match the Prisma UUID grammar. */
   private sanitizeInternalResourceId(value: unknown): string | undefined {
-    if (typeof value !== 'string') return undefined;
-    const text = value.trim();
-    if (
-      !text ||
-      text.length > AUDIT_METADATA_LIMITS.identifier ||
-      !INTERNAL_UUID_PATTERN.test(text)
-    ) {
-      return undefined;
-    }
-    return text;
-  }
-
-  private sanitizeWorkflowValue(value: unknown): unknown {
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'number') {
-      return Number.isSafeInteger(value) && Math.abs(value) <= 1_000_000
-        ? value
-        : undefined;
-    }
-    if (typeof value === 'string') {
-      const normalized = value.trim().toUpperCase();
-      return SAFE_WORKFLOW_TOKENS.has(normalized) ? normalized : undefined;
-    }
-    if (Array.isArray(value)) {
-      const safe = value
-        .slice(0, AUDIT_METADATA_LIMITS.workflowArray)
-        .map((item) => this.sanitizeWorkflowValue(item))
-        .filter((item): item is string => typeof item === 'string');
-      return safe.length ? safe : undefined;
-    }
-    return undefined;
+    return sanitizeAuditResourceId(value);
   }
 
   private extractSafeErrorMetadata(error: unknown): Record<string, unknown> {
-    const err = error as { code?: unknown; name?: unknown };
-    return {
-      errorName: this.sanitizeErrorToken(err?.name, 64) || 'Error',
-      ...(this.sanitizeErrorToken(err?.code, 100)
-        ? { errorCode: this.sanitizeErrorToken(err?.code, 100) }
-        : {}),
-    };
+    return extractSafeAuditErrorMetadata(error);
   }
 
   private sanitizeErrorToken(
     value: unknown,
     maxLength: number,
   ): string | undefined {
-    if (typeof value !== 'string') return undefined;
-    const text = value.trim();
-    if (!text || text.length > maxLength || !/^[A-Za-z0-9_.:-]+$/.test(text)) {
-      return undefined;
-    }
-    return text;
+    return sanitizeAuditErrorToken(value, maxLength);
   }
 
   private sanitizeSchemaName(value: unknown): string | undefined {

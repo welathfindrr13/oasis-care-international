@@ -6,6 +6,7 @@ import { CreateClientInput } from './dto/create-client.input';
 import { UpdateClientInput } from './dto/update-client.input';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import { sanitizeAuditMetadata } from '../common/audit/audit-metadata.policy';
 
 @Injectable()
 export class ClientService {
@@ -109,7 +110,7 @@ export class ClientService {
       postcode: input.postcode,
     });
 
-    // GDPR: Audit log the client creation with PII masked
+    // Audit only reviewed identifiers; do not duplicate client PII.
     try {
       await this.prisma.auditLog.create({
         data: {
@@ -119,12 +120,15 @@ export class ClientService {
           resource_type: 'client',
           resource_id: client.id,
           old_values: {},
-          new_values: {
-            id: client.id,
-            fullName: '[REDACTED]',
-            city: client.city,
-            postcode: '[REDACTED]',
-          },
+          new_values: sanitizeAuditMetadata(
+            {
+              id: client.id,
+              fullName: client.full_name,
+              city: client.city,
+              postcode: client.postcode,
+            },
+            { identifierSource: 'trusted' },
+          ),
           timestamp: new Date(),
         },
       });
@@ -165,18 +169,24 @@ export class ClientService {
           action: 'UPDATE_CLIENT',
           resource_type: 'client',
           resource_id: client.id,
-          old_values: {
-            id: existingClient.id,
-            fullName: '[REDACTED]',
-            city: existingClient.city,
-            postcode: '[REDACTED]',
-          },
-          new_values: {
-            id: client.id,
-            fullName: '[REDACTED]',
-            city: client.city,
-            postcode: '[REDACTED]',
-          },
+          old_values: sanitizeAuditMetadata(
+            {
+              id: existingClient.id,
+              fullName: existingClient.full_name,
+              city: existingClient.city,
+              postcode: existingClient.postcode,
+            },
+            { identifierSource: 'trusted' },
+          ),
+          new_values: sanitizeAuditMetadata(
+            {
+              id: client.id,
+              fullName: client.full_name,
+              city: client.city,
+              postcode: client.postcode,
+            },
+            { identifierSource: 'trusted' },
+          ),
           timestamp: new Date(),
         },
       });
@@ -224,7 +234,7 @@ export class ClientService {
       );
     }
 
-    // GDPR: Audit log the deletion with PII masked
+    // Audit only reviewed identifiers; do not duplicate client PII.
     try {
       await this.prisma.auditLog.create({
         data: {
@@ -233,16 +243,22 @@ export class ClientService {
           action: 'DELETE_CLIENT',
           resource_type: 'client',
           resource_id: id,
-          old_values: {
-            id,
-            fullName: '[REDACTED]',
-            city: existingClient.city,
-            postcode: '[REDACTED]',
-          },
-          new_values: {
-            id,
-            deletedAt: new Date().toISOString(),
-          },
+          old_values: sanitizeAuditMetadata(
+            {
+              id,
+              fullName: existingClient.full_name,
+              city: existingClient.city,
+              postcode: existingClient.postcode,
+            },
+            { identifierSource: 'trusted' },
+          ),
+          new_values: sanitizeAuditMetadata(
+            {
+              id,
+              deletedAt: new Date().toISOString(),
+            },
+            { identifierSource: 'trusted' },
+          ),
           timestamp: new Date(),
         },
       });

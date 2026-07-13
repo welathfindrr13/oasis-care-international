@@ -1,6 +1,10 @@
 import { AuditLogInterceptor } from '../audit-log.interceptor';
 import { GqlExecutionContext } from '@nestjs/graphql';
+import { HttpStatus } from '@nestjs/common';
+import { GraphQLError } from 'graphql';
 import { of, lastValueFrom, throwError } from 'rxjs';
+import { BaseHttpException } from '../../errors/base-http.exception';
+import { ErrorCode } from '../../errors/error-codes';
 
 describe('AuditLogInterceptor', () => {
   const flushAuditWrite = () => new Promise((resolve) => setImmediate(resolve));
@@ -388,6 +392,9 @@ describe('AuditLogInterceptor', () => {
               'VIEW_MEDICATION_SUPPORT_STATUS',
               'RAISE_CONCERNS',
             ],
+            outcome: 'ESCALATED',
+            reason: 'APPROVED',
+            timestamp: 'ACTIVE',
             freeText: forbidden[2],
             apiKey: forbidden[5],
             medication: { id: 'medication-1', dosage: forbidden[3] },
@@ -690,6 +697,42 @@ describe('AuditLogInterceptor', () => {
       forbiddenMessage,
     );
     gqlSpy.mockRestore();
+  });
+
+  it('extracts a bounded code from a real BaseHttpException without its response message', () => {
+    const { interceptor } = createInterceptor();
+    const forbiddenMessage = 'PRIVATE_BASE_HTTP_MESSAGE';
+    const failure = new BaseHttpException(
+      ErrorCode.VALIDATION_FAILED,
+      forbiddenMessage,
+      HttpStatus.BAD_REQUEST,
+    );
+
+    const metadata = (interceptor as any).extractSafeErrorMetadata(failure);
+
+    expect(metadata).toEqual({
+      errorName: 'BaseHttpException',
+      errorCode: ErrorCode.VALIDATION_FAILED,
+    });
+    expect(JSON.stringify(metadata)).not.toContain(forbiddenMessage);
+  });
+
+  it('extracts a bounded GraphQL extensions code without its message or other extensions', () => {
+    const { interceptor } = createInterceptor();
+    const failure = new GraphQLError('PRIVATE_GRAPHQL_MESSAGE', {
+      extensions: {
+        code: 'FORBIDDEN',
+        details: 'PRIVATE_GRAPHQL_DETAILS',
+      },
+    });
+
+    const metadata = (interceptor as any).extractSafeErrorMetadata(failure);
+
+    expect(metadata).toEqual({
+      errorName: 'GraphQLError',
+      errorCode: 'FORBIDDEN',
+    });
+    expect(JSON.stringify(metadata)).not.toContain('PRIVATE_');
   });
 
   it('logs metadata only when the database audit sink is unavailable', async () => {
