@@ -1,20 +1,21 @@
-/**
- * Time utilities for Oasis Care application
- * Default timezone: Europe/London
- */
+import {
+  formatInOrganizationTimezone,
+  organizationCalendarDayUtcRange,
+  organizationDateKey as dateKeyInOrganizationTimezone,
+  organizationDayUtcRange,
+  organizationWallClock,
+  organizationWeekUtcRange,
+  resolveOrganizationTimezone,
+  resolveOrganizationWallClock,
+} from '@oasis/time';
 
-const LONDON_TIMEZONE = 'Europe/London';
-
-type LondonDayRange = { start: string; end: string };
+type OrganizationDayRange = { start: string; end: string };
 
 /**
  * Format date/time for London timezone display
  */
 export function formatDateTime(date: Date | string, options?: Intl.DateTimeFormatOptions): string {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  
   const defaultOptions: Intl.DateTimeFormatOptions = {
-    timeZone: LONDON_TIMEZONE,
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -24,107 +25,78 @@ export function formatDateTime(date: Date | string, options?: Intl.DateTimeForma
     ...options,
   };
 
-  return new Intl.DateTimeFormat('en-GB', defaultOptions).format(dateObj);
+  return formatInOrganizationTimezone(date, defaultOptions);
 }
 
 /**
  * Format time only for London timezone
  */
 export function formatTime(date: Date | string): string {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: LONDON_TIMEZONE,
+  return formatInOrganizationTimezone(date, {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-  }).format(dateObj);
+  });
 }
 
 /**
  * Format date only for London timezone
  */
-export function formatDate(date: Date | string): string {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: LONDON_TIMEZONE,
+export function formatDate(
+  date: Date | string,
+  options?: Intl.DateTimeFormatOptions,
+): string {
+  return formatInOrganizationTimezone(date, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-  }).format(dateObj);
+    ...options,
+  });
 }
 
-export function formatLondonLongDate(date: Date | string): string {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: LONDON_TIMEZONE,
+export function formatOrganizationLongDate(date: Date | string): string {
+  return formatInOrganizationTimezone(date, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-  }).format(dateObj);
+  });
 }
 
-export function getLondonDayUtcRange(now: Date = new Date()): LondonDayRange {
-  const current = londonDateParts(now);
-  const nextCalendarDay = new Date(
-    Date.UTC(current.year, current.month - 1, current.day + 1),
-  );
+export function getOrganizationDayUtcRange(now: Date = new Date()): OrganizationDayRange {
+  const range = organizationDayUtcRange(now);
   return {
-    start: londonMidnightUtc(current.year, current.month, current.day).toISOString(),
-    end: londonMidnightUtc(
-      nextCalendarDay.getUTCFullYear(),
-      nextCalendarDay.getUTCMonth() + 1,
-      nextCalendarDay.getUTCDate(),
-    ).toISOString(),
+    start: range.start.toISOString(),
+    end: range.end.toISOString(),
   };
 }
 
-function londonDateParts(date: Date): { year: number; month: number; day: number } {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: LONDON_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const value = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((part) => part.type === type)?.value);
-  return { year: value('year'), month: value('month'), day: value('day') };
+// Compatibility aliases for existing page imports. The implementation resolves
+// the organization timezone centrally and is not tied to the function name.
+export const formatLondonLongDate = formatOrganizationLongDate;
+export const getLondonDayUtcRange = getOrganizationDayUtcRange;
+
+export function getOrganizationDateUtcRange(dateKey: string): OrganizationDayRange {
+  const match = String(dateKey || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) throw new RangeError('Enter a valid organization calendar date');
+  const range = organizationCalendarDayUtcRange({
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+  });
+  return { start: range.start.toISOString(), end: range.end.toISOString() };
 }
 
-function londonMidnightUtc(year: number, month: number, day: number): Date {
-  const wallClockUtc = Date.UTC(year, month - 1, day);
-  let utc = wallClockUtc;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const parts = new Intl.DateTimeFormat('en-GB', {
-      timeZone: LONDON_TIMEZONE,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hourCycle: 'h23',
-    }).formatToParts(new Date(utc));
-    const value = (type: Intl.DateTimeFormatPartTypes) =>
-      Number(parts.find((part) => part.type === type)?.value);
-    const representedAsUtc = Date.UTC(
-      value('year'),
-      value('month') - 1,
-      value('day'),
-      value('hour'),
-      value('minute'),
-      value('second'),
-    );
-    utc = wallClockUtc - (representedAsUtc - utc);
-  }
-  return new Date(utc);
+export function getOrganizationWeekUtcRange(now: Date = new Date()): OrganizationDayRange {
+  const range = organizationWeekUtcRange(now);
+  return { start: range.start.toISOString(), end: range.end.toISOString() };
 }
 
 /**
  * Get current date/time in London timezone as ISO string
  */
 export function nowInLondon(): string {
-  return new Date().toLocaleString('sv-SE', { timeZone: LONDON_TIMEZONE }).replace(' ', 'T') + 'Z';
+  return new Date().toISOString();
 }
 
 /**
@@ -132,15 +104,38 @@ export function nowInLondon(): string {
  */
 export function isToday(date: Date | string): boolean {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  const today = new Date();
-  
-  const londonDate = new Intl.DateTimeFormat('en-CA', { 
-    timeZone: LONDON_TIMEZONE 
-  }).format(dateObj);
-  
-  const londonToday = new Intl.DateTimeFormat('en-CA', { 
-    timeZone: LONDON_TIMEZONE 
-  }).format(today);
-  
-  return londonDate === londonToday;
+  return organizationDateKey(dateObj) === organizationDateKey(new Date());
+}
+
+export const ORGANIZATION_TIMEZONE = resolveOrganizationTimezone();
+
+export function organizationDateKey(date: Date | string = new Date()): string {
+  const instant = typeof date === 'string' ? new Date(date) : date;
+  return dateKeyInOrganizationTimezone(instant);
+}
+
+export function formatOrganizationDateTimeInput(date: Date | string): string {
+  const instant = typeof date === 'string' ? new Date(date) : date;
+  const wallClock = organizationWallClock(instant);
+  return `${String(wallClock.year).padStart(4, '0')}-${String(wallClock.month).padStart(2, '0')}-${String(wallClock.day).padStart(2, '0')}T${String(wallClock.hour).padStart(2, '0')}:${String(wallClock.minute).padStart(2, '0')}`;
+}
+
+export function organizationDateTimeInputToIso(value: string): string {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!match) throw new RangeError('Enter a valid organization date and time');
+  const resolution = resolveOrganizationWallClock({
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+    hour: Number(match[4]),
+    minute: Number(match[5]),
+  });
+  if (resolution.kind !== 'unique') {
+    throw new RangeError(
+      resolution.kind === 'ambiguous'
+        ? 'This organization time occurs twice because the clocks change. Choose an unambiguous time.'
+        : 'This organization time does not exist because the clocks change. Choose another time.',
+    );
+  }
+  return resolution.instant.toISOString();
 }

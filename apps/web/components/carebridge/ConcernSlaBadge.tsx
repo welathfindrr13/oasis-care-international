@@ -1,13 +1,10 @@
+import { formatDateTime } from '../../lib/time'
+
 function formatDue(value?: string | null) {
   if (!value) return 'No deadline set'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return 'No deadline set'
-  return date.toLocaleString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(date, { year: undefined })
 }
 
 interface ConcernSlaBadgeProps {

@@ -95,6 +95,9 @@ describe('MedicationService', () => {
       findDueMedicationsForVisit: jest.fn(),
       findTodaysMedicationsByClient: jest.fn(),
       createMedication: jest.fn(),
+      createPrescription: jest.fn(),
+      findMedicationAdministrationTimesForPrescriptionWindow: jest.fn(),
+      createMedicationAdministrationsBulk: jest.fn(),
       findMedicationById: jest.fn(),
       findClientInOrganization: jest.fn(),
       findOrganizationsForContext: jest.fn(),
@@ -516,6 +519,68 @@ describe('MedicationService', () => {
   });
 
   describe('permission checks', () => {
+    it('materialises a normal BST medication wall time as a UTC instant', async () => {
+      const prescription = {
+        id: 'prescription-bst',
+        start_date: new Date('2026-07-12T00:00:00.000Z'),
+        end_date: new Date('2026-07-12T00:00:00.000Z'),
+        administration_times: ['08:00'],
+      } as any;
+      repository.findMedicationById.mockResolvedValue({ id: 'medication-123' } as any);
+      repository.findClientInOrganization.mockResolvedValue({ id: 'client-123' } as any);
+      repository.createPrescription.mockResolvedValue(prescription);
+      repository.findMedicationAdministrationTimesForPrescriptionWindow.mockResolvedValue([]);
+      repository.createMedicationAdministrationsBulk.mockResolvedValue(1);
+      repository.createMedicationAudit.mockResolvedValue({} as any);
+
+      await service.createPrescription(
+        {
+          clientId: 'client-123',
+          medicationId: 'medication-123',
+          startDate: '2026-07-12',
+          endDate: '2026-07-12',
+          frequencyPerDay: 1,
+          administrationTimes: ['08:00'],
+        },
+        mockAdminUser.id,
+        mockAdminUser.role,
+        organizationId,
+      );
+
+      expect(repository.createMedicationAdministrationsBulk).toHaveBeenCalledWith([
+        expect.objectContaining({
+          prescription_id: 'prescription-bst',
+          scheduled_time: new Date('2026-07-12T07:00:00.000Z'),
+        }),
+      ]);
+    });
+
+    it('rejects a repeated autumn medication wall time before creating a prescription', async () => {
+      repository.findMedicationById.mockResolvedValue({ id: 'medication-123' } as any);
+      repository.findClientInOrganization.mockResolvedValue({ id: 'client-123' } as any);
+
+      await expect(
+        service.createPrescription(
+          {
+            clientId: 'client-123',
+            medicationId: 'medication-123',
+            startDate: '2026-10-25',
+            endDate: '2026-10-25',
+            frequencyPerDay: 1,
+            administrationTimes: ['01:30'],
+          },
+          mockAdminUser.id,
+          mockAdminUser.role,
+          organizationId,
+        ),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { code: ErrorCode.MEDICATION_SCHEDULE_TIME_UNRESOLVED },
+      });
+
+      expect(repository.createPrescription).not.toHaveBeenCalled();
+    });
+
     it('should allow admin to create medications', async () => {
       const medicationData = {
         name: 'Test Med',

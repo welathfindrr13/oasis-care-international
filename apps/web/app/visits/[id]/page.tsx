@@ -9,6 +9,12 @@ import { hasAccessCapability } from '../../../lib/auth/capabilities';
 import { Button } from '../../../components/ui/Button';
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card';
 import { clientQuery } from '../../../lib/graphql/client-side';
+import {
+  formatDateTime as formatOrganizationDateTime,
+  formatOrganizationDateTimeInput,
+  formatTime as formatOrganizationTime,
+  organizationDateTimeInputToIso,
+} from '../../../lib/time';
 
 type VisitStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 type MedicationStatus = 'SCHEDULED' | 'ADMINISTERED' | 'MISSED' | 'REFUSED' | 'CANCELLED';
@@ -259,34 +265,21 @@ const TASK_OUTCOME_OPTIONS: Array<{ outcome: TaskOutcome; label: string; variant
 
 function formatDateTime(date?: string | null): string {
   if (!date) return 'Not recorded';
-  return new Date(date).toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatOrganizationDateTime(date);
 }
 
 function formatTime(date?: string | null): string {
   if (!date) return 'Not recorded';
-  return new Date(date).toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatOrganizationTime(date);
 }
 
 function formatDateInput(date?: string | null): string {
   if (!date) return '';
-  const parsed = new Date(date);
-  const tzOffset = parsed.getTimezoneOffset() * 60000;
-  return new Date(parsed.getTime() - tzOffset).toISOString().slice(0, 16);
+  return formatOrganizationDateTimeInput(date);
 }
 
 function nowLocalDatetime(): string {
-  const now = new Date();
-  const tzOffset = now.getTimezoneOffset() * 60000;
-  return new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
+  return formatOrganizationDateTimeInput(new Date());
 }
 
 function statusBadge(status: VisitStatus | MedicationStatus): string {
@@ -556,7 +549,9 @@ export default function VisitDetailPage() {
             visitId: visit.id,
             category: careNoteCategory,
             notes: careNoteNotes.trim(),
-            occurredAt: careNoteOccurredAt ? new Date(careNoteOccurredAt).toISOString() : undefined,
+            occurredAt: careNoteOccurredAt
+              ? organizationDateTimeInputToIso(careNoteOccurredAt)
+              : undefined,
             escalated: careNoteEscalated,
             escalatedTo: careNoteEscalatedTo.trim() || undefined,
           },
@@ -620,7 +615,9 @@ export default function VisitDetailPage() {
           input: {
             visitId: visit.id,
             notes: visitCompletionNotes.trim() || undefined,
-            actualEnd: visitCompletionAt ? new Date(visitCompletionAt).toISOString() : undefined,
+            actualEnd: visitCompletionAt
+              ? organizationDateTimeInputToIso(visitCompletionAt)
+              : undefined,
           },
         },
         { getBearerToken },
@@ -649,8 +646,8 @@ export default function VisitDetailPage() {
             id: visit.id,
             status: visitStatus,
             notes: visitNotes.trim() || null,
-            actualStart: actualStart ? new Date(actualStart).toISOString() : null,
-            actualEnd: actualEnd ? new Date(actualEnd).toISOString() : null,
+            actualStart: actualStart ? organizationDateTimeInputToIso(actualStart) : null,
+            actualEnd: actualEnd ? organizationDateTimeInputToIso(actualEnd) : null,
           },
         },
         { getBearerToken },

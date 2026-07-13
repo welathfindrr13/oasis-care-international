@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/utils'
 import type { VerifiedVisitStory } from '../../lib/graphql/queries'
+import { formatDateTime } from '../../lib/time'
 
 interface VerifiedVisitStoryCardProps {
   story: VerifiedVisitStory
@@ -24,12 +25,7 @@ function formatTimestamp(value?: string | null) {
   if (!value) return null
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return null
-  return date.toLocaleString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(date, { year: undefined })
 }
 
 export function VerifiedVisitStoryCard({

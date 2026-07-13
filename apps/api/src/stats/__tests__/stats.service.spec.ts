@@ -55,19 +55,13 @@ describe('StatsService', () => {
       expect(transactionCalls).toHaveLength(2);
     });
 
-    it('should use correct date for start of day', async () => {
-      const mockDate = new Date('2025-07-30T15:30:00.000Z');
+    it('uses the organization calendar day after BST starts', async () => {
+      const mockDate = new Date('2026-07-30T15:30:00.000Z');
       jest.useFakeTimers();
       jest.setSystemTime(mockDate);
 
       (prisma.$transaction as jest.Mock).mockImplementation((queries) => {
-        // Verify the queries use the correct start of day
-        const expectedStartOfDay = new Date('2025-07-30T00:00:00.000Z');
-        
         expect(queries).toHaveLength(2);
-        // We can't directly test the query parameters here since they're promises
-        // but we've verified the logic in the service
-        
         return Promise.resolve([10, 7]);
       });
 
@@ -77,6 +71,14 @@ describe('StatsService', () => {
         booked: 10,
         finished: 7,
       });
+      expect((prisma as any).whereNotDeleted).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scheduled_start: {
+            gte: new Date('2026-07-29T23:00:00.000Z'),
+            lt: new Date('2026-07-30T23:00:00.000Z'),
+          },
+        }),
+      );
 
       jest.useRealTimers();
     });

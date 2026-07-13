@@ -64,6 +64,26 @@ describe('MedicationRepository', () => {
     );
   });
 
+  it('uses the 23-hour organization day for eMAR on the BST spring boundary', async () => {
+    const { prisma, repository } = createRepository();
+
+    await repository.findTodaysMedicationsByClient(
+      new Date('2026-03-29T12:00:00.000Z'),
+      'org-123',
+    );
+
+    expect(prisma.medicationAdministration.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          scheduled_time: {
+            gte: new Date('2026-03-29T00:00:00.000Z'),
+            lt: new Date('2026-03-29T23:00:00.000Z'),
+          },
+        }),
+      }),
+    );
+  });
+
   it('rejects medication audit creation without tenant ownership', async () => {
     const { prisma, repository } = createRepository();
 

@@ -88,4 +88,27 @@ describe('CareLogService raw operational access policy', () => {
       }),
     );
   });
+
+  it('uses organization calendar boundaries for monthly care records and eMAR', async () => {
+    const { prisma, service } = createService();
+    prisma.careLog.findMany.mockResolvedValue([]);
+    prisma.medicationAdministration.findMany.mockResolvedValue([]);
+
+    await service.monthlyCareSummary('client-1', 2026, 3, 'admin-1', 'admin', 'org-1');
+
+    const expectedRange = {
+      gte: new Date('2026-03-01T00:00:00.000Z'),
+      lt: new Date('2026-03-31T23:00:00.000Z'),
+    };
+    expect(prisma.careLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ occurred_at: expectedRange }),
+      }),
+    );
+    expect(prisma.medicationAdministration.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ scheduled_time: expectedRange }),
+      }),
+    );
+  });
 });

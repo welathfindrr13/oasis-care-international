@@ -9,6 +9,10 @@ import { Button } from '../../../components/ui/Button'
 import { useClientAccess } from '../../../components/providers/ClientAccessProvider'
 import { clientQuery } from '../../../lib/graphql/client-side'
 import {
+  formatOrganizationDateTimeInput,
+  organizationDateTimeInputToIso,
+} from '../../../lib/time'
+import {
   CARERS_QUERY,
   CLIENTS_QUERY,
   CREATE_VISIT_MUTATION,
@@ -30,9 +34,8 @@ interface NewVisitPageClientProps {
   initialClientId: string
 }
 
-function toLocalDatetimeValue(date: Date) {
-  const tzOffset = date.getTimezoneOffset() * 60000
-  return new Date(date.getTime() - tzOffset).toISOString().slice(0, 16)
+function toOrganizationDatetimeValue(date: Date) {
+  return formatOrganizationDateTimeInput(date)
 }
 
 export default function NewVisitPageClient({ initialClientId }: NewVisitPageClientProps) {
@@ -46,17 +49,15 @@ export default function NewVisitPageClient({ initialClientId }: NewVisitPageClie
   const [loadAttempt, setLoadAttempt] = useState(0)
 
   const defaultStart = useMemo(() => {
-    const date = new Date()
-    date.setMinutes(0, 0, 0)
-    date.setHours(date.getHours() + 1)
-    return toLocalDatetimeValue(date)
+    const date = new Date(Date.now() + 60 * 60_000)
+    date.setUTCMinutes(0, 0, 0)
+    return toOrganizationDatetimeValue(date)
   }, [])
 
   const defaultEnd = useMemo(() => {
-    const date = new Date()
-    date.setMinutes(0, 0, 0)
-    date.setHours(date.getHours() + 2)
-    return toLocalDatetimeValue(date)
+    const date = new Date(Date.now() + 2 * 60 * 60_000)
+    date.setUTCMinutes(0, 0, 0)
+    return toOrganizationDatetimeValue(date)
   }, [])
 
   const [form, setForm] = useState<FormState>({
@@ -161,8 +162,8 @@ export default function NewVisitPageClient({ initialClientId }: NewVisitPageClie
           input: {
             clientId: form.clientId,
             carerId: form.carerId,
-            scheduledStart: new Date(form.startTime).toISOString(),
-            scheduledEnd: new Date(form.endTime).toISOString(),
+            scheduledStart: organizationDateTimeInputToIso(form.startTime),
+            scheduledEnd: organizationDateTimeInputToIso(form.endTime),
             notes: form.notes || undefined,
           },
         },

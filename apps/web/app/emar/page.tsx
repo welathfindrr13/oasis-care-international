@@ -6,6 +6,10 @@ import { useSearchParams } from 'next/navigation';
 import { Header } from '../../components/oasis/Header';
 import { useClientAccess } from '../../components/providers/ClientAccessProvider';
 import { clientQuery } from '../../lib/graphql/client-side';
+import {
+  formatDate as formatOrganizationDate,
+  formatTime as formatOrganizationTime,
+} from '../../lib/time';
 
 interface MedicationAdministration {
   id: string;
@@ -257,18 +261,12 @@ function EmarPageContent() {
   };
 
   const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
+    return formatOrganizationTime(dateString);
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return formatOrganizationDate(dateString, {
       weekday: 'short',
-      month: 'short',
-      day: 'numeric',
     });
   };
 

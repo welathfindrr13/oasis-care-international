@@ -6,6 +6,12 @@ import { useParams } from 'next/navigation';
 import { Header } from '../../../../components/oasis/Header';
 import { useClientAccess } from '../../../../components/providers/ClientAccessProvider';
 import { clientQuery } from '../../../../lib/graphql/client-side';
+import {
+  formatDateTime,
+  formatOrganizationDateTimeInput,
+  organizationDateKey,
+  organizationDateTimeInputToIso,
+} from '../../../../lib/time';
 
 type CareLogCategory =
   | 'TOILETING'
@@ -112,9 +118,7 @@ const CREATE_CARE_LOG_MUTATION = `
 `;
 
 function nowLocalDatetime() {
-  const now = new Date();
-  const tzOffset = now.getTimezoneOffset() * 60000;
-  return new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
+  return formatOrganizationDateTimeInput(new Date());
 }
 
 export default function ClientCareLogsPage() {
@@ -130,8 +134,7 @@ export default function ClientCareLogsPage() {
 
   const [clientName, setClientName] = useState<string>('Client');
   const [selectedMonth, setSelectedMonth] = useState(() => {
-    const d = new Date();
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    return organizationDateKey().slice(0, 7);
   });
 
   const [logs, setLogs] = useState<CareLog[]>([]);
@@ -270,7 +273,7 @@ export default function ClientCareLogsPage() {
     try {
       const input: Record<string, any> = {
         clientId,
-        occurredAt: new Date(occurredAt).toISOString(),
+        occurredAt: organizationDateTimeInputToIso(occurredAt),
         category,
         notes: notes || undefined,
         source: 'web',
@@ -577,7 +580,7 @@ export default function ClientCareLogsPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-medium text-slate-900">{log.category}</p>
-                      <p className="text-xs text-slate-500">{new Date(log.occurredAt).toLocaleString('en-GB')}</p>
+                      <p className="text-xs text-slate-500">{formatDateTime(log.occurredAt)}</p>
                     </div>
                     {log.escalated && (
                       <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">Escalated</span>

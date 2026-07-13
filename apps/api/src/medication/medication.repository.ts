@@ -9,6 +9,7 @@ import {
   Prisma 
 } from '@oasis/db';
 import { assertTenantIdForSensitiveWrite } from '../common/tenant/tenant-ownership';
+import { organizationDayUtcRange } from '@oasis/time';
 
 @Injectable()
 export class MedicationRepository {
@@ -318,16 +319,15 @@ export class MedicationRepository {
     organizationId: string,
     carerId?: string,
   ): Promise<MedicationAdministration[]> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    const { start: startOfDay, end: endOfDayExclusive } = organizationDayUtcRange(
+      date,
+      organizationId,
+    );
 
     const where: Prisma.MedicationAdministrationWhereInput = {
       scheduled_time: {
         gte: startOfDay,
-        lte: endOfDay
+        lt: endOfDayExclusive
       },
       deleted_at: null,
       ...(carerId

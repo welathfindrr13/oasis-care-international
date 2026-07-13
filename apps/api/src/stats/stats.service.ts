@@ -3,6 +3,7 @@ import { PrismaService, VisitStatus } from '@oasis/db';
 import { TodayStatsDto } from './dto/today-stats.dto';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import { organizationDayUtcRange } from '@oasis/time';
 
 @Injectable()
 export class StatsService {
@@ -10,10 +11,10 @@ export class StatsService {
 
   async getTodayStats(organizationId?: string): Promise<TodayStatsDto> {
     const orgId = await this.requireOrganizationId(organizationId);
-    const startOfDay = new Date();
-    startOfDay.setUTCHours(0, 0, 0, 0);
-    const endOfDayExclusive = new Date(startOfDay);
-    endOfDayExclusive.setUTCDate(endOfDayExclusive.getUTCDate() + 1);
+    const { start: startOfDay, end: endOfDayExclusive } = organizationDayUtcRange(
+      new Date(),
+      orgId,
+    );
 
     const [booked, finished] = await this.prisma.$transaction([
       this.prisma.visit.count({

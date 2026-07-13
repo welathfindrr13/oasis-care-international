@@ -17,6 +17,12 @@ import {
   type CanonicalCapabilityActor,
   hasCanonicalActorCapability,
 } from '../auth/access-capability';
+import {
+  addCalendarDays,
+  resolveOrganizationWallClock,
+  utcStoredDateToCalendarDate,
+  type OrganizationCalendarDate,
+} from '@oasis/time';
 
 // Inline types for now
 interface CreatePrescriptionInput {
@@ -116,6 +122,15 @@ export class MedicationService {
         HttpStatus.NOT_FOUND,
       );
     }
+
+    // Resolve every local schedule time before writing the prescription so a
+    // DST ambiguity cannot leave a partially materialised care record.
+    this.buildSchedulePlan(
+      new Date(data.startDate),
+      data.endDate ? new Date(data.endDate) : null,
+      data.administrationTimes,
+      orgId,
+    );
 
     const prescription = await this.medicationRepository.createPrescription({
       client: { connect: { id: data.clientId } },
@@ -416,18 +431,6 @@ export class MedicationService {
     }
   }
 
-  private materializationWindowEnd(startDate: Date, endDate?: Date | null): Date {
-    if (endDate) {
-      const bounded = new Date(endDate);
-      bounded.setUTCHours(23, 59, 59, 999);
-      return bounded;
-    }
-    const fallback = new Date(startDate);
-    fallback.setUTCDate(fallback.getUTCDate() + 30);
-    fallback.setUTCHours(23, 59, 59, 999);
-    return fallback;
-  }
-
   private parseTimeOfDay(time: string): { hours: number; minutes: number } | null {
     const normalized = String(time || '').trim();
     const match = normalized.match(/^(\d{1,2}):(\d{2})$/);
@@ -439,45 +442,68 @@ export class MedicationService {
     return { hours, minutes };
   }
 
-  private buildScheduleCandidates(
+  private compareCalendarDates(left: OrganizationCalendarDate, right: OrganizationCalendarDate): number {
+    return Date.UTC(left.year, left.month - 1, left.day)
+      - Date.UTC(right.year, right.month - 1, right.day);
+  }
+
+  private buildSchedulePlan(
     startDate: Date,
-    endDate: Date,
+    endDate: Date | null | undefined,
     administrationTimes: string[],
-  ): Date[] {
+    organizationId: string,
+  ): { candidates: Date[]; windowStart: Date; windowEndExclusive: Date } {
     const parsedTimes = administrationTimes
       .map((time) => this.parseTimeOfDay(time))
       .filter((value): value is { hours: number; minutes: number } => Boolean(value));
 
+    const startCalendarDate = utcStoredDateToCalendarDate(startDate);
+    const endCalendarDate = endDate
+      ? utcStoredDateToCalendarDate(endDate)
+      : addCalendarDays(startCalendarDate, 30);
     const candidates: Date[] = [];
-    const cursor = new Date(Date.UTC(
-      startDate.getUTCFullYear(),
-      startDate.getUTCMonth(),
-      startDate.getUTCDate(),
-      0,
-      0,
-      0,
-      0,
-    ));
+    let cursor = startCalendarDate;
 
-    while (cursor <= endDate) {
+    while (this.compareCalendarDates(cursor, endCalendarDate) <= 0) {
       for (const t of parsedTimes) {
-        const scheduled = new Date(Date.UTC(
-          cursor.getUTCFullYear(),
-          cursor.getUTCMonth(),
-          cursor.getUTCDate(),
-          t.hours,
-          t.minutes,
-          0,
-          0,
-        ));
-        if (scheduled >= startDate && scheduled <= endDate) {
-          candidates.push(scheduled);
+        const resolution = resolveOrganizationWallClock(
+          { ...cursor, hour: t.hours, minute: t.minutes },
+          organizationId,
+        );
+        if (resolution.kind !== 'unique') {
+          throw new BaseHttpException(
+            ErrorCode.MEDICATION_SCHEDULE_TIME_UNRESOLVED,
+            'Medication schedule includes a local time affected by daylight saving. Clinical scheduling approval is required before materialisation.',
+            HttpStatus.CONFLICT,
+          );
         }
+        candidates.push(resolution.instant);
       }
-      cursor.setUTCDate(cursor.getUTCDate() + 1);
+      cursor = addCalendarDays(cursor, 1);
     }
 
-    return candidates;
+    const windowStartResolution = resolveOrganizationWallClock(
+      { ...startCalendarDate, hour: 0, minute: 0 },
+      organizationId,
+    );
+    const dayAfterEnd = addCalendarDays(endCalendarDate, 1);
+    const windowEndResolution = resolveOrganizationWallClock(
+      { ...dayAfterEnd, hour: 0, minute: 0 },
+      organizationId,
+    );
+    if (windowStartResolution.kind !== 'unique' || windowEndResolution.kind !== 'unique') {
+      throw new BaseHttpException(
+        ErrorCode.MEDICATION_SCHEDULE_TIME_UNRESOLVED,
+        'Medication schedule calendar boundary could not be resolved safely.',
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    return {
+      candidates,
+      windowStart: windowStartResolution.instant,
+      windowEndExclusive: windowEndResolution.instant,
+    };
   }
 
   private async materializePrescriptionAdministrations(
@@ -485,26 +511,26 @@ export class MedicationService {
     organizationId: string,
   ): Promise<number> {
     const startDate = new Date(prescription.start_date);
-    const endDate = this.materializationWindowEnd(startDate, prescription.end_date);
-    const candidates = this.buildScheduleCandidates(
+    const plan = this.buildSchedulePlan(
       startDate,
-      endDate,
+      prescription.end_date,
       Array.isArray(prescription.administration_times) ? prescription.administration_times : [],
+      organizationId,
     );
 
-    if (!candidates.length) {
+    if (!plan.candidates.length) {
       return 0;
     }
 
     const existing = await this.medicationRepository.findMedicationAdministrationTimesForPrescriptionWindow(
       prescription.id,
-      startDate,
-      endDate,
+      plan.windowStart,
+      new Date(plan.windowEndExclusive.getTime() - 1),
       organizationId,
     );
     const existingSet = new Set(existing.map((d) => d.toISOString()));
 
-    const createPayload = candidates
+    const createPayload = plan.candidates
       .filter((scheduled) => !existingSet.has(scheduled.toISOString()))
       .map((scheduled) => ({
         prescription_id: prescription.id,

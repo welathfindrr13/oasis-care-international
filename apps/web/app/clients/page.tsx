@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { getServerAuthContext } from '../../lib/auth/server-auth'
 import { query } from '../../lib/graphql/client'
+import { formatDateTime } from '../../lib/time'
 import {
   CLIENTS_QUERY,
   DEFAULT_PAGE_SIZE,
@@ -100,11 +101,9 @@ function EmptyState({ isAdmin }: { isAdmin: boolean }) {
 
 function formatVisitDate(dateString: string | undefined | null): string {
   if (!dateString) return '—';
-  return new Date(dateString).toLocaleDateString('en-GB', {
+  return formatDateTime(dateString, {
     day: 'numeric',
     month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
   });
 }
 
