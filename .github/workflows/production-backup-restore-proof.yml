@@ -240,10 +240,17 @@ jobs:
           [ -z "$(git status --porcelain --untracked-files=no 2>/dev/null)" ] || fail PRODUCTION_REPOSITORY_DIRTY
           printf 'PRODUCTION_CODE_SHA_OK\n'
 
-          install -d -m 0700 /etc/oasis /var/backups/oasis
-          [ ! -L /etc/oasis ] && [ ! -L /var/backups/oasis ] || fail PRODUCTION_BACKUP_STORAGE_INVALID
-          [ "$(stat -c '%u:%g:%a' /etc/oasis 2>/dev/null)" = 0:0:700 ] || fail PRODUCTION_BACKUP_STORAGE_INVALID
-          [ "$(stat -c '%u:%g:%a' /var/backups/oasis 2>/dev/null)" = 0:0:700 ] || fail PRODUCTION_BACKUP_STORAGE_INVALID
+          ensure_private_directory() {
+            local directory="$1"
+            if [ -e "$directory" ] || [ -L "$directory" ]; then
+              [ -d "$directory" ] && [ ! -L "$directory" ] || fail PRODUCTION_BACKUP_STORAGE_INVALID
+            else
+              install -d -m 0700 "$directory" || fail PRODUCTION_BACKUP_STORAGE_INVALID
+            fi
+            [ "$(stat -c '%u:%g:%a' "$directory" 2>/dev/null)" = 0:0:700 ] || fail PRODUCTION_BACKUP_STORAGE_INVALID
+          }
+          ensure_private_directory /etc/oasis
+          ensure_private_directory /var/backups/oasis
           temporary_key=""
           backup_output=""
           backup_diagnostic=""

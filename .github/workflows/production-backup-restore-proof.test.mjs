@@ -154,12 +154,14 @@ test("durable production key and archive are regular root-only files", () => {
   assert.match(workflow, /stat -c '%u:%g:%a'.*= 0:0:600/);
   assert.match(
     workflow,
-    /stat -c '%u:%g:%a' \/etc\/oasis.*= 0:0:700.*PRODUCTION_BACKUP_STORAGE_INVALID/,
+    /if \[ -e "\$directory" \] \|\| \[ -L "\$directory" \]; then[\s\S]*else[\s\S]*install -d -m 0700 "\$directory"/,
   );
   assert.match(
     workflow,
-    /stat -c '%u:%g:%a' \/var\/backups\/oasis.*= 0:0:700.*PRODUCTION_BACKUP_STORAGE_INVALID/,
+    /stat -c '%u:%g:%a' "\$directory".*= 0:0:700.*PRODUCTION_BACKUP_STORAGE_INVALID/,
   );
+  assert.match(workflow, /ensure_private_directory \/etc\/oasis/);
+  assert.match(workflow, /ensure_private_directory \/var\/backups\/oasis/);
   assert.match(workflow, /validate-key "\$key_file"/);
   assert.match(workflow, /PRODUCTION_BACKUP_KEY_READY/);
   assert.match(workflow, /PRODUCTION_BACKUP_ARCHIVE_READY/);
@@ -288,8 +290,10 @@ test("remote proof creates restores rotates and fails closed on SHA mismatch", (
     fs.rmSync(helperDir, { recursive: true, force: true });
   });
   fs.mkdirSync(path.join(repo, ".git"), { recursive: true });
-  fs.mkdirSync(etc, { recursive: true });
-  fs.mkdirSync(backups, { recursive: true });
+  fs.mkdirSync(etc, { recursive: true, mode: 0o700 });
+  fs.chmodSync(etc, 0o700);
+  fs.mkdirSync(backups, { recursive: true, mode: 0o700 });
+  fs.chmodSync(backups, 0o700);
   fs.mkdirSync(bin, { recursive: true });
   fs.mkdirSync(helperDir, { recursive: true, mode: 0o700 });
   fs.writeFileSync(
