@@ -23,16 +23,12 @@ function LoginContent() {
   } as NodeJS.ProcessEnv);
   const [role, setRole] = useState('admin');
   const errorMessage =
-    error === 'OAuthSignin'
-      ? 'Authentication provider configuration is invalid. Please check the production auth provider settings.'
-      : error === 'OAuthCallback'
-      ? 'There was a problem signing in. Please try again.'
-      : error === 'Configuration'
-      ? 'Authentication is not configured correctly for this environment.'
+    error === 'OAuthCallback'
+      ? 'We could not complete sign-in. Try again.'
       : error === 'CredentialsSignin'
-      ? 'We could not start a local session. Please try again.'
+      ? 'We could not sign you in. Check your details and try again.'
       : error
-      ? 'An error occurred. Please try again.'
+      ? 'Sign-in is not available right now. Try again or contact your Manager or Oasis support.'
       : null;
 
   async function handleLocalSignIn() {
@@ -162,7 +158,7 @@ function LoginContent() {
 
           {/* Footer */}
           <p className="mt-8 text-center text-xs text-slate-600">
-            Need help signing in? Contact your organisation administrator.
+            Need help signing in? Contact your Manager or Oasis support.
           </p>
         </div>
       </main>

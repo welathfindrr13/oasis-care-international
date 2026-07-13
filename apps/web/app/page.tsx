@@ -7,15 +7,15 @@ const pillars = [
   },
   {
     name: 'Deliver',
-    text: 'Guided care visits, care actions, medication support, and notes recorded once.',
+    text: 'Guided visit records, care actions, and notes kept together.',
   },
   {
     name: 'Prove',
-    text: 'Operational records become source-linked evidence for managers and inspections.',
+    text: 'Managers can review operational records and prepare information for inspections.',
   },
   {
     name: 'Reassure',
-    text: 'Approved family updates and concern cases keep relatives informed without raw-record exposure.',
+    text: 'Approved family updates and concern cases keep relatives informed without showing internal care records.',
   },
   {
     name: 'Improve',
@@ -42,7 +42,7 @@ export default function Home() {
           </div>
           <Link
             href="/login"
-            className="whitespace-nowrap rounded-full border border-slate-300 bg-white/80 px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm backdrop-blur hover:border-teal-500 hover:text-teal-800"
+            className="whitespace-nowrap rounded-full border border-slate-300 bg-white/80 px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm backdrop-blur hover:border-teal-500 hover:text-teal-800"
           >
             Sign in
           </Link>

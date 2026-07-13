@@ -6,15 +6,15 @@ import { hasRole } from '../../../lib/auth/roles'
 import { getServerAuthContext } from '../../../lib/auth/server-auth'
 
 export const metadata: Metadata = {
-  title: 'Metrics - Oasis Care Admin',
-  description: 'System metrics and performance monitoring',
+  title: 'Service monitoring - Oasis Care',
+  description: 'Observed service monitoring response',
 }
 
 async function getMetrics(): Promise<string> {
   try {
     const { accessToken } = await getServerAuthContext()
     if (!accessToken) {
-      return 'Metrics unavailable: missing access token'
+      return 'Metrics unavailable'
     }
 
     const fullApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql'
@@ -31,8 +31,8 @@ async function getMetrics(): Promise<string> {
     }
     
     return await response.text()
-  } catch (error) {
-    return `Metrics unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`
+  } catch {
+    return 'Metrics unavailable'
   }
 }
 
@@ -51,10 +51,10 @@ export default async function MetricsPage() {
         
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-text-primary font-heading mb-2">
-            System Metrics
+            Service monitoring
           </h1>
           <p className="text-text-secondary">
-            Application performance and monitoring data
+            Observed monitoring response from Oasis
           </p>
         </div>
 
@@ -67,7 +67,7 @@ export default async function MetricsPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm leading-6 text-text-secondary">
-                The authenticated API metrics endpoint. This page shows its response without inferring service health.
+                Monitoring data returned by this Oasis service. This page does not infer service health.
               </p>
             </CardContent>
           </Card>
@@ -80,7 +80,7 @@ export default async function MetricsPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm leading-6 text-text-secondary">
-                Runtime label: <span className="font-mono text-text-primary">{process.env.NODE_ENV || 'unknown'}</span>
+                System environment: <span className="font-mono text-text-primary">{process.env.NODE_ENV || 'unknown'}</span>
               </p>
             </CardContent>
           </Card>
@@ -93,7 +93,7 @@ export default async function MetricsPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm leading-6 text-text-secondary">
-                An administrator account is required. Reload this page to request a fresh response.
+                A Manager account is required. Reload this page to request a fresh response.
               </p>
             </CardContent>
           </Card>
@@ -105,10 +105,10 @@ export default async function MetricsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-text-primary font-heading">
-                  Raw Metrics Data
+                  Monitoring response
                 </h2>
                 <p className="text-sm text-text-secondary">
-                  Prometheus-style metrics from the API server
+                  Response returned by the monitoring service
                 </p>
               </div>
             </div>
@@ -120,7 +120,7 @@ export default async function MetricsPage() {
               </pre>
             </div>
 
-            {/* Info Notice */}
+            {/* Access notice */}
             <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-sm">
               <div className="flex items-start">
                 <div className="flex-shrink-0">
@@ -130,7 +130,7 @@ export default async function MetricsPage() {
                 </div>
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-blue-800">
-                    Admin Access Required
+                    Manager access required
                   </h3>
                   <div className="mt-2 text-sm text-blue-700">
                     <p>An unavailable response is shown as unavailable. This page does not prove API or database health.</p>
