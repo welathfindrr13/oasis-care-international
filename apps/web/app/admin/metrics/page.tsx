@@ -93,7 +93,7 @@ export default async function MetricsPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm leading-6 text-text-secondary">
-                A Manager account is required. Reload this page to request a fresh response.
+                This page is restricted. Reload it to request a fresh response.
               </p>
             </CardContent>
           </Card>
@@ -130,10 +130,10 @@ export default async function MetricsPage() {
                 </div>
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-blue-800">
-                    Manager access required
+                    Restricted access
                   </h3>
                   <div className="mt-2 text-sm text-blue-700">
-                    <p>An unavailable response is shown as unavailable. This page does not prove API or database health.</p>
+                    <p>An unavailable response is shown as unavailable. Contact Oasis support if you need access. This page does not prove API or database health.</p>
                   </div>
                 </div>
               </div>

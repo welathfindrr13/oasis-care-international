@@ -225,7 +225,9 @@ test("metrics page reports only observed data and has no inert refresh control",
   assert.doesNotMatch(metricsSource, /components\/ui\/Button/);
   assert.doesNotMatch(metricsSource, /authenticated API|Runtime label|Prometheus-style|administrator|Admin Access|System Metrics|Raw Metrics Data/i);
   assert.doesNotMatch(metricsSource, /error\.message|missing access token|Unknown error/);
-  assert.match(metricsSource, /Manager account is required/);
+  assert.match(metricsSource, /This page is restricted/);
+  assert.match(metricsSource, /Contact Oasis support if you need access/);
+  assert.doesNotMatch(metricsSource, /Manager account is required|administrator account is required/i);
 });
 
 test("access states give calm actions without resolver jargon", () => {

@@ -29,7 +29,7 @@ Sign in
 Metrics
   Source | Environment | Access
   Raw response from authenticated metrics endpoint
-  Unavailable means unavailable; no inferred API/database status
+  Restricted access; unavailable means unavailable; no inferred API/database status
 ```
 
 ## State matrix
