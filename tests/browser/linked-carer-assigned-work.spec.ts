@@ -68,7 +68,7 @@ test("a linked fake carer follows the database role despite an admin token claim
 }) => {
   await page.goto("/login");
   await expect(
-    page.getByRole("heading", { name: "Welcome back" }),
+    page.getByRole("heading", { name: "Sign in to Oasis Care" }),
   ).toBeVisible();
 
   await signIn(page, {

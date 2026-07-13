@@ -197,7 +197,11 @@ test("Carer Today and My visits use assigned-work cards instead of admin schedul
 test("public and sign-in copy avoids unsupported assurance and internal product language", () => {
   assert.match(publicHomeSource, /Available features depend on your organisation/);
   assert.match(publicHomeSource, /Open Manager Today/);
-  assert.match(publicHomeSource, /whitespace-nowrap rounded-full/);
+  assert.match(publicHomeSource, /Request company access/);
+  assert.match(publicHomeSource, /Review family updates/);
+  assert.match(publicHomeSource, /How the record moves through care/);
+  assert.match(publicHomeSource, /<ol className=/);
+  assert.doesNotMatch(publicHomeSource, /gradient|backdrop-blur|rounded-3xl|shadow-2xl/);
   assert.doesNotMatch(
     publicHomeSource,
     /care OS|operating system|command centre|source-linked evidence|raw-record exposure|medication support/i,
@@ -207,6 +211,8 @@ test("public and sign-in copy avoids unsupported assurance and internal product 
   assert.match(loginSource, /Contact your Manager or Oasis support/);
   assert.match(loginSource, /<main className=/);
   assert.match(loginSource, /<footer className=/);
+  assert.match(loginSource, /Loading sign-in/);
+  assert.doesNotMatch(loginSource, /animate-|gradient|backdrop-blur|rounded-2xl|shadow-2xl/);
   assert.doesNotMatch(
     loginSource,
     /GDPR Compliant|256-bit SSL|command centre|provider configuration|production auth|environment|local session|organisation administrator/i,

@@ -228,9 +228,29 @@ async function expectAccessibilityFoundation(
   expect(normalizedViolations).toEqual([]);
 }
 
+test("Public", async ({ page }) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", {
+      name: "Clear care records, from plan to visit update",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Request company access" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open Manager Today" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Review family updates" })).toBeVisible();
+  await expect(page.getByRole("contentinfo")).toBeVisible();
+  await expectAccessibilityFoundation(page);
+});
+
 test("Login", async ({ page }) => {
   await page.goto("/login");
-  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in to Oasis Care" })).toBeVisible();
+  const headingLevels = await page.locator("h1, h2, h3, h4, h5, h6").evaluateAll((headings) =>
+    headings.map((heading) => Number(heading.tagName.slice(1))),
+  );
+  expect(headingLevels).toEqual([1, 2]);
   await expect(page.getByLabel("Workspace")).toBeVisible();
   await expect(page.getByRole("contentinfo")).toBeVisible();
   await expectAccessibilityFoundation(page);
