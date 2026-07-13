@@ -547,12 +547,124 @@ describe('MedicationService', () => {
         organizationId,
       );
 
+      expect(repository.createPrescription).toHaveBeenCalledWith(
+        expect.objectContaining({
+          start_date: new Date('2026-07-12T00:00:00.000Z'),
+          end_date: new Date('2026-07-12T00:00:00.000Z'),
+        }),
+      );
       expect(repository.createMedicationAdministrationsBulk).toHaveBeenCalledWith([
         expect.objectContaining({
           prescription_id: 'prescription-bst',
           scheduled_time: new Date('2026-07-12T07:00:00.000Z'),
         }),
       ]);
+    });
+
+    it('stores canonical dates and materialises a valid wall time on the spring BST boundary', async () => {
+      const prescription = {
+        id: 'prescription-spring-boundary',
+        start_date: new Date('2026-03-29T00:00:00.000Z'),
+        end_date: new Date('2026-03-29T00:00:00.000Z'),
+        administration_times: ['02:30'],
+      } as any;
+      repository.findMedicationById.mockResolvedValue({ id: 'medication-123' } as any);
+      repository.findClientInOrganization.mockResolvedValue({ id: 'client-123' } as any);
+      repository.createPrescription.mockResolvedValue(prescription);
+      repository.findMedicationAdministrationTimesForPrescriptionWindow.mockResolvedValue([]);
+      repository.createMedicationAdministrationsBulk.mockResolvedValue(1);
+      repository.createMedicationAudit.mockResolvedValue({} as any);
+
+      await service.createPrescription(
+        {
+          clientId: 'client-123',
+          medicationId: 'medication-123',
+          startDate: '2026-03-29',
+          endDate: '2026-03-29',
+          frequencyPerDay: 1,
+          administrationTimes: ['02:30'],
+        },
+        mockAdminUser.id,
+        mockAdminUser.role,
+        organizationId,
+      );
+
+      expect(repository.createPrescription).toHaveBeenCalledWith(
+        expect.objectContaining({
+          start_date: new Date('2026-03-29T00:00:00.000Z'),
+          end_date: new Date('2026-03-29T00:00:00.000Z'),
+        }),
+      );
+      expect(repository.createMedicationAdministrationsBulk).toHaveBeenCalledWith([
+        expect.objectContaining({
+          prescription_id: 'prescription-spring-boundary',
+          scheduled_time: new Date('2026-03-29T01:30:00.000Z'),
+        }),
+      ]);
+    });
+
+    it.each([
+      {
+        startDate: '2026-07-13T00:00:00.000Z',
+        endDate: '2026-07-13',
+      },
+      {
+        startDate: '2026-07-13',
+        endDate: '2026-07-13T00:00:00+01:00',
+      },
+    ])('rejects non-date-only prescription input before any write', async ({
+      startDate,
+      endDate,
+    }) => {
+      await expect(
+        service.createPrescription(
+          {
+            clientId: 'client-123',
+            medicationId: 'medication-123',
+            startDate,
+            endDate,
+            frequencyPerDay: 1,
+            administrationTimes: ['08:00'],
+          },
+          mockAdminUser.id,
+          mockAdminUser.role,
+          organizationId,
+        ),
+      ).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        response: { code: ErrorCode.VALIDATION_FAILED },
+      });
+
+      expect(repository.findMedicationById).not.toHaveBeenCalled();
+      expect(repository.createPrescription).not.toHaveBeenCalled();
+      expect(repository.createMedicationAdministrationsBulk).not.toHaveBeenCalled();
+      expect(repository.createMedicationAudit).not.toHaveBeenCalled();
+    });
+
+    it('rejects a prescription end date before its start before any write', async () => {
+      await expect(
+        service.createPrescription(
+          {
+            clientId: 'client-123',
+            medicationId: 'medication-123',
+            startDate: '2026-07-14',
+            endDate: '2026-07-13',
+            frequencyPerDay: 1,
+            administrationTimes: ['08:00'],
+          },
+          mockAdminUser.id,
+          mockAdminUser.role,
+          organizationId,
+        ),
+      ).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        response: { code: ErrorCode.VALIDATION_FAILED },
+      });
+
+      expect(repository.findMedicationById).not.toHaveBeenCalled();
+      expect(repository.createPrescription).not.toHaveBeenCalled();
+      expect(repository.createMedicationAdministrationsBulk).not.toHaveBeenCalled();
+      expect(repository.createMedicationAudit).not.toHaveBeenCalled();
     });
 
     it('rejects a repeated autumn medication wall time before creating a prescription', async () => {

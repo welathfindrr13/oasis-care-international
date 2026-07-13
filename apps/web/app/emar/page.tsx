@@ -357,10 +357,8 @@ function EmarPageContent() {
           input: {
             clientId: newPrescription.clientId,
             medicationId: newPrescription.medicationId,
-            startDate: `${newPrescription.startDate}T00:00:00.000Z`,
-            endDate: newPrescription.endDate
-              ? `${newPrescription.endDate}T23:59:59.999Z`
-              : null,
+            startDate: newPrescription.startDate,
+            endDate: newPrescription.endDate || null,
             frequencyPerDay: Number(newPrescription.frequencyPerDay || '1'),
             administrationTimes: times,
             specialInstructions: newPrescription.specialInstructions.trim() || null,

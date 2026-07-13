@@ -7,7 +7,10 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
 test('eMAR defaults to the organization date rather than the UTC host date', () => {
   const source = read('./emar/page.tsx')
   assert.match(source, /return organizationDateKey\(\)/)
+  assert.match(source, /startDate: newPrescription\.startDate/)
+  assert.match(source, /endDate: newPrescription\.endDate \|\| null/)
   assert.doesNotMatch(source, /toISOString\(\)\.split\(['"]T['"]\)/)
+  assert.doesNotMatch(source, /T00:00:00\.000Z|T23:59:59\.999Z/)
 })
 
 test('care-log month filters share organization calendar boundaries with summaries', () => {

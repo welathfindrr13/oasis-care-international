@@ -1,5 +1,15 @@
 import { InputType, Field, Int } from '@nestjs/graphql';
-import { IsString, IsNotEmpty, IsOptional, IsInt, IsArray, IsBoolean, IsDateString, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsInt,
+  IsArray,
+  IsBoolean,
+  Matches,
+  Min,
+  Max,
+} from 'class-validator';
 
 @InputType()
 export class CreatePrescriptionInput {
@@ -14,11 +24,11 @@ export class CreatePrescriptionInput {
   medicationId: string;
 
   @Field()
-  @IsDateString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
   startDate: string;
 
   @Field({ nullable: true })
-  @IsDateString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
   @IsOptional()
   endDate?: string;
 

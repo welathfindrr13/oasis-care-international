@@ -19,6 +19,7 @@ import {
 } from '../auth/access-capability';
 import {
   addCalendarDays,
+  organizationCalendarDateToUtcStoredDate,
   parseOrganizationDateKey,
   resolveOrganizationWallClock,
   utcStoredDateToCalendarDate,
@@ -101,7 +102,26 @@ export class MedicationService {
     const orgId = await this.requireOrganizationId(organizationId);
     const normalizedRole = this.normalizeRole(userRole);
     this.checkAdminAccess(normalizedRole);
-    
+
+    const startCalendarDate = this.parsePrescriptionDateKey(data.startDate, 'start');
+    const endCalendarDate = data.endDate
+      ? this.parsePrescriptionDateKey(data.endDate, 'end')
+      : null;
+    if (
+      endCalendarDate &&
+      this.compareCalendarDates(startCalendarDate, endCalendarDate) > 0
+    ) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Prescription start date must not be after its end date',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const startDate = organizationCalendarDateToUtcStoredDate(startCalendarDate);
+    const endDate = endCalendarDate
+      ? organizationCalendarDateToUtcStoredDate(endCalendarDate)
+      : null;
+
     const requestId = this.cls.get('requestId');
     this.logger.log(`Creating prescription for client ${data.clientId}`, { requestId });
 
@@ -127,8 +147,8 @@ export class MedicationService {
     // Resolve every local schedule time before writing the prescription so a
     // DST ambiguity cannot leave a partially materialised care record.
     this.buildSchedulePlan(
-      new Date(data.startDate),
-      data.endDate ? new Date(data.endDate) : null,
+      startDate,
+      endDate,
       data.administrationTimes,
       orgId,
     );
@@ -136,8 +156,8 @@ export class MedicationService {
     const prescription = await this.medicationRepository.createPrescription({
       client: { connect: { id: data.clientId } },
       medication: { connect: { id: data.medicationId } },
-      start_date: new Date(data.startDate),
-      end_date: data.endDate ? new Date(data.endDate) : null,
+      start_date: startDate,
+      end_date: endDate,
       frequency_per_day: data.frequencyPerDay,
       frequency_interval_hours: data.frequencyIntervalHours,
       administration_times: data.administrationTimes,
@@ -445,7 +465,25 @@ export class MedicationService {
     return { hours, minutes };
   }
 
-  private compareCalendarDates(left: OrganizationCalendarDate, right: OrganizationCalendarDate): number {
+  private parsePrescriptionDateKey(
+    value: string,
+    field: 'start' | 'end',
+  ): OrganizationCalendarDate {
+    try {
+      return parseOrganizationDateKey(value);
+    } catch {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        `Prescription ${field} date must use YYYY-MM-DD`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  private compareCalendarDates(
+    left: OrganizationCalendarDate,
+    right: OrganizationCalendarDate,
+  ): number {
     return Date.UTC(left.year, left.month - 1, left.day)
       - Date.UTC(right.year, right.month - 1, right.day);
   }
