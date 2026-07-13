@@ -18,6 +18,8 @@ REPOSITORY=/opt/oasis-care
 CONFIG_DIRECTORY=/etc/oasis
 CONFIG_FILE=$CONFIG_DIRECTORY/production-signals.env
 HEARTBEAT_FILE=/var/lib/oasis-production-signals/heartbeat.json
+BACKUP_DIRECTORY=/var/backups/oasis
+PRODUCTION_BACKUP_KEY_FILE=/etc/oasis/oasis-backup.key
 RUNTIME_ROOT=/usr/local/lib/oasis-production-signals
 VERIFIER_COMMAND=/usr/local/sbin/oasis-verify-production-signal-scheduler
 SERVICE_UNIT=oasis-production-signals.service
@@ -37,6 +39,7 @@ set -u
 [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || fail
 [[ "$OASIS_PRODUCTION_APP_URL" =~ ^https://[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]{1,5})?/?$ ]] || fail
 [[ "$BACKUP_ENCRYPTION_KEY_FILE" =~ ^/[A-Za-z0-9._/-]+$ ]] || fail
+[ "$BACKUP_ENCRYPTION_KEY_FILE" = "$PRODUCTION_BACKUP_KEY_FILE" ] || fail
 case "$BACKUP_ENCRYPTION_KEY_FILE" in
   /home/*|/root/*|/run/user/*) fail ;;
 esac
@@ -59,6 +62,7 @@ for executable in \
 do
   [ -x "$executable" ] || fail
 done
+[ "$(/usr/bin/stat -c '%u:%g:%a' "$BACKUP_ENCRYPTION_KEY_FILE" 2>/dev/null)" = 0:0:600 ] || fail
 
 cd "$REPOSITORY" 2>/dev/null || fail
 [ -d .git ] || fail
@@ -175,7 +179,7 @@ temporary_timer="$(/usr/bin/mktemp "/etc/systemd/system/.$TIMER_UNIT.XXXXXXXX")"
   printf 'PRODUCTION_SIGNAL_HEARTBEAT_FILE=%s\n' "$HEARTBEAT_FILE"
   printf 'COMPOSE_FILE=%s\n' "$runtime_current/deploy/v2/docker-compose.yml"
   printf 'ENV_FILE=%s\n' "$REPOSITORY/deploy/v2/.env"
-  printf 'BACKUP_DIR=%s\n' "$REPOSITORY/deploy/v2/backups"
+  printf 'BACKUP_DIR=%s\n' "$BACKUP_DIRECTORY"
 } >"$temporary_config" || fail
 
 /usr/bin/install -m 0644 \

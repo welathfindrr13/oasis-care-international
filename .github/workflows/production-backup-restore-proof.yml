@@ -1,0 +1,475 @@
+name: Production Backup Restore Proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_production_sha:
+        description: Exact currently deployed production git SHA.
+        required: true
+        type: string
+      production_backup_approval:
+        description: Exact approval token for the encrypted backup and disposable restore proof.
+        required: true
+        type: string
+
+concurrency:
+  group: production-vps-mutation
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  production-backup-restore-proof:
+    name: Prove encrypted production backup recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+    steps:
+      - name: Checkout reviewed proof commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate production proof inputs
+        shell: bash
+        env:
+          OASIS_PRODUCTION_VPS_HOST: ${{ secrets.OASIS_PRODUCTION_VPS_HOST }}
+          OASIS_PRODUCTION_VPS_USER: ${{ secrets.OASIS_PRODUCTION_VPS_USER }}
+          OASIS_PRODUCTION_VPS_SSH_KEY: ${{ secrets.OASIS_PRODUCTION_VPS_SSH_KEY }}
+          OASIS_PRODUCTION_VPS_KNOWN_HOSTS: ${{ secrets.OASIS_PRODUCTION_VPS_KNOWN_HOSTS }}
+          EXPECTED_PRODUCTION_SHA: ${{ inputs.expected_production_sha }}
+          PROOF_COMMIT_SHA: ${{ github.sha }}
+          PRODUCTION_BACKUP_APPROVAL: ${{ inputs.production_backup_approval }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_PRODUCTION_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            printf 'PRODUCTION_BACKUP_INPUTS_INVALID\n' >&2
+            exit 1
+          }
+          [[ "$PROOF_COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            printf 'PRODUCTION_BACKUP_INPUTS_INVALID\n' >&2
+            exit 1
+          }
+          required_approval="APPROVE_PRODUCTION_BACKUP_RESTORE_PROOF_${EXPECTED_PRODUCTION_SHA}_WITH_${PROOF_COMMIT_SHA}"
+          [ "$PRODUCTION_BACKUP_APPROVAL" = "$required_approval" ] || {
+            printf 'PRODUCTION_BACKUP_APPROVAL_MISMATCH\n' >&2
+            exit 1
+          }
+          printf 'PRODUCTION_BACKUP_APPROVAL_BINDS_LIVE_AND_PROOF_SHA\n'
+          if [ -z "$OASIS_PRODUCTION_VPS_HOST" ] || [ -z "$OASIS_PRODUCTION_VPS_USER" ] || [ -z "$OASIS_PRODUCTION_VPS_SSH_KEY" ] || [ -z "$OASIS_PRODUCTION_VPS_KNOWN_HOSTS" ]; then
+            printf 'PRODUCTION_BACKUP_TRANSPORT_UNKNOWN\n' >&2
+            exit 1
+          fi
+          [[ "$OASIS_PRODUCTION_VPS_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9.:-]*$ ]] || {
+            printf 'PRODUCTION_BACKUP_TRANSPORT_UNKNOWN\n' >&2
+            exit 1
+          }
+          [[ "$OASIS_PRODUCTION_VPS_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || {
+            printf 'PRODUCTION_BACKUP_TRANSPORT_UNKNOWN\n' >&2
+            exit 1
+          }
+
+      - name: Configure production transport
+        shell: bash
+        env:
+          OASIS_PRODUCTION_VPS_SSH_KEY: ${{ secrets.OASIS_PRODUCTION_VPS_SSH_KEY }}
+          OASIS_PRODUCTION_VPS_KNOWN_HOSTS: ${{ secrets.OASIS_PRODUCTION_VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$OASIS_PRODUCTION_VPS_SSH_KEY" > ~/.ssh/oasis_production_vps
+          chmod 600 ~/.ssh/oasis_production_vps
+          printf '%s\n' "$OASIS_PRODUCTION_VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Create retrieve restore and destroy production backup proof
+        shell: bash
+        env:
+          OASIS_PRODUCTION_VPS_HOST: ${{ secrets.OASIS_PRODUCTION_VPS_HOST }}
+          OASIS_PRODUCTION_VPS_USER: ${{ secrets.OASIS_PRODUCTION_VPS_USER }}
+          EXPECTED_PRODUCTION_SHA: ${{ inputs.expected_production_sha }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          for required_file in \
+            deploy/v2/scripts/backup-crypto.mjs \
+            deploy/v2/scripts/backup-postgres.sh \
+            deploy/v2/scripts/rehearse-backup-restore.sh
+          do
+            [ -f "$required_file" ] || {
+              printf 'PRODUCTION_BACKUP_REVIEWED_HELPER_MISSING\n' >&2
+              exit 1
+            }
+          done
+
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]] || {
+            printf 'PRODUCTION_BACKUP_RUN_ID_INVALID\n' >&2
+            exit 1
+          }
+          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]] || {
+            printf 'PRODUCTION_BACKUP_RUN_ID_INVALID\n' >&2
+            exit 1
+          }
+
+          private_dir="$(mktemp -d)"
+          local_backup="$private_dir/production.dump.enc"
+          local_manifest="$private_dir/retrieval.sha256"
+          helper_manifest="$private_dir/reviewed-helpers.sha256"
+          remote_helper_dir=""
+          remote_backup_file="/var/backups/oasis/.proof-staging/oasis-proof-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.dump.enc"
+          remote_retrieval_file="/var/backups/oasis/oasis-production-latest.dump.enc"
+          remote_key_file="/etc/oasis/oasis-backup.key"
+
+          cleanup() {
+            local status=$?
+            trap - EXIT
+            rm -rf "$private_dir"
+            if [ -n "${remote_helper_dir:-}" ]; then
+              ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 \
+                "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- "$remote_helper_dir" "$remote_backup_file" <<'REMOTE_CLEANUP' >/dev/null 2>&1 || true
+          set -euo pipefail
+          helper_dir="$1"
+          backup_file="$2"
+          [[ "$helper_dir" =~ ^/tmp/oasis-backup-proof\.[A-Za-z0-9]{8}$ ]] || exit 1
+          [[ "$backup_file" =~ ^/var/backups/oasis/\.proof-staging/oasis-proof-[0-9]+-[0-9]+\.dump\.enc$ ]] || exit 1
+          rm -rf -- "$helper_dir"
+          rm -f -- "$backup_file"
+          REMOTE_CLEANUP
+            fi
+            exit "$status"
+          }
+          trap cleanup EXIT
+
+          (
+            cd deploy/v2/scripts
+            sha256sum backup-crypto.mjs backup-postgres.sh rehearse-backup-restore.sh
+          ) > "$helper_manifest"
+          chmod 0600 "$helper_manifest"
+
+          remote_helper_dir="$(
+            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 \
+              "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" \
+              'umask 077; mktemp -d /tmp/oasis-backup-proof.XXXXXXXX' 2>/dev/null
+          )"
+          [[ "$remote_helper_dir" =~ ^/tmp/oasis-backup-proof\.[A-Za-z0-9]{8}$ ]] || {
+            printf 'PRODUCTION_BACKUP_REMOTE_PREPARE_FAILED\n' >&2
+            exit 1
+          }
+
+          if ! scp -q -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 \
+            deploy/v2/scripts/backup-crypto.mjs \
+            deploy/v2/scripts/backup-postgres.sh \
+            deploy/v2/scripts/rehearse-backup-restore.sh \
+            "$helper_manifest" \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST:$remote_helper_dir/" \
+            >/dev/null 2>&1
+          then
+            printf 'PRODUCTION_BACKUP_HELPER_TRANSFER_FAILED\n' >&2
+            exit 1
+          fi
+
+          remote_report="$private_dir/remote.report"
+          remote_diagnostic="$private_dir/remote.diagnostic"
+          : > "$remote_report"
+          : > "$remote_diagnostic"
+          chmod 600 "$remote_report" "$remote_diagnostic"
+          set +e
+          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- \
+            "$EXPECTED_PRODUCTION_SHA" "$remote_helper_dir" "$remote_backup_file" "$remote_key_file" "$remote_retrieval_file" \
+            >"$remote_report" 2>"$remote_diagnostic" <<'REMOTE_PROOF'
+          set -euo pipefail
+          expected_sha="$1"
+          helper_dir="$2"
+          backup_file="$3"
+          key_file="$4"
+          retrieval_file="$5"
+
+          fail() {
+            printf '%s\n' "$1" >&2
+            exit 1
+          }
+
+          [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] || fail PRODUCTION_BACKUP_INPUTS_INVALID
+          [[ "$helper_dir" =~ ^/tmp/oasis-backup-proof\.[A-Za-z0-9]{8}$ ]] || fail PRODUCTION_BACKUP_REMOTE_STATE_INVALID
+          [[ "$backup_file" =~ ^/var/backups/oasis/\.proof-staging/oasis-proof-[0-9]+-[0-9]+\.dump\.enc$ ]] || fail PRODUCTION_BACKUP_REMOTE_STATE_INVALID
+          [ "$key_file" = /etc/oasis/oasis-backup.key ] || fail PRODUCTION_BACKUP_REMOTE_STATE_INVALID
+          [ "$retrieval_file" = /var/backups/oasis/oasis-production-latest.dump.enc ] || fail PRODUCTION_BACKUP_REMOTE_STATE_INVALID
+          [ "$(id -u)" = 0 ] || fail PRODUCTION_BACKUP_ROOT_REQUIRED
+          [ -d "$helper_dir" ] && [ ! -L "$helper_dir" ] || fail PRODUCTION_BACKUP_REMOTE_STATE_INVALID
+          [ "$(stat -c '%u:%g:%a' "$helper_dir" 2>/dev/null)" = 0:0:700 ] || fail PRODUCTION_BACKUP_REMOTE_STATE_INVALID
+
+          chmod 0400 "$helper_dir/backup-crypto.mjs"
+          chmod 0400 "$helper_dir/reviewed-helpers.sha256"
+          chmod 0500 "$helper_dir/backup-postgres.sh" "$helper_dir/rehearse-backup-restore.sh"
+          (cd "$helper_dir" && sha256sum -c reviewed-helpers.sha256 >/dev/null 2>&1) || fail PRODUCTION_BACKUP_REVIEWED_HELPER_INVALID
+          node --check "$helper_dir/backup-crypto.mjs" >/dev/null 2>&1 || fail PRODUCTION_BACKUP_REVIEWED_HELPER_INVALID
+          bash -n "$helper_dir/backup-postgres.sh" >/dev/null 2>&1 || fail PRODUCTION_BACKUP_REVIEWED_HELPER_INVALID
+          bash -n "$helper_dir/rehearse-backup-restore.sh" >/dev/null 2>&1 || fail PRODUCTION_BACKUP_REVIEWED_HELPER_INVALID
+
+          cd /opt/oasis-care || fail PRODUCTION_REPOSITORY_UNAVAILABLE
+          [ -d .git ] || fail PRODUCTION_REPOSITORY_UNAVAILABLE
+          git_common_raw="$(git --no-replace-objects rev-parse --git-common-dir 2>/dev/null)" || fail PRODUCTION_REPOSITORY_UNAVAILABLE
+          git_common="$(cd "$git_common_raw" 2>/dev/null && pwd -P)" || fail PRODUCTION_REPOSITORY_UNAVAILABLE
+          install -d -m 0700 "$git_common/oasis-deploy" || fail PRODUCTION_BACKUP_LOCK_UNKNOWN
+          exec 9>"$git_common/oasis-deploy/production-vps-mutation.lock"
+          flock -n 9 || fail PRODUCTION_BACKUP_LOCKED
+
+          target_class="$(tr -d '\r\n' < /etc/oasis/production-deploy-target-class 2>/dev/null)" || fail DEPLOY_TARGET_UNKNOWN
+          [ "$target_class" = production ] || fail DEPLOY_TARGET_NOT_PRODUCTION
+          printf 'DEPLOY_TARGET_PRODUCTION\n'
+
+          [ -f /etc/oasis/controlled-data-class ] && [ ! -L /etc/oasis/controlled-data-class ] || fail PRODUCTION_DATA_CLASS_UNKNOWN
+          [ "$(stat -c '%u:%g:%a' /etc/oasis/controlled-data-class 2>/dev/null)" = 0:0:600 ] || fail PRODUCTION_DATA_CLASS_UNKNOWN
+          controlled_data_class="$(tr -d '\r\n' < /etc/oasis/controlled-data-class 2>/dev/null)" || fail PRODUCTION_DATA_CLASS_UNKNOWN
+          [ "$controlled_data_class" = synthetic-only ] || fail PRODUCTION_DATA_CLASS_NOT_SYNTHETIC
+          printf 'PRODUCTION_DATA_CLASS_SYNTHETIC_ONLY\n'
+
+          current_sha="$(git --no-replace-objects rev-parse HEAD 2>/dev/null)" || fail PRODUCTION_CODE_SHA_UNKNOWN
+          [ "$current_sha" = "$expected_sha" ] || fail PRODUCTION_CODE_SHA_MISMATCH
+          [ -z "$(git status --porcelain --untracked-files=no 2>/dev/null)" ] || fail PRODUCTION_REPOSITORY_DIRTY
+          printf 'PRODUCTION_CODE_SHA_OK\n'
+
+          ensure_private_directory() {
+            local directory="$1"
+            if [ -e "$directory" ] || [ -L "$directory" ]; then
+              [ -d "$directory" ] && [ ! -L "$directory" ] || fail PRODUCTION_BACKUP_STORAGE_INVALID
+            else
+              install -d -m 0700 "$directory" || fail PRODUCTION_BACKUP_STORAGE_INVALID
+            fi
+            [ "$(stat -c '%u:%g:%a' "$directory" 2>/dev/null)" = 0:0:700 ] || fail PRODUCTION_BACKUP_STORAGE_INVALID
+          }
+          ensure_private_directory /etc/oasis
+          ensure_private_directory /var/backups/oasis
+          ensure_private_directory /var/backups/oasis/.proof-staging
+          temporary_key=""
+          backup_output=""
+          backup_diagnostic=""
+          rehearsal_output=""
+          rehearsal_diagnostic=""
+          backup_owned=false
+          cleanup_remote_proof() {
+            rm -f "${temporary_key:-}" "${backup_output:-}" "${backup_diagnostic:-}" "${rehearsal_output:-}" "${rehearsal_diagnostic:-}"
+            if [ "${backup_owned:-false}" = true ]; then
+              rm -f "$backup_file"
+            fi
+          }
+          trap cleanup_remote_proof EXIT
+          if [ -e "$key_file" ] || [ -L "$key_file" ]; then
+            [ -f "$key_file" ] && [ ! -L "$key_file" ] || fail PRODUCTION_BACKUP_KEY_INVALID
+            [ "$(stat -c '%u:%g:%a' "$key_file" 2>/dev/null)" = 0:0:600 ] || fail PRODUCTION_BACKUP_KEY_INVALID
+          else
+            temporary_key="$(mktemp /etc/oasis/.oasis-backup-key.XXXXXXXX)" || fail PRODUCTION_BACKUP_KEY_CREATE_FAILED
+            openssl rand -hex 32 > "$temporary_key" 2>/dev/null || fail PRODUCTION_BACKUP_KEY_CREATE_FAILED
+            chmod 0600 "$temporary_key" || fail PRODUCTION_BACKUP_KEY_CREATE_FAILED
+            ln "$temporary_key" "$key_file" 2>/dev/null || fail PRODUCTION_BACKUP_KEY_CREATE_FAILED
+            rm -f "$temporary_key" || fail PRODUCTION_BACKUP_KEY_CREATE_FAILED
+            temporary_key=""
+          fi
+          node "$helper_dir/backup-crypto.mjs" validate-key "$key_file" >/dev/null 2>&1 || fail PRODUCTION_BACKUP_KEY_INVALID
+          printf 'PRODUCTION_BACKUP_KEY_READY\n'
+
+          compose=(docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml)
+          "${compose[@]}" config --quiet >/dev/null 2>&1 || fail PRODUCTION_BACKUP_COMPOSE_INVALID
+          postgres_container="$("${compose[@]}" ps -q postgres 2>/dev/null)" || fail PRODUCTION_POSTGRES_UNAVAILABLE
+          [ -n "$postgres_container" ] && [ "${postgres_container//$'\n'/}" = "$postgres_container" ] || fail PRODUCTION_POSTGRES_UNAVAILABLE
+          postgres_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$postgres_container" 2>/dev/null)" || fail PRODUCTION_POSTGRES_UNAVAILABLE
+          [ "$postgres_health" = healthy ] || fail PRODUCTION_POSTGRES_UNHEALTHY
+
+          database_bytes="$(docker exec "$postgres_container" sh -lc 'psql --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --tuples-only --no-align --command "SELECT pg_database_size(current_database());"' 2>/dev/null)" || fail PRODUCTION_BACKUP_CAPACITY_UNKNOWN
+          database_bytes="${database_bytes//$'\r'/}"
+          database_bytes="${database_bytes//$'\n'/}"
+          [[ "$database_bytes" =~ ^[0-9]+$ ]] || fail PRODUCTION_BACKUP_CAPACITY_UNKNOWN
+          available_bytes="$(df -PB1 /var/backups/oasis 2>/dev/null | awk 'NR == 2 { print $4 }')" || fail PRODUCTION_BACKUP_CAPACITY_UNKNOWN
+          [[ "$available_bytes" =~ ^[0-9]+$ ]] || fail PRODUCTION_BACKUP_CAPACITY_UNKNOWN
+          required_bytes=$((database_bytes * 2 + 1073741824))
+          [ "$available_bytes" -ge "$required_bytes" ] || fail PRODUCTION_BACKUP_CAPACITY_INSUFFICIENT
+          printf 'PRODUCTION_BACKUP_CAPACITY_OK\n'
+
+          backup_output="$(mktemp)"
+          backup_diagnostic="$(mktemp)"
+          rehearsal_output="$(mktemp)"
+          rehearsal_diagnostic="$(mktemp)"
+          chmod 0600 "$backup_output" "$backup_diagnostic"
+          chmod 0600 "$rehearsal_output" "$rehearsal_diagnostic"
+          [ ! -e "$backup_file" ] && [ ! -L "$backup_file" ] || fail PRODUCTION_BACKUP_DESTINATION_EXISTS
+          backup_owned=true
+          set +e
+          COMPOSE_FILE=/opt/oasis-care/deploy/v2/docker-compose.yml \
+            ENV_FILE=/opt/oasis-care/deploy/v2/.env \
+            BACKUP_DIR=/var/backups/oasis \
+            BACKUP_FILE="$backup_file" \
+            BACKUP_ENCRYPTION_KEY_FILE="$key_file" \
+            CRYPTO_HELPER="$helper_dir/backup-crypto.mjs" \
+            NODE_BINARY=node \
+            "$helper_dir/backup-postgres.sh" >"$backup_output" 2>"$backup_diagnostic"
+          backup_status=$?
+          set -e
+          [ "$backup_status" -eq 0 ] || fail PRODUCTION_BACKUP_CREATION_FAILED
+          [ "$(grep -c '^BACKUP_ENCRYPTION_READY$' "$backup_output" 2>/dev/null)" -eq 1 ] || fail PRODUCTION_BACKUP_OUTPUT_INVALID
+          [ "$(grep -c '^BACKUP_CREATED_ENCRYPTED$' "$backup_output" 2>/dev/null)" -eq 1 ] || fail PRODUCTION_BACKUP_OUTPUT_INVALID
+          [ "$(wc -l < "$backup_output" | tr -d ' ')" -eq 2 ] || fail PRODUCTION_BACKUP_OUTPUT_INVALID
+          [ -f "$backup_file" ] && [ ! -L "$backup_file" ] || fail PRODUCTION_BACKUP_ARCHIVE_INVALID
+          [ "$(stat -c '%u:%g:%a' "$backup_file" 2>/dev/null)" = 0:0:600 ] || fail PRODUCTION_BACKUP_ARCHIVE_INVALID
+          node "$helper_dir/backup-crypto.mjs" verify "$key_file" "$backup_file" >/dev/null 2>&1 || fail PRODUCTION_BACKUP_ARCHIVE_INVALID
+          printf 'BACKUP_CREATED_ENCRYPTED\n'
+          printf 'PRODUCTION_BACKUP_ARCHIVE_READY\n'
+
+          set +e
+          BACKUP_ENCRYPTION_KEY_FILE="$key_file" \
+            CRYPTO_HELPER="$helper_dir/backup-crypto.mjs" \
+            NODE_BINARY=node \
+            "$helper_dir/rehearse-backup-restore.sh" "$backup_file" >"$rehearsal_output" 2>"$rehearsal_diagnostic"
+          rehearsal_status=$?
+          set -e
+          [ "$rehearsal_status" -eq 0 ] || fail PRODUCTION_BACKUP_DISPOSABLE_RESTORE_FAILED
+          expected_rehearsal_markers=$'ENCRYPTED_BACKUP_AUTHENTICATED\nDISPOSABLE_POSTGRES_READY\nDISPOSABLE_RESTORE_COMPLETE\nDISPOSABLE_RESTORE_QUERY_OK\nDISPOSABLE_RESTORE_DESTROYED'
+          [ "$(cat "$rehearsal_output")" = "$expected_rehearsal_markers" ] || fail PRODUCTION_BACKUP_REHEARSAL_OUTPUT_INVALID
+          printf '%s\n' "$expected_rehearsal_markers"
+
+          retrieval_digest="$(sha256sum "$backup_file" 2>/dev/null | awk '{ print $1 }')" || fail PRODUCTION_BACKUP_RETRIEVAL_MANIFEST_FAILED
+          [[ "$retrieval_digest" =~ ^[0-9a-f]{64}$ ]] || fail PRODUCTION_BACKUP_RETRIEVAL_MANIFEST_FAILED
+          printf '%s  production.dump.enc\n' "$retrieval_digest" > "$helper_dir/retrieval.sha256" || fail PRODUCTION_BACKUP_RETRIEVAL_MANIFEST_FAILED
+          chmod 0400 "$helper_dir/retrieval.sha256" || fail PRODUCTION_BACKUP_RETRIEVAL_MANIFEST_FAILED
+          rm -f "$backup_output" "$backup_diagnostic" "$rehearsal_output" "$rehearsal_diagnostic"
+          backup_owned=false
+          trap - EXIT
+          printf 'PRODUCTION_BACKUP_STAGED_READY\n'
+          REMOTE_PROOF
+          remote_status=$?
+          set -e
+
+          if [ "$remote_status" -ne 0 ]; then
+            rm -f "$remote_report" "$remote_diagnostic"
+            printf 'PRODUCTION_BACKUP_REMOTE_PROOF_FAILED\n' >&2
+            exit 1
+          fi
+          expected_remote_markers=$'DEPLOY_TARGET_PRODUCTION\nPRODUCTION_DATA_CLASS_SYNTHETIC_ONLY\nPRODUCTION_CODE_SHA_OK\nPRODUCTION_BACKUP_KEY_READY\nPRODUCTION_BACKUP_CAPACITY_OK\nBACKUP_CREATED_ENCRYPTED\nPRODUCTION_BACKUP_ARCHIVE_READY\nENCRYPTED_BACKUP_AUTHENTICATED\nDISPOSABLE_POSTGRES_READY\nDISPOSABLE_RESTORE_COMPLETE\nDISPOSABLE_RESTORE_QUERY_OK\nDISPOSABLE_RESTORE_DESTROYED\nPRODUCTION_BACKUP_STAGED_READY'
+          if [ "$(cat "$remote_report")" != "$expected_remote_markers" ]; then
+            rm -f "$remote_report" "$remote_diagnostic"
+            printf 'PRODUCTION_BACKUP_REMOTE_OUTPUT_INVALID\n' >&2
+            exit 1
+          fi
+          cat "$remote_report"
+          rm -f "$remote_report" "$remote_diagnostic"
+
+          if ! scp -q -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST:$remote_backup_file" "$local_backup" \
+            >/dev/null 2>&1
+          then
+            printf 'PRODUCTION_BACKUP_RETRIEVAL_FAILED\n' >&2
+            exit 1
+          fi
+          if ! scp -q -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST:$remote_helper_dir/retrieval.sha256" "$local_manifest" \
+            >/dev/null 2>&1
+          then
+            printf 'PRODUCTION_BACKUP_MANIFEST_RETRIEVAL_FAILED\n' >&2
+            exit 1
+          fi
+          chmod 0600 "$local_backup" "$local_manifest"
+          [ -f "$local_backup" ] && [ ! -L "$local_backup" ] || {
+            printf 'PRODUCTION_BACKUP_RETRIEVAL_INVALID\n' >&2
+            exit 1
+          }
+          [ -f "$local_manifest" ] && [ ! -L "$local_manifest" ] || {
+            printf 'PRODUCTION_BACKUP_MANIFEST_RETRIEVAL_INVALID\n' >&2
+            exit 1
+          }
+          if ! (cd "$private_dir" && sha256sum -c retrieval.sha256 >/dev/null 2>&1); then
+            printf 'PRODUCTION_BACKUP_RETRIEVAL_DIGEST_MISMATCH\n' >&2
+            exit 1
+          fi
+          printf 'PRODUCTION_BACKUP_RETRIEVED_VERIFIED\n'
+
+          promotion_report="$private_dir/promotion.report"
+          promotion_diagnostic="$private_dir/promotion.diagnostic"
+          : > "$promotion_report"
+          : > "$promotion_diagnostic"
+          chmod 600 "$promotion_report" "$promotion_diagnostic"
+          set +e
+          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- \
+            promote "$EXPECTED_PRODUCTION_SHA" "$remote_helper_dir" "$remote_backup_file" "$remote_key_file" "$remote_retrieval_file" \
+            >"$promotion_report" 2>"$promotion_diagnostic" <<'REMOTE_PROMOTION'
+          set -euo pipefail
+          [ "$1" = promote ] || exit 1
+          expected_sha="$2"
+          helper_dir="$3"
+          backup_file="$4"
+          key_file="$5"
+          retrieval_file="$6"
+
+          fail() {
+            printf '%s\n' "$1" >&2
+            exit 1
+          }
+
+          [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] || fail PRODUCTION_BACKUP_PROMOTION_INVALID
+          [[ "$helper_dir" =~ ^/tmp/oasis-backup-proof\.[A-Za-z0-9]{8}$ ]] || fail PRODUCTION_BACKUP_PROMOTION_INVALID
+          [[ "$backup_file" =~ ^/var/backups/oasis/\.proof-staging/oasis-proof-[0-9]+-[0-9]+\.dump\.enc$ ]] || fail PRODUCTION_BACKUP_PROMOTION_INVALID
+          [ "$key_file" = /etc/oasis/oasis-backup.key ] || fail PRODUCTION_BACKUP_PROMOTION_INVALID
+          [ "$retrieval_file" = /var/backups/oasis/oasis-production-latest.dump.enc ] || fail PRODUCTION_BACKUP_PROMOTION_INVALID
+          [ "$(id -u)" = 0 ] || fail PRODUCTION_BACKUP_ROOT_REQUIRED
+
+          cd /opt/oasis-care || fail PRODUCTION_REPOSITORY_UNAVAILABLE
+          git_common_raw="$(git --no-replace-objects rev-parse --git-common-dir 2>/dev/null)" || fail PRODUCTION_REPOSITORY_UNAVAILABLE
+          git_common="$(cd "$git_common_raw" 2>/dev/null && pwd -P)" || fail PRODUCTION_REPOSITORY_UNAVAILABLE
+          exec 9>"$git_common/oasis-deploy/production-vps-mutation.lock"
+          flock -n 9 || fail PRODUCTION_BACKUP_LOCKED
+          current_sha="$(git --no-replace-objects rev-parse HEAD 2>/dev/null)" || fail PRODUCTION_CODE_SHA_UNKNOWN
+          [ "$current_sha" = "$expected_sha" ] || fail PRODUCTION_CODE_SHA_MISMATCH
+          [ -z "$(git status --porcelain --untracked-files=no 2>/dev/null)" ] || fail PRODUCTION_REPOSITORY_DIRTY
+
+          [ -d "$helper_dir" ] && [ ! -L "$helper_dir" ] || fail PRODUCTION_BACKUP_PROMOTION_INVALID
+          [ "$(stat -c '%u:%g:%a' "$helper_dir" 2>/dev/null)" = 0:0:700 ] || fail PRODUCTION_BACKUP_PROMOTION_INVALID
+          [ -f "$key_file" ] && [ ! -L "$key_file" ] || fail PRODUCTION_BACKUP_KEY_INVALID
+          [ "$(stat -c '%u:%g:%a' "$key_file" 2>/dev/null)" = 0:0:600 ] || fail PRODUCTION_BACKUP_KEY_INVALID
+          [ -f "$backup_file" ] && [ ! -L "$backup_file" ] || fail PRODUCTION_BACKUP_ARCHIVE_INVALID
+          [ "$(stat -c '%u:%g:%a' "$backup_file" 2>/dev/null)" = 0:0:600 ] || fail PRODUCTION_BACKUP_ARCHIVE_INVALID
+          node "$helper_dir/backup-crypto.mjs" verify "$key_file" "$backup_file" >/dev/null 2>&1 || fail PRODUCTION_BACKUP_ARCHIVE_INVALID
+          retrieval_digest="$(sha256sum "$backup_file" 2>/dev/null | awk '{ print $1 }')" || fail PRODUCTION_BACKUP_RETRIEVAL_MANIFEST_FAILED
+          [ "$(cat "$helper_dir/retrieval.sha256" 2>/dev/null)" = "$retrieval_digest  production.dump.enc" ] || fail PRODUCTION_BACKUP_RETRIEVAL_MANIFEST_FAILED
+
+          previous_file=/var/backups/oasis/oasis-production-previous.dump.enc
+          for retained_file in "$retrieval_file" "$previous_file"; do
+            if [ -e "$retained_file" ] || [ -L "$retained_file" ]; then
+              [ -f "$retained_file" ] && [ ! -L "$retained_file" ] || fail PRODUCTION_BACKUP_RETENTION_INVALID
+              [ "$(stat -c '%u:%g:%a' "$retained_file" 2>/dev/null)" = 0:0:600 ] || fail PRODUCTION_BACKUP_RETENTION_INVALID
+              node "$helper_dir/backup-crypto.mjs" verify "$key_file" "$retained_file" >/dev/null 2>&1 || fail PRODUCTION_BACKUP_RETENTION_INVALID
+            fi
+          done
+          rm -f "$previous_file"
+          if [ -f "$retrieval_file" ]; then
+            mv "$retrieval_file" "$previous_file" || fail PRODUCTION_BACKUP_RETENTION_FAILED
+          fi
+          mv "$backup_file" "$retrieval_file" || fail PRODUCTION_BACKUP_RETENTION_FAILED
+          printf 'PRODUCTION_BACKUP_RETENTION_READY\n'
+          REMOTE_PROMOTION
+          promotion_status=$?
+          set -e
+          if [ "$promotion_status" -ne 0 ] || [ "$(cat "$promotion_report")" != PRODUCTION_BACKUP_RETENTION_READY ]; then
+            rm -f "$promotion_report" "$promotion_diagnostic"
+            printf 'PRODUCTION_BACKUP_PROMOTION_FAILED\n' >&2
+            exit 1
+          fi
+          cat "$promotion_report"
+          rm -f "$promotion_report" "$promotion_diagnostic"
+
+          rm -f "$local_backup" "$local_manifest"
+          [ ! -e "$local_backup" ] && [ ! -e "$local_manifest" ] || {
+            printf 'PRODUCTION_BACKUP_EPHEMERAL_CLEANUP_FAILED\n' >&2
+            exit 1
+          }
+          printf 'PRODUCTION_BACKUP_EPHEMERAL_MATERIAL_DESTROYED\n'
+          printf 'PRODUCTION_BACKUP_RESTORE_PROOF_PASS\n'

@@ -236,8 +236,9 @@ key file must remain a regular `0600` file and must never be committed:
 
 ```bash
 umask 077
-openssl rand -hex 32 > /secure/operator-path/oasis-backup.key
-chmod 600 /secure/operator-path/oasis-backup.key
+install -d -m 0700 /etc/oasis
+openssl rand -hex 32 > /etc/oasis/oasis-backup.key
+chmod 600 /etc/oasis/oasis-backup.key
 ```
 
 Create a timestamped AES-256-GCM encrypted backup. No plaintext dump is written
@@ -245,7 +246,7 @@ to disk:
 
 ```bash
 POSTGRES_USER=oasis POSTGRES_DB=oasis \
-BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
 deploy/v2/scripts/backup-postgres.sh
 ```
 
@@ -254,7 +255,7 @@ Override backup location if needed:
 ```bash
 POSTGRES_USER=oasis POSTGRES_DB=oasis \
 BACKUP_DIR=/var/backups/oasis \
-BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
 deploy/v2/scripts/backup-postgres.sh
 ```
 
@@ -270,7 +271,7 @@ Restore requires an explicit backup file and confirmation:
 
 ```bash
 PRE_RESTORE_BACKUP_CONFIRMED=true \
-BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
 deploy/v2/scripts/restore-postgres.sh /var/backups/oasis/oasis-oasis-YYYYMMDDTHHMMSSZ.dump.enc
 ```
 
@@ -289,7 +290,7 @@ PRE_RESTORE_BACKUP_CONFIRMED=true \
 NON_INTERACTIVE=true \
 POSTGRES_USER=oasis \
 POSTGRES_DB=oasis \
-BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
 deploy/v2/scripts/restore-postgres.sh /path/to/backup.dump.enc
 ```
 
@@ -298,7 +299,7 @@ new disposable Postgres container. This command authenticates the archive,
 restores it, checks required schema objects, and destroys the container:
 
 ```bash
-BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
 deploy/v2/scripts/rehearse-backup-restore.sh /retrieved/offsite/backup.dump.enc
 ```
 
@@ -313,6 +314,35 @@ that applied migration rows were recovered, disables persistent container logs,
 discards raw restore diagnostics, and verifies container destruction.
 CI also creates a synthetic migrated database and exercises this complete backup,
 restore, query, and destruction path against real PostgreSQL and Docker.
+
+For the controlled production gate, use the protected `Production Backup Restore
+Proof` workflow. It requires the exact currently deployed production SHA and an
+approval token binding that live SHA to the exact reviewed workflow/helper commit:
+`APPROVE_PRODUCTION_BACKUP_RESTORE_PROOF_<live-sha>_WITH_<proof-commit-sha>`.
+The workflow serializes with other production mutations, verifies the production
+marker, live repository SHA, repository cleanliness, and healthy Postgres before
+creating an archive.
+
+The workflow transfers only reviewed backup helpers, verifies their SHA-256
+manifest on the server, and creates or reuses a private root-owned encryption key.
+The durable key never leaves the production trust boundary. The encrypted archive
+is restored into a network-isolated tmpfs-backed disposable Postgres container on
+the production host, queried through the bounded schema proof, and destroyed. Only
+after that succeeds does the workflow retrieve the encrypted archive and checksum
+into a private ephemeral runner directory to prove off-host retrieval integrity.
+Those runner copies are destroyed before the proof can pass and are never uploaded
+as workflow artifacts. Raw database, transport, Docker, and restore diagnostics
+remain suppressed.
+
+This gate requires a root-owned `0600` controlled-data marker containing exactly
+`synthetic-only`; it refuses to retrieve an archive without that classification.
+It uses the same host mutation lock as deployment, requires capacity for twice the
+reported database size plus one GiB, and retains at most the latest and previous
+verified archives. It may create the private production backup key, but it never
+deploys code, runs migrations, restores production, or changes application records.
+A separate operator-controlled copy of the key and encrypted archive is still
+required before real client data. The controlled fake-data canary does not satisfy
+that later real-data retention decision.
 
 Provider-level droplet backups complement this database archive; they do not
 replace it. Confirm the provider policy and a current private backup image before
@@ -334,7 +364,7 @@ Run it with the exact deployed SHA and explicit private backup key:
 ```bash
 TARGET_SHA=<lowercase-40-character-reviewed-sha> \
 OASIS_PRODUCTION_APP_URL=https://care.example.org \
-BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
 node deploy/v2/scripts/production-signals.mjs
 ```
 
@@ -383,7 +413,7 @@ execute an installer directly from the mutable deploy checkout. Then run:
 ```bash
 sudo TARGET_SHA=<exact-reviewed-main-sha> \
   OASIS_PRODUCTION_APP_URL=https://care.example.org \
-  BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+  BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
   /usr/local/sbin/oasis-install-production-signal-scheduler
 ```
 

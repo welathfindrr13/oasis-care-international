@@ -40,3 +40,10 @@ test('Deployment V2 CI runs production migration gate workflow static guard', ()
     /node --test \.github\/workflows\/production-tenant-migration-gate\.test\.mjs/,
   );
 });
+
+test('Deployment V2 CI runs production backup restore proof workflow guard', () => {
+  assert.match(
+    workflow,
+    /node --test \.github\/workflows\/production-backup-restore-proof\.test\.mjs/,
+  );
+});

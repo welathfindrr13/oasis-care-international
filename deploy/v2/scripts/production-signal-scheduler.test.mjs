@@ -65,6 +65,15 @@ test("systemd timer is persistent and schedules every five minutes", () => {
 
 test("installer proves exact main revision and private inputs before enabling", () => {
   assert.match(installer, /^REPOSITORY=\/opt\/oasis-care$/m);
+  assert.match(installer, /^BACKUP_DIRECTORY=\/var\/backups\/oasis$/m);
+  assert.match(
+    installer,
+    /^PRODUCTION_BACKUP_KEY_FILE=\/etc\/oasis\/oasis-backup\.key$/m,
+  );
+  assert.match(
+    installer,
+    /\[ "\$BACKUP_ENCRYPTION_KEY_FILE" = "\$PRODUCTION_BACKUP_KEY_FILE" \] \|\| fail/,
+  );
   assert.match(installer, /^PATH=\/usr\/sbin:\/usr\/bin:\/sbin:\/bin$/m);
   assert.match(
     installer,
@@ -96,9 +105,14 @@ test("installer proves exact main revision and private inputs before enabling", 
   );
   assert.match(installer, /stat -c '%a'/);
   assert.match(installer, /stat -c '%u'/);
+  assert.match(
+    installer,
+    /stat -c '%u:%g:%a' "\$BACKUP_ENCRYPTION_KEY_FILE".*= 0:0:600/,
+  );
   assert.match(installer, /\)\" = 600 \] \|\| fail/);
   assert.match(installer, /systemd-analyze verify/);
   assert.match(installer, /systemctl start "\$SERVICE_UNIT"/);
+  assert.match(installer, /printf 'BACKUP_DIR=%s\\n' "\$BACKUP_DIRECTORY"/);
   assert.match(
     installer,
     /production-signal-runner\.mjs" \\\n    check >\/dev\/null 2>&1/,
