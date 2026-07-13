@@ -28,7 +28,7 @@ The practical loop is:
 7. Raise or escalate a concern when needed.
 8. Complete the visit and understand what remains.
 
-Relevant routes are `/today`, `/visits`, `/visits/[id]`, `/shift`, `/medication`, and person context under `/people/[id]` or `/clients/[id]`. Design priority: fast scanning, readable content on a phone, safe confirmation, minimal duplicate entry, clear offline/error recovery, and no hidden critical action.
+Current frontline-accessible routes are `/today`, `/visits`, `/visits/[id]`, `/schedule/[id]`, `/shift`, `/settings`, and person context under `/clients/[id]`. Medication recording is currently reached through an assigned visit; the standalone `/medication` route and `/people/[id]` are not proven frontline destinations. Design priority: fast scanning, readable content on a phone, safe confirmation, minimal duplicate entry, clear offline/error recovery, and no hidden critical action.
 
 ## Tenant-admin and manager journey
 
