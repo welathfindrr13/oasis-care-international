@@ -2,15 +2,20 @@
 
 import { SignIn } from '@clerk/nextjs';
 import { signIn } from 'next-auth/react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 
 import { isLocalAuthEnabled, resolveAuthMode } from '../../lib/auth/mode';
+import { normalizeCallbackUrl } from './callback-url';
 
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/access';
+  const callbackUrl = normalizeCallbackUrl(
+    searchParams.get('callbackUrl'),
+    process.env.NEXT_PUBLIC_SITE_URL,
+  );
   const error = searchParams.get('error');
   const localAuthEnabled = isLocalAuthEnabled({
     NODE_ENV: process.env.NODE_ENV,
@@ -46,140 +51,122 @@ function LoginContent() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 flex flex-col">
-      {/* Main Content */}
-      <main className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md">
-          {/* Logo & Branding */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-900 rounded-2xl mb-6">
-              <span className="text-2xl font-semibold text-white">O</span>
+    <div className="flex min-h-screen flex-col bg-oasis-canvas text-oasis-ink">
+      <main className="flex flex-1 items-center px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+        <div className="mx-auto grid w-full max-w-5xl overflow-hidden rounded-lg border border-oasis-border bg-white shadow-sm lg:grid-cols-[minmax(0,0.8fr)_minmax(24rem,1.2fr)]">
+          <section className="border-b border-oasis-border bg-oasis-teal-soft p-6 sm:p-8 lg:border-b-0 lg:border-r">
+            <Link
+              href="/"
+              className="inline-flex min-h-11 items-center gap-3 text-sm font-semibold text-oasis-teal-dark hover:text-oasis-teal"
+            >
+              <span aria-hidden="true">←</span>
+              Back to Oasis Care
+            </Link>
+            <div className="mt-10 border-l-4 border-oasis-teal pl-5">
+              <p className="font-heading text-xl font-bold text-oasis-ink">Oasis Care</p>
+              <p className="mt-3 max-w-sm text-base leading-7 text-oasis-muted">
+                Care records for your organisation.
+              </p>
             </div>
-            <h1 className="text-3xl font-light text-slate-900 tracking-tight">
-              Oasis Care
-            </h1>
-            <p className="mt-2 text-slate-500 font-light">
-              Care records for your organisation
-            </p>
-          </div>
+            <div className="mt-10 border-t border-oasis-border pt-6">
+              <p className="text-base font-bold text-oasis-ink">Before you sign in</p>
+              <p className="mt-2 text-sm leading-6 text-oasis-muted">
+                Use the account provided by your organisation. What you can open depends on your assigned access.
+              </p>
+            </div>
+          </section>
 
-          {/* Login Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
-            <div className="text-center mb-8">
-              <h2 className="text-xl font-medium text-slate-900">
-                Welcome back
-              </h2>
-              <p className="mt-2 text-sm text-slate-500">
+          <section className="p-6 sm:p-8 lg:p-10" aria-labelledby="sign-in-heading">
+            <div className="max-w-md">
+              <h1 id="sign-in-heading" className="text-3xl font-bold text-oasis-ink sm:text-4xl">
+                Sign in to Oasis Care
+              </h1>
+              <p className="mt-3 text-base leading-7 text-oasis-muted">
                 {localAuthEnabled
-                  ? 'Choose a local workspace for product testing'
+                  ? 'Choose a local workspace for product testing.'
                   : authMode === 'clerk'
-                  ? 'Sign in with your organisation account'
-                  : 'Sign in to open your care workspace'}
+                  ? 'Sign in with your organisation account.'
+                  : 'Sign in to open your care workspace.'}
               </p>
             </div>
 
-            {/* Error Message */}
             {errorMessage && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl">
-                <p className="text-sm text-red-800">
-                  {errorMessage}
-                </p>
+              <div className="mt-6 rounded-md border border-oasis-danger bg-oasis-danger-soft p-4" role="alert">
+                <p className="text-sm font-semibold text-oasis-danger">{errorMessage}</p>
               </div>
             )}
 
-            {/* Sign In */}
-            {localAuthEnabled ? (
-              <div className="space-y-4">
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">Workspace</span>
-                  <select
-                    value={role}
-                    onChange={(event) => setRole(event.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+            <div className="mt-8 max-w-md">
+              {localAuthEnabled ? (
+                <div className="space-y-5">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-oasis-ink">Workspace</span>
+                    <select value={role} onChange={(event) => setRole(event.target.value)}>
+                      <option value="admin">Manager Today</option>
+                      <option value="carer">Carer workspace</option>
+                      <option value="user">Family view</option>
+                    </select>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={handleLocalSignIn}
+                    className="inline-flex min-h-12 w-full items-center justify-center rounded-md border border-oasis-teal bg-oasis-teal px-5 py-3 font-semibold text-white hover:border-oasis-teal-dark hover:bg-oasis-teal-dark"
                   >
-                    <option value="admin">Manager Today</option>
-                    <option value="carer">Carer workspace</option>
-                    <option value="user">Family view</option>
-                  </select>
-                </label>
-
-                <button
-                  onClick={handleLocalSignIn}
-                  className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                  </svg>
-                  Continue
-                </button>
-              </div>
-            ) : authMode === 'clerk' ? (
-              <div className="flex justify-center">
-                <SignIn
-                  routing="hash"
-                  signUpUrl="/login"
-                  fallbackRedirectUrl={callbackUrl}
-                  appearance={{
-                    elements: {
-                      rootBox: 'w-full',
-                      card: 'w-full border-0 shadow-none p-0',
-                    },
-                  }}
-                />
-              </div>
-            ) : (
-              <button
-                onClick={() => signIn('cognito', { callbackUrl }, { prompt: 'login' })}
-                className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                </svg>
-                Sign in
-              </button>
-            )}
-
-            {/* Divider */}
-            <div className="relative my-8">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-100"></div>
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="px-4 bg-white text-slate-600 uppercase tracking-wider">
-                  Organisation access
-                </span>
-              </div>
+                    Continue
+                  </button>
+                </div>
+              ) : authMode === 'clerk' ? (
+                <div className="flex justify-center">
+                  <SignIn
+                    routing="hash"
+                    transferable={false}
+                    forceRedirectUrl={callbackUrl}
+                    appearance={{
+                      elements: {
+                        rootBox: 'w-full',
+                        card: 'w-full border-0 shadow-none p-0',
+                        footerAction: 'hidden',
+                      },
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="rounded-md border border-oasis-border bg-oasis-canvas p-4" role="status">
+                  <p className="text-sm font-semibold text-oasis-ink">Sign-in is not configured here.</p>
+                  <p className="mt-2 text-sm leading-6 text-oasis-muted">Contact Oasis support.</p>
+                </div>
+              )}
             </div>
 
-            <p className="text-center text-xs leading-5 text-slate-500">
-              Use the account provided by your organisation. What you can open depends on your assigned access.
-            </p>
-          </div>
-
-          {/* Footer */}
-          <p className="mt-8 text-center text-xs text-slate-600">
-            Need help signing in? Contact your Manager or Oasis support.
-          </p>
+            <div className="mt-8 max-w-md border-t border-oasis-border pt-6">
+              <h2 className="text-base font-bold text-oasis-ink">Need help signing in?</h2>
+              <p className="mt-2 text-sm leading-6 text-oasis-muted">Contact your Manager or Oasis support.</p>
+            </div>
+          </section>
         </div>
       </main>
 
-      {/* Bottom Bar */}
-      <footer className="py-6 text-center">
-        <p className="text-xs text-slate-600">
-          &copy; {new Date().getFullYear()} Oasis Care. All rights reserved.
-        </p>
+      <footer className="border-t border-oasis-border bg-white px-4 py-5 text-center text-sm text-oasis-muted">
+        <p>&copy; {new Date().getFullYear()} Oasis Care</p>
       </footer>
     </div>
   );
 }
 
+function LoginLoading() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-oasis-canvas px-4">
+      <p className="text-sm font-semibold text-oasis-muted" role="status">
+        Loading sign-in
+      </p>
+    </main>
+  );
+}
+
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-        <div className="animate-pulse text-slate-400">Loading...</div>
-      </div>
-    }>
+    <Suspense fallback={<LoginLoading />}>
       <LoginContent />
     </Suspense>
   );
