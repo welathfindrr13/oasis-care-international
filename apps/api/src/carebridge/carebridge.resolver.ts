@@ -24,6 +24,7 @@ import {
   FamilyConcernReceiptDTO,
 } from './dto/carebridge.dto';
 import { FamilyInvitationService } from './family-invitation.service';
+import { ManualAudit } from '../common/decorators/manual-audit.decorator';
 
 const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => SetMetadata('roles', roles);
 
@@ -98,6 +99,7 @@ export class CarebridgeResolver {
 
   @Mutation(() => CareRoomDTO)
   @Roles('admin')
+  @ManualAudit()
   async createCareRoom(@Args('input') input: CreateCareRoomInput, @Context() ctx: any) {
     const viewer = this.viewerFromContext(ctx);
     return this.carebridgeService.createCareRoom(
@@ -110,12 +112,14 @@ export class CarebridgeResolver {
 
   @Mutation(() => CareRoomMembershipDTO)
   @Roles('admin')
+  @ManualAudit()
   async inviteFamilyContact(@Args('input') input: InviteFamilyContactInput, @Context() ctx: any) {
     return this.familyInvitations.invite(input, this.adminPrincipal(ctx));
   }
 
   @Mutation(() => CareRoomMembershipDTO)
   @Roles('admin')
+  @ManualAudit()
   async updateFamilyAccessGrants(
     @Args('input') input: UpdateFamilyAccessGrantsInput,
     @Context() ctx: any,
@@ -125,6 +129,7 @@ export class CarebridgeResolver {
 
   @Mutation(() => CareRoomMembershipDTO)
   @Roles('admin')
+  @ManualAudit()
   async revokeFamilyAccess(
     @Args('input') input: FamilyMembershipActionInput,
     @Context() ctx: any,
@@ -137,6 +142,7 @@ export class CarebridgeResolver {
 
   @Mutation(() => CareRoomMembershipDTO)
   @Roles('admin')
+  @ManualAudit()
   async revokeFamilyInvitation(
     @Args('input') input: FamilyInvitationActionInput,
     @Context() ctx: any,
@@ -161,6 +167,7 @@ export class CarebridgeResolver {
 
   @Mutation(() => CareBridgePolicyDTO)
   @Roles('admin')
+  @ManualAudit()
   async updateCarebridgePolicy(@Args('input') input: UpdateCarebridgePolicyInput, @Context() ctx: any) {
     const viewer = this.viewerFromContext(ctx);
     return this.carebridgeService.updatePolicy(
@@ -173,6 +180,7 @@ export class CarebridgeResolver {
 
   @Mutation(() => VerifiedVisitStoryDTO)
   @Roles('admin')
+  @ManualAudit()
   async generateVerifiedVisitStory(@Args('visitId') visitId: string, @Context() ctx: any) {
     const viewer = this.viewerFromContext(ctx);
     return this.carebridgeService.generateVerifiedVisitStory(
@@ -184,6 +192,7 @@ export class CarebridgeResolver {
 
   @Mutation(() => VerifiedVisitStoryDTO)
   @Roles('admin')
+  @ManualAudit()
   async publishVerifiedVisitStory(@Args('storyId') storyId: string, @Context() ctx: any) {
     const viewer = this.viewerFromContext(ctx);
     return this.carebridgeService.publishVerifiedVisitStory(storyId, viewer.userId || '', viewer.organizationId || '');
@@ -191,6 +200,7 @@ export class CarebridgeResolver {
 
   @Mutation(() => VerifiedVisitStoryDTO)
   @Roles('admin')
+  @ManualAudit()
   async rejectVerifiedVisitStory(@Args('input') input: RejectVerifiedVisitStoryInput, @Context() ctx: any) {
     const viewer = this.viewerFromContext(ctx);
     return this.carebridgeService.rejectVerifiedVisitStory(
@@ -203,12 +213,14 @@ export class CarebridgeResolver {
 
   @Mutation(() => ConcernDTO)
   @Roles('admin')
+  @ManualAudit()
   async raiseCarebridgeConcern(@Args('input') input: RaiseConcernInput, @Context() ctx: any) {
     return this.carebridgeService.raiseConcern(input, this.viewerFromContext(ctx));
   }
 
   @Mutation(() => FamilyConcernReceiptDTO)
   @Roles('user')
+  @ManualAudit()
   async raiseFamilyCarebridgeConcern(
     @Args('input') input: RaiseConcernInput,
     @Context() ctx: any,
@@ -221,6 +233,7 @@ export class CarebridgeResolver {
 
   @Mutation(() => ConcernDTO)
   @Roles('admin')
+  @ManualAudit()
   async updateCarebridgeConcern(@Args('input') input: UpdateConcernStatusInput, @Context() ctx: any) {
     const viewer = this.viewerFromContext(ctx);
     return this.carebridgeService.updateConcernStatus(
@@ -233,6 +246,7 @@ export class CarebridgeResolver {
 
   @Mutation(() => FamilyPulseDTO)
   @Roles('user')
+  @ManualAudit()
   async submitFamilyPulse(@Args('input') input: SubmitFamilyPulseInput, @Context() ctx: any) {
     return this.carebridgeService.submitFamilyPulse(input, this.viewerFromContext(ctx));
   }

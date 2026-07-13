@@ -1,11 +1,15 @@
 import { Injectable, HttpStatus, Logger } from '@nestjs/common';
-import { PrismaService } from '@oasis/db';
+import { Prisma, PrismaService } from '@oasis/db';
 import { ClientRepository } from './client.repository';
 import { ClientDTO, ClientPaginatedResponse } from './dto/client.dto';
 import { CreateClientInput } from './dto/create-client.input';
 import { UpdateClientInput } from './dto/update-client.input';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import {
+  extractSafeAuditErrorMetadata,
+  sanitizeAuditMetadata,
+} from '../common/audit/audit-metadata.policy';
 
 @Injectable()
 export class ClientService {
@@ -100,37 +104,42 @@ export class ClientService {
     const orgId = await this.requireOrganizationId(organizationId);
     this.logger.log(`Creating client: [NAME REDACTED]`); // GDPR: Don't log PII
 
-    const client = await this.clientRepository.create({
-      organization_id: orgId,
-      full_name: input.fullName,
-      address_line1: input.addressLine1,
-      address_line2: input.addressLine2,
-      city: input.city,
-      postcode: input.postcode,
-    });
-
-    // GDPR: Audit log the client creation with PII masked
-    try {
-      await this.prisma.auditLog.create({
-        data: {
-          user_id: userId || 'system',
+    const client = await this.runAuditedTransaction(
+      'creation',
+      async (tx) => {
+        const created = await this.clientRepository.create({
           organization_id: orgId,
-          action: 'CREATE_CLIENT',
-          resource_type: 'client',
-          resource_id: client.id,
-          old_values: {},
-          new_values: {
-            id: client.id,
-            fullName: '[REDACTED]',
-            city: client.city,
-            postcode: '[REDACTED]',
+          full_name: input.fullName,
+          address_line1: input.addressLine1,
+          address_line2: input.addressLine2,
+          city: input.city,
+          postcode: input.postcode,
+        }, tx);
+
+        // Audit only reviewed identifiers; do not duplicate client PII.
+        await tx.auditLog.create({
+          data: {
+            user_id: userId || 'system',
+            organization_id: orgId,
+            action: 'CREATE_CLIENT',
+            resource_type: 'client',
+            resource_id: created.id,
+            old_values: {},
+            new_values: sanitizeAuditMetadata(
+              {
+                id: created.id,
+                fullName: created.full_name,
+                city: created.city,
+                postcode: created.postcode,
+              },
+              { identifierSource: 'trusted' },
+            ),
+            timestamp: new Date(),
           },
-          timestamp: new Date(),
-        },
-      });
-    } catch (auditError) {
-      this.logger.warn('Failed to write audit log for client creation', auditError);
-    }
+        });
+        return created;
+      },
+    );
 
     this.logger.log(`Client created with ID: ${client.id}`);
     return this.mapClientToDTO(client);
@@ -149,40 +158,48 @@ export class ClientService {
       );
     }
 
-    const client = await this.clientRepository.update(id, orgId, {
-      full_name: input.fullName,
-      address_line1: input.addressLine1,
-      address_line2: input.addressLine2 ?? null,
-      city: input.city,
-      postcode: input.postcode,
-    });
+    const client = await this.runAuditedTransaction(
+      'update',
+      async (tx) => {
+        const updated = await this.clientRepository.update(id, orgId, {
+          full_name: input.fullName,
+          address_line1: input.addressLine1,
+          address_line2: input.addressLine2 ?? null,
+          city: input.city,
+          postcode: input.postcode,
+        }, tx);
 
-    try {
-      await this.prisma.auditLog.create({
-        data: {
-          user_id: userId || 'system',
-          organization_id: orgId,
-          action: 'UPDATE_CLIENT',
-          resource_type: 'client',
-          resource_id: client.id,
-          old_values: {
-            id: existingClient.id,
-            fullName: '[REDACTED]',
-            city: existingClient.city,
-            postcode: '[REDACTED]',
+        await tx.auditLog.create({
+          data: {
+            user_id: userId || 'system',
+            organization_id: orgId,
+            action: 'UPDATE_CLIENT',
+            resource_type: 'client',
+            resource_id: updated.id,
+            old_values: sanitizeAuditMetadata(
+              {
+                id: existingClient.id,
+                fullName: existingClient.full_name,
+                city: existingClient.city,
+                postcode: existingClient.postcode,
+              },
+              { identifierSource: 'trusted' },
+            ),
+            new_values: sanitizeAuditMetadata(
+              {
+                id: updated.id,
+                fullName: updated.full_name,
+                city: updated.city,
+                postcode: updated.postcode,
+              },
+              { identifierSource: 'trusted' },
+            ),
+            timestamp: new Date(),
           },
-          new_values: {
-            id: client.id,
-            fullName: '[REDACTED]',
-            city: client.city,
-            postcode: '[REDACTED]',
-          },
-          timestamp: new Date(),
-        },
-      });
-    } catch (auditError) {
-      this.logger.warn('Failed to write audit log for client update', auditError);
-    }
+        });
+        return updated;
+      },
+    );
 
     return this.mapClientToDTO(client);
   }
@@ -201,54 +218,64 @@ export class ClientService {
     }
 
     // Soft-delete related visits as well, so scheduled visits don't linger after cleanup.
-    const deletedClient = await this.prisma.$transaction(async (tx) => {
-      await tx.visit.updateMany({
-        where: { client_id: id, organization_id: orgId, deleted_at: null },
-        data: { deleted_at: new Date() },
-      });
+    const deletedClient = await this.runAuditedTransaction(
+      'deletion',
+      async (tx) => {
+        const deletedAt = new Date();
+        const transition = await tx.client.updateMany({
+          where: { id, organization_id: orgId, deleted_at: null },
+          data: { deleted_at: deletedAt },
+        });
 
-      await tx.client.updateMany({
-        where: { id, organization_id: orgId, deleted_at: null },
-        data: { deleted_at: new Date() },
-      });
+        const deleted = await tx.client.findFirst({
+          where: { id, organization_id: orgId },
+        });
+        if (!deleted) {
+          throw new BaseHttpException(
+            ErrorCode.CLIENT_NOT_FOUND,
+            'Client not found',
+            HttpStatus.NOT_FOUND,
+          );
+        }
+        if (transition.count === 0) {
+          return deleted;
+        }
 
-      return tx.client.findFirst({
-        where: { id, organization_id: orgId },
-      });
-    });
-    if (!deletedClient) {
-      throw new BaseHttpException(
-        ErrorCode.CLIENT_NOT_FOUND,
-        'Client not found',
-        HttpStatus.NOT_FOUND,
-      );
-    }
+        await tx.visit.updateMany({
+          where: { client_id: id, organization_id: orgId, deleted_at: null },
+          data: { deleted_at: deletedAt },
+        });
 
-    // GDPR: Audit log the deletion with PII masked
-    try {
-      await this.prisma.auditLog.create({
-        data: {
-          user_id: userId || 'system',
-          organization_id: orgId,
-          action: 'DELETE_CLIENT',
-          resource_type: 'client',
-          resource_id: id,
-          old_values: {
-            id,
-            fullName: '[REDACTED]',
-            city: existingClient.city,
-            postcode: '[REDACTED]',
+        // Audit only reviewed identifiers; do not duplicate client PII.
+        await tx.auditLog.create({
+          data: {
+            user_id: userId || 'system',
+            organization_id: orgId,
+            action: 'DELETE_CLIENT',
+            resource_type: 'client',
+            resource_id: id,
+            old_values: sanitizeAuditMetadata(
+              {
+                id,
+                fullName: existingClient.full_name,
+                city: existingClient.city,
+                postcode: existingClient.postcode,
+              },
+              { identifierSource: 'trusted' },
+            ),
+            new_values: sanitizeAuditMetadata(
+              {
+                id,
+                deletedAt: deletedAt.toISOString(),
+              },
+              { identifierSource: 'trusted' },
+            ),
+            timestamp: new Date(),
           },
-          new_values: {
-            id,
-            deletedAt: new Date().toISOString(),
-          },
-          timestamp: new Date(),
-        },
-      });
-    } catch (auditError) {
-      this.logger.warn('Failed to write audit log for client deletion', auditError);
-    }
+        });
+        return deleted;
+      },
+    );
 
     return this.mapClientToDTO(deletedClient);
   }
@@ -266,6 +293,21 @@ export class ClientService {
 
   private normalizeRole(userRole: string): string {
     return (userRole || '').toLowerCase().trim();
+  }
+
+  private async runAuditedTransaction<T>(
+    operation: string,
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await this.prisma.$transaction(work);
+    } catch (error) {
+      this.logger.warn(
+        `Audited client ${operation} failed`,
+        extractSafeAuditErrorMetadata(error),
+      );
+      throw error;
+    }
   }
 
   private async requireOrganizationId(organizationId?: string): Promise<string> {
