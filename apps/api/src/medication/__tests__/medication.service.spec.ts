@@ -643,8 +643,10 @@ describe('MedicationService', () => {
 
     it.each([
       { administrationTimes: [], label: 'an empty schedule' },
+      { administrationTimes: ['not-a-time'], label: 'an invalid wall-time format' },
       { administrationTimes: ['25:00'], label: 'an out-of-range wall time' },
       { administrationTimes: ['08:00', '08:00'], label: 'a duplicate wall time' },
+      { administrationTimes: ['8:00', '08:00'], label: 'a canonical duplicate wall time' },
     ])('rejects $label before any repository lookup or write', async ({ administrationTimes }) => {
       await expect(
         service.createPrescription(

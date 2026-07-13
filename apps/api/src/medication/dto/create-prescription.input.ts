@@ -12,6 +12,10 @@ import {
   Min,
   Max,
 } from 'class-validator';
+import {
+  MEDICATION_WALL_TIME_PATTERN,
+  medicationWallTimeUniquenessKey,
+} from '../medication-wall-time';
 
 @InputType()
 export class CreatePrescriptionInput {
@@ -50,9 +54,9 @@ export class CreatePrescriptionInput {
   @Field(() => [String])
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayUnique()
+  @ArrayUnique(medicationWallTimeUniquenessKey)
   @IsString({ each: true })
-  @Matches(/^(?:[01]?\d|2[0-3]):[0-5]\d$/, { each: true })
+  @Matches(MEDICATION_WALL_TIME_PATTERN, { each: true })
   administrationTimes: string[];
 
   @Field({ nullable: true })

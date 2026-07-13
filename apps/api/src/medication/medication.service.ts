@@ -25,6 +25,7 @@ import {
   utcStoredDateToCalendarDate,
   type OrganizationCalendarDate,
 } from '@oasis/time';
+import { normalizeMedicationWallTime } from './medication-wall-time';
 
 // Inline types for now
 interface CreatePrescriptionInput {
@@ -455,17 +456,6 @@ export class MedicationService {
     }
   }
 
-  private parseTimeOfDay(time: string): { hours: number; minutes: number } | null {
-    const normalized = String(time || '').trim();
-    const match = normalized.match(/^(\d{1,2}):(\d{2})$/);
-    if (!match) return null;
-    const hours = Number(match[1]);
-    const minutes = Number(match[2]);
-    if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
-    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
-    return { hours, minutes };
-  }
-
   private validateAdministrationTimes(
     administrationTimes: unknown,
   ): Array<{ hours: number; minutes: number }> {
@@ -480,8 +470,8 @@ export class MedicationService {
     const parsedTimes: Array<{ hours: number; minutes: number }> = [];
     const uniqueTimes = new Set<string>();
     for (const time of administrationTimes) {
-      const parsed = typeof time === 'string' ? this.parseTimeOfDay(time) : null;
-      if (!parsed) {
+      const normalized = normalizeMedicationWallTime(time);
+      if (!normalized) {
         throw new BaseHttpException(
           ErrorCode.VALIDATION_FAILED,
           'Prescription administration times must use a valid HH:mm wall time',
@@ -489,18 +479,15 @@ export class MedicationService {
         );
       }
 
-      const canonicalTime = `${String(parsed.hours).padStart(2, '0')}:${String(
-        parsed.minutes,
-      ).padStart(2, '0')}`;
-      if (uniqueTimes.has(canonicalTime)) {
+      if (uniqueTimes.has(normalized.canonical)) {
         throw new BaseHttpException(
           ErrorCode.VALIDATION_FAILED,
           'Prescription administration times must be unique',
           HttpStatus.BAD_REQUEST,
         );
       }
-      uniqueTimes.add(canonicalTime);
-      parsedTimes.push(parsed);
+      uniqueTimes.add(normalized.canonical);
+      parsedTimes.push({ hours: normalized.hours, minutes: normalized.minutes });
     }
 
     return parsedTimes;
