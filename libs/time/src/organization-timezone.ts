@@ -15,6 +15,11 @@ export interface OrganizationWallClock extends OrganizationCalendarDate {
   minute: number;
 }
 
+export interface OrganizationInclusiveCalendarPeriod {
+  start: OrganizationCalendarDate;
+  end: OrganizationCalendarDate;
+}
+
 export type WallClockResolution =
   | { kind: 'unique'; instant: Date }
   | { kind: 'ambiguous'; instants: [Date, Date] }
@@ -128,6 +133,35 @@ export function addCalendarDays(
     month: shifted.getUTCMonth() + 1,
     day: shifted.getUTCDate(),
   };
+}
+
+export function parseOrganizationDateKey(value: string): OrganizationCalendarDate {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    throw new RangeError('Organization calendar date must use YYYY-MM-DD');
+  }
+  const parsed = {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+  };
+  const normalized = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day));
+  if (
+    normalized.getUTCFullYear() !== parsed.year ||
+    normalized.getUTCMonth() + 1 !== parsed.month ||
+    normalized.getUTCDate() !== parsed.day
+  ) {
+    throw new RangeError('Organization calendar date must be valid');
+  }
+  return parsed;
+}
+
+export function organizationCalendarDateToUtcStoredDate(
+  date: OrganizationCalendarDate,
+): Date {
+  const key = `${String(date.year).padStart(4, '0')}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
+  const validated = parseOrganizationDateKey(key);
+  return new Date(Date.UTC(validated.year, validated.month - 1, validated.day));
 }
 
 export function utcStoredDateToCalendarDate(date: Date): OrganizationCalendarDate {
@@ -252,18 +286,27 @@ export function organizationCalendarMonthUtcRange(
   );
 }
 
+export function organizationWeekCalendarPeriod(
+  instant: Date,
+  organizationId?: string,
+  resolver: OrganizationTimezoneResolver = organizationTimezoneResolver,
+): OrganizationInclusiveCalendarPeriod {
+  // Calendar-week views retain the application's established Sunday start.
+  const current = organizationCalendarDate(instant, organizationId, resolver);
+  const dayOfWeek = new Date(Date.UTC(current.year, current.month - 1, current.day)).getUTCDay();
+  const weekStart = addCalendarDays(current, -dayOfWeek);
+  return { start: weekStart, end: addCalendarDays(weekStart, 6) };
+}
+
 export function organizationWeekUtcRange(
   instant: Date,
   organizationId?: string,
   resolver: OrganizationTimezoneResolver = organizationTimezoneResolver,
 ): { start: Date; end: Date } {
-  // Calendar-week views retain the application's established Sunday start.
-  const current = organizationCalendarDate(instant, organizationId, resolver);
-  const dayOfWeek = new Date(Date.UTC(current.year, current.month - 1, current.day)).getUTCDay();
-  const weekStart = addCalendarDays(current, -dayOfWeek);
+  const period = organizationWeekCalendarPeriod(instant, organizationId, resolver);
   return organizationCalendarRangeUtc(
-    weekStart,
-    addCalendarDays(weekStart, 7),
+    period.start,
+    addCalendarDays(period.end, 1),
     organizationId,
     resolver,
   );
@@ -275,24 +318,36 @@ export function organizationWeekUtcRange(
  * Friday through Thursday. This is deliberately separate from calendar-week
  * views, which use Sunday through Saturday.
  */
+export function organizationCompletedReportingPeriod(
+  instant: Date,
+  organizationId?: string,
+  resolver: OrganizationTimezoneResolver = organizationTimezoneResolver,
+): OrganizationInclusiveCalendarPeriod {
+  const current = organizationCalendarDate(instant, organizationId, resolver);
+  const dayOfWeek = new Date(Date.UTC(current.year, current.month - 1, current.day)).getUTCDay();
+  const daysSinceFriday = (dayOfWeek - 5 + 7) % 7;
+  const completedPeriodEnd = addCalendarDays(current, -daysSinceFriday);
+  return {
+    start: addCalendarDays(completedPeriodEnd, -7),
+    end: addCalendarDays(completedPeriodEnd, -1),
+  };
+}
+
 export function organizationCompletedReportingPeriodUtcRange(
   instant: Date,
   organizationId?: string,
   resolver: OrganizationTimezoneResolver = organizationTimezoneResolver,
 ): { start: Date; end: Date } {
-  const current = organizationCalendarDate(instant, organizationId, resolver);
-  const dayOfWeek = new Date(Date.UTC(current.year, current.month - 1, current.day)).getUTCDay();
-  const daysSinceFriday = (dayOfWeek - 5 + 7) % 7;
-  const completedPeriodEnd = addCalendarDays(current, -daysSinceFriday);
+  const period = organizationCompletedReportingPeriod(instant, organizationId, resolver);
   return organizationCalendarRangeUtc(
-    addCalendarDays(completedPeriodEnd, -7),
-    completedPeriodEnd,
+    period.start,
+    addCalendarDays(period.end, 1),
     organizationId,
     resolver,
   );
 }
 
-function organizationCalendarRangeUtc(
+export function organizationCalendarRangeUtc(
   startDate: OrganizationCalendarDate,
   endDateExclusive: OrganizationCalendarDate,
   organizationId?: string,

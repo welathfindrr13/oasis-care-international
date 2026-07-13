@@ -9,7 +9,10 @@ import {
   Prisma 
 } from '@oasis/db';
 import { assertTenantIdForSensitiveWrite } from '../common/tenant/tenant-ownership';
-import { organizationDayUtcRange } from '@oasis/time';
+import {
+  organizationCalendarDayUtcRange,
+  parseOrganizationDateKey,
+} from '@oasis/time';
 
 @Injectable()
 export class MedicationRepository {
@@ -315,12 +318,12 @@ export class MedicationRepository {
   }
 
   async findTodaysMedicationsByClient(
-    date: Date,
+    dateKey: string,
     organizationId: string,
     carerId?: string,
   ): Promise<MedicationAdministration[]> {
-    const { start: startOfDay, end: endOfDayExclusive } = organizationDayUtcRange(
-      date,
+    const { start: startOfDay, end: endOfDayExclusive } = organizationCalendarDayUtcRange(
+      parseOrganizationDateKey(dateKey),
       organizationId,
     );
 

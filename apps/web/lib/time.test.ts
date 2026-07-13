@@ -5,12 +5,15 @@ import {
   formatDate,
   formatLondonLongDate,
   formatOrganizationDateTimeInput,
+  formatStoredCalendarDate,
   formatTime,
   getOrganizationDateUtcRange,
   getOrganizationMonthUtcRange,
   getOrganizationWeekUtcRange,
+  getOrganizationWeekStoredDateRange,
   getLondonDayUtcRange,
   organizationDateKey,
+  organizationDateKeyToStoredDateIso,
   organizationDateTimeInputToIso,
 } from './time'
 
@@ -77,4 +80,16 @@ test('converts organization wall time to UTC and rejects DST ambiguity', () => {
     () => organizationDateTimeInputToIso('2026-03-29T01:30'),
     /does not exist/,
   )
+})
+
+test('keeps stored calendar dates independent from organization boundary instants', () => {
+  assert.equal(
+    organizationDateKeyToStoredDateIso('2026-05-01'),
+    '2026-05-01T00:00:00.000Z',
+  )
+  assert.deepEqual(getOrganizationWeekStoredDateRange(new Date('2026-05-06T12:00:00Z')), {
+    start: '2026-05-03T00:00:00.000Z',
+    end: '2026-05-09T00:00:00.000Z',
+  })
+  assert.equal(formatStoredCalendarDate('2026-05-01T00:00:00.000Z'), '1 May 2026')
 })

@@ -28,5 +28,27 @@ test('person and care-planning views do not format or filter care dates in the h
   assert.match(picker, /formatDateTime\(value, \{ year: undefined \}\)/)
   assert.doesNotMatch(picker, /T00:00:00\.000Z|T23:59:59\.000Z/)
   assert.match(actions, /getOrganizationDateUtcRange\(value\)/)
+  assert.match(actions, /organizationDateKeyToStoredDateIso\(value\)/)
   assert.doesNotMatch(actions, /T00:00:00\.000Z|T23:59:59\.000Z/)
+})
+
+test('evidence dashboard and PDF use central instant and stored-date formatters', () => {
+  const dashboard = read('./evidence/page.tsx')
+  const pdf = read('../components/evidence/EvidencePackPdf.tsx')
+
+  for (const source of [dashboard, pdf]) {
+    assert.match(source, /formatStoredCalendarDate/)
+    assert.doesNotMatch(source, /new Intl\.DateTimeFormat/)
+  }
+  assert.match(dashboard, /formatDate\(value\)/)
+  assert.match(pdf, /formatDateTime\(value\)/)
+})
+
+test('health summary generation sends inclusive stored calendar keys', () => {
+  const source = read('./clients/[id]/summary/page.tsx')
+
+  assert.match(source, /getOrganizationWeekStoredDateRange\(\)/)
+  assert.match(source, /periodStart: week\.start/)
+  assert.match(source, /periodEnd: week\.end/)
+  assert.doesNotMatch(source, /getOrganizationWeekUtcRange/)
 })

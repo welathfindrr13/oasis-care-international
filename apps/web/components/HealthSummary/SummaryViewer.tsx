@@ -2,8 +2,8 @@
 
 import RiskIndicator from './RiskIndicator';
 import {
-  formatDate as formatOrganizationDate,
   formatDateTime as formatOrganizationDateTime,
+  formatStoredCalendarDate,
 } from '../../lib/time';
 
 interface HealthSummary {
@@ -42,7 +42,7 @@ interface SummaryViewerProps {
 
 export default function SummaryViewer({ summary, className = '' }: SummaryViewerProps) {
   const formatDate = (dateString: string) => {
-    return formatOrganizationDate(dateString, {
+    return formatStoredCalendarDate(dateString, {
       month: 'long',
     });
   };

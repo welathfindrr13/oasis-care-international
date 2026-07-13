@@ -81,4 +81,31 @@ describe('AiSummaryService Deployment V2 runtime guard', () => {
 
     expect(prisma.carer.create).not.toHaveBeenCalled();
   });
+
+  it('queries summary source visits with an exclusive organization-period end', async () => {
+    const prisma = {
+      visit: { findMany: jest.fn().mockResolvedValue([]) },
+      whereNotDeleted: jest.fn((where) => where),
+    };
+    const service = createService(prisma) as any;
+    const periodStart = new Date('2026-05-02T23:00:00.000Z');
+    const periodEndExclusive = new Date('2026-05-09T23:00:00.000Z');
+
+    await service.collectCareLogs(
+      'client-1',
+      periodStart,
+      periodEndExclusive,
+      'org-1',
+    );
+
+    expect(prisma.visit.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organization_id: 'org-1',
+          client_id: 'client-1',
+          scheduled_start: { gte: periodStart, lt: periodEndExclusive },
+        }),
+      }),
+    );
+  });
 });

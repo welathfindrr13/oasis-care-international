@@ -17,6 +17,12 @@ import {
   type CanonicalCapabilityActor,
   hasCanonicalActorCapability,
 } from '../auth/access-capability';
+import {
+  addCalendarDays,
+  organizationCalendarDateToUtcStoredDate,
+  organizationCalendarRangeUtc,
+  utcStoredDateToCalendarDate,
+} from '@oasis/time';
 
 type RiskLevel = 'green' | 'amber' | 'red';
 
@@ -91,11 +97,40 @@ export class AiSummaryService {
       );
     }
 
+    const requestedPeriodStart = new Date(data.periodStart);
+    const requestedPeriodEnd = new Date(data.periodEnd);
+    if (
+      Number.isNaN(requestedPeriodStart.getTime()) ||
+      Number.isNaN(requestedPeriodEnd.getTime())
+    ) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'A valid summary calendar period is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const periodStartCalendar = utcStoredDateToCalendarDate(requestedPeriodStart);
+    const periodEndCalendar = utcStoredDateToCalendarDate(requestedPeriodEnd);
+    const periodStart = organizationCalendarDateToUtcStoredDate(periodStartCalendar);
+    const periodEnd = organizationCalendarDateToUtcStoredDate(periodEndCalendar);
+    if (periodStart > periodEnd) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'Summary start date must not be after its end date',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const queryPeriod = organizationCalendarRangeUtc(
+      periodStartCalendar,
+      addCalendarDays(periodEndCalendar, 1),
+      orgId,
+    );
+
     // Check if summary already exists for this period
     const existingSummary = await this.aiSummaryRepository.findByClientAndPeriod(
       data.clientId,
-      new Date(data.periodStart),
-      new Date(data.periodEnd),
+      periodStart,
+      periodEnd,
       orgId,
     );
 
@@ -107,9 +142,12 @@ export class AiSummaryService {
       return existingSummary;
     }
 
-    const periodStart = new Date(data.periodStart);
-    const periodEnd = new Date(data.periodEnd);
-    const logs = await this.collectCareLogs(data.clientId, periodStart, periodEnd, orgId);
+    const logs = await this.collectCareLogs(
+      data.clientId,
+      queryPeriod.start,
+      queryPeriod.end,
+      orgId,
+    );
     const generatedSummary = await this.generateSummaryFromModel(periodStart, periodEnd, logs);
     const riskLevels = this.calculateRiskLevels(generatedSummary);
 
@@ -133,8 +171,8 @@ export class AiSummaryService {
       changes: {
         summaryId: summary.id,
         clientId: data.clientId,
-        periodStart: data.periodStart,
-        periodEnd: data.periodEnd,
+        periodStart: periodStart.toISOString(),
+        periodEnd: periodEnd.toISOString(),
         riskLevels,
         logsAnalysed: logs.length,
         modelId: this.summaryModelId,
@@ -498,7 +536,7 @@ export class AiSummaryService {
   private async collectCareLogs(
     clientId: string,
     periodStart: Date,
-    periodEnd: Date,
+    periodEndExclusive: Date,
     organizationId: string,
   ): Promise<CareLogForModel[]> {
     const visits = await this.prisma.visit.findMany({
@@ -507,7 +545,7 @@ export class AiSummaryService {
         client_id: clientId,
         scheduled_start: {
           gte: periodStart,
-          lte: periodEnd,
+          lt: periodEndExclusive,
         },
       }),
       include: {

@@ -19,6 +19,7 @@ import {
 } from '../auth/access-capability';
 import {
   addCalendarDays,
+  parseOrganizationDateKey,
   resolveOrganizationWallClock,
   utcStoredDateToCalendarDate,
   type OrganizationCalendarDate,
@@ -296,12 +297,14 @@ export class MedicationService {
   }
 
   async getTodaysMedicationsByClient(
-    date: Date,
+    dateKey: string,
     userId: string,
     userRole: string,
     organizationId?: string,
   ): Promise<MedicationAdministration[]> {
-    if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    try {
+      parseOrganizationDateKey(dateKey);
+    } catch {
       throw new BaseHttpException(
         ErrorCode.VALIDATION_FAILED,
         'A valid medication date is required',
@@ -314,10 +317,10 @@ export class MedicationService {
     this.checkClinicalAccess(normalizedRole);
     
     const requestId = this.cls.get('requestId');
-    this.logger.log(`Fetching today's medications for date ${date.toISOString()}`, { requestId });
+    this.logger.log(`Fetching today's medications for organization date ${dateKey}`, { requestId });
 
     const administrations = await this.medicationRepository.findTodaysMedicationsByClient(
-      date,
+      dateKey,
       orgId,
       normalizedRole === 'carer' ? userId : undefined,
     );

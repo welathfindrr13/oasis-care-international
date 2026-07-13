@@ -424,7 +424,7 @@ describe('MedicationService', () => {
   describe('getTodaysMedicationsByClient', () => {
     it('should reject invalid dates before querying the repository', async () => {
       await expect(
-        service.getTodaysMedicationsByClient(new Date('invalid'), mockUser.id, mockUser.role, organizationId)
+        service.getTodaysMedicationsByClient('invalid', mockUser.id, mockUser.role, organizationId)
       ).rejects.toThrow(
         new BaseHttpException(
           ErrorCode.VALIDATION_FAILED,
@@ -447,7 +447,7 @@ describe('MedicationService', () => {
       ] as any);
 
       const result = await service.getTodaysMedicationsByClient(
-        new Date('2025-01-08T00:00:00Z'),
+        '2025-01-08',
         mockUser.id,
         mockUser.role,
         organizationId,
@@ -463,7 +463,7 @@ describe('MedicationService', () => {
       repository.findTodaysMedicationsByClient.mockResolvedValue(todaysMeds as any);
 
       const result = await service.getTodaysMedicationsByClient(
-        new Date(),
+        '2025-01-08',
         mockUser.id,
         mockUser.role,
         organizationId,
@@ -471,7 +471,7 @@ describe('MedicationService', () => {
 
       expect(result).toEqual(todaysMeds);
       expect(repository.findTodaysMedicationsByClient).toHaveBeenCalledWith(
-        expect.any(Date),
+        '2025-01-08',
         organizationId,
         mockUser.id,
       );
@@ -483,7 +483,7 @@ describe('MedicationService', () => {
       repository.findTodaysMedicationsByClient.mockResolvedValue(todaysMeds as any);
 
       const result = await service.getTodaysMedicationsByClient(
-        new Date(),
+        '2025-01-08',
         'office-user-123',
         'office',
         organizationId,
@@ -491,7 +491,7 @@ describe('MedicationService', () => {
 
       expect(result).toEqual(todaysMeds);
       expect(repository.findTodaysMedicationsByClient).toHaveBeenCalledWith(
-        expect.any(Date),
+        '2025-01-08',
         organizationId,
         undefined,
       );
@@ -503,7 +503,7 @@ describe('MedicationService', () => {
       repository.findTodaysMedicationsByClient.mockResolvedValue(todaysMeds as any);
 
       const result = await service.getTodaysMedicationsByClient(
-        new Date(),
+        '2025-01-08',
         mockAdminUser.id,
         mockAdminUser.role,
         organizationId,
@@ -511,7 +511,7 @@ describe('MedicationService', () => {
 
       expect(result).toEqual(todaysMeds);
       expect(repository.findTodaysMedicationsByClient).toHaveBeenCalledWith(
-        expect.any(Date),
+        '2025-01-08',
         organizationId,
         undefined,
       );

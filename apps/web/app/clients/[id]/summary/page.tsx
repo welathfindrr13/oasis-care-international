@@ -8,9 +8,9 @@ import ApprovalControls from '../../../../components/HealthSummary/ApprovalContr
 import { Header } from '../../../../components/oasis/Header';
 import { clientQuery } from '../../../../lib/graphql/client-side';
 import {
-  formatDate,
   formatDateTime,
-  getOrganizationWeekUtcRange,
+  formatStoredCalendarDate,
+  getOrganizationWeekStoredDateRange,
 } from '../../../../lib/time';
 
 interface HealthSummary {
@@ -122,7 +122,7 @@ export default function SummaryPage() {
       setIsGenerating(true);
       setError(null);
 
-      const week = getOrganizationWeekUtcRange();
+      const week = getOrganizationWeekStoredDateRange();
 
       const response = await clientQuery<{ generateSummary: HealthSummary }>(`
         mutation GenerateSummary($input: GenerateSummaryInput!) {
@@ -150,7 +150,7 @@ export default function SummaryPage() {
         input: {
           clientId,
           periodStart: week.start,
-          periodEnd: new Date(new Date(week.end).getTime() - 1).toISOString()
+          periodEnd: week.end
         }
       });
 
@@ -226,7 +226,7 @@ export default function SummaryPage() {
       const summaryText = `
 Health Summary Report
 ${currentSummary?.client?.fullName}
-Period: ${currentSummary?.periodStart ? formatDate(currentSummary.periodStart) : 'N/A'} - ${currentSummary?.periodEnd ? formatDate(currentSummary.periodEnd) : 'N/A'}
+Period: ${currentSummary?.periodStart ? formatStoredCalendarDate(currentSummary.periodStart) : 'N/A'} - ${currentSummary?.periodEnd ? formatStoredCalendarDate(currentSummary.periodEnd) : 'N/A'}
 
 Overall Health: ${currentSummary?.summaryJson?.overall_health || 'N/A'}
 

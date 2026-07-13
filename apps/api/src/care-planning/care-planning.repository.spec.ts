@@ -140,6 +140,44 @@ describe('CarePlanningRepository', () => {
     expect(prisma.evidencePack.create).not.toHaveBeenCalled();
   });
 
+  it('writes explicit UTC calendar keys to date-only fields in GMT and BST seasons', async () => {
+    const { prisma, repository } = createRepository();
+    prisma.client.findFirst.mockResolvedValue({ id: 'client-1' });
+    prisma.evidencePack.create.mockResolvedValue({ id: 'pack-1' });
+
+    await repository.createEvidencePack('org-1', {
+      clientId: 'client-1',
+      status: 'DRAFT' as any,
+      periodStart: new Date('2026-05-01T00:00:00.000Z'),
+      periodEnd: new Date('2026-05-07T00:00:00.000Z'),
+    });
+    await repository.createEvidencePack('org-1', {
+      clientId: 'client-1',
+      status: 'DRAFT' as any,
+      periodStart: new Date('2026-01-01T00:00:00.000Z'),
+      periodEnd: new Date('2026-01-07T00:00:00.000Z'),
+    });
+
+    expect(prisma.evidencePack.create).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          period_start: new Date('2026-05-01T00:00:00.000Z'),
+          period_end: new Date('2026-05-07T00:00:00.000Z'),
+        }),
+      }),
+    );
+    expect(prisma.evidencePack.create).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          period_start: new Date('2026-01-01T00:00:00.000Z'),
+          period_end: new Date('2026-01-07T00:00:00.000Z'),
+        }),
+      }),
+    );
+  });
+
   it('rejects evidence pack creation before lookup when tenant ownership is missing', async () => {
     const { prisma, repository } = createRepository();
 

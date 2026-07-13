@@ -1,11 +1,14 @@
 import {
   formatInOrganizationTimezone,
   organizationCalendarDayUtcRange,
+  organizationCalendarDateToUtcStoredDate,
   organizationCalendarMonthUtcRange,
   organizationDateKey as dateKeyInOrganizationTimezone,
   organizationDayUtcRange,
   organizationWallClock,
   organizationWeekUtcRange,
+  organizationWeekCalendarPeriod,
+  parseOrganizationDateKey,
   resolveOrganizationTimezone,
   resolveOrganizationWallClock,
 } from '@oasis/time';
@@ -55,6 +58,23 @@ export function formatDate(
   });
 }
 
+export function formatStoredCalendarDate(
+  date: Date | string,
+  options?: Intl.DateTimeFormatOptions,
+): string {
+  const storedDate = typeof date === 'string' ? new Date(date) : date;
+  if (Number.isNaN(storedDate.getTime())) {
+    throw new RangeError('Stored calendar date must be valid');
+  }
+  return new Intl.DateTimeFormat('en-GB', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    ...options,
+    timeZone: 'UTC',
+  }).format(storedDate);
+}
+
 export function formatOrganizationLongDate(date: Date | string): string {
   return formatInOrganizationTimezone(date, {
     weekday: 'long',
@@ -93,6 +113,14 @@ export function getOrganizationWeekUtcRange(now: Date = new Date()): Organizatio
   return { start: range.start.toISOString(), end: range.end.toISOString() };
 }
 
+export function getOrganizationWeekStoredDateRange(now: Date = new Date()): OrganizationDayRange {
+  const period = organizationWeekCalendarPeriod(now);
+  return {
+    start: organizationCalendarDateToUtcStoredDate(period.start).toISOString(),
+    end: organizationCalendarDateToUtcStoredDate(period.end).toISOString(),
+  };
+}
+
 export function getOrganizationMonthUtcRange(
   year: number,
   month: number,
@@ -117,6 +145,10 @@ export function isToday(date: Date | string): boolean {
 }
 
 export const ORGANIZATION_TIMEZONE = resolveOrganizationTimezone();
+
+export function organizationDateKeyToStoredDateIso(value: string): string {
+  return organizationCalendarDateToUtcStoredDate(parseOrganizationDateKey(value)).toISOString();
+}
 
 export function organizationDateKey(date: Date | string = new Date()): string {
   const instant = typeof date === 'string' ? new Date(date) : date;

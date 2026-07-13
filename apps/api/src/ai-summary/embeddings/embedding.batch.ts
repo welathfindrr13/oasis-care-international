@@ -5,6 +5,8 @@ import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedroc
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+  organizationCalendarDateToUtcStoredDate,
+  organizationCompletedReportingPeriod,
   organizationCompletedReportingPeriodUtcRange,
   resolveOrganizationTimezone,
 } from '@oasis/time';
@@ -17,6 +19,14 @@ interface BatchMetrics {
   embeddingsGenerated: number;
   summariesCreated: number;
   errors: Error[];
+}
+
+interface OrganizationReportingPeriod {
+  queryStart: DateTime;
+  queryEndExclusive: DateTime;
+  recordStart: Date;
+  recordEnd: Date;
+  timezone: string;
 }
 
 @Injectable()
@@ -96,14 +106,14 @@ export class EmbeddingBatchService {
           if (!client.organization_id) {
             throw new Error('AI summary client has no organization context');
           }
-          const { periodStart, periodEnd } = this.calculateCompletedReportingPeriod(
+          const reportingPeriod = this.calculateCompletedReportingPeriod(
             batchInstant,
             client.organization_id,
           );
           this.logger.log(
-            `Generating summary for client ${client.id} for period: ${periodStart.toISODate()} to ${periodEnd.toISODate()}`,
+            `Generating summary for client ${client.id} for period: ${reportingPeriod.recordStart.toISOString().slice(0, 10)} to ${reportingPeriod.recordEnd.toISOString().slice(0, 10)}`,
           );
-          await this.generateClientSummary(client.id, periodStart, periodEnd);
+          await this.generateClientSummary(client.id, reportingPeriod);
           
           const processingTime = DateTime.now().diff(clientStartTime).milliseconds;
           this.logger.log(`Client ${client.id} processed in ${processingTime}ms`);
@@ -135,38 +145,45 @@ export class EmbeddingBatchService {
   private calculateCompletedReportingPeriod(
     now: Date,
     organizationId: string,
-  ): { periodStart: DateTime; periodEnd: DateTime } {
-    const period = organizationCompletedReportingPeriodUtcRange(now, organizationId);
+  ): OrganizationReportingPeriod {
+    const calendarPeriod = organizationCompletedReportingPeriod(now, organizationId);
+    const queryPeriod = organizationCompletedReportingPeriodUtcRange(now, organizationId);
     const zone = resolveOrganizationTimezone(organizationId);
     return {
-      periodStart: DateTime.fromJSDate(period.start, { zone }),
-      periodEnd: DateTime.fromJSDate(period.end, { zone }),
+      queryStart: DateTime.fromJSDate(queryPeriod.start, { zone }),
+      queryEndExclusive: DateTime.fromJSDate(queryPeriod.end, { zone }),
+      recordStart: organizationCalendarDateToUtcStoredDate(calendarPeriod.start),
+      recordEnd: organizationCalendarDateToUtcStoredDate(calendarPeriod.end),
+      timezone: zone,
     };
   }
 
   private async generateClientSummary(
     clientId: string,
-    periodStart: DateTime,
-    periodEnd: DateTime,
+    period: OrganizationReportingPeriod,
   ): Promise<void> {
     this.logger.log(`Generating summary for client ${clientId}`);
 
     // 1. Collect all care logs for the period
-    const careLogs = await this.collectCareLogs(clientId, periodStart, periodEnd);
+    const careLogs = await this.collectCareLogs(
+      clientId,
+      period.queryStart,
+      period.queryEndExclusive,
+    );
     
     if (careLogs.length === 0) {
-      this.logger.warn(`No care logs found for client ${clientId} in period ${periodStart.toISODate()} to ${periodEnd.toISODate()}`);
+      this.logger.warn(`No care logs found for client ${clientId} in period ${period.recordStart.toISOString().slice(0, 10)} to ${period.recordEnd.toISOString().slice(0, 10)}`);
       return;
     }
 
     // 2. Generate embeddings for semantic search capability
-    await this.generateLogEmbeddings(careLogs, clientId);
+    await this.generateLogEmbeddings(careLogs, clientId, period.timezone);
 
     // 3. Create AI health summary using Bedrock
-    const healthSummary = await this.createHealthSummary(clientId, careLogs, periodStart, periodEnd);
+    const healthSummary = await this.createHealthSummary(clientId, careLogs, period);
 
     // 4. Store summary in database with expiration
-    await this.storeSummary(clientId, healthSummary, periodStart, periodEnd);
+    await this.storeSummary(clientId, healthSummary, period.recordStart, period.recordEnd);
 
     this.logger.log(`Successfully generated summary for client ${clientId}`);
   }
@@ -174,7 +191,7 @@ export class EmbeddingBatchService {
   private async collectCareLogs(
     clientId: string,
     periodStart: DateTime,
-    periodEnd: DateTime,
+    periodEndExclusive: DateTime,
   ): Promise<any[]> {
     // Collect all types of logs for this client in the period
     const visits = await this.prisma.visit.findMany({
@@ -182,7 +199,7 @@ export class EmbeddingBatchService {
         client_id: clientId,
         scheduled_start: {
           gte: periodStart.toJSDate(),
-          lt: periodEnd.toJSDate(),
+          lt: periodEndExclusive.toJSDate(),
         },
       },
       include: {
@@ -243,13 +260,17 @@ export class EmbeddingBatchService {
     return logs;
   }
 
-  private async generateLogEmbeddings(logs: any[], clientId: string): Promise<void> {
+  private async generateLogEmbeddings(
+    logs: any[],
+    clientId: string,
+    timezone: string,
+  ): Promise<void> {
     this.logger.log(`Generating embeddings for ${logs.length} log entries`);
 
     for (const log of logs) {
       try {
         // Create text representation for embedding
-        const logText = this.formatLogForEmbedding(log);
+        const logText = this.formatLogForEmbedding(log, timezone);
         
         // Generate embedding using Bedrock
         const embedding = await this.generateEmbedding(logText);
@@ -270,8 +291,8 @@ export class EmbeddingBatchService {
     }
   }
 
-  private formatLogForEmbedding(log: any): string {
-    const timestamp = DateTime.fromJSDate(log.timestamp).toFormat('yyyy-MM-dd HH:mm');
+  private formatLogForEmbedding(log: any, timezone: string): string {
+    const timestamp = DateTime.fromJSDate(log.timestamp, { zone: timezone }).toFormat('yyyy-MM-dd HH:mm');
     const data = JSON.stringify(log.data);
     return `${timestamp} ${log.logType}: ${data}`;
   }
@@ -294,12 +315,11 @@ export class EmbeddingBatchService {
   private async createHealthSummary(
     clientId: string,
     logs: any[],
-    periodStart: DateTime,
-    periodEnd: DateTime,
+    period: OrganizationReportingPeriod,
   ): Promise<any> {
     // Format logs for AI analysis
     const logsForAI = logs.map(log => ({
-      timestamp: DateTime.fromJSDate(log.timestamp).toFormat('yyyy-MM-dd HH:mm'),
+      timestamp: DateTime.fromJSDate(log.timestamp, { zone: period.timezone }).toFormat('yyyy-MM-dd HH:mm'),
       type: log.logType,
       data: log.data,
     }));
@@ -308,7 +328,7 @@ export class EmbeddingBatchService {
     const prompt = `${this.healthSummaryPrompt}
 
 ## Client Data for Analysis
-Period: ${periodStart.toFormat('yyyy-MM-dd')} to ${periodEnd.toFormat('yyyy-MM-dd')} (Fri-Thu)
+Period: ${period.recordStart.toISOString().slice(0, 10)} to ${period.recordEnd.toISOString().slice(0, 10)} (Friday to Thursday, inclusive)
 
 Care Logs:
 ${JSON.stringify(logsForAI, null, 2)}
@@ -348,8 +368,8 @@ Please analyze this week's care logs and generate the health summary in the spec
   private async storeSummary(
     clientId: string,
     summaryData: any,
-    periodStart: DateTime,
-    periodEnd: DateTime,
+    periodStart: Date,
+    periodEnd: Date,
   ): Promise<void> {
     // Calculate risk levels from summary data
     const riskLevels = this.calculateOverallRisk(summaryData);
@@ -358,8 +378,8 @@ Please analyze this week's care logs and generate the health summary in the spec
     await this.prisma.healthSummary.create({
       data: {
         client_id: clientId,
-        period_start: periodStart.toJSDate(),
-        period_end: periodEnd.toJSDate(),
+        period_start: periodStart,
+        period_end: periodEnd,
         summary_json: summaryData,
         risk_levels: riskLevels,
         generated_at: new Date(),

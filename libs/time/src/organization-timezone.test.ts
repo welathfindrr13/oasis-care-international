@@ -2,11 +2,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   formatInOrganizationTimezone,
+  organizationCalendarDateToUtcStoredDate,
+  organizationCalendarDayUtcRange,
+  organizationCompletedReportingPeriod,
   organizationDateKey,
   organizationDayUtcRange,
   organizationCalendarMonthUtcRange,
   organizationCompletedReportingPeriodUtcRange,
   organizationWeekUtcRange,
+  organizationWeekCalendarPeriod,
+  parseOrganizationDateKey,
   resolveOrganizationTimezone,
   resolveOrganizationWallClock,
   type OrganizationTimezoneResolver,
@@ -101,4 +106,39 @@ test('keeps completed Friday-Thursday reporting periods separate from calendar w
   );
   assert.equal(newYork.start.toISOString(), '2026-03-27T04:00:00.000Z');
   assert.equal(newYork.end.toISOString(), '2026-04-03T04:00:00.000Z');
+});
+
+test('keeps date-only storage keys separate from BST boundary instants', () => {
+  const mayDay = parseOrganizationDateKey('2026-05-01');
+  assert.equal(
+    organizationCalendarDateToUtcStoredDate(mayDay).toISOString(),
+    '2026-05-01T00:00:00.000Z',
+  );
+  assert.throws(() => parseOrganizationDateKey('2026-02-31'), /must be valid/);
+
+  const newYorkResolver: OrganizationTimezoneResolver = {
+    resolve: () => 'America/New_York',
+  };
+  const newYorkDay = organizationCalendarDayUtcRange(
+    mayDay,
+    'org-new-york',
+    newYorkResolver,
+  );
+  assert.equal(newYorkDay.start.toISOString(), '2026-05-01T04:00:00.000Z');
+  assert.equal(newYorkDay.end.toISOString(), '2026-05-02T04:00:00.000Z');
+
+  assert.deepEqual(
+    organizationWeekCalendarPeriod(new Date('2026-05-06T12:00:00.000Z')),
+    {
+      start: { year: 2026, month: 5, day: 3 },
+      end: { year: 2026, month: 5, day: 9 },
+    },
+  );
+  assert.deepEqual(
+    organizationCompletedReportingPeriod(new Date('2026-04-03T01:00:00.000Z')),
+    {
+      start: { year: 2026, month: 3, day: 27 },
+      end: { year: 2026, month: 4, day: 2 },
+    },
+  );
 });

@@ -4,6 +4,12 @@ Oasis stores and exchanges timestamps as UTC instants. Calendar-day filters,
 wall-clock inputs and customer-facing dates must resolve through `@oasis/time`
 instead of the host, browser or database timezone.
 
+Database `DATE` columns are not instants. Their inclusive calendar keys are
+encoded at UTC midnight only for Prisma transport and are kept separate from
+the `[start, end)` UTC instant ranges used to query timestamp columns. This
+prevents a London midnight during BST from being persisted as the previous
+UTC calendar date.
+
 The UK pilot resolver returns `Europe/London`. That choice exists in one
 resolver boundary so a future approved organization-timezone source can replace
 it without spreading London-specific constants through services and pages. This

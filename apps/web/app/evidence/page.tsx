@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { CarePlanningActions } from '../../components/care-planning/CarePlanningActions'
 import { Header } from '../../components/oasis/Header'
 import { query } from '../../lib/graphql/client'
+import { formatDate, formatStoredCalendarDate } from '../../lib/time'
 import {
   CARE_PLANNING_QUERY,
   CLIENTS_QUERY,
@@ -35,9 +36,14 @@ async function getEvidenceSafe(clientId: string): Promise<CarePlanningQueryRespo
   }
 }
 
-function formatDate(value?: string | null): string {
+function formatInstantDate(value?: string | null): string {
   if (!value) return 'Not set'
-  return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value))
+  return formatDate(value)
+}
+
+function formatRecordDate(value?: string | null): string {
+  if (!value) return 'Not set'
+  return formatStoredCalendarDate(value)
 }
 
 export default async function EvidencePage({ searchParams }: EvidencePageProps) {
@@ -100,7 +106,7 @@ export default async function EvidencePage({ searchParams }: EvidencePageProps) 
             </article>
             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Latest pack</p>
-              <p className="mt-2 text-xl font-black text-slate-950">{formatDate(latestPack?.generatedAt)}</p>
+              <p className="mt-2 text-xl font-black text-slate-950">{formatInstantDate(latestPack?.generatedAt)}</p>
               <p className="mt-1 text-sm text-slate-500">{latestPack ? latestPack.status : 'No evidence pack yet'}</p>
             </article>
           </section>
@@ -128,14 +134,14 @@ export default async function EvidencePage({ searchParams }: EvidencePageProps) 
               <article key={pack.id} className="rounded-xl border border-slate-200 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-semibold text-slate-900">
-                    {pack.kind} · {formatDate(pack.periodStart)} to {formatDate(pack.periodEnd)}
+                    {pack.kind} · {formatRecordDate(pack.periodStart)} to {formatRecordDate(pack.periodEnd)}
                   </p>
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
                     {pack.status}
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-slate-600">
-                  {pack.items.length} evidence items · generated {formatDate(pack.generatedAt)}
+                  {pack.items.length} evidence items · generated {formatInstantDate(pack.generatedAt)}
                 </p>
                 <div className="mt-3">
                   <Link
