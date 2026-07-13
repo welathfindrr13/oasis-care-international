@@ -28,9 +28,15 @@ jobs:
   production-migration-gate:
     name: Gate production tenant migration
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
     steps:
       - name: Checkout reviewed workflow commit
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - name: Validate production SSH secrets and approval inputs
         shell: bash
@@ -38,12 +44,13 @@ jobs:
           OASIS_PRODUCTION_VPS_HOST: ${{ secrets.OASIS_PRODUCTION_VPS_HOST }}
           OASIS_PRODUCTION_VPS_USER: ${{ secrets.OASIS_PRODUCTION_VPS_USER }}
           OASIS_PRODUCTION_VPS_SSH_KEY: ${{ secrets.OASIS_PRODUCTION_VPS_SSH_KEY }}
+          OASIS_PRODUCTION_VPS_KNOWN_HOSTS: ${{ secrets.OASIS_PRODUCTION_VPS_KNOWN_HOSTS }}
           EXPECTED_PRODUCTION_SHA: ${{ inputs.expected_production_sha }}
           PRODUCTION_MIGRATION_APPROVAL: ${{ inputs.production_migration_approval }}
           REQUIRED_APPROVAL_TOKEN: ${{ env.REQUIRED_APPROVAL_TOKEN }}
         run: |
           set -euo pipefail
-          if [ -z "$OASIS_PRODUCTION_VPS_HOST" ] || [ -z "$OASIS_PRODUCTION_VPS_USER" ] || [ -z "$OASIS_PRODUCTION_VPS_SSH_KEY" ]; then
+          if [ -z "$OASIS_PRODUCTION_VPS_HOST" ] || [ -z "$OASIS_PRODUCTION_VPS_USER" ] || [ -z "$OASIS_PRODUCTION_VPS_SSH_KEY" ] || [ -z "$OASIS_PRODUCTION_VPS_KNOWN_HOSTS" ]; then
             printf 'PRODUCTION_SSH_SECRETS_UNKNOWN\n' >&2
             exit 1
           fi
@@ -61,12 +68,14 @@ jobs:
         env:
           OASIS_PRODUCTION_VPS_HOST: ${{ secrets.OASIS_PRODUCTION_VPS_HOST }}
           OASIS_PRODUCTION_VPS_SSH_KEY: ${{ secrets.OASIS_PRODUCTION_VPS_SSH_KEY }}
+          OASIS_PRODUCTION_VPS_KNOWN_HOSTS: ${{ secrets.OASIS_PRODUCTION_VPS_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
           printf '%s\n' "$OASIS_PRODUCTION_VPS_SSH_KEY" > ~/.ssh/oasis_production_vps
           chmod 600 ~/.ssh/oasis_production_vps
-          ssh-keyscan -H "$OASIS_PRODUCTION_VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          printf '%s\n' "$OASIS_PRODUCTION_VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
       - name: Gate approved production migration
         shell: bash
@@ -194,19 +203,19 @@ jobs:
 
             cleanup_dry_run() {
               if [ -n "${remote_script_dir:-}" ]; then
-                ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" "chmod u+w '$remote_script_dir' 2>/dev/null || true; rm -rf '$remote_script_dir'" >/dev/null 2>> "$diagnostic_file" || true
+                ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" "chmod u+w '$remote_script_dir' 2>/dev/null || true; rm -rf '$remote_script_dir'" >/dev/null 2>> "$diagnostic_file" || true
               fi
               rm -f "$report_file" "$diagnostic_file"
               trap - RETURN
             }
             trap cleanup_dry_run RETURN
 
-            remote_script_dir="$(ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'mktemp -d' 2>> "$diagnostic_file")"
-            scp -i ~/.ssh/oasis_production_vps -o BatchMode=yes scripts/release/tenant-nullability-dry-run.mjs "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST:$remote_script_dir/tenant-nullability-dry-run.mjs" 2>> "$diagnostic_file"
-            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" "chmod 0444 '$remote_script_dir/tenant-nullability-dry-run.mjs'; chmod 0555 '$remote_script_dir'" 2>> "$diagnostic_file"
+            remote_script_dir="$(ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'mktemp -d' 2>> "$diagnostic_file")"
+            scp -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 scripts/release/tenant-nullability-dry-run.mjs "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST:$remote_script_dir/tenant-nullability-dry-run.mjs" 2>> "$diagnostic_file"
+            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" "chmod 0444 '$remote_script_dir/tenant-nullability-dry-run.mjs'; chmod 0555 '$remote_script_dir'" 2>> "$diagnostic_file"
 
             set +e
-            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- "$remote_script_dir" <<'REMOTE' > "$report_file" 2>> "$diagnostic_file"
+            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- "$remote_script_dir" <<'REMOTE' > "$report_file" 2>> "$diagnostic_file"
           set -euo pipefail
           remote_script_dir="$1"
           cd /opt/oasis-care
@@ -261,7 +270,7 @@ jobs:
           }
 
           run_remote_gate() {
-            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- "$EXPECTED_PRODUCTION_SHA" "$MIGRATION_PATH" "$MIGRATION_NAME" <<'REMOTE'
+            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- "$EXPECTED_PRODUCTION_SHA" "$MIGRATION_PATH" "$MIGRATION_NAME" <<'REMOTE'
           set -euo pipefail
           expected_sha="$1"
           migration_path="$2"
@@ -360,7 +369,7 @@ jobs:
             trap 'rm -f "$proof_file" "$diagnostic_file"; trap - RETURN' RETURN
 
             set +e
-            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- "$MIGRATION_NAME" <<'REMOTE' > "$proof_file" 2>> "$diagnostic_file"
+            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- "$MIGRATION_NAME" <<'REMOTE' > "$proof_file" 2>> "$diagnostic_file"
           set -euo pipefail
           MIGRATION_NAME="$1"
           cd /opt/oasis-care
@@ -556,7 +565,7 @@ jobs:
 
             printf 'MIGRATION_PRODUCTION_STARTED: %s\n' "$MIGRATION_NAME"
             set +e
-            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' <<'REMOTE' > "$result_file" 2>> "$diagnostic_file"
+            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' <<'REMOTE' > "$result_file" 2>> "$diagnostic_file"
           set -euo pipefail
           cd /opt/oasis-care
           remote_tmp="$(mktemp -d)"
@@ -599,7 +608,7 @@ jobs:
             trap 'rm -f "$status_file" "$diagnostic_file"; trap - RETURN' RETURN
 
             set +e
-            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- "$MIGRATION_NAME" <<'REMOTE' > "$status_file" 2>> "$diagnostic_file"
+            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- "$MIGRATION_NAME" <<'REMOTE' > "$status_file" 2>> "$diagnostic_file"
           set -euo pipefail
           migration_name="$1"
           cd /opt/oasis-care

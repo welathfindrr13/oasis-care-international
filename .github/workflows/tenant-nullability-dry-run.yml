@@ -14,9 +14,15 @@ jobs:
   dry-run:
     name: Run production eligible-table null tenant gate
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
     steps:
       - name: Checkout reviewed workflow commit
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - name: Validate SSH secrets
         shell: bash
@@ -24,23 +30,27 @@ jobs:
           OASIS_PRODUCTION_VPS_HOST: ${{ secrets.OASIS_PRODUCTION_VPS_HOST }}
           OASIS_PRODUCTION_VPS_USER: ${{ secrets.OASIS_PRODUCTION_VPS_USER }}
           OASIS_PRODUCTION_VPS_SSH_KEY: ${{ secrets.OASIS_PRODUCTION_VPS_SSH_KEY }}
+          OASIS_PRODUCTION_VPS_KNOWN_HOSTS: ${{ secrets.OASIS_PRODUCTION_VPS_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           test -n "$OASIS_PRODUCTION_VPS_HOST"
           test -n "$OASIS_PRODUCTION_VPS_USER"
           test -n "$OASIS_PRODUCTION_VPS_SSH_KEY"
+          test -n "$OASIS_PRODUCTION_VPS_KNOWN_HOSTS"
 
       - name: Configure SSH
         shell: bash
         env:
           OASIS_PRODUCTION_VPS_HOST: ${{ secrets.OASIS_PRODUCTION_VPS_HOST }}
           OASIS_PRODUCTION_VPS_SSH_KEY: ${{ secrets.OASIS_PRODUCTION_VPS_SSH_KEY }}
+          OASIS_PRODUCTION_VPS_KNOWN_HOSTS: ${{ secrets.OASIS_PRODUCTION_VPS_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
           printf '%s\n' "$OASIS_PRODUCTION_VPS_SSH_KEY" > ~/.ssh/oasis_production_vps
           chmod 600 ~/.ssh/oasis_production_vps
-          ssh-keyscan -H "$OASIS_PRODUCTION_VPS_HOST" >> ~/.ssh/known_hosts
+          printf '%s\n' "$OASIS_PRODUCTION_VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
       - name: Run fixed tenant nullability gate
         shell: bash
@@ -55,14 +65,14 @@ jobs:
 
           cleanup() {
             if [ -n "${remote_script_dir:-}" ]; then
-              ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" "chmod u+w '$remote_script_dir' 2>/dev/null || true; rm -rf '$remote_script_dir'" >/dev/null 2>> "$diagnostic_file" || true
+              ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" "chmod u+w '$remote_script_dir' 2>/dev/null || true; rm -rf '$remote_script_dir'" >/dev/null 2>> "$diagnostic_file" || true
             fi
             rm -f "$report_file" "$diagnostic_file"
           }
           trap cleanup EXIT
 
           test -f scripts/release/tenant-nullability-dry-run.mjs
-          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' <<'REMOTE'
+          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' <<'REMOTE'
           set -euo pipefail
           target_class="$(tr -d '\r\n' < /etc/oasis/production-deploy-target-class 2>/dev/null || true)"
           if [ "$target_class" = "production" ]; then
@@ -75,13 +85,13 @@ jobs:
             exit 1
           fi
           REMOTE
-          remote_script_dir="$(ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'mktemp -d' 2>> "$diagnostic_file")"
-          scp -i ~/.ssh/oasis_production_vps -o BatchMode=yes scripts/release/tenant-nullability-dry-run.mjs "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST:$remote_script_dir/tenant-nullability-dry-run.mjs" 2>> "$diagnostic_file"
-          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" "chmod 0444 '$remote_script_dir/tenant-nullability-dry-run.mjs'" 2>> "$diagnostic_file"
-          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" "chmod 0555 '$remote_script_dir'" 2>> "$diagnostic_file"
+          remote_script_dir="$(ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'mktemp -d' 2>> "$diagnostic_file")"
+          scp -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 scripts/release/tenant-nullability-dry-run.mjs "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST:$remote_script_dir/tenant-nullability-dry-run.mjs" 2>> "$diagnostic_file"
+          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" "chmod 0444 '$remote_script_dir/tenant-nullability-dry-run.mjs'" 2>> "$diagnostic_file"
+          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" "chmod 0555 '$remote_script_dir'" 2>> "$diagnostic_file"
 
           set +e
-          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- "$remote_script_dir" <<'REMOTE' > "$report_file" 2>> "$diagnostic_file"
+          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- "$remote_script_dir" <<'REMOTE' > "$report_file" 2>> "$diagnostic_file"
           set -euo pipefail
           remote_script_dir="$1"
           printf 'TENANT_NULLABILITY_DIAGNOSTIC: remote command started\n'

@@ -29,6 +29,26 @@ test('production tenant migration gate is manual only with required approval inp
   assert.doesNotMatch(workflow, /\bpush:/);
   assert.doesNotMatch(workflow, /\bpull_request:/);
   assert.doesNotMatch(workflow, /\bschedule:/);
+  assert.match(workflow, /if: github\.ref == 'refs\/heads\/main'/);
+  assert.match(
+    workflow,
+    /uses: actions\/checkout@v4\s*\n\s*with:\s*\n\s*ref: \$\{\{ github\.sha \}\}\s*\n\s*persist-credentials: false/,
+  );
+});
+
+test('production migration fixes SSH identity host-key and timeout policy on every remote command', () => {
+  const remoteCommandLines = workflow
+    .split('\n')
+    .filter((line) => /\b(?:ssh|scp) -i ~\/\.ssh\/oasis_production_vps/.test(line));
+
+  assert.equal(remoteCommandLines.length, 9);
+  for (const line of remoteCommandLines) {
+    assert.match(line, /-o BatchMode=yes/);
+    assert.match(line, /-o StrictHostKeyChecking=yes/);
+    assert.match(line, /-o UserKnownHostsFile=~\/\.ssh\/known_hosts/);
+    assert.match(line, /-o IdentitiesOnly=yes/);
+    assert.match(line, /-o ConnectTimeout=10/);
+  }
 });
 
 test('production tenant migration gate serializes production mutation runs', () => {
@@ -37,9 +57,14 @@ test('production tenant migration gate serializes production mutation runs', () 
 });
 
 test('production workflow uses production-specific secrets and marker only', () => {
+  assert.match(workflow, /environment:\s*\n\s*name: production/);
   assert.match(workflow, /OASIS_PRODUCTION_VPS_HOST/);
   assert.match(workflow, /OASIS_PRODUCTION_VPS_USER/);
   assert.match(workflow, /OASIS_PRODUCTION_VPS_SSH_KEY/);
+  assert.match(workflow, /OASIS_PRODUCTION_VPS_KNOWN_HOSTS/);
+  assert.match(workflow, /printf '%s\\n' "\$OASIS_PRODUCTION_VPS_KNOWN_HOSTS" > ~\/\.ssh\/known_hosts/);
+  assert.match(workflow, /chmod 600 ~\/\.ssh\/known_hosts/);
+  assert.doesNotMatch(workflow, /ssh-keyscan/);
   assert.doesNotMatch(workflow, /\bOASIS_VPS_HOST\b|\bOASIS_VPS_USER\b|\bOASIS_VPS_SSH_KEY\b/);
   assert.match(workflow, /\/etc\/oasis\/production-deploy-target-class/);
   assert.doesNotMatch(workflow, /\/etc\/oasis\/deploy-target-class/);
