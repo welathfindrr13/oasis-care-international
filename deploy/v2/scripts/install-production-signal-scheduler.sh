@@ -19,6 +19,7 @@ CONFIG_DIRECTORY=/etc/oasis
 CONFIG_FILE=$CONFIG_DIRECTORY/production-signals.env
 HEARTBEAT_FILE=/var/lib/oasis-production-signals/heartbeat.json
 BACKUP_DIRECTORY=/var/backups/oasis
+PRODUCTION_BACKUP_KEY_FILE=/etc/oasis/oasis-backup.key
 RUNTIME_ROOT=/usr/local/lib/oasis-production-signals
 VERIFIER_COMMAND=/usr/local/sbin/oasis-verify-production-signal-scheduler
 SERVICE_UNIT=oasis-production-signals.service
@@ -38,6 +39,7 @@ set -u
 [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || fail
 [[ "$OASIS_PRODUCTION_APP_URL" =~ ^https://[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]{1,5})?/?$ ]] || fail
 [[ "$BACKUP_ENCRYPTION_KEY_FILE" =~ ^/[A-Za-z0-9._/-]+$ ]] || fail
+[ "$BACKUP_ENCRYPTION_KEY_FILE" = "$PRODUCTION_BACKUP_KEY_FILE" ] || fail
 case "$BACKUP_ENCRYPTION_KEY_FILE" in
   /home/*|/root/*|/run/user/*) fail ;;
 esac

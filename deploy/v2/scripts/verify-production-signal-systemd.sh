@@ -49,9 +49,10 @@ UNIT
 cat >"$temporary_root/etc/oasis/production-signals.env" <<'ENVIRONMENT'
 TARGET_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 OASIS_PRODUCTION_APP_URL=https://care.example.org
-BACKUP_ENCRYPTION_KEY_FILE=/secure/oasis-backup.key
+BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key
 PRODUCTION_SIGNAL_HEARTBEAT_FILE=/var/lib/oasis-production-signals/heartbeat.json
 ENVIRONMENT
+printf 'ci-only-key\n' >"$temporary_root/etc/oasis/oasis-backup.key" || fail
 cat >"$temporary_root/usr/bin/node" <<'EXECUTABLE'
 #!/bin/sh
 exit 0
@@ -63,7 +64,10 @@ EXECUTABLE
 cat >"$temporary_root/usr/local/lib/oasis-production-signals/current/deploy/v2/scripts/production-signal-runner.mjs" <<'SCRIPT'
 // CI-only path placeholder for systemd-analyze.
 SCRIPT
-chmod 0600 "$temporary_root/etc/oasis/production-signals.env" || fail
+chmod 0600 \
+  "$temporary_root/etc/oasis/production-signals.env" \
+  "$temporary_root/etc/oasis/oasis-backup.key" \
+  || fail
 chmod 0755 "$temporary_root/usr/bin/node" "$temporary_root/usr/bin/true" || fail
 chmod 0400 \
   "$temporary_root/usr/local/lib/oasis-production-signals/current/deploy/v2/scripts/production-signal-runner.mjs" \

@@ -15,7 +15,8 @@ apt-get install -y git >/dev/null 2>&1 || fail
 rm -rf /opt/oasis-care /etc/oasis /usr/local/lib/oasis-production-signals
 rm -f /etc/systemd/system/oasis-production-signals.service
 rm -f /etc/systemd/system/oasis-production-signals.timer
-install -d -m 0755 /opt/oasis-care /secure /etc/systemd/system
+install -d -m 0755 /opt/oasis-care /etc/systemd/system
+install -d -m 0700 /etc/oasis
 
 while IFS= read -r source_path; do
   [ -n "$source_path" ] || fail
@@ -56,8 +57,8 @@ hostile_sha=$(/usr/bin/git rev-parse HEAD) || fail
 /usr/bin/git --no-replace-objects reset --hard "$target_sha" >/dev/null || fail
 
 printf 'test-only-env\n' >deploy/v2/.env
-printf 'test-only-key\n' >/secure/oasis-backup.key
-chmod 0600 deploy/v2/.env /secure/oasis-backup.key
+printf 'test-only-key\n' >/etc/oasis/oasis-backup.key
+chmod 0600 deploy/v2/.env /etc/oasis/oasis-backup.key
 
 cat >/usr/bin/node <<'MOCK'
 #!/bin/sh
@@ -109,7 +110,7 @@ run_install() {
   env \
     "TARGET_SHA=$target_sha" \
     OASIS_PRODUCTION_APP_URL=https://care.example.org \
-    BACKUP_ENCRYPTION_KEY_FILE=/secure/oasis-backup.key \
+    BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
     /opt/oasis-care/deploy/v2/scripts/install-production-signal-scheduler.sh
 }
 

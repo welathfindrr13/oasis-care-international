@@ -236,8 +236,9 @@ key file must remain a regular `0600` file and must never be committed:
 
 ```bash
 umask 077
-openssl rand -hex 32 > /secure/operator-path/oasis-backup.key
-chmod 600 /secure/operator-path/oasis-backup.key
+install -d -m 0700 /etc/oasis
+openssl rand -hex 32 > /etc/oasis/oasis-backup.key
+chmod 600 /etc/oasis/oasis-backup.key
 ```
 
 Create a timestamped AES-256-GCM encrypted backup. No plaintext dump is written
@@ -245,7 +246,7 @@ to disk:
 
 ```bash
 POSTGRES_USER=oasis POSTGRES_DB=oasis \
-BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
 deploy/v2/scripts/backup-postgres.sh
 ```
 
@@ -254,7 +255,7 @@ Override backup location if needed:
 ```bash
 POSTGRES_USER=oasis POSTGRES_DB=oasis \
 BACKUP_DIR=/var/backups/oasis \
-BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
 deploy/v2/scripts/backup-postgres.sh
 ```
 
@@ -270,7 +271,7 @@ Restore requires an explicit backup file and confirmation:
 
 ```bash
 PRE_RESTORE_BACKUP_CONFIRMED=true \
-BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
 deploy/v2/scripts/restore-postgres.sh /var/backups/oasis/oasis-oasis-YYYYMMDDTHHMMSSZ.dump.enc
 ```
 
@@ -289,7 +290,7 @@ PRE_RESTORE_BACKUP_CONFIRMED=true \
 NON_INTERACTIVE=true \
 POSTGRES_USER=oasis \
 POSTGRES_DB=oasis \
-BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
 deploy/v2/scripts/restore-postgres.sh /path/to/backup.dump.enc
 ```
 
@@ -298,7 +299,7 @@ new disposable Postgres container. This command authenticates the archive,
 restores it, checks required schema objects, and destroys the container:
 
 ```bash
-BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
 deploy/v2/scripts/rehearse-backup-restore.sh /retrieved/offsite/backup.dump.enc
 ```
 
@@ -363,7 +364,7 @@ Run it with the exact deployed SHA and explicit private backup key:
 ```bash
 TARGET_SHA=<lowercase-40-character-reviewed-sha> \
 OASIS_PRODUCTION_APP_URL=https://care.example.org \
-BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
 node deploy/v2/scripts/production-signals.mjs
 ```
 
@@ -412,7 +413,7 @@ execute an installer directly from the mutable deploy checkout. Then run:
 ```bash
 sudo TARGET_SHA=<exact-reviewed-main-sha> \
   OASIS_PRODUCTION_APP_URL=https://care.example.org \
-  BACKUP_ENCRYPTION_KEY_FILE=/secure/operator-path/oasis-backup.key \
+  BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
   /usr/local/sbin/oasis-install-production-signal-scheduler
 ```
 
