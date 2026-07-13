@@ -18,6 +18,7 @@ REPOSITORY=/opt/oasis-care
 CONFIG_DIRECTORY=/etc/oasis
 CONFIG_FILE=$CONFIG_DIRECTORY/production-signals.env
 HEARTBEAT_FILE=/var/lib/oasis-production-signals/heartbeat.json
+BACKUP_DIRECTORY=/var/backups/oasis
 RUNTIME_ROOT=/usr/local/lib/oasis-production-signals
 VERIFIER_COMMAND=/usr/local/sbin/oasis-verify-production-signal-scheduler
 SERVICE_UNIT=oasis-production-signals.service
@@ -175,7 +176,7 @@ temporary_timer="$(/usr/bin/mktemp "/etc/systemd/system/.$TIMER_UNIT.XXXXXXXX")"
   printf 'PRODUCTION_SIGNAL_HEARTBEAT_FILE=%s\n' "$HEARTBEAT_FILE"
   printf 'COMPOSE_FILE=%s\n' "$runtime_current/deploy/v2/docker-compose.yml"
   printf 'ENV_FILE=%s\n' "$REPOSITORY/deploy/v2/.env"
-  printf 'BACKUP_DIR=%s\n' "$REPOSITORY/deploy/v2/backups"
+  printf 'BACKUP_DIR=%s\n' "$BACKUP_DIRECTORY"
 } >"$temporary_config" || fail
 
 /usr/bin/install -m 0644 \
