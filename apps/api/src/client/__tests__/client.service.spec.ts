@@ -1,5 +1,6 @@
 import { BaseHttpException } from '../../common/errors/base-http.exception';
 import { ClientService } from '../client.service';
+import { Logger } from '@nestjs/common';
 
 describe('ClientService', () => {
   const clientRepository = {
@@ -15,6 +16,9 @@ describe('ClientService', () => {
       updateMany: jest.fn(),
       findFirst: jest.fn(),
     },
+    auditLog: {
+      create: jest.fn(),
+    },
   };
 
   const prisma = {
@@ -22,9 +26,7 @@ describe('ClientService', () => {
       findFirst: jest.fn(),
     },
     whereNotDeleted: jest.fn((value) => value),
-    auditLog: {
-      create: jest.fn(),
-    },
+    auditLog: transactionClient.auditLog,
     $transaction: jest.fn(
       async (work: (tx: typeof transactionClient) => Promise<unknown>) =>
         work(transactionClient),
@@ -35,6 +37,10 @@ describe('ClientService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.$transaction.mockImplementation(
+      async (work: (tx: typeof transactionClient) => Promise<unknown>) =>
+        work(transactionClient),
+    );
     service = new ClientService(clientRepository as any, prisma as any);
   });
 
@@ -108,6 +114,59 @@ describe('ClientService', () => {
     const auditData = prisma.auditLog.create.mock.calls[0][0].data;
     expect(auditData.new_values).toEqual({ id: 'client-1' });
     expect(JSON.stringify(auditData)).not.toContain('PRIVATE_');
+    expect(clientRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ organization_id: 'org-1' }),
+      transactionClient,
+    );
+  });
+
+  it('rejects an audited create transaction and logs only bounded error metadata when the audit row fails', async () => {
+    clientRepository.create.mockResolvedValue({
+      id: 'client-1',
+      full_name: 'PRIVATE_CLIENT_NAME',
+      address_line1: 'PRIVATE_ADDRESS',
+      address_line2: null,
+      city: 'PRIVATE_CITY',
+      postcode: 'PRIVATE_POSTCODE',
+    });
+    const failure = Object.assign(new Error('PRIVATE_DATABASE_MESSAGE'), {
+      code: 'P2002',
+      meta: { target: 'PRIVATE_DATABASE_TARGET' },
+    });
+    transactionClient.auditLog.create.mockRejectedValueOnce(failure);
+    let committed = false;
+    prisma.$transaction.mockImplementationOnce(async (work) => {
+      const result = await work(transactionClient);
+      committed = true;
+      return result;
+    });
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+
+    await expect(
+      service.createClient(
+        {
+          fullName: 'PRIVATE_CLIENT_NAME',
+          addressLine1: 'PRIVATE_ADDRESS',
+          city: 'PRIVATE_CITY',
+          postcode: 'PRIVATE_POSTCODE',
+        },
+        'user-1',
+        'org-1',
+      ),
+    ).rejects.toBe(failure);
+
+    expect(committed).toBe(false);
+    expect(clientRepository.create).toHaveBeenCalledWith(
+      expect.any(Object),
+      transactionClient,
+    );
+    expect(transactionClient.auditLog.create).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Audited client creation failed',
+      { errorName: 'Error', errorCode: 'P2002' },
+    );
+    expect(JSON.stringify(warnSpy.mock.calls)).not.toContain('PRIVATE_');
+    warnSpy.mockRestore();
   });
 
   it('stores only old and new identifiers when updating a client audit event', async () => {
@@ -143,6 +202,12 @@ describe('ClientService', () => {
     expect(auditData.old_values).toEqual({ id: 'client-1' });
     expect(auditData.new_values).toEqual({ id: 'client-1' });
     expect(JSON.stringify(auditData)).not.toContain('PRIVATE_');
+    expect(clientRepository.update).toHaveBeenCalledWith(
+      'client-1',
+      'org-1',
+      expect.any(Object),
+      transactionClient,
+    );
   });
 
   it('does not duplicate personal fields or deletion time in client deletion audit metadata', async () => {

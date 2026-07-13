@@ -67,15 +67,23 @@ export class CarebridgeRepository {
     return Boolean(client);
   }
 
-  async createCareRoom(data: Prisma.CareRoomUncheckedCreateInput) {
-    return this.prisma.careRoom.create({
+  async createCareRoom(
+    data: Prisma.CareRoomUncheckedCreateInput,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    return tx.careRoom.create({
       data,
       include: this.roomInclude(),
     });
   }
 
-  async ensurePolicyForRoom(careRoomId: string, organizationId: string, clientId: string) {
-    const existing = await this.prisma.careBridgePolicy.findFirst({
+  async ensurePolicyForRoom(
+    careRoomId: string,
+    organizationId: string,
+    clientId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const existing = await tx.careBridgePolicy.findFirst({
       where: { care_room_id: careRoomId },
     });
 
@@ -83,7 +91,7 @@ export class CarebridgeRepository {
       return existing;
     }
 
-    return this.prisma.careBridgePolicy.create({
+    return tx.careBridgePolicy.create({
       data: {
         organization_id: organizationId,
         care_room_id: careRoomId,
@@ -92,19 +100,26 @@ export class CarebridgeRepository {
     });
   }
 
-  async findPolicyByRoomId(careRoomId: string) {
-    return this.prisma.careBridgePolicy.findFirst({
+  async findPolicyByRoomId(
+    careRoomId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    return tx.careBridgePolicy.findFirst({
       where: { care_room_id: careRoomId },
     });
   }
 
-  async updatePolicy(careRoomId: string, data: Prisma.CareBridgePolicyUpdateInput) {
-    const policy = await this.findPolicyByRoomId(careRoomId);
+  async updatePolicy(
+    careRoomId: string,
+    data: Prisma.CareBridgePolicyUpdateInput,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const policy = await this.findPolicyByRoomId(careRoomId, tx);
     if (!policy) {
       throw new Error(`CareBridge policy not found for room ${careRoomId}`);
     }
 
-    return this.prisma.careBridgePolicy.update({
+    return tx.careBridgePolicy.update({
       where: { id: policy.id },
       data,
     });
@@ -179,8 +194,11 @@ export class CarebridgeRepository {
     });
   }
 
-  async createVerifiedVisitStory(data: Prisma.VerifiedVisitStoryUncheckedCreateInput) {
-    return this.prisma.verifiedVisitStory.create({ data });
+  async createVerifiedVisitStory(
+    data: Prisma.VerifiedVisitStoryUncheckedCreateInput,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    return tx.verifiedVisitStory.create({ data });
   }
 
   async listVerifiedVisitStoriesByRoomId(careRoomId: string, status?: CarebridgeContentStatus) {
@@ -241,8 +259,14 @@ export class CarebridgeRepository {
     });
   }
 
-  async publishVerifiedVisitStory(id: string, approvedTitle: string, approvedBody: string, approvedById: string) {
-    const changed = await this.prisma.verifiedVisitStory.updateMany({
+  async publishVerifiedVisitStory(
+    id: string,
+    approvedTitle: string,
+    approvedBody: string,
+    approvedById: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const changed = await tx.verifiedVisitStory.updateMany({
       where: {
         id,
         status: CarebridgeContentStatus.DRAFT,
@@ -263,11 +287,15 @@ export class CarebridgeRepository {
       },
     });
     if (changed.count !== 1) return null;
-    return this.prisma.verifiedVisitStory.findUnique({ where: { id } });
+    return tx.verifiedVisitStory.findUnique({ where: { id } });
   }
 
-  async rejectVerifiedVisitStory(id: string, rejectionReason: string) {
-    const changed = await this.prisma.verifiedVisitStory.updateMany({
+  async rejectVerifiedVisitStory(
+    id: string,
+    rejectionReason: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const changed = await tx.verifiedVisitStory.updateMany({
       where: { id, status: CarebridgeContentStatus.DRAFT },
       data: {
         status: CarebridgeContentStatus.REJECTED,
@@ -281,22 +309,31 @@ export class CarebridgeRepository {
       },
     });
     if (changed.count !== 1) return null;
-    return this.prisma.verifiedVisitStory.findUnique({ where: { id } });
+    return tx.verifiedVisitStory.findUnique({ where: { id } });
   }
 
-  async createConcern(data: Prisma.ConcernUncheckedCreateInput) {
-    return this.prisma.concern.create({
+  async createConcern(
+    data: Prisma.ConcernUncheckedCreateInput,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    return tx.concern.create({
       data,
       include: this.concernInclude(),
     });
   }
 
-  async appendConcernEvent(data: Prisma.ConcernEventUncheckedCreateInput) {
-    return this.prisma.concernEvent.create({ data });
+  async appendConcernEvent(
+    data: Prisma.ConcernEventUncheckedCreateInput,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    return tx.concernEvent.create({ data });
   }
 
-  async appendConcernMessage(data: Prisma.ConcernMessageUncheckedCreateInput) {
-    return this.prisma.concernMessage.create({ data });
+  async appendConcernMessage(
+    data: Prisma.ConcernMessageUncheckedCreateInput,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    return tx.concernMessage.create({ data });
   }
 
   async findConcernById(id: string, organizationId: string) {
@@ -320,16 +357,23 @@ export class CarebridgeRepository {
     });
   }
 
-  async updateConcern(id: string, data: Prisma.ConcernUpdateInput) {
-    return this.prisma.concern.update({
+  async updateConcern(
+    id: string,
+    data: Prisma.ConcernUpdateInput,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    return tx.concern.update({
       where: { id },
       data,
       include: this.concernInclude(),
     });
   }
 
-  async createFamilyPulse(data: Prisma.FamilyPulseUncheckedCreateInput) {
-    return this.prisma.familyPulse.create({ data });
+  async createFamilyPulse(
+    data: Prisma.FamilyPulseUncheckedCreateInput,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    return tx.familyPulse.create({ data });
   }
 
   private roomInclude() {

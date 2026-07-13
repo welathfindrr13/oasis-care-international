@@ -5,6 +5,7 @@ import {
   ConcernEventType,
   ConcernStatus,
   FamilyPulseSentiment,
+  Prisma,
   PrismaService,
 } from '@oasis/db';
 import { BaseHttpException } from '../common/errors/base-http.exception';
@@ -67,18 +68,26 @@ export class CarebridgeService {
       return this.mapCareRoom(existing);
     }
 
-    const room = await this.repository.createCareRoom({
-      organization_id: organizationId,
-      client_id: clientId,
-    });
-    await this.repository.ensurePolicyForRoom(room.id, organizationId, clientId);
-    await this.createAudit({
-      organizationId: room.organization_id,
-      actorId: actorUserId,
-      action: 'CAREBRIDGE_ROOM_CREATED',
-      resourceType: 'CareRoom',
-      resourceId: room.id,
-      newValues: { clientId },
+    const room = await this.prisma.$transaction(async (tx) => {
+      const created = await this.repository.createCareRoom({
+        organization_id: organizationId,
+        client_id: clientId,
+      }, tx);
+      await this.repository.ensurePolicyForRoom(
+        created.id,
+        organizationId,
+        clientId,
+        tx,
+      );
+      await this.createAudit(tx, {
+        organizationId: created.organization_id,
+        actorId: actorUserId,
+        action: 'CAREBRIDGE_ROOM_CREATED',
+        resourceType: 'CareRoom',
+        resourceId: created.id,
+        newValues: { clientId },
+      });
+      return created;
     });
     return this.mapCareRoom({
       ...room,
@@ -97,20 +106,23 @@ export class CarebridgeService {
       );
     }
 
-    const policy = await this.repository.updatePolicy(input.careRoomId, {
-      show_visit_times_default: input.showVisitTimesDefault ?? undefined,
-      show_task_summary_default: input.showTaskSummaryDefault ?? undefined,
-      show_medication_support_default: input.showMedicationSupportDefault ?? undefined,
-      require_approval_for_all_content: input.requireApprovalForAllContent ?? undefined,
-    });
+    const policy = await this.prisma.$transaction(async (tx) => {
+      const updated = await this.repository.updatePolicy(input.careRoomId, {
+        show_visit_times_default: input.showVisitTimesDefault ?? undefined,
+        show_task_summary_default: input.showTaskSummaryDefault ?? undefined,
+        show_medication_support_default: input.showMedicationSupportDefault ?? undefined,
+        require_approval_for_all_content: input.requireApprovalForAllContent ?? undefined,
+      }, tx);
 
-    await this.createAudit({
-      organizationId: room.organization_id,
-      actorId: actorUserId,
-      action: 'CAREBRIDGE_POLICY_UPDATED',
-      resourceType: 'CareBridgePolicy',
-      resourceId: policy.id,
-      newValues: { careRoomId: input.careRoomId },
+      await this.createAudit(tx, {
+        organizationId: room.organization_id,
+        actorId: actorUserId,
+        action: 'CAREBRIDGE_POLICY_UPDATED',
+        resourceType: 'CareBridgePolicy',
+        resourceId: updated.id,
+        newValues: { careRoomId: input.careRoomId },
+      });
+      return updated;
     });
 
     return this.mapPolicy(policy);
@@ -274,30 +286,33 @@ export class CarebridgeService {
       ...visit.tasks.map((task) => ({ type: 'VisitTask', id: task.id })),
     ];
 
-    const story = await this.repository.createVerifiedVisitStory({
-      organization_id: organizationId,
-      care_room_id: room.id,
-      client_id: visit.client_id,
-      visit_id: visit.id,
-      status: 'DRAFT' as any,
-      draft_title: draftTitle,
-      draft_body: draftBody,
-      family_safe_version: 1,
-      family_safe_title: 'Care visit update',
-      family_safe_body: familySafeBody,
-      source_refs: sourceRefs,
-    });
+    const story = await this.prisma.$transaction(async (tx) => {
+      const created = await this.repository.createVerifiedVisitStory({
+        organization_id: organizationId,
+        care_room_id: room.id,
+        client_id: visit.client_id,
+        visit_id: visit.id,
+        status: 'DRAFT' as any,
+        draft_title: draftTitle,
+        draft_body: draftBody,
+        family_safe_version: 1,
+        family_safe_title: 'Care visit update',
+        family_safe_body: familySafeBody,
+        source_refs: sourceRefs,
+      }, tx);
 
-    await this.createAudit({
-      organizationId: story.organization_id,
-      actorId: actorUserId,
-      action: 'CAREBRIDGE_VISIT_STORY_DRAFTED',
-      resourceType: 'VerifiedVisitStory',
-      resourceId: story.id,
-      newValues: {
-        visitId,
-        careRoomId: room.id,
-      },
+      await this.createAudit(tx, {
+        organizationId: created.organization_id,
+        actorId: actorUserId,
+        action: 'CAREBRIDGE_VISIT_STORY_DRAFTED',
+        resourceType: 'VerifiedVisitStory',
+        resourceId: created.id,
+        newValues: {
+          visitId,
+          careRoomId: room.id,
+        },
+      });
+      return created;
     });
 
     return this.mapStory(story);
@@ -353,28 +368,32 @@ export class CarebridgeService {
       );
     }
 
-    const published = await this.repository.publishVerifiedVisitStory(
-      storyId,
-      familySafeTitle,
-      familySafeBody,
-      approvalActorUserId,
-    );
-    if (!published) {
-      throw new BaseHttpException(
-        ErrorCode.VALIDATION_FAILED,
-        'Verified visit story state changed before publication.',
-        HttpStatus.CONFLICT,
+    const published = await this.prisma.$transaction(async (tx) => {
+      const updated = await this.repository.publishVerifiedVisitStory(
+        storyId,
+        familySafeTitle,
+        familySafeBody,
+        approvalActorUserId,
+        tx,
       );
-    }
-    await this.createAudit({
-      organizationId: story.organization_id,
-      actorId: approvalActorUserId,
-      action: 'CAREBRIDGE_VISIT_STORY_PUBLISHED',
-      resourceType: 'VerifiedVisitStory',
-      resourceId: storyId,
-      newValues: {
-        version: story.family_safe_version,
-      },
+      if (!updated) {
+        throw new BaseHttpException(
+          ErrorCode.VALIDATION_FAILED,
+          'Verified visit story state changed before publication.',
+          HttpStatus.CONFLICT,
+        );
+      }
+      await this.createAudit(tx, {
+        organizationId: story.organization_id,
+        actorId: approvalActorUserId,
+        action: 'CAREBRIDGE_VISIT_STORY_PUBLISHED',
+        resourceType: 'VerifiedVisitStory',
+        resourceId: storyId,
+        newValues: {
+          version: story.family_safe_version,
+        },
+      });
+      return updated;
     });
     return this.mapStory(published);
   }
@@ -411,21 +430,28 @@ export class CarebridgeService {
       );
     }
 
-    const rejected = await this.repository.rejectVerifiedVisitStory(storyId, reason);
-    if (!rejected) {
-      throw new BaseHttpException(
-        ErrorCode.VALIDATION_FAILED,
-        'Verified visit story state changed before rejection.',
-        HttpStatus.CONFLICT,
+    const rejected = await this.prisma.$transaction(async (tx) => {
+      const updated = await this.repository.rejectVerifiedVisitStory(
+        storyId,
+        reason,
+        tx,
       );
-    }
-    await this.createAudit({
-      organizationId: story.organization_id,
-      actorId: rejectionActorUserId,
-      action: 'CAREBRIDGE_VISIT_STORY_REJECTED',
-      resourceType: 'VerifiedVisitStory',
-      resourceId: storyId,
-      newValues: { status: 'REJECTED' },
+      if (!updated) {
+        throw new BaseHttpException(
+          ErrorCode.VALIDATION_FAILED,
+          'Verified visit story state changed before rejection.',
+          HttpStatus.CONFLICT,
+        );
+      }
+      await this.createAudit(tx, {
+        organizationId: story.organization_id,
+        actorId: rejectionActorUserId,
+        action: 'CAREBRIDGE_VISIT_STORY_REJECTED',
+        resourceType: 'VerifiedVisitStory',
+        resourceId: storyId,
+        newValues: { status: 'REJECTED' },
+      });
+      return updated;
     });
     return this.mapStory(rejected);
   }
@@ -450,11 +476,14 @@ export class CarebridgeService {
       throw this.familyRoomForbidden();
     }
 
-    return this.createConcernForRoom(
-      input,
-      viewer,
-      room,
-      familyAccess?.membership,
+    return this.prisma.$transaction((tx) =>
+      this.createConcernForRoom(
+        input,
+        viewer,
+        room,
+        tx,
+        familyAccess?.membership,
+      ),
     );
   }
 
@@ -467,6 +496,7 @@ export class CarebridgeService {
     input: RaiseConcernInput,
     viewer: ViewerContext,
     room: any,
+    tx: Prisma.TransactionClient,
     familyMembership?: any,
     familyAuditActorId?: string,
   ) {
@@ -492,14 +522,14 @@ export class CarebridgeService {
       response_due_at: new Date(now.getTime() + 4 * 60 * 60 * 1000),
       resolution_due_at: new Date(now.getTime() + 24 * 60 * 60 * 1000),
       source_refs: [{ type: 'CareRoom', id: room.id }],
-    });
+    }, tx);
 
     await this.repository.appendConcernEvent({
       concern_id: concern.id,
       event_type: ConcernEventType.RAISED,
       actor_type: this.isExternalViewer(viewer) ? 'FAMILY' as any : 'STAFF' as any,
       actor_id: viewer.userId ?? viewer.email ?? null,
-    });
+    }, tx);
 
     if (input.description) {
       if (typeof (this.repository as any).appendConcernMessage === 'function') {
@@ -509,11 +539,11 @@ export class CarebridgeService {
           actor_id: viewer.userId ?? viewer.email ?? null,
           actor_label: this.isExternalViewer(viewer) ? 'Family member' : 'Staff member',
           body: input.description,
-        });
+        }, tx);
       }
     }
 
-    await this.createAudit({
+    await this.createAudit(tx, {
       organizationId: room.organization_id,
       actorId: auditActorId,
       action: 'CAREBRIDGE_CONCERN_RAISED',
@@ -545,35 +575,42 @@ export class CarebridgeService {
       nextData.outcome = input.outcome ?? null;
     }
 
-    const updated = await this.repository.updateConcern(input.concernId, nextData);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const next = await this.repository.updateConcern(
+        input.concernId,
+        nextData,
+        tx,
+      );
 
-    if (input.message) {
-      await this.repository.appendConcernMessage({
+      if (input.message) {
+        await this.repository.appendConcernMessage({
+          concern_id: input.concernId,
+          actor_type: 'STAFF' as any,
+          actor_id: actorUserId,
+          actor_label: 'Care team',
+          body: input.message,
+        }, tx);
+      }
+
+      await this.repository.appendConcernEvent({
         concern_id: input.concernId,
+        event_type: this.mapConcernEventType(input.status),
         actor_type: 'STAFF' as any,
         actor_id: actorUserId,
-        actor_label: 'Care team',
-        body: input.message,
+        metadata: input.outcome ? { outcome: input.outcome } : undefined,
+      }, tx);
+
+      await this.createAudit(tx, {
+        organizationId: concern.organization_id,
+        actorId: actorUserId,
+        action: 'CAREBRIDGE_CONCERN_UPDATED',
+        resourceType: 'Concern',
+        resourceId: input.concernId,
+        newValues: {
+          status: input.status,
+        },
       });
-    }
-
-    await this.repository.appendConcernEvent({
-      concern_id: input.concernId,
-      event_type: this.mapConcernEventType(input.status),
-      actor_type: 'STAFF' as any,
-      actor_id: actorUserId,
-      metadata: input.outcome ? { outcome: input.outcome } : undefined,
-    });
-
-    await this.createAudit({
-      organizationId: concern.organization_id,
-      actorId: actorUserId,
-      action: 'CAREBRIDGE_CONCERN_UPDATED',
-      resourceType: 'Concern',
-      resourceId: input.concernId,
-      newValues: {
-        status: input.status,
-      },
+      return next;
     });
 
     return this.mapConcern(updated);
@@ -603,40 +640,43 @@ export class CarebridgeService {
     const { membership, room } = access;
     const familyAuditActorId = this.requireFamilyAuditActorId(viewer, membership);
 
-    const pulse = await this.repository.createFamilyPulse({
-      organization_id: room.organization_id,
-      care_room_id: room.id,
-      care_room_membership_id: membership.id,
-      sentiment: input.sentiment,
-      note: input.note ?? null,
+    return this.prisma.$transaction(async (tx) => {
+      const pulse = await this.repository.createFamilyPulse({
+        organization_id: room.organization_id,
+        care_room_id: room.id,
+        care_room_membership_id: membership.id,
+        sentiment: input.sentiment,
+        note: input.note ?? null,
+      }, tx);
+
+      await this.createAudit(tx, {
+        organizationId: pulse.organization_id,
+        actorId: familyAuditActorId,
+        action: 'CAREBRIDGE_PULSE_SUBMITTED',
+        resourceType: 'FamilyPulse',
+        resourceId: pulse.id,
+        newValues: { sentiment: input.sentiment },
+      });
+
+      if (createsConcern) {
+        await this.createConcernForRoom(
+          {
+            careRoomId: input.careRoomId,
+            title: input.sentiment === FamilyPulseSentiment.NEED_CALL ? 'Callback requested' : 'Family confidence concern',
+            description: input.note,
+            severity: 'MEDIUM' as any,
+            category: 'COMMUNICATION' as any,
+          },
+          viewer,
+          room,
+          tx,
+          membership,
+          familyAuditActorId,
+        );
+      }
+
+      return this.mapFamilyPulse(pulse);
     });
-
-    await this.createAudit({
-      organizationId: pulse.organization_id,
-      actorId: familyAuditActorId,
-      action: 'CAREBRIDGE_PULSE_SUBMITTED',
-      resourceType: 'FamilyPulse',
-      resourceId: pulse.id,
-      newValues: { sentiment: input.sentiment },
-    });
-
-    if (createsConcern) {
-      await this.createConcernForRoom(
-        {
-          careRoomId: input.careRoomId,
-          title: input.sentiment === FamilyPulseSentiment.NEED_CALL ? 'Callback requested' : 'Family confidence concern',
-          description: input.note,
-          severity: 'MEDIUM' as any,
-          category: 'COMMUNICATION' as any,
-        },
-        viewer,
-        room,
-        membership,
-        familyAuditActorId,
-      );
-    }
-
-    return this.mapFamilyPulse(pulse);
   }
 
   private assertStaffRole(role: string) {
@@ -818,7 +858,10 @@ export class CarebridgeService {
     }
   }
 
-  private async createAudit(options: CreateCarebridgeAuditOptions) {
+  private async createAudit(
+    tx: Prisma.TransactionClient,
+    options: CreateCarebridgeAuditOptions,
+  ) {
     const organizationId = (options.organizationId || '').trim();
     if (!organizationId) {
       throw new BaseHttpException(
@@ -827,7 +870,7 @@ export class CarebridgeService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-    await this.prisma.auditLog.create({
+    await tx.auditLog.create({
       data: {
         user_id: options.actorId?.trim() || null,
         organization_id: organizationId,

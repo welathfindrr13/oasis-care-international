@@ -75,13 +75,21 @@ describe('CarebridgeService', () => {
     requireFamilyScopes: jest.fn().mockResolvedValue({ id: 'membership-1' }),
   };
 
+  const transactionClient = {
+    auditLog: {
+      create: jest.fn().mockResolvedValue({ id: 'audit-1' }),
+    },
+  };
+
   const mockPrisma = {
     organization: {
       findMany: jest.fn().mockResolvedValue([]),
     },
-    auditLog: {
-      create: jest.fn().mockResolvedValue({ id: 'audit-1' }),
-    },
+    auditLog: transactionClient.auditLog,
+    $transaction: jest.fn(
+      async (work: (tx: typeof transactionClient) => Promise<unknown>) =>
+        work(transactionClient),
+    ),
   };
 
   beforeEach(async () => {
@@ -107,6 +115,11 @@ describe('CarebridgeService', () => {
     repository = module.get(CarebridgeRepository);
     accessService = module.get(CarebridgeAccessService);
     jest.clearAllMocks();
+    mockPrisma.$transaction.mockImplementation(
+      async (work: (tx: typeof transactionClient) => Promise<unknown>) =>
+        work(transactionClient),
+    );
+    mockPrisma.auditLog.create.mockResolvedValue({ id: 'audit-1' });
     mockAccessService.requireFamilyScopes.mockResolvedValue({ id: 'membership-1' });
   });
 
@@ -128,7 +141,12 @@ describe('CarebridgeService', () => {
     const result = await service.createCareRoom('client-1', 'admin-1', 'admin', 'org-1');
 
     expect(repository.ensureClientInOrganization).toHaveBeenCalledWith('client-1', 'org-1');
-    expect(repository.ensurePolicyForRoom).toHaveBeenCalledWith('room-1', 'org-1', 'client-1');
+    expect(repository.ensurePolicyForRoom).toHaveBeenCalledWith(
+      'room-1',
+      'org-1',
+      'client-1',
+      transactionClient,
+    );
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         organization_id: 'org-1',
@@ -139,6 +157,45 @@ describe('CarebridgeService', () => {
     });
     expect(result.id).toBe('room-1');
     expect(result.client?.fullName).toBe('Mary Smith');
+  });
+
+  it('rejects the CareBridge transaction so its state write cannot commit when audit persistence fails', async () => {
+    repository.ensureClientInOrganization.mockResolvedValue(true);
+    repository.createCareRoom.mockResolvedValue({
+      id: 'room-1',
+      organization_id: 'org-1',
+      client_id: 'client-1',
+      status: 'ACTIVE',
+      created_at: new Date('2026-04-21T09:00:00Z'),
+      updated_at: new Date('2026-04-21T09:00:00Z'),
+      policies: [],
+      memberships: [],
+    } as any);
+    const failure = new Error('PRIVATE_AUDIT_FAILURE');
+    mockPrisma.auditLog.create.mockRejectedValueOnce(failure);
+    let committed = false;
+    mockPrisma.$transaction.mockImplementationOnce(async (work) => {
+      const result = await work(transactionClient);
+      committed = true;
+      return result;
+    });
+
+    await expect(
+      service.createCareRoom('client-1', 'admin-1', 'admin', 'org-1'),
+    ).rejects.toBe(failure);
+
+    expect(committed).toBe(false);
+    expect(repository.createCareRoom).toHaveBeenCalledWith(
+      expect.objectContaining({ client_id: 'client-1' }),
+      transactionClient,
+    );
+    expect(repository.ensurePolicyForRoom).toHaveBeenCalledWith(
+      'room-1',
+      'org-1',
+      'client-1',
+      transactionClient,
+    );
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledTimes(1);
   });
 
   it('denies care room creation when the client is outside the organization', async () => {
@@ -536,7 +593,8 @@ describe('CarebridgeService', () => {
         family_safe_title: 'Care visit update',
         family_safe_body: 'The scheduled care visit was completed. One care task was recorded as completed. 1 care task needs follow-up.',
         source_refs: expect.arrayContaining([{ type: 'Visit', id: 'visit-1' }]),
-      })
+      }),
+      transactionClient,
     );
     expect(result.id).toBe('story-1');
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
@@ -688,6 +746,7 @@ describe('CarebridgeService', () => {
       'Care visit update',
       'A scheduled care visit update is available.',
       'admin-1',
+      transactionClient,
     );
 
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
@@ -765,7 +824,11 @@ describe('CarebridgeService', () => {
       'org-1'
     );
 
-    expect(repository.rejectVerifiedVisitStory).toHaveBeenCalledWith('story-1', 'Need clearer timeline details');
+    expect(repository.rejectVerifiedVisitStory).toHaveBeenCalledWith(
+      'story-1',
+      'Need clearer timeline details',
+      transactionClient,
+    );
     expect(result.status).toBe('REJECTED');
     expect(result.rejectionReason).toBe('Need clearer timeline details');
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
@@ -886,7 +949,8 @@ describe('CarebridgeService', () => {
         acknowledgement_due_at: expect.any(Date),
         response_due_at: expect.any(Date),
         resolution_due_at: expect.any(Date),
-      })
+      }),
+      transactionClient,
     );
     expect(repository.appendConcernEvent).toHaveBeenCalled();
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
@@ -927,6 +991,7 @@ describe('CarebridgeService', () => {
     expect(accessService.requireFamilyScopes).not.toHaveBeenCalled();
     expect(repository.createConcern).toHaveBeenCalledWith(
       expect.not.objectContaining({ raised_by_membership_id: expect.anything() }),
+      transactionClient,
     );
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -1017,9 +1082,11 @@ describe('CarebridgeService', () => {
     );
     expect(repository.createFamilyPulse).toHaveBeenCalledWith(
       expect.objectContaining({ care_room_membership_id: 'membership-1' }),
+      transactionClient,
     );
     expect(repository.createConcern).toHaveBeenCalledWith(
       expect.objectContaining({ raised_by_membership_id: 'membership-1' }),
+      transactionClient,
     );
     expect(mockPrisma.auditLog.create).toHaveBeenNthCalledWith(1, {
       data: expect.objectContaining({

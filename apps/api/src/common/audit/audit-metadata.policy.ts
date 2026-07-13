@@ -1,5 +1,5 @@
+import { HttpException } from '@nestjs/common';
 import { GraphQLError } from 'graphql';
-import { BaseHttpException } from '../errors/base-http.exception';
 
 const AUDIT_METADATA_LIMITS = {
   depth: 4,
@@ -227,15 +227,15 @@ export function extractSafeAuditErrorMetadata(
 ): Record<string, unknown> {
   const err = error as { code?: unknown; name?: unknown };
   const directCode = sanitizeAuditErrorToken(err?.code, 100);
-  const baseHttpCode =
-    !directCode && error instanceof BaseHttpException
-      ? extractBaseHttpErrorCode(error)
+  const httpExceptionCode =
+    !directCode && error instanceof HttpException
+      ? extractHttpExceptionCode(error)
       : undefined;
   const graphQlCode =
-    !directCode && !baseHttpCode && error instanceof GraphQLError
+    !directCode && !httpExceptionCode && error instanceof GraphQLError
       ? sanitizeAuditErrorToken(error.extensions?.code, 100)
       : undefined;
-  const errorCode = directCode || baseHttpCode || graphQlCode;
+  const errorCode = directCode || httpExceptionCode || graphQlCode;
 
   return {
     errorName: sanitizeAuditErrorToken(err?.name, 64) || 'Error',
@@ -255,17 +255,20 @@ export function sanitizeAuditErrorToken(
   return text;
 }
 
-function extractBaseHttpErrorCode(
-  error: BaseHttpException,
-): string | undefined {
+function extractHttpExceptionCode(error: HttpException): string | undefined {
   const response = error.getResponse();
-  if (!response || typeof response !== 'object' || Array.isArray(response)) {
-    return undefined;
+  if (response && typeof response === 'object' && !Array.isArray(response)) {
+    const responseCode = sanitizeAuditErrorToken(
+      (response as Record<string, unknown>).code,
+      100,
+    );
+    if (responseCode) return responseCode;
   }
-  return sanitizeAuditErrorToken(
-    (response as Record<string, unknown>).code,
-    100,
-  );
+
+  const status = error.getStatus();
+  return Number.isInteger(status) && status >= 100 && status <= 599
+    ? `HTTP_${Math.floor(status / 100)}XX`
+    : undefined;
 }
 
 function normalizeMetadataKey(value: string): string {

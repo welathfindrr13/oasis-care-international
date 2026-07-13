@@ -7,6 +7,7 @@ import { UpdateClientInput } from './dto/update-client.input';
 import { ClientService } from './client.service';
 import { LegacyOperationalSurface } from '../auth/legacy-operational-access';
 import { requireOperationalActor } from '../carer/carer-access.service';
+import { ManualAudit } from '../common/decorators/manual-audit.decorator';
 
 const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => SetMetadata('roles', roles);
 
@@ -39,6 +40,7 @@ export class ClientResolver {
 
   @Mutation(() => ClientDTO)
   @Roles('admin')
+  @ManualAudit()
   async createClient(@Args('input') input: CreateClientInput, @Context() ctx: any): Promise<ClientDTO> {
     // GDPR: Pass user ID for audit logging
     const userId = ctx.req?.user?.sub || ctx.req?.user?.id || 'anonymous';
@@ -48,6 +50,7 @@ export class ClientResolver {
 
   @Mutation(() => ClientDTO)
   @Roles('admin')
+  @ManualAudit()
   async updateClient(
     @Args('id') id: string,
     @Args('input') input: UpdateClientInput,
@@ -60,6 +63,7 @@ export class ClientResolver {
 
   @Mutation(() => ClientDTO)
   @Roles('admin')
+  @ManualAudit()
   async deleteClient(@Args('id') id: string, @Context() ctx: any): Promise<ClientDTO> {
     const userId = ctx.req?.user?.sub || ctx.req?.user?.id || 'anonymous';
     const organizationId = ctx.req?.user?.organizationId;

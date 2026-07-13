@@ -6,8 +6,12 @@ import { assertTenantIdForSensitiveWrite } from '../common/tenant/tenant-ownersh
 export class ClientRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findById(id: string, organizationId: string): Promise<Client | null> {
-    return this.prisma.client.findFirst({
+  async findById(
+    id: string,
+    organizationId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<Client | null> {
+    return tx.client.findFirst({
       where: this.prisma.whereNotDeleted({ id, organization_id: organizationId }),
     });
   }
@@ -35,16 +39,19 @@ export class ClientRepository {
     return { items, total };
   }
 
-  async create(data: {
-    organization_id: string;
-    full_name: string;
-    address_line1: string;
-    address_line2?: string;
-    city: string;
-    postcode: string;
-  }): Promise<Client> {
+  async create(
+    data: {
+      organization_id: string;
+      full_name: string;
+      address_line1: string;
+      address_line2?: string;
+      city: string;
+      postcode: string;
+    },
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<Client> {
     assertTenantIdForSensitiveWrite('Client', data.organization_id);
-    return this.prisma.client.create({
+    return tx.client.create({
       data,
     });
   }
@@ -58,16 +65,17 @@ export class ClientRepository {
       address_line2?: string | null;
       city: string;
       postcode: string;
-    }
+    },
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<Client> {
-    const updated = await this.prisma.client.updateMany({
+    const updated = await tx.client.updateMany({
       where: this.prisma.whereNotDeleted({ id, organization_id: organizationId }),
       data,
     });
     if (updated.count === 0) {
       throw new Error('Client not found in organization');
     }
-    return this.findById(id, organizationId) as Promise<Client>;
+    return this.findById(id, organizationId, tx) as Promise<Client>;
   }
 
   async softDelete(id: string, organizationId: string): Promise<Client> {

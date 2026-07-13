@@ -1,6 +1,6 @@
 import { AuditLogInterceptor } from '../audit-log.interceptor';
 import { GqlExecutionContext } from '@nestjs/graphql';
-import { HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { GraphQLError } from 'graphql';
 import { of, lastValueFrom, throwError } from 'rxjs';
 import { BaseHttpException } from '../../errors/base-http.exception';
@@ -733,6 +733,41 @@ describe('AuditLogInterceptor', () => {
       errorCode: 'FORBIDDEN',
     });
     expect(JSON.stringify(metadata)).not.toContain('PRIVATE_');
+  });
+
+  it('derives a stable status class from a real Nest HttpException without its message', () => {
+    const { interceptor } = createInterceptor();
+    const failure = new HttpException(
+      'PRIVATE_NEST_HTTP_MESSAGE',
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
+
+    const metadata = (interceptor as any).extractSafeErrorMetadata(failure);
+
+    expect(metadata).toEqual({
+      errorName: 'HttpException',
+      errorCode: 'HTTP_4XX',
+    });
+    expect(JSON.stringify(metadata)).not.toContain('PRIVATE_');
+  });
+
+  it('reads only a stable code from a Nest HttpException response object', () => {
+    const { interceptor } = createInterceptor();
+    const response = {
+      code: 'ACCESS_CONTEXT_UNAVAILABLE',
+      message: 'PRIVATE_NEST_RESPONSE_MESSAGE',
+    };
+    const failure = new HttpException(response, HttpStatus.SERVICE_UNAVAILABLE);
+    Object.defineProperty(response, 'message', {
+      get: () => {
+        throw new Error('PRIVATE_MESSAGE_GETTER_WAS_READ');
+      },
+    });
+
+    expect((interceptor as any).extractSafeErrorMetadata(failure)).toEqual({
+      errorName: 'HttpException',
+      errorCode: 'ACCESS_CONTEXT_UNAVAILABLE',
+    });
   });
 
   it('logs metadata only when the database audit sink is unavailable', async () => {
