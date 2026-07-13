@@ -7,14 +7,14 @@ This harness is for Oasis engineers reviewing the six pilot-critical web surface
 The covered users and contexts are:
 
 - a signed-out user opening Login;
-- a Manager reviewing Today;
+- a tenant admin reviewing Today;
 - a carer opening Today and a visit;
 - a family member opening Family;
-- a Manager reviewing family concerns.
+- a tenant admin reviewing family concerns.
 
 ## Decision and primary action
 
-The merge decision is whether all 18 surface-and-viewport combinations remain free of automated WCAG A/AA Axe violations and horizontal document overflow, remain reachable in sequential keyboard focus order, and honour reduced-motion preferences.
+The merge decision is whether all 18 surface-and-viewport combinations remain free of new or unbaselined automated WCAG A/AA Axe violations and horizontal document overflow, remain reachable in sequential keyboard focus order, and honour reduced-motion preferences.
 
 The primary action is running:
 
@@ -32,7 +32,7 @@ The harness does not change customer-facing content. It verifies the existing re
 Login
   page shell -> Oasis Care -> Welcome back -> local workspace selector -> Continue
 
-Manager Today
+Tenant admin Today
   header -> main -> Today -> summary -> needs attention -> today’s visits
 
 Carer Today
@@ -80,11 +80,11 @@ Each of the six tests runs in Playwright projects at 390×844, 768×1024 and 144
 | Surface | Stable fixture state |
 | --- | --- |
 | Login | Local test workspace selector |
-| Manager Today | Ready Manager access with no visits or exceptions |
+| Tenant admin Today | Ready tenant-admin access with no visits or exceptions |
 | Carer Today | Ready linked-carer access with no assigned visits |
 | Visit detail | Ready linked-carer access with one scheduled synthetic visit |
 | Family home | Ready linked-family access with no shared care rooms |
-| Concerns | Ready Manager access with an empty concern inbox |
+| Concerns | Ready tenant-admin access with an empty concern inbox |
 
 Loading, populated, error, offline, denied, stale-data and mutation states remain outside this foundation and should be added only with truthful fixtures for their owning workflows.
 

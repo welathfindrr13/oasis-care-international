@@ -9,10 +9,10 @@ type TestProfile = {
   role: "admin" | "carer" | "user";
 };
 
-const profiles: Record<"manager" | "carer" | "family", TestProfile> = {
-  manager: {
-    email: "manager-accessibility@local.dev",
-    name: "Accessibility Manager",
+const profiles: Record<"tenantAdmin" | "carer" | "family", TestProfile> = {
+  tenantAdmin: {
+    email: "tenant-admin-accessibility@local.dev",
+    name: "Accessibility Tenant Admin",
     role: "admin",
   },
   carer: {
@@ -172,8 +172,8 @@ test("Login", async ({ page }) => {
   });
 });
 
-test("Manager Today", async ({ page }) => {
-  await signIn(page, profiles.manager);
+test("Tenant admin Today", async ({ page }) => {
+  await signIn(page, profiles.tenantAdmin);
   await page.goto("/today");
   await expect(page).toHaveURL(/\/today$/);
   await expect(page.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
@@ -211,8 +211,8 @@ test("Family home", async ({ page }) => {
   await expectAccessibilityFoundation(page);
 });
 
-test("family concerns", async ({ page }) => {
-  await signIn(page, profiles.manager);
+test("Tenant admin family concerns", async ({ page }) => {
+  await signIn(page, profiles.tenantAdmin);
   await page.goto("/family-updates/concerns");
   await expect(page).toHaveURL(/\/family-updates\/concerns$/);
   await expect(
