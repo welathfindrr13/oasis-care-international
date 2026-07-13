@@ -2,20 +2,19 @@ import { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { Header } from '../../../components/oasis/Header'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
-import { Button } from '../../../components/ui/Button'
 import { hasRole } from '../../../lib/auth/roles'
 import { getServerAuthContext } from '../../../lib/auth/server-auth'
 
 export const metadata: Metadata = {
-  title: 'Metrics - Oasis Care Admin',
-  description: 'System metrics and performance monitoring',
+  title: 'Service monitoring - Oasis Care',
+  description: 'Observed service monitoring response',
 }
 
 async function getMetrics(): Promise<string> {
   try {
     const { accessToken } = await getServerAuthContext()
     if (!accessToken) {
-      return 'Metrics unavailable: missing access token'
+      return 'Metrics unavailable'
     }
 
     const fullApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql'
@@ -32,8 +31,8 @@ async function getMetrics(): Promise<string> {
     }
     
     return await response.text()
-  } catch (error) {
-    return `Metrics unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`
+  } catch {
+    return 'Metrics unavailable'
   }
 }
 
@@ -52,84 +51,50 @@ export default async function MetricsPage() {
         
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-text-primary font-heading mb-2">
-            System Metrics
+            Service monitoring
           </h1>
           <p className="text-text-secondary">
-            Application performance and monitoring data
+            Observed monitoring response from Oasis
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          {/* Quick Stats */}
           <Card>
             <CardHeader>
               <h3 className="text-lg font-semibold text-text-primary">
-                API Status
+                Source
               </h3>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Status:</span>
-                  <span className="text-green-600 font-medium">✅ Online</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Port:</span>
-                  <span className="text-text-primary font-mono">4000</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Environment:</span>
-                  <span className="text-text-primary">{process.env.NODE_ENV || 'unknown'}</span>
-                </div>
-              </div>
+              <p className="text-sm leading-6 text-text-secondary">
+                Monitoring data returned by this Oasis service. This page does not infer service health.
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
               <h3 className="text-lg font-semibold text-text-primary">
-                Database
+                Environment
               </h3>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Status:</span>
-                  <span className="text-green-600 font-medium">✅ Connected</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Type:</span>
-                  <span className="text-text-primary">PostgreSQL + pgvector</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Port:</span>
-                  <span className="text-text-primary font-mono">5434</span>
-                </div>
-              </div>
+              <p className="text-sm leading-6 text-text-secondary">
+                System environment: <span className="font-mono text-text-primary">{process.env.NODE_ENV || 'unknown'}</span>
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
               <h3 className="text-lg font-semibold text-text-primary">
-                Demo Mode
+                Access
               </h3>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Auth Mode:</span>
-                  <span className="text-green-600 font-medium">✅ JWT + RBAC</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Metrics Endpoint:</span>
-                  <span className="text-text-primary">/metrics</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Access:</span>
-                  <span className="text-green-600 font-medium">✅ Admin only</span>
-                </div>
-              </div>
+              <p className="text-sm leading-6 text-text-secondary">
+                This page is restricted. Reload it to request a fresh response.
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -140,15 +105,12 @@ export default async function MetricsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-text-primary font-heading">
-                  Raw Metrics Data
+                  Monitoring response
                 </h2>
                 <p className="text-sm text-text-secondary">
-                  Prometheus-style metrics from the API server
+                  Response returned by the monitoring service
                 </p>
               </div>
-              <Button variant="ghost" size="sm">
-                Refresh
-              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -158,7 +120,7 @@ export default async function MetricsPage() {
               </pre>
             </div>
 
-            {/* Info Notice */}
+            {/* Access notice */}
             <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-sm">
               <div className="flex items-start">
                 <div className="flex-shrink-0">
@@ -168,10 +130,10 @@ export default async function MetricsPage() {
                 </div>
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-blue-800">
-                    Admin Access Required
+                    Restricted access
                   </h3>
                   <div className="mt-2 text-sm text-blue-700">
-                    <p>This page shows system metrics and is typically restricted to administrators. In demo mode, some metrics may be unavailable or simulated.</p>
+                    <p>An unavailable response is shown as unavailable. Contact Oasis support if you need access. This page does not prove API or database health.</p>
                   </div>
                 </div>
               </div>

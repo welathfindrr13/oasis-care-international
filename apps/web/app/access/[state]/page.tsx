@@ -4,23 +4,23 @@ import { AccessStateActions } from "../AccessStateActions";
 const messages = {
   "no-membership": {
     title: "Access is not set up",
-    body: "Your sign-in is valid, but it is not connected to an Oasis organization yet.",
+    body: "Your sign-in worked, but it is not connected to an Oasis organisation yet. Ask your Manager to finish setting up access.",
   },
   disabled: {
     title: "Access is disabled",
-    body: "This account cannot currently open an Oasis workspace. Contact your organization administrator.",
+    body: "This account cannot currently open an Oasis workspace. Contact your Manager or Oasis support.",
   },
   pending: {
     title: "Invitation pending",
-    body: "Your invitation is waiting to be completed before organization information can be shown.",
+    body: "Finish the invitation before organisation information can be shown.",
   },
   setup: {
     title: "Setup required",
-    body: "Your sign-in is accepted. An organization administrator must finish linking the account profile before care information can be opened.",
+    body: "Your sign-in worked. A Manager must finish linking the account before care information can be opened.",
   },
   unavailable: {
     title: "Access is temporarily unavailable",
-    body: "Oasis could not safely resolve this account. Try again or contact your organization administrator.",
+    body: "Oasis could not confirm access for this account. Try again or contact your Manager or Oasis support.",
   },
 } as const;
 
@@ -45,7 +45,7 @@ export default function AccessStatePage({
         <div className="mt-7">
           <AccessStateActions />
         </div>
-        <p className="mt-5 text-xs text-slate-400">
+        <p className="mt-5 text-xs text-slate-600">
           No care information has been loaded.
         </p>
       </section>

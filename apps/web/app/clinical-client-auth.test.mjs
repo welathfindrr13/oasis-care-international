@@ -22,6 +22,16 @@ const settingsSource = readFileSync(
   new URL("settings/page.tsx", import.meta.url),
   "utf8",
 );
+const publicHomeSource = readFileSync(new URL("page.tsx", import.meta.url), "utf8");
+const loginSource = readFileSync(new URL("login/page.tsx", import.meta.url), "utf8");
+const metricsSource = readFileSync(
+  new URL("admin/metrics/page.tsx", import.meta.url),
+  "utf8",
+);
+const accessStateSource = readFileSync(
+  new URL("access/[state]/page.tsx", import.meta.url),
+  "utf8",
+);
 
 const clinicalClients = [
   "visits/new/NewVisitPageClient.tsx",
@@ -182,4 +192,47 @@ test("Carer Today and My visits use assigned-work cards instead of admin schedul
   assert.doesNotMatch(visitWorkspace, /Care note and evidence/);
   assert.match(visitWorkspace, /isAdmin &&\s*visit\?\.client/);
   assert.match(visitWorkspace, /\{isAdmin && \([\s\S]*?Open care-note records/);
+});
+
+test("public and sign-in copy avoids unsupported assurance and internal product language", () => {
+  assert.match(publicHomeSource, /Available features depend on your organisation/);
+  assert.match(publicHomeSource, /Open Manager Today/);
+  assert.match(publicHomeSource, /whitespace-nowrap rounded-full/);
+  assert.doesNotMatch(
+    publicHomeSource,
+    /care OS|operating system|command centre|source-linked evidence|raw-record exposure|medication support/i,
+  );
+
+  assert.match(loginSource, /What you can open depends on your assigned access/);
+  assert.match(loginSource, /Contact your Manager or Oasis support/);
+  assert.match(loginSource, /<main className=/);
+  assert.match(loginSource, /<footer className=/);
+  assert.doesNotMatch(
+    loginSource,
+    /GDPR Compliant|256-bit SSL|command centre|provider configuration|production auth|environment|local session|organisation administrator/i,
+  );
+  assert.doesNotMatch(loginSource, /agree to our Terms of Service/);
+  assert.match(loginSource, /We could not complete sign-in\. Try again\./);
+  assert.match(loginSource, /We could not sign you in\. Check your details and try again\./);
+  assert.match(loginSource, /Sign-in is not available right now\. Try again or contact your Manager or Oasis support\./);
+});
+
+test("metrics page reports only observed data and has no inert refresh control", () => {
+  assert.match(metricsSource, /This page does not infer service health/);
+  assert.match(metricsSource, /does not prove API or database health/);
+  assert.doesNotMatch(metricsSource, /✅ Online|✅ Connected|JWT \+ RBAC/);
+  assert.doesNotMatch(metricsSource, />\s*Refresh\s*</);
+  assert.doesNotMatch(metricsSource, /components\/ui\/Button/);
+  assert.doesNotMatch(metricsSource, /authenticated API|Runtime label|Prometheus-style|administrator|Admin Access|System Metrics|Raw Metrics Data/i);
+  assert.doesNotMatch(metricsSource, /error\.message|missing access token|Unknown error/);
+  assert.match(metricsSource, /This page is restricted/);
+  assert.match(metricsSource, /Contact Oasis support if you need access/);
+  assert.doesNotMatch(metricsSource, /Manager account is required|administrator account is required/i);
+});
+
+test("access states give calm actions without resolver jargon", () => {
+  assert.match(accessStateSource, /Manager/);
+  assert.match(accessStateSource, /No care information has been loaded/);
+  assert.match(accessStateSource, /text-slate-600/);
+  assert.doesNotMatch(accessStateSource, /safely resolve|session context|tenant|organisation administrator/i);
 });
