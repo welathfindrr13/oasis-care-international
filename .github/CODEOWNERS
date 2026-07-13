@@ -1,0 +1,5 @@
+/.github/CODEOWNERS @welathfindrr13
+/.github/workflows/secret-leak-prevention.yml @welathfindrr13
+/.github/workflows/secret-leak-prevention.test.mjs @welathfindrr13
+/scripts/security/check-secret-range.mjs @welathfindrr13
+/scripts/security/check-secret-range.test.mjs @welathfindrr13
