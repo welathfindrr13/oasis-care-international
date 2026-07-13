@@ -18,6 +18,7 @@
     "release:mobile-smoke": "node scripts/release/mobile-route-smoke.mjs",
     "release:staging:reliability": "node scripts/release/run-staging-reliability-suite.mjs",
     "release:readiness-report": "node scripts/release/generate-readiness-report.mjs",
+    "test:browser:accessibility": "node --test tests/browser/fixtures/accessibility-api.test.mjs && playwright test --config playwright.accessibility.config.ts",
     "test:browser:linked-carer": "pnpm --filter @oasis/db exec prisma generate && node scripts/test/seed-linked-carer-browser.mjs && playwright test --config playwright.linked-carer.config.ts",
     "tenant:nullability:dry-run:local": "pnpm --filter @oasis/db exec prisma generate && node scripts/release/tenant-nullability-dry-run.mjs",
     "deploy:v2:preflight": "node deploy/v2/scripts/preflight-env.mjs",

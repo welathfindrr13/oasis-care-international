@@ -2,7 +2,7 @@
 
 ## User, context and single job
 
-This harness is for Oasis engineers reviewing the six pilot-critical web surfaces before a pull request is merged. Its single job is to catch WCAG, keyboard, motion and narrow-screen regressions consistently at phone, tablet and desktop sizes.
+This harness is for Oasis engineers reviewing the six pilot-critical web surfaces before a pull request is merged. Its single job is to catch automated WCAG, bounded keyboard-traversal, motion and narrow-screen regressions consistently at phone, tablet and desktop sizes.
 
 The covered users and contexts are:
 
@@ -14,15 +14,15 @@ The covered users and contexts are:
 
 ## Decision and primary action
 
-The merge decision is whether all 18 surface-and-viewport combinations remain free of automated WCAG A/AA Axe violations and horizontal document overflow, remain reachable in sequential keyboard focus order, and honour reduced-motion preferences.
+The merge decision is whether all 18 surface-and-viewport combinations remain free of automated WCAG A/AA Axe violations and horizontal document overflow, complete a bounded sequential keyboard traversal without traps or invalid focus, and honour reduced-motion preferences.
 
 The primary action is running:
 
 ```bash
-corepack pnpm@9.13.1 exec playwright test --config playwright.accessibility.config.ts
+corepack pnpm@9.13.1 test:browser:accessibility
 ```
 
-Failures include the route, viewport project and assertion evidence. Every surface, including Login, must return zero Axe violations.
+The maintained command first runs the fixture parser tests and then the 18 browser cases. Failures include the route, viewport project and assertion evidence. Every surface, including Login, must return zero Axe violations. The same command runs in natural CI after Chromium installation, and `.github/workflows/ci.test.mjs` guards both the root script and workflow ordering against silent removal.
 
 ## Content outline and text wireframe
 
@@ -66,9 +66,9 @@ Body and heading roles remain defined by the existing global tokens. The useful 
 
 ## Reused and changed foundations
 
-The implementation reuses the repository's installed Playwright and `@axe-core/playwright` packages, local NextAuth test provider, global reduced-motion CSS and existing three responsive sizes. It adds one isolated Playwright configuration, one six-test specification and one local mock GraphQL fixture. No application component, token, route, dependency or authentication policy changes.
+The implementation reuses the repository's installed Playwright, GraphQL parser and `@axe-core/playwright` packages, local NextAuth test provider, global reduced-motion CSS and existing three responsive sizes. It adds one isolated Playwright configuration, one six-test specification, fixture parser tests and one local mock GraphQL fixture. The shared Header adds a focus-visible “Skip to main content” link and assigns the current `main` landmark a focus target without changing routes, tokens, dependencies, authentication policy or care-record behaviour.
 
-The mock API returns only explicit synthetic access snapshots and the minimum safe data needed to render each target. Unsupported GraphQL operations fail instead of receiving generic success data.
+The mock API parses each GraphQL document, requires one named query and dispatches only exact allowlisted operation names. Malformed, anonymous, multiple, mismatched, mutation and unsupported operations fail closed instead of receiving generic success data.
 
 ## Removal and scope control
 
@@ -97,13 +97,14 @@ Every case verifies:
 - zero Axe WCAG 2.0, 2.1 and 2.2 A/AA violations, with no disabled rules or excluded page regions;
 - no horizontal document overflow;
 - no positive `tabindex` values;
-- keyboard Tab reaches a visible, named focusable element within the viewport;
+- bounded, non-activating Tab traversal reaches every visible focusable element once, detects early repeats or traps, and rejects invisible, unnamed, non-focus-visible or out-of-viewport focus;
+- repeated-header surfaces expose a visible-on-focus skip link whose safe activation moves focus to the `main` landmark;
 - `prefers-reduced-motion: reduce` matches and leaves no long-running animation.
 
-The checks are deterministic and do not activate clinical or destructive controls. Focus-indicator token contrast remains covered by `apps/web/styles/tokens.test.mjs`; this browser foundation tests keyboard reachability without making a brittle computed-style claim.
+The traversal checks are deterministic and do not activate clinical or destructive controls; only the non-destructive skip link is activated in its separate bypass assertion. Focus-indicator token contrast remains covered by `apps/web/styles/tokens.test.mjs`; this browser foundation tests sequential reachability and `:focus-visible` state without claiming visual focus-indicator contrast from computed styles.
 
 ## Anti-slop critique
 
 Plan critique: a large cross-product test with repeated setup would be harder to maintain and could hide role mistakes. Three Playwright projects create the viewport cross-product while six named tests keep the care context visible. A permissive mock would make false-green tests likely, so unknown operations fail closed.
 
-Final critique: the harness is intentionally plain infrastructure. It adds no visual layer, invented statistics, gradients, decorative states or motion. The truthful-copy change gives Login semantic `main` and `footer` landmarks, removes unsupported trust claims and raises the affected secondary text to `slate-600`, so preserving the old contrast allowance would hide a regression. Its major limitation remains that synthetic local authentication does not prove Clerk rendering, production token handling, live API permissions, populated data density, assistive-technology behaviour or clinical workflow safety.
+Final critique: the harness is intentionally plain infrastructure. It adds no decorative visual layer, invented statistics, gradients, decorative states or motion. The bypass link appears only on keyboard focus and uses the existing Oasis focus treatment. This automated foundation does not prove complete WCAG 2.2 AA conformance and does not replace manual keyboard review, screen-reader or other assistive-technology testing, testing with people who have access needs, Clerk rendering, production token handling, live API permissions, populated data density or clinical workflow safety.

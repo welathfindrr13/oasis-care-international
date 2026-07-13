@@ -3,10 +3,33 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const workflow = fs.readFileSync(new URL('./ci.yml', import.meta.url), 'utf8');
+const packageJson = JSON.parse(
+  fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+);
 
 test('CI executes Prisma migrations before the linked-carer browser journey', () => {
   assert.match(workflow, /run: pnpm --filter @oasis\/db exec prisma migrate deploy/);
   assert.match(workflow, /run: pnpm test:browser:linked-carer/);
+});
+
+test('CI keeps the maintained accessibility browser command after Chromium installation', () => {
+  assert.equal(
+    packageJson.scripts['test:browser:accessibility'],
+    'node --test tests/browser/fixtures/accessibility-api.test.mjs && playwright test --config playwright.accessibility.config.ts',
+  );
+
+  const installIndex = workflow.indexOf(
+    'run: pnpm exec playwright install --with-deps chromium',
+  );
+  const accessibilityIndex = workflow.indexOf(
+    'run: pnpm test:browser:accessibility',
+  );
+  assert.notEqual(installIndex, -1);
+  assert.notEqual(accessibilityIndex, -1);
+  assert.ok(
+    accessibilityIndex > installIndex,
+    'accessibility browser checks must run after Chromium is installed',
+  );
 });
 
 test('Deployment V2 CI compose verification uses the generated env file', () => {

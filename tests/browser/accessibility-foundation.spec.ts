@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "playwright/test";
 
 const VISIT_ID = "77777777-7777-4777-8777-777777777777";
+const MAX_SEQUENTIAL_FOCUS_STEPS = 80;
 
 type TestProfile = {
   email: string;
@@ -57,7 +58,128 @@ async function signIn(page: Page, profile: TestProfile) {
     .toBe(profile.email.toLowerCase());
 }
 
-async function expectAccessibilityFoundation(page: Page) {
+async function expectSequentialKeyboardTraversal(page: Page) {
+  const focusableIds = await page.evaluate(() => {
+    const selector = [
+      "a[href]",
+      "area[href]",
+      "button",
+      "input:not([type='hidden'])",
+      "select",
+      "textarea",
+      "iframe",
+      "[contenteditable]:not([contenteditable='false'])",
+      "[tabindex]",
+    ].join(",");
+
+    return Array.from(document.querySelectorAll<HTMLElement>(selector))
+      .filter((element) => {
+        const style = getComputedStyle(element);
+        const bounds = element.getBoundingClientRect();
+        return (
+          element.tabIndex >= 0 &&
+          !element.matches(":disabled") &&
+          !element.closest("[inert], [aria-hidden='true']") &&
+          bounds.width > 0 &&
+          bounds.height > 0 &&
+          style.display !== "none" &&
+          style.visibility !== "hidden"
+        );
+      })
+      .map((element, index) => {
+        const id = `accessibility-focus-${index}`;
+        element.dataset.accessibilityFocusId = id;
+        return id;
+      });
+  });
+
+  expect(focusableIds.length).toBeGreaterThan(0);
+  expect(focusableIds.length).toBeLessThanOrEqual(MAX_SEQUENTIAL_FOCUS_STEPS);
+
+  await page.evaluate(() => {
+    document.body.tabIndex = -1;
+    document.body.focus();
+    document.body.removeAttribute("tabindex");
+    window.scrollTo(0, 0);
+  });
+
+  const visited = new Set<string>();
+  let firstFocusId: string | null = null;
+  let completedCycle = false;
+
+  for (let step = 0; step < focusableIds.length + 2; step += 1) {
+    await page.keyboard.press("Tab");
+    const focus = await page.evaluate(() => {
+      const element = document.activeElement;
+      if (!(element instanceof HTMLElement) || element === document.body) {
+        return null;
+      }
+      const style = getComputedStyle(element);
+      const bounds = element.getBoundingClientRect();
+      return {
+        id: element.dataset.accessibilityFocusId || null,
+        visible:
+          bounds.width > 0 &&
+          bounds.height > 0 &&
+          style.display !== "none" &&
+          style.visibility !== "hidden" &&
+          style.opacity !== "0" &&
+          !element.closest("[inert], [aria-hidden='true']"),
+        focusVisible: element.matches(":focus-visible"),
+        withinViewport:
+          bounds.left >= 0 &&
+          bounds.top >= 0 &&
+          bounds.right <= window.innerWidth &&
+          bounds.bottom <= window.innerHeight,
+      };
+    });
+
+    if (!focus) continue;
+    expect(focus.id).not.toBeNull();
+
+    if (visited.has(focus.id as string)) {
+      expect(focus.id).toBe(firstFocusId);
+      completedCycle = true;
+      break;
+    }
+
+    if (!firstFocusId) firstFocusId = focus.id;
+    visited.add(focus.id as string);
+    expect(focus.visible).toBe(true);
+    expect(focus.focusVisible).toBe(true);
+    expect(focus.withinViewport).toBe(true);
+    await expect(page.locator(":focus")).toHaveAccessibleName(/\S/);
+  }
+
+  expect(visited.size).toBe(focusableIds.length);
+  expect(completedCycle || visited.size === focusableIds.length).toBe(true);
+
+  await page.evaluate(() => {
+    document
+      .querySelectorAll("[data-accessibility-focus-id]")
+      .forEach((element) => element.removeAttribute("data-accessibility-focus-id"));
+  });
+}
+
+async function expectMainContentBypass(page: Page) {
+  const skipLink = page.getByRole("link", { name: "Skip to main content" });
+  await page.evaluate(() => {
+    document.body.tabIndex = -1;
+    document.body.focus();
+    document.body.removeAttribute("tabindex");
+    window.scrollTo(0, 0);
+  });
+  await page.keyboard.press("Tab");
+  await expect(skipLink).toBeFocused();
+  await expect(skipLink).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("main#main-content")).toBeFocused();
+}
+
+async function expectAccessibilityFoundation(
+  page: Page,
+  options: { repeatedHeader?: boolean } = {},
+) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(page.locator("main")).toBeVisible();
   await expect(page.locator("h1:visible")).toHaveCount(1);
@@ -77,45 +199,8 @@ async function expectAccessibilityFoundation(page: Page) {
     );
   expect(positiveTabIndexes).toEqual([]);
 
-  await page.evaluate(() => {
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-  });
-  await page.keyboard.press("Tab");
-  const keyboardFocus = await page.evaluate(() => {
-    const element = document.activeElement;
-    if (!(element instanceof HTMLElement) || element === document.body) {
-      return null;
-    }
-    const style = getComputedStyle(element);
-    const bounds = element.getBoundingClientRect();
-    const accessibleName =
-      element.getAttribute("aria-label")?.trim() ||
-      element.textContent?.trim() ||
-      element.getAttribute("name")?.trim() ||
-      element.getAttribute("title")?.trim() ||
-      "";
-    return {
-      visible:
-        bounds.width > 0 &&
-        bounds.height > 0 &&
-        style.visibility !== "hidden" &&
-        style.display !== "none",
-      focusVisible: element.matches(":focus-visible"),
-      accessibleName,
-      withinViewport:
-        bounds.right > 0 &&
-        bounds.left < window.innerWidth &&
-        bounds.bottom > 0 &&
-        bounds.top < window.innerHeight,
-    };
-  });
-  expect(keyboardFocus).not.toBeNull();
-  expect(keyboardFocus?.visible).toBe(true);
-  expect(keyboardFocus?.focusVisible).toBe(true);
-  expect(keyboardFocus?.withinViewport).toBe(true);
-  expect(keyboardFocus?.accessibleName).not.toBe("");
+  await expectSequentialKeyboardTraversal(page);
+  if (options.repeatedHeader) await expectMainContentBypass(page);
 
   const motion = await page.evaluate(() => ({
     reduce: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -158,7 +243,7 @@ test("Tenant admin Today", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Needs attention" })).toBeVisible();
   await expect(page.getByText("No visits scheduled today")).toBeVisible();
-  await expectAccessibilityFoundation(page);
+  await expectAccessibilityFoundation(page, { repeatedHeader: true });
 });
 
 test("Carer Today", async ({ page }) => {
@@ -167,7 +252,7 @@ test("Carer Today", async ({ page }) => {
   await expect(page).toHaveURL(/\/today$/);
   await expect(page.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "No visits assigned today" })).toBeVisible();
-  await expectAccessibilityFoundation(page);
+  await expectAccessibilityFoundation(page, { repeatedHeader: true });
 });
 
 test("visit detail", async ({ page }) => {
@@ -176,7 +261,7 @@ test("visit detail", async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/visits/${VISIT_ID}$`));
   await expect(page.getByRole("heading", { name: "Jordan Ellis" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Visit details" })).toBeVisible();
-  await expectAccessibilityFoundation(page);
+  await expectAccessibilityFoundation(page, { repeatedHeader: true });
 });
 
 test("Family home", async ({ page }) => {
@@ -187,7 +272,7 @@ test("Family home", async ({ page }) => {
     page.getByRole("heading", { name: "Stay up to date with their care" }),
   ).toBeVisible();
   await expect(page.getByText("You do not have access to anyone’s updates yet.")).toBeVisible();
-  await expectAccessibilityFoundation(page);
+  await expectAccessibilityFoundation(page, { repeatedHeader: true });
 });
 
 test("Tenant admin family concerns", async ({ page }) => {
@@ -200,5 +285,5 @@ test("Tenant admin family concerns", async ({ page }) => {
     }),
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "No concerns in this view" })).toBeVisible();
-  await expectAccessibilityFoundation(page);
+  await expectAccessibilityFoundation(page, { repeatedHeader: true });
 });

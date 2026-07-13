@@ -1,4 +1,11 @@
 import http from "node:http";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
+
+const requireFromApiWorkspace = createRequire(
+  new URL("../../../apps/api/package.json", import.meta.url),
+);
+const { Kind, parse } = requireFromApiWorkspace("graphql");
 
 const port = Number(process.env.ACCESSIBILITY_FIXTURE_API_PORT || 4014);
 const visitId = "77777777-7777-4777-8777-777777777777";
@@ -91,15 +98,15 @@ function accessSnapshot(request) {
   };
 }
 
-function graphqlData(query, request) {
-  if (query.includes("ViewerAccessSnapshot")) {
-    return { viewerAccessSnapshot: accessSnapshot(request) };
-  }
-  if (query.includes("query Visits(")) {
-    return { visits: { items: [], total: 0 } };
-  }
-  if (query.includes("query ShiftAnalytics")) {
-    return {
+const operationHandlers = new Map([
+  [
+    "ViewerAccessSnapshot",
+    (request) => ({ viewerAccessSnapshot: accessSnapshot(request) }),
+  ],
+  ["Visits", () => ({ visits: { items: [], total: 0 } })],
+  [
+    "ShiftAnalytics",
+    () => ({
       shiftAnalytics: {
         activeCarersNow: 0,
         openShiftCount: 0,
@@ -109,16 +116,13 @@ function graphqlData(query, request) {
         clockInMethods: { gps: 0, qr: 0, nfc: 0, phone: 0, manual: 0 },
         clockOutMethods: { gps: 0, qr: 0, nfc: 0, phone: 0, manual: 0 },
       },
-    };
-  }
-  if (query.includes("query CarerAccessLifecycle")) {
-    return { carerAccessLifecycle: [] };
-  }
-  if (query.includes("query MyActiveShift")) {
-    return { myActiveShift: null };
-  }
-  if (query.includes("query Visit(")) {
-    return {
+    }),
+  ],
+  ["CarerAccessLifecycle", () => ({ carerAccessLifecycle: [] })],
+  ["MyActiveShift", () => ({ myActiveShift: null })],
+  [
+    "Visit",
+    () => ({
       visit: {
         id: visitId,
         clientId: "person-accessibility-fixture",
@@ -155,24 +159,56 @@ function graphqlData(query, request) {
           },
         ],
       },
-    };
+    }),
+  ],
+  ["CareLogs", () => ({ careLogs: { total: 0, items: [] } })],
+  ["DueMeds", () => ({ listDueMeds: [] })],
+  ["FamilyCareRooms", () => ({ familyCareRooms: [] })],
+  [
+    "FamilyVerifiedVisitStories",
+    () => ({ familyVerifiedVisitStories: [] }),
+  ],
+  ["CarebridgeConcernInbox", () => ({ carebridgeConcernInbox: [] })],
+]);
+
+export function parseAllowedOperation(payload) {
+  if (!payload || typeof payload !== "object" || typeof payload.query !== "string") {
+    throw new Error("GraphQL request must include a query string");
   }
-  if (query.includes("query CareLogs(")) {
-    return { careLogs: { total: 0, items: [] } };
+
+  let document;
+  try {
+    document = parse(payload.query);
+  } catch {
+    throw new Error("GraphQL request could not be parsed");
   }
-  if (query.includes("query DueMeds(")) {
-    return { listDueMeds: [] };
+
+  const operations = document.definitions.filter(
+    (definition) => definition.kind === Kind.OPERATION_DEFINITION,
+  );
+  if (operations.length !== 1) {
+    throw new Error("GraphQL request must contain exactly one operation");
   }
-  if (query.includes("query FamilyCareRooms")) {
-    return { familyCareRooms: [] };
+
+  const [operation] = operations;
+  const operationName = operation.name?.value;
+  if (operation.operation !== "query" || !operationName) {
+    throw new Error("GraphQL request must contain one named query");
   }
-  if (query.includes("query FamilyVerifiedVisitStories")) {
-    return { familyVerifiedVisitStories: [] };
+  if (payload.operationName && payload.operationName !== operationName) {
+    throw new Error("GraphQL operationName does not match the parsed query");
   }
-  if (query.includes("query CarebridgeConcernInbox")) {
-    return { carebridgeConcernInbox: [] };
+  if (!operationHandlers.has(operationName)) {
+    throw new Error(
+      `Unsupported accessibility fixture operation: ${operationName}`,
+    );
   }
-  return null;
+  return operationName;
+}
+
+export function graphqlData(payload, request) {
+  const operationName = parseAllowedOperation(payload);
+  return operationHandlers.get(operationName)(request);
 }
 
 function sendJson(response, status, body) {
@@ -206,12 +242,19 @@ const server = http.createServer((request, response) => {
       sendJson(response, 400, { errors: [{ message: "Invalid JSON" }] });
       return;
     }
-    const query = String(payload.query || "");
-    const data = graphqlData(query, request);
-    if (!data) {
-      const operation = query.match(/(?:query|mutation)\s+(\w+)/)?.[1] || "unknown";
+    let data;
+    try {
+      data = graphqlData(payload, request);
+    } catch (error) {
       sendJson(response, 400, {
-        errors: [{ message: `Unsupported accessibility fixture operation: ${operation}` }],
+        errors: [
+          {
+            message:
+              error instanceof Error
+                ? error.message
+                : "Unsupported accessibility fixture operation",
+          },
+        ],
       });
       return;
     }
@@ -219,10 +262,12 @@ const server = http.createServer((request, response) => {
   });
 });
 
-server.listen(port, "127.0.0.1", () => {
-  process.stdout.write(`Accessibility fixture API listening on ${port}\n`);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  server.listen(port, "127.0.0.1", () => {
+    process.stdout.write(`Accessibility fixture API listening on ${port}\n`);
+  });
 
-for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.on(signal, () => server.close(() => process.exit(0)));
+  for (const signal of ["SIGINT", "SIGTERM"]) {
+    process.on(signal, () => server.close(() => process.exit(0)));
+  }
 }
