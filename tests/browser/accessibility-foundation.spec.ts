@@ -57,17 +57,9 @@ async function signIn(page: Page, profile: TestProfile) {
     .toBe(profile.email.toLowerCase());
 }
 
-async function expectAccessibilityFoundation(
-  page: Page,
-  {
-    expectMain = true,
-    axeBaseline = [],
-  }: { expectMain?: boolean; axeBaseline?: Array<{ id: string; targets: string[] }> } = {},
-) {
+async function expectAccessibilityFoundation(page: Page) {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  if (expectMain) {
-    await expect(page.locator("main")).toBeVisible();
-  }
+  await expect(page.locator("main")).toBeVisible();
   await expect(page.locator("h1:visible")).toHaveCount(1);
 
   const overflow = await page.evaluate(() => ({
@@ -148,28 +140,15 @@ async function expectAccessibilityFoundation(
     id: violation.id,
     targets: violation.nodes.map((node) => node.target.join(" ")).sort(),
   }));
-  expect(normalizedViolations).toEqual(axeBaseline);
+  expect(normalizedViolations).toEqual([]);
 }
 
 test("Login", async ({ page }) => {
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
   await expect(page.getByLabel("Workspace")).toBeVisible();
-  await expectAccessibilityFoundation(page, {
-    expectMain: false,
-    axeBaseline: [
-      {
-        id: "color-contrast",
-        targets: [
-          ".gap-2.items-center.flex:nth-child(1) > span",
-          ".gap-2.items-center.flex:nth-child(2) > span",
-          ".mt-8",
-          ".py-6 > p",
-          ".uppercase",
-        ],
-      },
-    ],
-  });
+  await expect(page.getByRole("contentinfo")).toBeVisible();
+  await expectAccessibilityFoundation(page);
 });
 
 test("Tenant admin Today", async ({ page }) => {

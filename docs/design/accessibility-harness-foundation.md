@@ -14,7 +14,7 @@ The covered users and contexts are:
 
 ## Decision and primary action
 
-The merge decision is whether all 18 surface-and-viewport combinations remain free of new or unbaselined automated WCAG A/AA Axe violations and horizontal document overflow, remain reachable in sequential keyboard focus order, and honour reduced-motion preferences.
+The merge decision is whether all 18 surface-and-viewport combinations remain free of automated WCAG A/AA Axe violations and horizontal document overflow, remain reachable in sequential keyboard focus order, and honour reduced-motion preferences.
 
 The primary action is running:
 
@@ -22,7 +22,7 @@ The primary action is running:
 corepack pnpm@9.13.1 exec playwright test --config playwright.accessibility.config.ts
 ```
 
-Failures include the route, viewport project and assertion evidence. Login carries one exact five-target colour-contrast baseline from the requested base commit; new rules, nodes or changed targets still fail. The baseline must be removed when the truthful-copy correction is integrated.
+Failures include the route, viewport project and assertion evidence. Every surface, including Login, must return zero Axe violations.
 
 ## Content outline and text wireframe
 
@@ -30,7 +30,8 @@ The harness does not change customer-facing content. It verifies the existing re
 
 ```text
 Login
-  page shell -> Oasis Care -> Welcome back -> local workspace selector -> Continue
+  main -> Oasis Care -> Welcome back -> local workspace selector -> Continue -> help
+  content info -> copyright
 
 Tenant admin Today
   header -> main -> Today -> summary -> needs attention -> today’s visits
@@ -92,8 +93,8 @@ Loading, populated, error, offline, denied, stale-data and mutation states remai
 
 Every case verifies:
 
-- one visible `h1`, plus a visible `main` landmark on the five authenticated surfaces;
-- Axe WCAG 2.0, 2.1 and 2.2 A/AA results with no disabled rules or excluded page regions, matched against the exact documented Login baseline and zero violations elsewhere;
+- one visible `h1` and one visible `main` landmark on every surface, plus a visible content-information footer on Login;
+- zero Axe WCAG 2.0, 2.1 and 2.2 A/AA violations, with no disabled rules or excluded page regions;
 - no horizontal document overflow;
 - no positive `tabindex` values;
 - keyboard Tab reaches a visible, named focusable element within the viewport;
@@ -105,4 +106,4 @@ The checks are deterministic and do not activate clinical or destructive control
 
 Plan critique: a large cross-product test with repeated setup would be harder to maintain and could hide role mistakes. Three Playwright projects create the viewport cross-product while six named tests keep the care context visible. A permissive mock would make false-green tests likely, so unknown operations fail closed.
 
-Final critique: the harness is intentionally plain infrastructure. It adds no visual layer, invented statistics, gradients, decorative states or motion. Login in the exact base commit has no `main` landmark and has five known `slate-400` contrast failures; the harness records those exact debts rather than changing the page from a test-only branch. The baseline is deliberately narrow, so any added violation still fails, and should be deleted as soon as the truthful-copy correction lands. Its other major limitation is that synthetic local authentication does not prove Clerk rendering, production token handling, live API permissions, populated data density, assistive-technology behaviour or clinical workflow safety.
+Final critique: the harness is intentionally plain infrastructure. It adds no visual layer, invented statistics, gradients, decorative states or motion. The truthful-copy change gives Login semantic `main` and `footer` landmarks, removes unsupported trust claims and raises the affected secondary text to `slate-600`, so preserving the old contrast allowance would hide a regression. Its major limitation remains that synthetic local authentication does not prove Clerk rendering, production token handling, live API permissions, populated data density, assistive-technology behaviour or clinical workflow safety.
