@@ -76,12 +76,14 @@ test("production backup proof pins reviewed helpers to the dispatched main commi
   assert.match(workflow, /PRODUCTION_BACKUP_REVIEWED_HELPER_INVALID/);
 });
 
-test("production backup proof requires canonical live SHA and exact per-SHA approval", () => {
+test("production backup proof binds approval to canonical live and proof SHAs", () => {
   assert.match(workflow, /\^\[0-9a-f\]\{40\}\$/);
+  assert.match(workflow, /PROOF_COMMIT_SHA: \$\{\{ github\.sha \}\}/);
   assert.match(
     workflow,
-    /APPROVE_PRODUCTION_BACKUP_RESTORE_PROOF_\$\{EXPECTED_PRODUCTION_SHA\}/,
+    /APPROVE_PRODUCTION_BACKUP_RESTORE_PROOF_\$\{EXPECTED_PRODUCTION_SHA\}_WITH_\$\{PROOF_COMMIT_SHA\}/,
   );
+  assert.match(workflow, /PRODUCTION_BACKUP_APPROVAL_BINDS_LIVE_AND_PROOF_SHA/);
   assert.match(workflow, /PRODUCTION_BACKUP_APPROVAL_MISMATCH/);
   assert.match(workflow, /PRODUCTION_BACKUP_INPUTS_INVALID/);
 });

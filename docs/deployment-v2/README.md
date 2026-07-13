@@ -315,11 +315,12 @@ CI also creates a synthetic migrated database and exercises this complete backup
 restore, query, and destruction path against real PostgreSQL and Docker.
 
 For the controlled production gate, use the protected `Production Backup Restore
-Proof` workflow. It requires the exact currently deployed production SHA and the
-per-SHA approval token
-`APPROVE_PRODUCTION_BACKUP_RESTORE_PROOF_<sha>`. The workflow serializes with
-other production mutations, verifies the production marker, live repository SHA,
-repository cleanliness, and healthy Postgres before creating an archive.
+Proof` workflow. It requires the exact currently deployed production SHA and an
+approval token binding that live SHA to the exact reviewed workflow/helper commit:
+`APPROVE_PRODUCTION_BACKUP_RESTORE_PROOF_<live-sha>_WITH_<proof-commit-sha>`.
+The workflow serializes with other production mutations, verifies the production
+marker, live repository SHA, repository cleanliness, and healthy Postgres before
+creating an archive.
 
 The workflow transfers only reviewed backup helpers, verifies their SHA-256
 manifest on the server, and creates or reuses a private root-owned encryption key.

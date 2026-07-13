@@ -47,6 +47,7 @@ jobs:
           OASIS_PRODUCTION_VPS_SSH_KEY: ${{ secrets.OASIS_PRODUCTION_VPS_SSH_KEY }}
           OASIS_PRODUCTION_VPS_KNOWN_HOSTS: ${{ secrets.OASIS_PRODUCTION_VPS_KNOWN_HOSTS }}
           EXPECTED_PRODUCTION_SHA: ${{ inputs.expected_production_sha }}
+          PROOF_COMMIT_SHA: ${{ github.sha }}
           PRODUCTION_BACKUP_APPROVAL: ${{ inputs.production_backup_approval }}
         run: |
           set -euo pipefail
@@ -54,11 +55,16 @@ jobs:
             printf 'PRODUCTION_BACKUP_INPUTS_INVALID\n' >&2
             exit 1
           }
-          required_approval="APPROVE_PRODUCTION_BACKUP_RESTORE_PROOF_${EXPECTED_PRODUCTION_SHA}"
+          [[ "$PROOF_COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            printf 'PRODUCTION_BACKUP_INPUTS_INVALID\n' >&2
+            exit 1
+          }
+          required_approval="APPROVE_PRODUCTION_BACKUP_RESTORE_PROOF_${EXPECTED_PRODUCTION_SHA}_WITH_${PROOF_COMMIT_SHA}"
           [ "$PRODUCTION_BACKUP_APPROVAL" = "$required_approval" ] || {
             printf 'PRODUCTION_BACKUP_APPROVAL_MISMATCH\n' >&2
             exit 1
           }
+          printf 'PRODUCTION_BACKUP_APPROVAL_BINDS_LIVE_AND_PROOF_SHA\n'
           if [ -z "$OASIS_PRODUCTION_VPS_HOST" ] || [ -z "$OASIS_PRODUCTION_VPS_USER" ] || [ -z "$OASIS_PRODUCTION_VPS_SSH_KEY" ] || [ -z "$OASIS_PRODUCTION_VPS_KNOWN_HOSTS" ]; then
             printf 'PRODUCTION_BACKUP_TRANSPORT_UNKNOWN\n' >&2
             exit 1
