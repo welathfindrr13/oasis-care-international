@@ -7,10 +7,13 @@ RUN corepack enable && corepack prepare pnpm@9.13.1 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY turbo.json ./
 COPY apps/web/package.json ./apps/web/
+COPY libs/time/package.json ./libs/time/
 
 RUN pnpm install --frozen-lockfile
 
 COPY . .
+
+RUN cd libs/time && pnpm build
 
 ARG NEXT_PUBLIC_API_URL=https://app.oasis-care.local/api/graphql
 ARG NEXT_PUBLIC_SITE_URL=https://app.oasis-care.local
@@ -58,6 +61,11 @@ COPY --from=build /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=build /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/web ./apps/web
+COPY --from=build /app/libs/time/package.json ./libs/time/package.json
+COPY --from=build /app/libs/time/dist ./libs/time/dist
+
+RUN sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|g' ./libs/time/package.json && \
+    cd apps/web && node -e "require('@oasis/time')"
 
 EXPOSE 3000
 

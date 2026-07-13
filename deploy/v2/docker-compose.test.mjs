@@ -93,6 +93,15 @@ test('api production image packages every compiled Oasis workspace dependency', 
   assert.match(apiDockerfile, /RUN node -e "require\('@oasis\/time'\)"/);
 });
 
+test('web production image packages the compiled time workspace dependency', () => {
+  assert.match(webDockerfile, /COPY libs\/time\/package\.json \.\/libs\/time\//);
+  assert.match(webDockerfile, /RUN cd libs\/time && pnpm build/);
+  assert.match(webDockerfile, /COPY --from=build \/app\/libs\/time\/package\.json \.\/libs\/time\/package\.json/);
+  assert.match(webDockerfile, /COPY --from=build \/app\/libs\/time\/dist \.\/libs\/time\/dist/);
+  assert.match(webDockerfile, /sed -i[^\n]*libs\/time\/package\.json/);
+  assert.match(webDockerfile, /cd apps\/web && node -e "require\('@oasis\/time'\)"/);
+});
+
 test('api service does not inject a default Clerk audience', () => {
   const apiBlock = serviceBlock('api');
 
