@@ -225,6 +225,14 @@ test("production archive capacity and retention are bounded", () => {
   assert.match(workflow, /database_bytes \* 2 \+ 1073741824/);
   assert.match(workflow, /oasis-production-latest\.dump\.enc/);
   assert.match(workflow, /oasis-production-previous\.dump\.enc/);
+  assert.match(
+    workflow,
+    /remote_backup_file="\/var\/backups\/oasis\/\.proof-staging\/oasis-proof-/,
+  );
+  assert.match(
+    workflow,
+    /ensure_private_directory \/var\/backups\/oasis\/\.proof-staging/,
+  );
   assert.match(workflow, /backup_promoted=true/);
   assert.match(workflow, /PRODUCTION_BACKUP_CAPACITY_INSUFFICIENT/);
 });
@@ -412,7 +420,11 @@ printf '%064d  %s\\n' 0 "\${1:-synthetic}"
     .replaceAll("/var/backups/oasis", backups);
   const keyFile = path.join(etc, "oasis-backup.key");
   const retrievalFile = path.join(backups, "oasis-production-latest.dump.enc");
-  const backupFile = path.join(backups, "oasis-proof-12345-1.dump.enc");
+  const backupFile = path.join(
+    backups,
+    ".proof-staging",
+    "oasis-proof-12345-1.dump.enc",
+  );
   const success = spawnSync(
     "/bin/bash",
     [
@@ -464,7 +476,11 @@ printf '%064d  %s\\n' 0 "\${1:-synthetic}"
   assert.notEqual(wrongStorageOwner.status, 0);
   assert.match(wrongStorageOwner.stderr, /PRODUCTION_BACKUP_STORAGE_INVALID/);
 
-  const mismatchFile = path.join(backups, "oasis-proof-12345-2.dump.enc");
+  const mismatchFile = path.join(
+    backups,
+    ".proof-staging",
+    "oasis-proof-12345-2.dump.enc",
+  );
   const mismatch = spawnSync(
     "/bin/bash",
     [
@@ -528,7 +544,7 @@ case "$*" in
       DISPOSABLE_RESTORE_DESTROYED \\
       PRODUCTION_BACKUP_RETENTION_READY
     ;;
-  *"/tmp/oasis-backup-proof.Ab12Cd34 /var/backups/oasis/oasis-proof-"*)
+  *"/tmp/oasis-backup-proof.Ab12Cd34 /var/backups/oasis/.proof-staging/oasis-proof-"*)
     printf 'CLEANUP\\n' >> "$CLEANUP_LOG"
     ;;
 esac

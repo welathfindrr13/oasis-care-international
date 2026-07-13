@@ -126,7 +126,7 @@ jobs:
           local_manifest="$private_dir/retrieval.sha256"
           helper_manifest="$private_dir/reviewed-helpers.sha256"
           remote_helper_dir=""
-          remote_backup_file="/var/backups/oasis/oasis-proof-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.dump.enc"
+          remote_backup_file="/var/backups/oasis/.proof-staging/oasis-proof-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.dump.enc"
           remote_retrieval_file="/var/backups/oasis/oasis-production-latest.dump.enc"
           remote_key_file="/etc/oasis/oasis-backup.key"
 
@@ -141,7 +141,7 @@ jobs:
           helper_dir="$1"
           backup_file="$2"
           [[ "$helper_dir" =~ ^/tmp/oasis-backup-proof\.[A-Za-z0-9]{8}$ ]] || exit 1
-          [[ "$backup_file" =~ ^/var/backups/oasis/oasis-proof-[0-9]+-[0-9]+\.dump\.enc$ ]] || exit 1
+          [[ "$backup_file" =~ ^/var/backups/oasis/\.proof-staging/oasis-proof-[0-9]+-[0-9]+\.dump\.enc$ ]] || exit 1
           rm -rf -- "$helper_dir"
           rm -f -- "$backup_file"
           REMOTE_CLEANUP
@@ -202,7 +202,7 @@ jobs:
 
           [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] || fail PRODUCTION_BACKUP_INPUTS_INVALID
           [[ "$helper_dir" =~ ^/tmp/oasis-backup-proof\.[A-Za-z0-9]{8}$ ]] || fail PRODUCTION_BACKUP_REMOTE_STATE_INVALID
-          [[ "$backup_file" =~ ^/var/backups/oasis/oasis-proof-[0-9]+-[0-9]+\.dump\.enc$ ]] || fail PRODUCTION_BACKUP_REMOTE_STATE_INVALID
+          [[ "$backup_file" =~ ^/var/backups/oasis/\.proof-staging/oasis-proof-[0-9]+-[0-9]+\.dump\.enc$ ]] || fail PRODUCTION_BACKUP_REMOTE_STATE_INVALID
           [ "$key_file" = /etc/oasis/oasis-backup.key ] || fail PRODUCTION_BACKUP_REMOTE_STATE_INVALID
           [ "$retrieval_file" = /var/backups/oasis/oasis-production-latest.dump.enc ] || fail PRODUCTION_BACKUP_REMOTE_STATE_INVALID
           [ "$(id -u)" = 0 ] || fail PRODUCTION_BACKUP_ROOT_REQUIRED
@@ -251,6 +251,7 @@ jobs:
           }
           ensure_private_directory /etc/oasis
           ensure_private_directory /var/backups/oasis
+          ensure_private_directory /var/backups/oasis/.proof-staging
           temporary_key=""
           backup_output=""
           backup_diagnostic=""
