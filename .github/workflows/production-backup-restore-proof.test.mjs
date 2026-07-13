@@ -179,7 +179,7 @@ test("backup is encrypted without writing or transporting a plaintext dump", () 
 
 test("only the encrypted archive and checksum leave the production trust boundary", () => {
   const backupRetrieval = indexOfRequired(
-    '$remote_retrieval_file" "$local_backup"',
+    '$remote_backup_file" "$local_backup"',
   );
   const manifestRetrieval = indexOfRequired(
     '$remote_helper_dir/retrieval.sha256" "$local_manifest"',
@@ -217,9 +217,11 @@ test("disposable restore requires all authentication query and destruction marke
 test("production archive capacity and retention are bounded", () => {
   const capacity = indexOfRequired("PRODUCTION_BACKUP_CAPACITY_OK");
   const backupCall = workflow.lastIndexOf('"$helper_dir/backup-postgres.sh"');
+  const retrieved = indexOfRequired("PRODUCTION_BACKUP_RETRIEVED_VERIFIED");
   const retention = indexOfRequired("PRODUCTION_BACKUP_RETENTION_READY");
 
   assert(capacity < backupCall);
+  assert(retrieved < retention);
   assert(backupCall < retention);
   assert.match(workflow, /pg_database_size\(current_database\(\)\)/);
   assert.match(workflow, /database_bytes \* 2 \+ 1073741824/);
@@ -233,7 +235,8 @@ test("production archive capacity and retention are bounded", () => {
     workflow,
     /ensure_private_directory \/var\/backups\/oasis\/\.proof-staging/,
   );
-  assert.match(workflow, /backup_promoted=true/);
+  assert.match(workflow, /PRODUCTION_BACKUP_STAGED_READY/);
+  assert.match(workflow, /<<'REMOTE_PROMOTION'/);
   assert.match(workflow, /PRODUCTION_BACKUP_CAPACITY_INSUFFICIENT/);
 });
 
@@ -242,11 +245,17 @@ test("remote production proof shell is syntactically valid", () => {
     "Create retrieve restore and destroy production backup proof",
   );
   const remoteProof = extractHeredoc(runner, "REMOTE_PROOF");
+  const remotePromotion = extractHeredoc(runner, "REMOTE_PROMOTION");
   const syntax = spawnSync("/bin/bash", ["-n"], {
     encoding: "utf8",
     input: remoteProof,
   });
   assert.equal(syntax.status, 0, syntax.stderr);
+  const promotionSyntax = spawnSync("/bin/bash", ["-n"], {
+    encoding: "utf8",
+    input: remotePromotion,
+  });
+  assert.equal(promotionSyntax.status, 0, promotionSyntax.stderr);
 });
 
 test("proof never deploys migrates restores production or mutates application records", () => {
@@ -418,6 +427,10 @@ printf '%064d  %s\\n' 0 "\${1:-synthetic}"
     .replaceAll("/opt/oasis-care", repo)
     .replaceAll("/etc/oasis", etc)
     .replaceAll("/var/backups/oasis", backups);
+  const remotePromotion = extractHeredoc(runner, "REMOTE_PROMOTION")
+    .replaceAll("/opt/oasis-care", repo)
+    .replaceAll("/etc/oasis", etc)
+    .replaceAll("/var/backups/oasis", backups);
   const keyFile = path.join(etc, "oasis-backup.key");
   const retrievalFile = path.join(backups, "oasis-production-latest.dump.enc");
   const backupFile = path.join(
@@ -446,11 +459,34 @@ printf '%064d  %s\\n' 0 "\${1:-synthetic}"
   assert.match(success.stdout, /PRODUCTION_DATA_CLASS_SYNTHETIC_ONLY/);
   assert.match(success.stdout, /PRODUCTION_BACKUP_CAPACITY_OK/);
   assert.match(success.stdout, /DISPOSABLE_RESTORE_DESTROYED/);
-  assert.match(success.stdout, /PRODUCTION_BACKUP_RETENTION_READY/);
-  assert.equal(fs.existsSync(backupFile), false);
-  assert.equal(fs.existsSync(retrievalFile), true);
+  assert.match(success.stdout, /PRODUCTION_BACKUP_STAGED_READY/);
+  assert.equal(fs.existsSync(backupFile), true);
+  assert.equal(fs.existsSync(retrievalFile), false);
   assert.equal(fs.existsSync(keyFile), true);
   assert.equal(fs.existsSync(path.join(helperDir, "retrieval.sha256")), true);
+
+  const promotion = spawnSync(
+    "/bin/bash",
+    [
+      "-c",
+      remotePromotion,
+      "remote-promotion",
+      "promote",
+      targetSha,
+      helperDir,
+      backupFile,
+      keyFile,
+      retrievalFile,
+    ],
+    {
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${bin}:/usr/bin:/bin` },
+    },
+  );
+  assert.equal(promotion.status, 0, promotion.stderr || promotion.stdout);
+  assert.equal(promotion.stdout, "PRODUCTION_BACKUP_RETENTION_READY\n");
+  assert.equal(fs.existsSync(backupFile), false);
+  assert.equal(fs.existsSync(retrievalFile), true);
 
   const wrongStorageOwner = spawnSync(
     "/bin/bash",
@@ -513,6 +549,7 @@ test("proof runner completes the allowlisted retrieval restore and cleanup contr
   const scripts = path.join(workspace, "deploy", "v2", "scripts");
   const transferLog = path.join(root, "transfer.log");
   const cleanupLog = path.join(root, "cleanup.log");
+  const promotionLog = path.join(root, "promotion.log");
   const targetSha = "a".repeat(40);
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.mkdirSync(bin, { recursive: true });
@@ -528,6 +565,10 @@ case "$*" in
   *"mktemp -d /tmp/oasis-backup-proof.XXXXXXXX"*)
     printf '/tmp/oasis-backup-proof.Ab12Cd34\\n'
     ;;
+  *"promote ${targetSha}"*)
+    printf 'PROMOTION\\n' >> "$PROMOTION_LOG"
+    printf 'PRODUCTION_BACKUP_RETENTION_READY\\n'
+    ;;
   *"${targetSha}"*)
     printf '%s\\n' \\
       DEPLOY_TARGET_PRODUCTION \\
@@ -542,7 +583,7 @@ case "$*" in
       DISPOSABLE_RESTORE_COMPLETE \\
       DISPOSABLE_RESTORE_QUERY_OK \\
       DISPOSABLE_RESTORE_DESTROYED \\
-      PRODUCTION_BACKUP_RETENTION_READY
+      PRODUCTION_BACKUP_STAGED_READY
     ;;
   *"/tmp/oasis-backup-proof.Ab12Cd34 /var/backups/oasis/.proof-staging/oasis-proof-"*)
     printf 'CLEANUP\\n' >> "$CLEANUP_LOG"
@@ -556,7 +597,7 @@ esac
 set -euo pipefail
 destination="\${!#}"
 case "$*" in
-  *":/var/backups/oasis/oasis-production-latest.dump.enc"*)
+  *":/var/backups/oasis/.proof-staging/oasis-proof-"*)
     printf 'synthetic encrypted archive\\n' > "$destination"
     printf 'DOWNLOAD %s\\n' "$destination" >> "$TRANSFER_LOG"
     ;;
@@ -620,6 +661,7 @@ printf '%s\\n' \\
         OASIS_PRODUCTION_VPS_HOST: "production.invalid",
         OASIS_PRODUCTION_VPS_USER: "root",
         PATH: `${bin}:/usr/bin:/bin`,
+        PROMOTION_LOG: promotionLog,
         TRANSFER_LOG: transferLog,
       },
     },
@@ -641,8 +683,9 @@ printf '%s\\n' \\
       "DISPOSABLE_RESTORE_COMPLETE",
       "DISPOSABLE_RESTORE_QUERY_OK",
       "DISPOSABLE_RESTORE_DESTROYED",
-      "PRODUCTION_BACKUP_RETENTION_READY",
+      "PRODUCTION_BACKUP_STAGED_READY",
       "PRODUCTION_BACKUP_RETRIEVED_VERIFIED",
+      "PRODUCTION_BACKUP_RETENTION_READY",
       "PRODUCTION_BACKUP_EPHEMERAL_MATERIAL_DESTROYED",
       "PRODUCTION_BACKUP_RESTORE_PROOF_PASS",
       "",
@@ -657,6 +700,7 @@ printf '%s\\n' \\
   for (const downloadedPath of downloadedPaths) {
     assert.equal(fs.existsSync(downloadedPath), false);
   }
+  assert.equal(fs.readFileSync(promotionLog, "utf8"), "PROMOTION\n");
 
   fs.writeFileSync(transferLog, "");
   const failed = spawnSync(
@@ -680,6 +724,7 @@ printf '%s\\n' \\
         OASIS_PRODUCTION_VPS_HOST: "production.invalid",
         OASIS_PRODUCTION_VPS_USER: "root",
         PATH: `${bin}:/usr/bin:/bin`,
+        PROMOTION_LOG: promotionLog,
         TRANSFER_LOG: transferLog,
       },
     },
@@ -691,6 +736,7 @@ printf '%s\\n' \\
     .trim()
     .slice("DOWNLOAD ".length);
   assert.equal(fs.existsSync(failedDownload), false);
+  assert.equal(fs.readFileSync(promotionLog, "utf8"), "PROMOTION\n");
   assert.equal(
     fs.readFileSync(cleanupLog, "utf8").trim().split("\n").length,
     2,

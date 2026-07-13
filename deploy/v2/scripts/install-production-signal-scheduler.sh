@@ -62,6 +62,7 @@ for executable in \
 do
   [ -x "$executable" ] || fail
 done
+[ "$(/usr/bin/stat -c '%u:%g:%a' "$BACKUP_ENCRYPTION_KEY_FILE" 2>/dev/null)" = 0:0:600 ] || fail
 
 cd "$REPOSITORY" 2>/dev/null || fail
 [ -d .git ] || fail

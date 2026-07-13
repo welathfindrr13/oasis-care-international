@@ -114,6 +114,16 @@ run_install() {
     /opt/oasis-care/deploy/v2/scripts/install-production-signal-scheduler.sh
 }
 
+chown 1000:1000 /etc/oasis/oasis-backup.key
+set +e
+run_install >/tmp/install.stdout 2>/tmp/install.stderr
+wrong_owner_status=$?
+set -e
+[ "$wrong_owner_status" -ne 0 ] || fail
+[ ! -s /tmp/install.stdout ] || fail
+[ "$(cat /tmp/install.stderr)" = PRODUCTION_SIGNAL_SCHEDULER_INSTALL_FAILED ] || fail
+chown 0:0 /etc/oasis/oasis-backup.key
+
 : >/tmp/oasis-systemctl.log
 export NODE_OPTIONS=--require=/tmp/hostile-preload.cjs
 export NODE_PATH=/tmp/hostile-node-path

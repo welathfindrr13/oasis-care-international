@@ -105,6 +105,10 @@ test("installer proves exact main revision and private inputs before enabling", 
   );
   assert.match(installer, /stat -c '%a'/);
   assert.match(installer, /stat -c '%u'/);
+  assert.match(
+    installer,
+    /stat -c '%u:%g:%a' "\$BACKUP_ENCRYPTION_KEY_FILE".*= 0:0:600/,
+  );
   assert.match(installer, /\)\" = 600 \] \|\| fail/);
   assert.match(installer, /systemd-analyze verify/);
   assert.match(installer, /systemctl start "\$SERVICE_UNIT"/);

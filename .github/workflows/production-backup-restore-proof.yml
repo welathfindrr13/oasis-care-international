@@ -258,10 +258,9 @@ jobs:
           rehearsal_output=""
           rehearsal_diagnostic=""
           backup_owned=false
-          backup_promoted=false
           cleanup_remote_proof() {
             rm -f "${temporary_key:-}" "${backup_output:-}" "${backup_diagnostic:-}" "${rehearsal_output:-}" "${rehearsal_diagnostic:-}"
-            if [ "${backup_owned:-false}" = true ] && [ "${backup_promoted:-false}" != true ]; then
+            if [ "${backup_owned:-false}" = true ]; then
               rm -f "$backup_file"
             fi
           }
@@ -338,27 +337,14 @@ jobs:
           [ "$(cat "$rehearsal_output")" = "$expected_rehearsal_markers" ] || fail PRODUCTION_BACKUP_REHEARSAL_OUTPUT_INVALID
           printf '%s\n' "$expected_rehearsal_markers"
 
-          previous_file=/var/backups/oasis/oasis-production-previous.dump.enc
-          for retained_file in "$retrieval_file" "$previous_file"; do
-            if [ -e "$retained_file" ] || [ -L "$retained_file" ]; then
-              [ -f "$retained_file" ] && [ ! -L "$retained_file" ] || fail PRODUCTION_BACKUP_RETENTION_INVALID
-              [ "$(stat -c '%u:%g:%a' "$retained_file" 2>/dev/null)" = 0:0:600 ] || fail PRODUCTION_BACKUP_RETENTION_INVALID
-              node "$helper_dir/backup-crypto.mjs" verify "$key_file" "$retained_file" >/dev/null 2>&1 || fail PRODUCTION_BACKUP_RETENTION_INVALID
-            fi
-          done
-          rm -f "$previous_file"
-          if [ -f "$retrieval_file" ]; then
-            mv "$retrieval_file" "$previous_file" || fail PRODUCTION_BACKUP_RETENTION_FAILED
-          fi
-          mv "$backup_file" "$retrieval_file" || fail PRODUCTION_BACKUP_RETENTION_FAILED
-          backup_promoted=true
-          retrieval_digest="$(sha256sum "$retrieval_file" 2>/dev/null | awk '{ print $1 }')" || fail PRODUCTION_BACKUP_RETRIEVAL_MANIFEST_FAILED
+          retrieval_digest="$(sha256sum "$backup_file" 2>/dev/null | awk '{ print $1 }')" || fail PRODUCTION_BACKUP_RETRIEVAL_MANIFEST_FAILED
           [[ "$retrieval_digest" =~ ^[0-9a-f]{64}$ ]] || fail PRODUCTION_BACKUP_RETRIEVAL_MANIFEST_FAILED
           printf '%s  production.dump.enc\n' "$retrieval_digest" > "$helper_dir/retrieval.sha256" || fail PRODUCTION_BACKUP_RETRIEVAL_MANIFEST_FAILED
           chmod 0400 "$helper_dir/retrieval.sha256" || fail PRODUCTION_BACKUP_RETRIEVAL_MANIFEST_FAILED
           rm -f "$backup_output" "$backup_diagnostic" "$rehearsal_output" "$rehearsal_diagnostic"
+          backup_owned=false
           trap - EXIT
-          printf 'PRODUCTION_BACKUP_RETENTION_READY\n'
+          printf 'PRODUCTION_BACKUP_STAGED_READY\n'
           REMOTE_PROOF
           remote_status=$?
           set -e
@@ -368,7 +354,7 @@ jobs:
             printf 'PRODUCTION_BACKUP_REMOTE_PROOF_FAILED\n' >&2
             exit 1
           fi
-          expected_remote_markers=$'DEPLOY_TARGET_PRODUCTION\nPRODUCTION_DATA_CLASS_SYNTHETIC_ONLY\nPRODUCTION_CODE_SHA_OK\nPRODUCTION_BACKUP_KEY_READY\nPRODUCTION_BACKUP_CAPACITY_OK\nBACKUP_CREATED_ENCRYPTED\nPRODUCTION_BACKUP_ARCHIVE_READY\nENCRYPTED_BACKUP_AUTHENTICATED\nDISPOSABLE_POSTGRES_READY\nDISPOSABLE_RESTORE_COMPLETE\nDISPOSABLE_RESTORE_QUERY_OK\nDISPOSABLE_RESTORE_DESTROYED\nPRODUCTION_BACKUP_RETENTION_READY'
+          expected_remote_markers=$'DEPLOY_TARGET_PRODUCTION\nPRODUCTION_DATA_CLASS_SYNTHETIC_ONLY\nPRODUCTION_CODE_SHA_OK\nPRODUCTION_BACKUP_KEY_READY\nPRODUCTION_BACKUP_CAPACITY_OK\nBACKUP_CREATED_ENCRYPTED\nPRODUCTION_BACKUP_ARCHIVE_READY\nENCRYPTED_BACKUP_AUTHENTICATED\nDISPOSABLE_POSTGRES_READY\nDISPOSABLE_RESTORE_COMPLETE\nDISPOSABLE_RESTORE_QUERY_OK\nDISPOSABLE_RESTORE_DESTROYED\nPRODUCTION_BACKUP_STAGED_READY'
           if [ "$(cat "$remote_report")" != "$expected_remote_markers" ]; then
             rm -f "$remote_report" "$remote_diagnostic"
             printf 'PRODUCTION_BACKUP_REMOTE_OUTPUT_INVALID\n' >&2
@@ -378,7 +364,7 @@ jobs:
           rm -f "$remote_report" "$remote_diagnostic"
 
           if ! scp -q -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 \
-            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST:$remote_retrieval_file" "$local_backup" \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST:$remote_backup_file" "$local_backup" \
             >/dev/null 2>&1
           then
             printf 'PRODUCTION_BACKUP_RETRIEVAL_FAILED\n' >&2
@@ -405,6 +391,80 @@ jobs:
             exit 1
           fi
           printf 'PRODUCTION_BACKUP_RETRIEVED_VERIFIED\n'
+
+          promotion_report="$private_dir/promotion.report"
+          promotion_diagnostic="$private_dir/promotion.diagnostic"
+          : > "$promotion_report"
+          : > "$promotion_diagnostic"
+          chmod 600 "$promotion_report" "$promotion_diagnostic"
+          set +e
+          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" 'bash -se' -- \
+            promote "$EXPECTED_PRODUCTION_SHA" "$remote_helper_dir" "$remote_backup_file" "$remote_key_file" "$remote_retrieval_file" \
+            >"$promotion_report" 2>"$promotion_diagnostic" <<'REMOTE_PROMOTION'
+          set -euo pipefail
+          [ "$1" = promote ] || exit 1
+          expected_sha="$2"
+          helper_dir="$3"
+          backup_file="$4"
+          key_file="$5"
+          retrieval_file="$6"
+
+          fail() {
+            printf '%s\n' "$1" >&2
+            exit 1
+          }
+
+          [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] || fail PRODUCTION_BACKUP_PROMOTION_INVALID
+          [[ "$helper_dir" =~ ^/tmp/oasis-backup-proof\.[A-Za-z0-9]{8}$ ]] || fail PRODUCTION_BACKUP_PROMOTION_INVALID
+          [[ "$backup_file" =~ ^/var/backups/oasis/\.proof-staging/oasis-proof-[0-9]+-[0-9]+\.dump\.enc$ ]] || fail PRODUCTION_BACKUP_PROMOTION_INVALID
+          [ "$key_file" = /etc/oasis/oasis-backup.key ] || fail PRODUCTION_BACKUP_PROMOTION_INVALID
+          [ "$retrieval_file" = /var/backups/oasis/oasis-production-latest.dump.enc ] || fail PRODUCTION_BACKUP_PROMOTION_INVALID
+          [ "$(id -u)" = 0 ] || fail PRODUCTION_BACKUP_ROOT_REQUIRED
+
+          cd /opt/oasis-care || fail PRODUCTION_REPOSITORY_UNAVAILABLE
+          git_common_raw="$(git --no-replace-objects rev-parse --git-common-dir 2>/dev/null)" || fail PRODUCTION_REPOSITORY_UNAVAILABLE
+          git_common="$(cd "$git_common_raw" 2>/dev/null && pwd -P)" || fail PRODUCTION_REPOSITORY_UNAVAILABLE
+          exec 9>"$git_common/oasis-deploy/production-vps-mutation.lock"
+          flock -n 9 || fail PRODUCTION_BACKUP_LOCKED
+          current_sha="$(git --no-replace-objects rev-parse HEAD 2>/dev/null)" || fail PRODUCTION_CODE_SHA_UNKNOWN
+          [ "$current_sha" = "$expected_sha" ] || fail PRODUCTION_CODE_SHA_MISMATCH
+          [ -z "$(git status --porcelain --untracked-files=no 2>/dev/null)" ] || fail PRODUCTION_REPOSITORY_DIRTY
+
+          [ -d "$helper_dir" ] && [ ! -L "$helper_dir" ] || fail PRODUCTION_BACKUP_PROMOTION_INVALID
+          [ "$(stat -c '%u:%g:%a' "$helper_dir" 2>/dev/null)" = 0:0:700 ] || fail PRODUCTION_BACKUP_PROMOTION_INVALID
+          [ -f "$key_file" ] && [ ! -L "$key_file" ] || fail PRODUCTION_BACKUP_KEY_INVALID
+          [ "$(stat -c '%u:%g:%a' "$key_file" 2>/dev/null)" = 0:0:600 ] || fail PRODUCTION_BACKUP_KEY_INVALID
+          [ -f "$backup_file" ] && [ ! -L "$backup_file" ] || fail PRODUCTION_BACKUP_ARCHIVE_INVALID
+          [ "$(stat -c '%u:%g:%a' "$backup_file" 2>/dev/null)" = 0:0:600 ] || fail PRODUCTION_BACKUP_ARCHIVE_INVALID
+          node "$helper_dir/backup-crypto.mjs" verify "$key_file" "$backup_file" >/dev/null 2>&1 || fail PRODUCTION_BACKUP_ARCHIVE_INVALID
+          retrieval_digest="$(sha256sum "$backup_file" 2>/dev/null | awk '{ print $1 }')" || fail PRODUCTION_BACKUP_RETRIEVAL_MANIFEST_FAILED
+          [ "$(cat "$helper_dir/retrieval.sha256" 2>/dev/null)" = "$retrieval_digest  production.dump.enc" ] || fail PRODUCTION_BACKUP_RETRIEVAL_MANIFEST_FAILED
+
+          previous_file=/var/backups/oasis/oasis-production-previous.dump.enc
+          for retained_file in "$retrieval_file" "$previous_file"; do
+            if [ -e "$retained_file" ] || [ -L "$retained_file" ]; then
+              [ -f "$retained_file" ] && [ ! -L "$retained_file" ] || fail PRODUCTION_BACKUP_RETENTION_INVALID
+              [ "$(stat -c '%u:%g:%a' "$retained_file" 2>/dev/null)" = 0:0:600 ] || fail PRODUCTION_BACKUP_RETENTION_INVALID
+              node "$helper_dir/backup-crypto.mjs" verify "$key_file" "$retained_file" >/dev/null 2>&1 || fail PRODUCTION_BACKUP_RETENTION_INVALID
+            fi
+          done
+          rm -f "$previous_file"
+          if [ -f "$retrieval_file" ]; then
+            mv "$retrieval_file" "$previous_file" || fail PRODUCTION_BACKUP_RETENTION_FAILED
+          fi
+          mv "$backup_file" "$retrieval_file" || fail PRODUCTION_BACKUP_RETENTION_FAILED
+          printf 'PRODUCTION_BACKUP_RETENTION_READY\n'
+          REMOTE_PROMOTION
+          promotion_status=$?
+          set -e
+          if [ "$promotion_status" -ne 0 ] || [ "$(cat "$promotion_report")" != PRODUCTION_BACKUP_RETENTION_READY ]; then
+            rm -f "$promotion_report" "$promotion_diagnostic"
+            printf 'PRODUCTION_BACKUP_PROMOTION_FAILED\n' >&2
+            exit 1
+          fi
+          cat "$promotion_report"
+          rm -f "$promotion_report" "$promotion_diagnostic"
 
           rm -f "$local_backup" "$local_manifest"
           [ ! -e "$local_backup" ] && [ ! -e "$local_manifest" ] || {
