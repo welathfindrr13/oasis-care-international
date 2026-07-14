@@ -303,7 +303,7 @@ BACKUP_ENCRYPTION_KEY_FILE=/etc/oasis/oasis-backup.key \
 deploy/v2/scripts/rehearse-backup-restore.sh /retrieved/offsite/backup.dump.enc
 ```
 
-Only five allowlisted proof markers are printed. Raw database contents,
+Only allowlisted proof markers are printed. Raw database contents,
 credentials, container details, and diagnostics remain suppressed. Do not run a
 production restore until this rehearsal passes and a separate explicit recovery
 decision has been made.
@@ -334,15 +334,19 @@ Those runner copies are destroyed before the proof can pass and are never upload
 as workflow artifacts. Raw database, transport, Docker, and restore diagnostics
 remain suppressed.
 
-This gate requires a root-owned `0600` controlled-data marker containing exactly
-`synthetic-only`; it refuses to retrieve an archive without that classification.
+This pre-launch gate requires a root-owned `0600` controlled-data marker containing
+exactly `empty-production`. It queries every public application table except
+Prisma's migration ledger before backup creation, then repeats that assertion on
+the restored disposable archive. Any row fails the workflow before retrieval. This
+allows the real production schema and recovery path to be rehearsed without
+deploying synthetic records or transporting real records through the proof runner.
 It uses the same host mutation lock as deployment, requires capacity for twice the
 reported database size plus one GiB, and retains at most the latest and previous
 verified archives. It may create the private production backup key, but it never
 deploys code, runs migrations, restores production, or changes application records.
-A separate operator-controlled copy of the key and encrypted archive is still
-required before real client data. The controlled fake-data canary does not satisfy
-that later real-data retention decision.
+A separately approved offsite destination and operator-controlled copy of the key
+and encrypted archive are still required before real client data. This empty-system
+rehearsal does not satisfy that later retention or live recovery decision.
 
 Provider-level droplet backups complement this database archive; they do not
 replace it. Confirm the provider policy and a current private backup image before

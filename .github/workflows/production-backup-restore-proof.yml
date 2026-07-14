@@ -232,8 +232,8 @@ jobs:
           [ -f /etc/oasis/controlled-data-class ] && [ ! -L /etc/oasis/controlled-data-class ] || fail PRODUCTION_DATA_CLASS_UNKNOWN
           [ "$(stat -c '%u:%g:%a' /etc/oasis/controlled-data-class 2>/dev/null)" = 0:0:600 ] || fail PRODUCTION_DATA_CLASS_UNKNOWN
           controlled_data_class="$(tr -d '\r\n' < /etc/oasis/controlled-data-class 2>/dev/null)" || fail PRODUCTION_DATA_CLASS_UNKNOWN
-          [ "$controlled_data_class" = synthetic-only ] || fail PRODUCTION_DATA_CLASS_NOT_SYNTHETIC
-          printf 'PRODUCTION_DATA_CLASS_SYNTHETIC_ONLY\n'
+          [ "$controlled_data_class" = empty-production ] || fail PRODUCTION_DATA_CLASS_NOT_EMPTY
+          printf 'PRODUCTION_DATA_CLASS_EMPTY\n'
 
           current_sha="$(git --no-replace-objects rev-parse HEAD 2>/dev/null)" || fail PRODUCTION_CODE_SHA_UNKNOWN
           [ "$current_sha" = "$expected_sha" ] || fail PRODUCTION_CODE_SHA_MISMATCH
@@ -286,6 +286,9 @@ jobs:
           postgres_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$postgres_container" 2>/dev/null)" || fail PRODUCTION_POSTGRES_UNAVAILABLE
           [ "$postgres_health" = healthy ] || fail PRODUCTION_POSTGRES_UNHEALTHY
 
+          docker exec "$postgres_container" sh -lc 'psql --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --set ON_ERROR_STOP=1 --command "DO \$oasis\$ DECLARE candidate record; contains_rows boolean; BEGIN FOR candidate IN SELECT schemaname, tablename FROM pg_tables WHERE schemaname = \$value\$public\$value\$ AND tablename <> \$value\$_prisma_migrations\$value\$ LOOP EXECUTE format(\$query\$SELECT EXISTS (SELECT 1 FROM %I.%I LIMIT 1)\$query\$, candidate.schemaname, candidate.tablename) INTO contains_rows; IF contains_rows THEN RAISE EXCEPTION \$message\$application table contains rows\$message\$; END IF; END LOOP; END \$oasis\$;"' >/dev/null 2>&1 || fail PRODUCTION_DATABASE_NOT_EMPTY
+          printf 'PRODUCTION_DATABASE_EMPTY\n'
+
           database_bytes="$(docker exec "$postgres_container" sh -lc 'psql --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --tuples-only --no-align --command "SELECT pg_database_size(current_database());"' 2>/dev/null)" || fail PRODUCTION_BACKUP_CAPACITY_UNKNOWN
           database_bytes="${database_bytes//$'\r'/}"
           database_bytes="${database_bytes//$'\n'/}"
@@ -329,11 +332,12 @@ jobs:
           BACKUP_ENCRYPTION_KEY_FILE="$key_file" \
             CRYPTO_HELPER="$helper_dir/backup-crypto.mjs" \
             NODE_BINARY=node \
+            REQUIRE_EMPTY_APPLICATION_DATA=true \
             "$helper_dir/rehearse-backup-restore.sh" "$backup_file" </dev/null >"$rehearsal_output" 2>"$rehearsal_diagnostic"
           rehearsal_status=$?
           set -e
           [ "$rehearsal_status" -eq 0 ] || fail PRODUCTION_BACKUP_DISPOSABLE_RESTORE_FAILED
-          expected_rehearsal_markers=$'ENCRYPTED_BACKUP_AUTHENTICATED\nDISPOSABLE_POSTGRES_READY\nDISPOSABLE_RESTORE_COMPLETE\nDISPOSABLE_RESTORE_QUERY_OK\nDISPOSABLE_RESTORE_DESTROYED'
+          expected_rehearsal_markers=$'ENCRYPTED_BACKUP_AUTHENTICATED\nDISPOSABLE_POSTGRES_READY\nDISPOSABLE_RESTORE_COMPLETE\nDISPOSABLE_RESTORE_QUERY_OK\nDISPOSABLE_RESTORE_EMPTY\nDISPOSABLE_RESTORE_DESTROYED'
           [ "$(cat "$rehearsal_output")" = "$expected_rehearsal_markers" ] || fail PRODUCTION_BACKUP_REHEARSAL_OUTPUT_INVALID
           printf '%s\n' "$expected_rehearsal_markers"
 
@@ -354,7 +358,7 @@ jobs:
             printf 'PRODUCTION_BACKUP_REMOTE_PROOF_FAILED\n' >&2
             exit 1
           fi
-          expected_remote_markers=$'DEPLOY_TARGET_PRODUCTION\nPRODUCTION_DATA_CLASS_SYNTHETIC_ONLY\nPRODUCTION_CODE_SHA_OK\nPRODUCTION_BACKUP_KEY_READY\nPRODUCTION_BACKUP_CAPACITY_OK\nBACKUP_CREATED_ENCRYPTED\nPRODUCTION_BACKUP_ARCHIVE_READY\nENCRYPTED_BACKUP_AUTHENTICATED\nDISPOSABLE_POSTGRES_READY\nDISPOSABLE_RESTORE_COMPLETE\nDISPOSABLE_RESTORE_QUERY_OK\nDISPOSABLE_RESTORE_DESTROYED\nPRODUCTION_BACKUP_STAGED_READY'
+          expected_remote_markers=$'DEPLOY_TARGET_PRODUCTION\nPRODUCTION_DATA_CLASS_EMPTY\nPRODUCTION_CODE_SHA_OK\nPRODUCTION_BACKUP_KEY_READY\nPRODUCTION_DATABASE_EMPTY\nPRODUCTION_BACKUP_CAPACITY_OK\nBACKUP_CREATED_ENCRYPTED\nPRODUCTION_BACKUP_ARCHIVE_READY\nENCRYPTED_BACKUP_AUTHENTICATED\nDISPOSABLE_POSTGRES_READY\nDISPOSABLE_RESTORE_COMPLETE\nDISPOSABLE_RESTORE_QUERY_OK\nDISPOSABLE_RESTORE_EMPTY\nDISPOSABLE_RESTORE_DESTROYED\nPRODUCTION_BACKUP_STAGED_READY'
           if [ "$(cat "$remote_report")" != "$expected_remote_markers" ]; then
             rm -f "$remote_report" "$remote_diagnostic"
             printf 'PRODUCTION_BACKUP_REMOTE_OUTPUT_INVALID\n' >&2
