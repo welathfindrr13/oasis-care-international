@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../app/api/auth/[...nextauth]/authOptions';
+import { getBrowserClerkFixtureSession } from './clerk-browser-test-session';
 import {
   AuthoritativeAccessSnapshot,
   fetchAuthoritativeAccessSnapshot,
@@ -23,6 +24,14 @@ export interface ServerAuthContext {
 export async function getServerAuthContext(): Promise<ServerAuthContext> {
   const authMode = resolveAuthMode(process.env);
   if (authMode === 'clerk') {
+    const fixtureSession = getBrowserClerkFixtureSession();
+    if (fixtureSession.userId && fixtureSession.token) {
+      return buildContext(
+        authMode,
+        fixtureSession.userId,
+        fixtureSession.token,
+      );
+    }
     const clerkAuth = await auth();
     let accessToken: string | null = null;
     if (clerkAuth.userId) {

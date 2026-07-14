@@ -3,6 +3,9 @@ import {
   PrismaClient,
   VisitStatus,
 } from "../../libs/db/src/generated/client/index.js";
+import { assertSafeTestDatabaseSeed } from "./assert-safe-test-database.mjs";
+
+assertSafeTestDatabaseSeed();
 
 const ORGANIZATION_ID = "org-browser-linked-carer";
 const SENTINEL_ORGANIZATION_ID = "org-browser-sentinel";
