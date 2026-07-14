@@ -161,7 +161,7 @@ describe('Visit E2E Tests', () => {
     await app.init();
 
     // Create test fixtures
-    fixtures = await createTestFixtures(prisma);
+    fixtures = await createTestFixtures(prisma, 'clerk');
   }, 180000); // 3 minutes total timeout
 
   afterAll(async () => {
@@ -177,7 +177,7 @@ describe('Visit E2E Tests', () => {
     // Clean database between tests
     await cleanDatabase(prisma);
     // Recreate fixtures for each test
-    fixtures = await createTestFixtures(prisma);
+    fixtures = await createTestFixtures(prisma, 'clerk');
   });
 
   describe('Visit Creation', () => {
@@ -241,6 +241,68 @@ describe('Visit E2E Tests', () => {
       expect(response.body.data.createVisit.tasks).toHaveLength(1);
       expect(response.body.data.createVisit.carer.firstName).toBe('Jane');
       expect(response.body.data.createVisit.client.fullName).toBe('Mary Jones');
+    });
+
+    it('rejects GraphQL status injection on visit creation', async () => {
+      const before = await prisma.visit.count();
+      const response = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('admin'))
+        .send({
+          query: `
+            mutation CreateVisit($input: CreateVisitInput!) {
+              createVisit(input: $input) { id status }
+            }
+          `,
+          variables: {
+            input: {
+              carerId: fixtures.carers.carer.id,
+              clientId: fixtures.clients.client.id,
+              scheduledStart: '2024-02-15T11:00:00Z',
+              scheduledEnd: '2024-02-15T12:00:00Z',
+              status: 'COMPLETED',
+            },
+          },
+        })
+        .expect(200);
+
+      expect(response.body.data).toBeUndefined();
+      expect(response.body.errors?.[0]?.message).toContain(
+        'Field "status" is not defined by type "CreateVisitInput"',
+      );
+      await expect(prisma.visit.count()).resolves.toBe(before);
+    });
+
+    it.each([
+      ['equal', '2024-02-15T11:00:00Z', '2024-02-15T11:00:00Z'],
+      ['inverted', '2024-02-15T12:00:00Z', '2024-02-15T11:00:00Z'],
+    ])('rejects %s create times through the real API', async (_case, start, end) => {
+      const before = await prisma.visit.count();
+      const response = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('admin'))
+        .send({
+          query: `
+            mutation CreateVisit($input: CreateVisitInput!) {
+              createVisit(input: $input) { id }
+            }
+          `,
+          variables: {
+            input: {
+              carerId: fixtures.carers.carer.id,
+              clientId: fixtures.clients.client.id,
+              scheduledStart: start,
+              scheduledEnd: end,
+            },
+          },
+        })
+        .expect(200);
+
+      expect(response.body.data).toBeNull();
+      expect(response.body.errors?.[0]?.extensions?.code).toBe(
+        'VALIDATION_FAILED',
+      );
+      await expect(prisma.visit.count()).resolves.toBe(before);
     });
 
     it('should prevent overlapping visits for same carer', async () => {
@@ -515,6 +577,127 @@ describe('Visit E2E Tests', () => {
       });
     }
 
+    it.each(['COMPLETED', 'CANCELLED'] as const)(
+      'rejects task completion, task outcome, and care-note writes for a %s visit',
+      async (status) => {
+        const visit = await createCompletionVisit({
+          status,
+          actual_end: status === 'COMPLETED' ? new Date() : null,
+        });
+        const task = await prisma.visitTask.create({
+          data: { visit_id: visit.id, task_name: 'Terminal-safe task' },
+        });
+        const access = admittedCarerAccess();
+        const attempts = [
+          () =>
+            visitService.completeTask(
+              task.id,
+              'Must not persist after terminal state.',
+              fixtures.carers.carer.id,
+              'carer',
+              fixtures.organization.id,
+              access,
+            ),
+          () =>
+            visitService.recordVisitTaskOutcome(
+              {
+                taskId: task.id,
+                outcome: 'DONE' as any,
+                notes: 'Must not persist after terminal state.',
+              },
+              fixtures.carers.carer.id,
+              'carer',
+              fixtures.organization.id,
+              access,
+            ),
+          () =>
+            visitService.submitVisitCareNote(
+              {
+                visitId: visit.id,
+                category: 'OTHER' as any,
+                notes: 'Must not persist after terminal state.',
+              },
+              fixtures.carers.carer.id,
+              'carer',
+              fixtures.organization.id,
+              access,
+            ),
+        ];
+        for (const attempt of attempts) {
+          await expect(attempt()).rejects.toMatchObject({
+            response: { code: 'VISIT_COMPLETION_CONFLICT' },
+          });
+        }
+        const [persistedTask, careLogs] = await Promise.all([
+          prisma.visitTask.findUniqueOrThrow({ where: { id: task.id } }),
+          prisma.careLog.count({ where: { visit_id: visit.id } }),
+        ]);
+        expect(persistedTask.is_completed).toBe(false);
+        expect(persistedTask.notes).toBeNull();
+        expect(careLogs).toBe(0);
+      },
+    );
+
+    it.each(['task-completion', 'task-outcome', 'care-note'] as const)(
+      'revalidates the current Clerk membership for %s writes',
+      async (write) => {
+        const visit = await createCompletionVisit();
+        const task = await prisma.visitTask.create({
+          data: { visit_id: visit.id, task_name: 'Membership-bound task' },
+        });
+        const access = admittedCarerAccess();
+        await carerInvitations.deactivateMembership(
+          fixtures.memberships.carerMembership.id,
+          {
+            organizationId: fixtures.organization.id,
+            organizationMembershipId: fixtures.memberships.adminMembership.id,
+            authSubject: TEST_USERS.admin.sub,
+          },
+        );
+        const attempt = write === 'task-completion'
+          ? visitService.completeTask(
+              task.id,
+              'Stale admitted request.',
+              fixtures.carers.carer.id,
+              'carer',
+              fixtures.organization.id,
+              access,
+            )
+          : write === 'task-outcome'
+            ? visitService.recordVisitTaskOutcome(
+                { taskId: task.id, outcome: 'DONE' as any },
+                fixtures.carers.carer.id,
+                'carer',
+                fixtures.organization.id,
+                access,
+              )
+            : visitService.submitVisitCareNote(
+                {
+                  visitId: visit.id,
+                  category: 'OTHER' as any,
+                  notes: 'Stale admitted request.',
+                },
+                fixtures.carers.carer.id,
+                'carer',
+                fixtures.organization.id,
+                access,
+              );
+        await expect(attempt).rejects.toMatchObject({
+          response: {
+            code: 'FORBIDDEN',
+            message: 'Access is unavailable for this account',
+          },
+        });
+        const [persistedTask, careLogs] = await Promise.all([
+          prisma.visitTask.findUniqueOrThrow({ where: { id: task.id } }),
+          prisma.careLog.count({ where: { visit_id: visit.id } }),
+        ]);
+        expect(persistedTask.is_completed).toBe(false);
+        expect(persistedTask.notes).toBeNull();
+        expect(careLogs).toBe(0);
+      },
+    );
+
     it('should start, record outcome, submit care note, complete visit, and not create a family update', async () => {
       const visitId = fixtures.visits.scheduledVisit.id;
       const task = await prisma.visitTask.findFirstOrThrow({
@@ -734,7 +917,7 @@ describe('Visit E2E Tests', () => {
       expect(JSON.stringify(audits)).not.toContain(input.notes);
     });
 
-    it('rejects identical completion details from a different linked membership', async () => {
+    it('rejects identical completion details after the linked membership rotates', async () => {
       const visit = await createCompletionVisit();
       const input = {
         visitId: visit.id,
@@ -750,6 +933,10 @@ describe('Visit E2E Tests', () => {
         ),
       ).resolves.toMatchObject({ status: 'COMPLETED' });
 
+      await prisma.organizationMembership.update({
+        where: { id: fixtures.memberships.carerMembership.id },
+        data: { status: 'REVOKED', revoked_at: new Date() },
+      });
       const secondMembership = await prisma.organizationMembership.create({
         data: {
           organization_id: fixtures.organization.id,
@@ -758,7 +945,7 @@ describe('Visit E2E Tests', () => {
           role: 'carer',
           status: 'ACTIVE',
           carer_id: fixtures.carers.carer.id,
-        },
+        } as any,
       });
       const secondAccess: CanonicalAccessContext = {
         ...admittedCarerAccess(),
@@ -1124,6 +1311,81 @@ describe('Visit E2E Tests', () => {
       expect(persisted.actual_end).not.toBeNull();
       expect(persisted.notes).toContain('Concurrent completion evidence.');
     });
+
+    it.each(['task-outcome', 'care-note'] as const)(
+      'serializes a concurrent %s against completion without any post-completion write',
+      async (write) => {
+        const visit = await createCompletionVisit();
+        const task = await prisma.visitTask.create({
+          data: { visit_id: visit.id, task_name: 'Concurrent guided task' },
+        });
+        const access = admittedCarerAccess();
+        const guidedWrite = write === 'task-outcome'
+          ? visitService.recordVisitTaskOutcome(
+              {
+                taskId: task.id,
+                outcome: 'DONE' as any,
+                notes: 'Concurrent task evidence.',
+              },
+              fixtures.carers.carer.id,
+              'carer',
+              fixtures.organization.id,
+              access,
+            )
+          : visitService.submitVisitCareNote(
+              {
+                visitId: visit.id,
+                category: 'OTHER' as any,
+                notes: 'Concurrent care evidence.',
+              },
+              fixtures.carers.carer.id,
+              'carer',
+              fixtures.organization.id,
+              access,
+            );
+        const [completionResult, guidedResult] = await Promise.allSettled([
+          visitService.completeVisit(
+            { visitId: visit.id, notes: 'Concurrent completion evidence.' },
+            fixtures.carers.carer.id,
+            'carer',
+            fixtures.organization.id,
+            access,
+          ),
+          guidedWrite,
+        ]);
+        expect(completionResult.status).toBe('fulfilled');
+        if (guidedResult.status === 'rejected') {
+          expect(guidedResult.reason).toMatchObject({
+            response: { code: 'VISIT_COMPLETION_CONFLICT' },
+          });
+        }
+        const [persisted, completionAudit, persistedTask, careLog] = await Promise.all([
+          prisma.visit.findUniqueOrThrow({ where: { id: visit.id } }),
+          prisma.auditLog.findFirstOrThrow({
+            where: {
+              resource_type: 'Visit',
+              resource_id: visit.id,
+              action: 'VISIT_COMPLETED',
+            },
+          }),
+          prisma.visitTask.findUniqueOrThrow({ where: { id: task.id } }),
+          prisma.careLog.findFirst({ where: { visit_id: visit.id } }),
+        ]);
+        expect(persisted.status).toBe('COMPLETED');
+        if (guidedResult.status === 'fulfilled') {
+          const guidedTimestamp = write === 'task-outcome'
+            ? persistedTask.updated_at
+            : careLog!.created_at;
+          expect(guidedTimestamp.getTime()).toBeLessThanOrEqual(
+            completionAudit.timestamp.getTime(),
+          );
+        } else if (write === 'task-outcome') {
+          expect(persistedTask.notes).toBeNull();
+        } else {
+          expect(careLog).toBeNull();
+        }
+      },
+    );
 
     it.each(['complete', 'start'] as const)(
       'revalidates an admitted %s request after real deactivation wins the lifecycle lock',
@@ -1643,7 +1905,7 @@ describe('Visit E2E Tests', () => {
         })
         .expect(200);
 
-      expect(response.body.errors).toHaveLength(1);
+      expect(response.body.errors).toHaveLength(4);
       await expect(
         prisma.visit.findUniqueOrThrow({ where: { id: visitId } }),
       ).resolves.toMatchObject({
@@ -1785,6 +2047,25 @@ describe('Visit E2E Tests', () => {
         where: { id: visitId },
       });
       expect(deletedVisit?.deleted_at).toBeTruthy();
+      const deletionAudit = await prisma.auditLog.findFirstOrThrow({
+        where: {
+          resource_type: 'Visit',
+          resource_id: visitId,
+          action: 'VISIT_DELETED',
+        },
+      });
+      expect(deletionAudit).toMatchObject({
+        organization_id: fixtures.organization.id,
+        user_id: TEST_USERS.admin.sub,
+        old_values: { status: 'SCHEDULED', deleted: false },
+        new_values: expect.objectContaining({
+          status: 'SCHEDULED',
+          deleted: true,
+        }),
+      });
+      expect(JSON.stringify(deletionAudit)).not.toContain(
+        deletedVisit?.notes || 'fixture-note-not-present',
+      );
 
       // Verify it's not returned in queries
       const queryResponse = await request(app.getHttpServer())
@@ -1804,6 +2085,139 @@ describe('Visit E2E Tests', () => {
 
       expect(queryResponse.body.errors).toBeDefined();
       expect(queryResponse.body.errors[0].message).toContain('not found');
+    });
+
+    it('serializes delete against completion and never deletes an in-progress visit', async () => {
+      const visit = await prisma.visit.create({
+        data: {
+          organization_id: fixtures.organization.id,
+          carer_id: fixtures.carers.carer.id,
+          client_id: fixtures.clients.client.id,
+          scheduled_start: new Date('2024-04-01T09:00:00.000Z'),
+          scheduled_end: new Date('2024-04-01T10:00:00.000Z'),
+          actual_start: new Date('2024-04-01T09:01:00.000Z'),
+          status: 'IN_PROGRESS',
+          notes: 'Completion evidence that must never enter deletion audit.',
+        },
+      });
+      const access: CanonicalAccessContext = {
+        authenticated: true,
+        identityProvider: 'clerk',
+        membershipId: fixtures.memberships.carerMembership.id,
+        surface: 'STAFF',
+        effectiveRole: 'carer',
+        organizationId: fixtures.organization.id,
+        membershipState: 'ACTIVE',
+        onboardingState: 'READY',
+        rawRole: 'carer',
+        linkedIdentityState: 'LINKED',
+        domainIdentityId: fixtures.carers.carer.id,
+        authSubject: TEST_USERS.carer.sub,
+      };
+      const [deleteResult, completionResult] = await Promise.allSettled([
+        visitService.deleteVisit(
+          visit.id,
+          TEST_USERS.admin.sub,
+          'admin',
+          fixtures.organization.id,
+        ),
+        visitService.completeVisit(
+          { visitId: visit.id, notes: 'Atomic completion wins.' },
+          fixtures.carers.carer.id,
+          'carer',
+          fixtures.organization.id,
+          access,
+        ),
+      ]);
+      expect(deleteResult.status).toBe('rejected');
+      if (deleteResult.status === 'rejected') {
+        expect(deleteResult.reason).toMatchObject({
+          response: { code: 'VISIT_COMPLETION_CONFLICT' },
+        });
+      }
+      expect(completionResult.status).toBe('fulfilled');
+      const [persisted, deletionAudits] = await Promise.all([
+        prisma.visit.findUniqueOrThrow({ where: { id: visit.id } }),
+        prisma.auditLog.count({
+          where: {
+            resource_type: 'Visit',
+            resource_id: visit.id,
+            action: 'VISIT_DELETED',
+          },
+        }),
+      ]);
+      expect(persisted.status).toBe('COMPLETED');
+      expect(persisted.deleted_at).toBeNull();
+      expect(deletionAudits).toBe(0);
+    });
+
+    it('rolls back the soft delete when its narrow audit insert fails', async () => {
+      const visit = await prisma.visit.create({
+        data: {
+          organization_id: fixtures.organization.id,
+          carer_id: fixtures.carers.carer.id,
+          client_id: fixtures.clients.client.id,
+          scheduled_start: new Date('2024-04-01T11:00:00.000Z'),
+          scheduled_end: new Date('2024-04-01T12:00:00.000Z'),
+          status: 'SCHEDULED',
+          notes: 'Sensitive note that must not enter deletion audit.',
+        },
+      });
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE test_visit_delete_audit_failure (
+          resource_id text PRIMARY KEY
+        )
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE FUNCTION fail_visit_delete_audit() RETURNS trigger AS $$
+        BEGIN
+          IF NEW.action = 'VISIT_DELETED' AND EXISTS (
+            SELECT 1 FROM test_visit_delete_audit_failure
+            WHERE resource_id = NEW.resource_id
+          ) THEN
+            RAISE EXCEPTION 'forced visit deletion audit failure';
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TRIGGER fail_visit_delete_audit_trigger
+        BEFORE INSERT ON audit_log
+        FOR EACH ROW EXECUTE FUNCTION fail_visit_delete_audit()
+      `);
+      await prisma.$executeRaw`
+        INSERT INTO test_visit_delete_audit_failure (resource_id)
+        VALUES (${visit.id})
+      `;
+      try {
+        await expect(
+          visitService.deleteVisit(
+            visit.id,
+            TEST_USERS.admin.sub,
+            'admin',
+            fixtures.organization.id,
+          ),
+        ).rejects.toThrow();
+        const [persisted, auditCount] = await Promise.all([
+          prisma.visit.findUniqueOrThrow({ where: { id: visit.id } }),
+          prisma.auditLog.count({
+            where: { resource_type: 'Visit', resource_id: visit.id },
+          }),
+        ]);
+        expect(persisted.deleted_at).toBeNull();
+        expect(auditCount).toBe(0);
+      } finally {
+        await prisma.$executeRawUnsafe(
+          'DROP TRIGGER IF EXISTS fail_visit_delete_audit_trigger ON audit_log',
+        );
+        await prisma.$executeRawUnsafe(
+          'DROP FUNCTION IF EXISTS fail_visit_delete_audit()',
+        );
+        await prisma.$executeRawUnsafe(
+          'DROP TABLE IF EXISTS test_visit_delete_audit_failure',
+        );
+      }
     });
 
     it('should prevent non-admin from deleting visits', async () => {

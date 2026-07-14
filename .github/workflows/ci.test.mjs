@@ -6,6 +6,21 @@ const workflow = fs.readFileSync(new URL('./ci.yml', import.meta.url), 'utf8');
 const packageJson = JSON.parse(
   fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
 );
+const linkedCarerConfig = fs.readFileSync(
+  new URL('../../playwright.linked-carer.config.ts', import.meta.url),
+  'utf8',
+);
+const linkedCarerSeed = fs.readFileSync(
+  new URL('../../scripts/test/seed-linked-carer-browser.mjs', import.meta.url),
+  'utf8',
+);
+const linkedCarerJourney = fs.readFileSync(
+  new URL(
+    '../../tests/browser/linked-carer-assigned-work.spec.ts',
+    import.meta.url,
+  ),
+  'utf8',
+);
 
 test('CI executes Prisma migrations before the linked-carer browser journey', () => {
   assert.match(workflow, /run: pnpm --filter @oasis\/db exec prisma migrate deploy/);
@@ -36,6 +51,21 @@ test('CI composes the maintained accessibility gate into its browser journey', (
   );
 });
 
+test('linked-carer browser fixtures use Clerk tenant binding with local test signing', () => {
+  assert.match(linkedCarerConfig, /LOCAL_AUTH_ENABLED: "true"/);
+  assert.match(linkedCarerConfig, /AUTH_IDENTITY_PROVIDER: "clerk"/);
+  assert.doesNotMatch(linkedCarerSeed, /identity_provider: "cognito"/);
+  assert.match(linkedCarerSeed, /identity_provider: "clerk"/);
+  assert.match(
+    linkedCarerSeed,
+    /\.update\(`\$\{role\}:\$\{email\}:\$\{ORGANIZATION_ID\}`\)/,
+  );
+  assert.match(
+    linkedCarerJourney,
+    /organizationId: profile\.organizationId \?\? ORGANIZATION_ID/,
+  );
+});
+
 test('Deployment V2 CI compose verification uses the generated env file', () => {
   assert.match(workflow, /docker compose --env-file "\$TEMP_ENV" -f deploy\/v2\/docker-compose\.yml config/);
 });
@@ -57,6 +87,14 @@ test('Deployment V2 CI synthetic env includes the complete shift idempotency key
     /SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET=YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=/,
   );
   assert.match(workflow, /SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON=\[\]/);
+});
+
+test('Deployment V2 CI synthetic env includes the visit completion proof key', () => {
+  assert.match(workflow, /VISIT_COMPLETION_PROOF_ACTIVE_KEY_ID=visit-synthetic/);
+  assert.match(
+    workflow,
+    /VISIT_COMPLETION_PROOF_ACTIVE_SECRET=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc/,
+  );
 });
 
 test('Deployment V2 CI runs tenant nullability dry-run workflow static guard', () => {

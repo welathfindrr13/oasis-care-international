@@ -1,6 +1,7 @@
 import { expect, test } from "playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+const ORGANIZATION_ID = "org-browser-linked-carer";
 const VISIT_ID = "55555555-5555-4555-8555-555555555555";
 const UNASSIGNED_VISIT_ID = "55555555-5555-4555-8555-666666666666";
 const CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -10,7 +11,13 @@ const SENTINEL_VISIT_ID = "55555555-5555-4555-8555-888888888888";
 
 async function signIn(
   page: import("playwright/test").Page,
-  profile: { email: string; name: string; role: string; callbackUrl?: string },
+  profile: {
+    email: string;
+    name: string;
+    role: string;
+    callbackUrl?: string;
+    organizationId?: string;
+  },
 ) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const csrfResponse = await page.request.get("/api/auth/csrf");
@@ -24,7 +31,7 @@ async function signIn(
           email: profile.email,
           name: profile.name,
           role: profile.role,
-          organizationId: "",
+          organizationId: profile.organizationId ?? ORGANIZATION_ID,
         },
       },
     );

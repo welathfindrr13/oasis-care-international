@@ -4,11 +4,10 @@ import { VisitService } from "./visit.service";
 import { VisitResolver } from "./visit.resolver";
 import { VisitRepository } from "./visit.repository";
 import { PrismaService } from "@oasis/db";
-import { CareLogModule } from "../care-log/care-log.module";
 import { CarerModule } from "../carer/carer.module";
 import { VisitCompletionProofKeyring } from "./visit-completion-proof-keyring";
 @Module({
-  imports: [ClsModule, CareLogModule, CarerModule],
+  imports: [ClsModule, CarerModule],
   providers: [
     VisitService,
     VisitResolver,

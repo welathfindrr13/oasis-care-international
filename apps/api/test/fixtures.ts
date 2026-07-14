@@ -3,8 +3,7 @@ import { TEST_ORGANIZATION_ID, TEST_USERS } from './jwt.mock';
 
 export async function createTestFixtures(
   prisma: PrismaClient,
-  identityProvider =
-    process.env.AUTH_IDENTITY_PROVIDER?.trim().toLowerCase() || 'clerk',
+  identityProvider = 'cognito',
 ) {
   // Clean up existing data
   await cleanDatabase(prisma);

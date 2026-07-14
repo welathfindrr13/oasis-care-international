@@ -6,7 +6,6 @@ import { ClsService } from "nestjs-cls";
 import { CareLogCategory, PrismaService, VisitStatus } from "@oasis/db";
 import { BaseHttpException } from "../src/common/errors/base-http.exception";
 import { ErrorCode } from "../src/common/errors/error-codes";
-import { CareLogService } from "../src/care-log/care-log.service";
 import { VisitTaskOutcome } from "../src/visit/dto/visit.dto";
 
 describe("VisitService", () => {
@@ -23,20 +22,18 @@ describe("VisitService", () => {
     updateScheduleAtomically: jest.fn(),
     startAtomically: jest.fn(),
     completeAtomically: jest.fn(),
-    delete: jest.fn(),
+    deleteAtomically: jest.fn(),
     findOverlappingVisits: jest.fn(),
     createTask: jest.fn(),
     updateTask: jest.fn(),
+    writeGuidedTaskAtomically: jest.fn(),
+    createGuidedCareLogAtomically: jest.fn(),
     findTaskById: jest.fn(),
     countTaskOutcomeEntriesForVisit: jest.fn(),
     countCareLogsForVisit: jest.fn(),
     countMedicationOutcomesForVisit: jest.fn(),
     findCarerInOrganization: jest.fn(),
     findClientInOrganization: jest.fn(),
-  };
-
-  const mockCareLogService = {
-    createCareLog: jest.fn(),
   };
 
   const mockClsService = {
@@ -92,7 +89,7 @@ describe("VisitService", () => {
     linkedIdentityState: "LINKED",
     domainIdentityId: "carer-123",
     authSubject: "auth-carer-123",
-  } satisfies import('../src/auth/access-context.service').CanonicalAccessContext;
+  } satisfies import("../src/auth/access-context.service").CanonicalAccessContext;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -109,10 +106,6 @@ describe("VisitService", () => {
         {
           provide: PrismaService,
           useValue: mockPrisma,
-        },
-        {
-          provide: CareLogService,
-          useValue: mockCareLogService,
         },
         {
           provide: "visit_overlap_total",
@@ -171,6 +164,45 @@ describe("VisitService", () => {
       expect(result).toBeDefined();
       expect(result.id).toBe("visit-123");
     });
+
+    it("should ignore direct status injection and always create SCHEDULED", async () => {
+      await service.createVisit(
+        {
+          ...createVisitInput,
+          tasks: undefined,
+          status: VisitStatus.COMPLETED,
+        } as any,
+        "user-123",
+        "admin",
+        organizationId,
+      );
+
+      expect(repository.createIfAssignable).toHaveBeenCalledWith(
+        expect.objectContaining({ status: VisitStatus.SCHEDULED }),
+        expect.any(Object),
+      );
+    });
+
+    it.each([
+      ["equal", "2024-01-01T09:00:00Z", "2024-01-01T09:00:00Z"],
+      ["inverted", "2024-01-01T10:00:00Z", "2024-01-01T09:00:00Z"],
+    ])(
+      "should reject %s scheduled times before persistence",
+      async (_case, start, end) => {
+        await expect(
+          service.createVisit(
+            { ...createVisitInput, scheduledStart: start, scheduledEnd: end },
+            "user-123",
+            "admin",
+            organizationId,
+          ),
+        ).rejects.toMatchObject({
+          status: HttpStatus.BAD_REQUEST,
+          response: { code: ErrorCode.VALIDATION_FAILED },
+        });
+        expect(repository.createIfAssignable).not.toHaveBeenCalled();
+      },
+    );
 
     it("should throw BaseHttpException for overlapping visits", async () => {
       mockVisitRepository.createIfAssignable.mockResolvedValue({
@@ -513,12 +545,9 @@ describe("VisitService", () => {
     };
 
     it("should complete a task successfully", async () => {
-      mockVisitRepository.findTaskById.mockResolvedValue(mockTask);
-      mockVisitRepository.findById.mockResolvedValue(mockVisit);
-      mockVisitRepository.updateTask.mockResolvedValue({
-        ...mockTask,
-        is_completed: true,
-        completed_at: new Date(),
+      mockVisitRepository.writeGuidedTaskAtomically.mockResolvedValue({
+        status: "UPDATED",
+        task: { ...mockTask, is_completed: true, completed_at: new Date() },
       });
 
       const result = await service.completeTask(
@@ -530,20 +559,24 @@ describe("VisitService", () => {
         frontlineAccess,
       );
 
-      expect(repository.updateTask).toHaveBeenCalledWith(
-        "task-123",
-        expect.objectContaining({
-          is_completed: true,
-          completed_at: expect.any(Date),
-          notes: "Completed notes",
-        }),
+      expect(repository.writeGuidedTaskAtomically).toHaveBeenCalledWith({
+        taskId: "task-123",
         organizationId,
-      );
+        expectedCarerId: "carer-123",
+        actor: {
+          authSubject: "auth-carer-123",
+          identityProvider: "clerk",
+          membershipId: "membership-carer-123",
+        },
+        write: { kind: "COMPLETE", notes: "Completed notes" },
+      });
       expect(result.is_completed).toBe(true);
     });
 
     it("should throw BaseHttpException if task not found", async () => {
-      mockVisitRepository.findTaskById.mockResolvedValue(null);
+      mockVisitRepository.writeGuidedTaskAtomically.mockResolvedValue({
+        status: "NOT_FOUND",
+      });
 
       await expect(
         service.completeTask(
@@ -567,6 +600,25 @@ describe("VisitService", () => {
         ),
       ).rejects.toMatchObject({
         response: { code: ErrorCode.TASK_NOT_FOUND },
+      });
+    });
+
+    it("should reject a task write when the locked visit is terminal", async () => {
+      mockVisitRepository.writeGuidedTaskAtomically.mockResolvedValue({
+        status: "TERMINAL",
+      });
+      await expect(
+        service.completeTask(
+          "task-123",
+          "late note",
+          "carer-123",
+          "carer",
+          organizationId,
+          frontlineAccess,
+        ),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { code: ErrorCode.VISIT_COMPLETION_CONFLICT },
       });
     });
   });
@@ -654,12 +706,9 @@ describe("VisitService", () => {
     };
 
     it("should mark task complete for DONE and persist structured outcome metadata", async () => {
-      mockVisitRepository.findTaskById.mockResolvedValue(task);
-      mockVisitRepository.findById.mockResolvedValue(mockVisit);
-      mockVisitRepository.updateTask.mockResolvedValue({
-        ...task,
-        is_completed: true,
-        completed_at: new Date(),
+      mockVisitRepository.writeGuidedTaskAtomically.mockResolvedValue({
+        status: "UPDATED",
+        task: { ...task, is_completed: true, completed_at: new Date() },
       });
 
       await service.recordVisitTaskOutcome(
@@ -674,31 +723,28 @@ describe("VisitService", () => {
         frontlineAccess,
       );
 
-      expect(repository.updateTask).toHaveBeenCalledWith(
-        task.id,
-        expect.objectContaining({
-          is_completed: true,
-          completed_at: expect.any(Date),
-          notes: expect.stringContaining("VISIT_TASK_OUTCOME::"),
-        }),
+      expect(repository.writeGuidedTaskAtomically).toHaveBeenCalledWith({
+        taskId: task.id,
         organizationId,
-      );
-      expect(repository.updateTask).toHaveBeenCalledWith(
-        task.id,
-        expect.objectContaining({
-          notes: expect.stringContaining('"outcome":"DONE"'),
-        }),
-        organizationId,
-      );
+        expectedCarerId: "carer-123",
+        actor: {
+          authSubject: "auth-carer-123",
+          identityProvider: "clerk",
+          membershipId: "membership-carer-123",
+        },
+        write: {
+          kind: "OUTCOME",
+          outcome: VisitTaskOutcome.DONE,
+          completed: true,
+          notes: "Taken with water",
+        },
+      });
     });
 
     it("should mark task incomplete for non-DONE outcomes", async () => {
-      mockVisitRepository.findTaskById.mockResolvedValue(task);
-      mockVisitRepository.findById.mockResolvedValue(mockVisit);
-      mockVisitRepository.updateTask.mockResolvedValue({
-        ...task,
-        is_completed: false,
-        completed_at: null,
+      mockVisitRepository.writeGuidedTaskAtomically.mockResolvedValue({
+        status: "UPDATED",
+        task: { ...task, is_completed: false, completed_at: null },
       });
 
       await service.recordVisitTaskOutcome(
@@ -709,19 +755,17 @@ describe("VisitService", () => {
         frontlineAccess,
       );
 
-      expect(repository.updateTask).toHaveBeenCalledWith(
-        task.id,
+      expect(repository.writeGuidedTaskAtomically).toHaveBeenCalledWith(
         expect.objectContaining({
-          is_completed: false,
-          completed_at: null,
+          write: expect.objectContaining({ completed: false }),
         }),
-        organizationId,
       );
     });
 
     it("should deny unassigned carers from recording task outcomes", async () => {
-      mockVisitRepository.findTaskById.mockResolvedValue(task);
-      mockVisitRepository.findById.mockResolvedValue(mockVisit);
+      mockVisitRepository.writeGuidedTaskAtomically.mockResolvedValue({
+        status: "FORBIDDEN",
+      });
       const otherCarerAccess = {
         ...frontlineAccess,
         domainIdentityId: "other-carer-999",
@@ -757,8 +801,10 @@ describe("VisitService", () => {
     };
 
     it("should create a care log linked to visit, client, carer, and organization", async () => {
-      mockVisitRepository.findById.mockResolvedValue(mockVisit);
-      mockCareLogService.createCareLog.mockResolvedValue(careLog);
+      mockVisitRepository.createGuidedCareLogAtomically.mockResolvedValue({
+        status: "CREATED",
+        careLog,
+      });
 
       const result = await service.submitVisitCareNote(
         {
@@ -772,20 +818,44 @@ describe("VisitService", () => {
         frontlineAccess,
       );
 
-      expect(mockCareLogService.createCareLog).toHaveBeenCalledWith(
+      expect(repository.createGuidedCareLogAtomically).toHaveBeenCalledWith(
         expect.objectContaining({
           visitId: "visit-123",
-          clientId: "client-123",
-          carerId: "carer-123",
+          organizationId,
+          expectedCarerId: "carer-123",
+          actor: {
+            authSubject: "auth-carer-123",
+            identityProvider: "clerk",
+            membershipId: "membership-carer-123",
+          },
+          occurredAt: expect.any(Date),
           category: CareLogCategory.OTHER,
           notes: "Client settled well after lunch.",
         }),
-        "carer-123",
-        "carer",
-        organizationId,
-        frontlineAccess,
       );
       expect(result.id).toBe("care-log-123");
+    });
+
+    it("should reject care-note writes when the locked visit is terminal", async () => {
+      mockVisitRepository.createGuidedCareLogAtomically.mockResolvedValue({
+        status: "TERMINAL",
+      });
+      await expect(
+        service.submitVisitCareNote(
+          {
+            visitId: "visit-123",
+            category: CareLogCategory.OTHER,
+            notes: "Late write",
+          },
+          "carer-123",
+          "carer",
+          organizationId,
+          frontlineAccess,
+        ),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { code: ErrorCode.VISIT_COMPLETION_CONFLICT },
+      });
     });
 
     it("should deny family role from submitting visit care notes", async () => {
@@ -942,11 +1012,10 @@ describe("VisitService", () => {
   });
 
   describe("deleteVisit", () => {
-    it("should soft delete a visit", async () => {
-      mockVisitRepository.findById.mockResolvedValue(mockVisit);
-      mockVisitRepository.delete.mockResolvedValue({
-        ...mockVisit,
-        deleted_at: new Date(),
+    it("should route an admin delete through the atomic audit path", async () => {
+      mockVisitRepository.deleteAtomically.mockResolvedValue({
+        status: "DELETED",
+        visit: { ...mockVisit, deleted_at: new Date() },
       });
 
       const result = await service.deleteVisit(
@@ -956,52 +1025,33 @@ describe("VisitService", () => {
         organizationId,
       );
 
-      expect(repository.delete).toHaveBeenCalledWith(
-        "visit-123",
+      expect(repository.deleteAtomically).toHaveBeenCalledWith({
+        visitId: "visit-123",
         organizationId,
-      );
+        actorAuthSubject: "admin-123",
+      });
       expect(result.deleted_at).toBeTruthy();
     });
 
-    it("should throw BaseHttpException for carers trying to delete other carers visits", async () => {
-      mockVisitRepository.findById.mockResolvedValue(mockVisit);
-
+    it("should reject non-admin direct service callers", async () => {
       await expect(
-        service.deleteVisit(
-          "visit-123",
-          "different-carer-123",
-          "carer",
-          organizationId,
-        ),
-      ).rejects.toThrow(BaseHttpException);
-
-      await expect(
-        service.deleteVisit(
-          "visit-123",
-          "different-carer-123",
-          "carer",
-          organizationId,
-        ),
+        service.deleteVisit("visit-123", "carer-123", "carer", organizationId),
       ).rejects.toMatchObject({
-        response: { code: ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY },
+        response: { code: ErrorCode.FORBIDDEN_ADMIN_ONLY },
       });
+      expect(repository.deleteAtomically).not.toHaveBeenCalled();
     });
 
-    it("should allow carers to delete their own visits", async () => {
-      mockVisitRepository.findById.mockResolvedValue(mockVisit);
-      mockVisitRepository.delete.mockResolvedValue(mockVisit);
-
-      const result = await service.deleteVisit(
-        "visit-123",
-        "carer-123",
-        "carer",
-        organizationId,
-      );
-      expect(result).toEqual(mockVisit);
-      expect(mockVisitRepository.delete).toHaveBeenCalledWith(
-        "visit-123",
-        organizationId,
-      );
+    it("should reject deletion after the locked visit is no longer scheduled", async () => {
+      mockVisitRepository.deleteAtomically.mockResolvedValue({
+        status: "NOT_SCHEDULED",
+      });
+      await expect(
+        service.deleteVisit("visit-123", "admin-123", "admin", organizationId),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { code: ErrorCode.VISIT_COMPLETION_CONFLICT },
+      });
     });
   });
 });

@@ -6,6 +6,8 @@ import {
   Prisma,
   VisitStatus,
   MedicationStatus,
+  CareLog,
+  CareLogCategory,
 } from "@oasis/db";
 import { VISIT_TASK_OUTCOME_PREFIX } from "./visit.constants";
 import { assertTenantOwnershipForSensitiveWrite } from "../common/tenant/tenant-ownership";
@@ -55,6 +57,28 @@ export type StartVisitAtomicResult =
 export type UpdateVisitScheduleAtomicResult =
   | { status: "UPDATED"; visit: Visit }
   | { status: "NOT_FOUND" | "OVERLAP" | "TERMINAL" };
+
+type FrontlineWriteActor = {
+  authSubject: string;
+  identityProvider: string;
+  membershipId: string;
+};
+
+export type GuidedTaskWriteAtomicResult =
+  | { status: "UPDATED"; task: VisitTask }
+  | {
+      status: "NOT_FOUND" | "FORBIDDEN" | "ACCESS_UNAVAILABLE" | "TERMINAL";
+    };
+
+export type GuidedCareLogWriteAtomicResult =
+  | { status: "CREATED"; careLog: CareLog }
+  | {
+      status: "NOT_FOUND" | "FORBIDDEN" | "ACCESS_UNAVAILABLE" | "TERMINAL";
+    };
+
+export type DeleteVisitAtomicResult =
+  | { status: "DELETED"; visit: Visit }
+  | { status: "NOT_FOUND" | "NOT_SCHEDULED" };
 
 @Injectable()
 export class VisitRepository {
@@ -372,31 +396,31 @@ export class VisitRepository {
           );
           const proofMatches = Boolean(
             completionMetadata &&
-              completionAudit?.organization_id === input.organizationId &&
-              completionAudit.user_id === input.actor.authSubject &&
-              completionAudit.resource_type === "Visit" &&
-              completionAudit.resource_id === input.visitId &&
-              completionMetadata.membershipId === input.actor.membershipId &&
-              completionMetadata.actorRole === input.actor.role &&
-              completionMetadata.actorSurface === input.actor.surface &&
-              visit.actual_end?.toISOString() ===
-                completionMetadata.auditedActualEnd &&
-              this.completionProofKeyring.verify(
-                completionMetadata.keyId,
-                "request",
-                this.completionRequestPayload(input),
-                completionMetadata.requestFingerprint,
-              ) &&
-              this.completionProofKeyring.verify(
-                completionMetadata.keyId,
-                "record",
-                this.completionRecordPayload(
-                  input,
-                  visit.notes,
-                  visit.actual_end,
-                ),
-                completionMetadata.recordFingerprint,
+            completionAudit?.organization_id === input.organizationId &&
+            completionAudit.user_id === input.actor.authSubject &&
+            completionAudit.resource_type === "Visit" &&
+            completionAudit.resource_id === input.visitId &&
+            completionMetadata.membershipId === input.actor.membershipId &&
+            completionMetadata.actorRole === input.actor.role &&
+            completionMetadata.actorSurface === input.actor.surface &&
+            visit.actual_end?.toISOString() ===
+              completionMetadata.auditedActualEnd &&
+            this.completionProofKeyring.verify(
+              completionMetadata.keyId,
+              "request",
+              this.completionRequestPayload(input),
+              completionMetadata.requestFingerprint,
+            ) &&
+            this.completionProofKeyring.verify(
+              completionMetadata.keyId,
+              "record",
+              this.completionRecordPayload(
+                input,
+                visit.notes,
+                visit.actual_end,
               ),
+              completionMetadata.recordFingerprint,
+            ),
           );
           if (!proofMatches) {
             return {
@@ -447,10 +471,10 @@ export class VisitRepository {
           ]);
         const hasCompletionEvidence = Boolean(
           input.completionNote ||
-            this.nonEmpty(visit.notes) ||
-            taskOutcomeCount > 0 ||
-            careLogCount > 0 ||
-            medicationOutcomeCount > 0,
+          this.nonEmpty(visit.notes) ||
+          taskOutcomeCount > 0 ||
+          careLogCount > 0 ||
+          medicationOutcomeCount > 0,
         );
         if (!hasCompletionEvidence) {
           return { status: "EVIDENCE_REQUIRED" } as const;
@@ -492,27 +516,210 @@ export class VisitRepository {
     );
   }
 
-  async delete(id: string, organizationId: string): Promise<Visit> {
-    const deleted = await this.prisma.visit.updateMany({
-      where: this.prisma.whereNotDeleted({
-        id,
-        organization_id: organizationId,
-      }),
-      data: { deleted_at: new Date() },
-    });
-    if (deleted.count === 0) {
-      throw new Error("Visit not found in organization");
-    }
-    return this.prisma.visit.findFirst({
-      where: { id, organization_id: organizationId },
-      include: {
-        carer: true,
-        client: true,
-        tasks: {
-          where: { deleted_at: null },
-        },
+  async deleteAtomically(input: {
+    visitId: string;
+    organizationId: string;
+    actorAuthSubject: string;
+  }): Promise<DeleteVisitAtomicResult> {
+    return (this.prisma as any).$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const visit = await this.lockVisit(
+          tx,
+          input.visitId,
+          input.organizationId,
+        );
+        if (!visit) return { status: "NOT_FOUND" } as const;
+        if (visit.status !== VisitStatus.SCHEDULED) {
+          return { status: "NOT_SCHEDULED" } as const;
+        }
+
+        const deletedAt = new Date();
+        const deleted = await tx.visit.update({
+          where: { id: visit.id },
+          data: { deleted_at: deletedAt },
+          include: {
+            carer: true,
+            client: true,
+            tasks: { where: { deleted_at: null } },
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            organization_id: input.organizationId,
+            user_id: input.actorAuthSubject,
+            action: "VISIT_DELETED",
+            resource_type: "Visit",
+            resource_id: visit.id,
+            old_values: {
+              status: visit.status,
+              deleted: false,
+            },
+            new_values: {
+              status: visit.status,
+              deleted: true,
+              deletedAt: deletedAt.toISOString(),
+            },
+            timestamp: deletedAt,
+          },
+        });
+        return { status: "DELETED", visit: deleted } as const;
       },
-    }) as Promise<Visit>;
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+    );
+  }
+
+  async writeGuidedTaskAtomically(input: {
+    taskId: string;
+    organizationId: string;
+    expectedCarerId: string;
+    actor: FrontlineWriteActor;
+    write:
+      | { kind: "COMPLETE"; notes: string | null }
+      | {
+          kind: "OUTCOME";
+          outcome: string;
+          completed: boolean;
+          notes: string | null;
+        };
+  }): Promise<GuidedTaskWriteAtomicResult> {
+    return (this.prisma as any).$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const active = await this.lockAndValidateCarerAccess(tx, {
+          organizationId: input.organizationId,
+          carerId: input.expectedCarerId,
+          membershipId: input.actor.membershipId,
+          authSubject: input.actor.authSubject,
+          identityProvider: input.actor.identityProvider,
+        });
+        if (!active) return { status: "ACCESS_UNAVAILABLE" } as const;
+
+        const taskReference = await tx.visitTask.findFirst({
+          where: {
+            id: input.taskId,
+            deleted_at: null,
+            visit: {
+              organization_id: input.organizationId,
+              deleted_at: null,
+            },
+          },
+          select: { visit_id: true },
+        });
+        if (!taskReference) return { status: "NOT_FOUND" } as const;
+
+        const visit = await this.lockVisit(
+          tx,
+          taskReference.visit_id,
+          input.organizationId,
+        );
+        if (!visit) return { status: "NOT_FOUND" } as const;
+        if (visit.carer_id !== input.expectedCarerId) {
+          return { status: "FORBIDDEN" } as const;
+        }
+        if (
+          visit.client.organization_id !== input.organizationId ||
+          visit.client.deleted_at
+        ) {
+          return { status: "NOT_FOUND" } as const;
+        }
+        if (this.isTerminalVisit(visit.status)) {
+          return { status: "TERMINAL" } as const;
+        }
+
+        const task = await tx.visitTask.findFirst({
+          where: {
+            id: input.taskId,
+            visit_id: visit.id,
+            deleted_at: null,
+          },
+        });
+        if (!task) return { status: "NOT_FOUND" } as const;
+
+        const recordedAt = new Date();
+        const data: Prisma.VisitTaskUpdateInput =
+          input.write.kind === "COMPLETE"
+            ? {
+                is_completed: true,
+                completed_at: recordedAt,
+                notes: input.write.notes || task.notes,
+              }
+            : {
+                is_completed: input.write.completed,
+                completed_at: input.write.completed ? recordedAt : null,
+                notes: this.guidedOutcomeNotes(task.notes, input.write.notes, {
+                  outcome: input.write.outcome,
+                  recordedAt: recordedAt.toISOString(),
+                  recordedBy: input.expectedCarerId,
+                }),
+              };
+        const updated = await tx.visitTask.update({
+          where: { id: task.id },
+          data,
+        });
+        return { status: "UPDATED", task: updated } as const;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+    );
+  }
+
+  async createGuidedCareLogAtomically(input: {
+    visitId: string;
+    organizationId: string;
+    expectedCarerId: string;
+    actor: FrontlineWriteActor;
+    occurredAt: Date;
+    category: CareLogCategory;
+    notes: string;
+    escalated?: boolean;
+    escalatedTo?: string;
+  }): Promise<GuidedCareLogWriteAtomicResult> {
+    return (this.prisma as any).$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const active = await this.lockAndValidateCarerAccess(tx, {
+          organizationId: input.organizationId,
+          carerId: input.expectedCarerId,
+          membershipId: input.actor.membershipId,
+          authSubject: input.actor.authSubject,
+          identityProvider: input.actor.identityProvider,
+        });
+        if (!active) return { status: "ACCESS_UNAVAILABLE" } as const;
+
+        const visit = await this.lockVisit(
+          tx,
+          input.visitId,
+          input.organizationId,
+        );
+        if (!visit) return { status: "NOT_FOUND" } as const;
+        if (visit.carer_id !== input.expectedCarerId) {
+          return { status: "FORBIDDEN" } as const;
+        }
+        if (
+          visit.client.organization_id !== input.organizationId ||
+          visit.client.deleted_at
+        ) {
+          return { status: "NOT_FOUND" } as const;
+        }
+        if (this.isTerminalVisit(visit.status)) {
+          return { status: "TERMINAL" } as const;
+        }
+
+        const careLog = await tx.careLog.create({
+          data: {
+            organization_id: input.organizationId,
+            visit_id: visit.id,
+            client_id: visit.client_id,
+            carer_id: visit.carer_id,
+            occurred_at: input.occurredAt,
+            category: input.category,
+            notes: input.notes,
+            escalated: input.escalated ?? false,
+            escalated_to: input.escalatedTo,
+            source: "visit_workflow",
+          },
+        });
+        return { status: "CREATED", careLog } as const;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+    );
   }
 
   async findOverlappingVisits(
@@ -674,7 +881,10 @@ export class VisitRepository {
     return `carer-assignment:${organizationId}:${carerId}`;
   }
 
-  private carerIdentityLockKey(organizationId: string, carerId: string): string {
+  private carerIdentityLockKey(
+    organizationId: string,
+    carerId: string,
+  ): string {
     return `carer-identity:${organizationId}:${carerId}`;
   }
 
@@ -757,6 +967,31 @@ export class VisitRepository {
     return normalized || null;
   }
 
+  private isTerminalVisit(status: VisitStatus): boolean {
+    return status === VisitStatus.COMPLETED || status === VisitStatus.CANCELLED;
+  }
+
+  private guidedOutcomeNotes(
+    existingNotes: string | null,
+    newFreeTextNote: string | null,
+    metadata: {
+      outcome: string;
+      recordedAt: string;
+      recordedBy: string;
+    },
+  ): string {
+    const notes = (existingNotes || "")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(
+        (line) =>
+          line.length > 0 && !line.startsWith(VISIT_TASK_OUTCOME_PREFIX),
+      );
+    if (newFreeTextNote) notes.push(newFreeTextNote);
+    notes.push(`${VISIT_TASK_OUTCOME_PREFIX}${JSON.stringify(metadata)}`);
+    return notes.join("\n");
+  }
+
   private appendCompletionNote(
     current: string | null,
     completionNote: string,
@@ -778,7 +1013,8 @@ export class VisitRepository {
     }
     const metadata = value as Prisma.JsonObject;
     if (
-      metadata.completionFingerprintVersion !== VISIT_COMPLETION_PROOF_VERSION ||
+      metadata.completionFingerprintVersion !==
+        VISIT_COMPLETION_PROOF_VERSION ||
       !this.isCanonicalInstant(metadata.actualEnd) ||
       !this.isProofKeyId(metadata.completionProofKeyId) ||
       !this.isBoundIdentifier(metadata.membershipId) ||
@@ -879,7 +1115,9 @@ export class VisitRepository {
       ),
     );
     if (requestProof.keyId !== recordProof.keyId) {
-      throw new Error("Visit completion proof key changed during audit creation");
+      throw new Error(
+        "Visit completion proof key changed during audit creation",
+      );
     }
     await tx.auditLog.create({
       data: {

@@ -155,6 +155,8 @@ jobs:
         SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID=shift-synthetic
         SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET=YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=
         SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON=[]
+        VISIT_COMPLETION_PROOF_ACTIVE_KEY_ID=visit-synthetic
+        VISIT_COMPLETION_PROOF_ACTIVE_SECRET=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
         NEXTAUTH_SECRET=0123456789abcdef0123456789abcdefnextauth
         NEXTAUTH_URL=https://care.example.org
         NEXT_PUBLIC_API_URL=https://care.example.org/graphql
