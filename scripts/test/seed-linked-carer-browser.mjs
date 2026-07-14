@@ -47,7 +47,7 @@ const REVOKED_INVITATION_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 function localSubject(role, email) {
   return `local-${crypto
     .createHash("sha256")
-    .update(`${role}:${email}:auto`)
+    .update(`${role}:${email}:${ORGANIZATION_ID}`)
     .digest("hex")
     .slice(0, 16)}`;
 }
@@ -195,7 +195,7 @@ try {
     data: {
       id: MEMBERSHIP_ID,
       organization_id: ORGANIZATION_ID,
-      identity_provider: "cognito",
+      identity_provider: "clerk",
       auth_subject: carerSubject,
       normalized_email: "carer@local.dev",
       role: "carer",
@@ -208,7 +208,7 @@ try {
       {
         id: ADMIN_MEMBERSHIP_ID,
         organization_id: ORGANIZATION_ID,
-        identity_provider: "cognito",
+        identity_provider: "clerk",
         auth_subject: adminSubject,
         normalized_email: "admin@local.dev",
         role: "admin",
@@ -217,7 +217,7 @@ try {
       {
         id: FAMILY_MEMBERSHIP_ID,
         organization_id: ORGANIZATION_ID,
-        identity_provider: "cognito",
+        identity_provider: "clerk",
         auth_subject: familySubject,
         normalized_email: "family@local.dev",
         role: "family",
@@ -226,7 +226,7 @@ try {
       {
         id: UNAUTHORIZED_FAMILY_MEMBERSHIP_ID,
         organization_id: ORGANIZATION_ID,
-        identity_provider: "cognito",
+        identity_provider: "clerk",
         auth_subject: unauthorizedFamilySubject,
         normalized_email: "unauthorized-family@local.dev",
         role: "family",
@@ -235,7 +235,7 @@ try {
       {
         id: REVOKED_FAMILY_MEMBERSHIP_ID,
         organization_id: ORGANIZATION_ID,
-        identity_provider: "cognito",
+        identity_provider: "clerk",
         auth_subject: revokedFamilySubject,
         normalized_email: "revoked-family@local.dev",
         role: "family",
@@ -244,7 +244,7 @@ try {
       {
         id: MANAGER_MEMBERSHIP_ID,
         organization_id: ORGANIZATION_ID,
-        identity_provider: "cognito",
+        identity_provider: "clerk",
         auth_subject: managerSubject,
         normalized_email: "manager@local.dev",
         role: "manager",
@@ -253,7 +253,7 @@ try {
       {
         id: CARE_MANAGER_MEMBERSHIP_ID,
         organization_id: ORGANIZATION_ID,
-        identity_provider: "cognito",
+        identity_provider: "clerk",
         auth_subject: careManagerSubject,
         normalized_email: "care-manager@local.dev",
         role: "care_manager",
@@ -262,7 +262,7 @@ try {
       {
         id: OFFICE_MEMBERSHIP_ID,
         organization_id: ORGANIZATION_ID,
-        identity_provider: "cognito",
+        identity_provider: "clerk",
         auth_subject: officeSubject,
         normalized_email: "office@local.dev",
         role: "office",
@@ -279,7 +279,7 @@ try {
       {
         id: PENDING_INVITATION_ID,
         organization_id: ORGANIZATION_ID,
-        identity_provider: "cognito",
+        identity_provider: "clerk",
         intended_email: "pending-carer@example.test",
         normalized_email: "pending-carer@example.test",
         intended_role: "carer",
@@ -290,7 +290,7 @@ try {
       {
         id: EXPIRED_INVITATION_ID,
         organization_id: ORGANIZATION_ID,
-        identity_provider: "cognito",
+        identity_provider: "clerk",
         intended_email: "expired-carer@example.test",
         normalized_email: "expired-carer@example.test",
         intended_role: "carer",
@@ -303,7 +303,7 @@ try {
       {
         id: REVOKED_INVITATION_ID,
         organization_id: ORGANIZATION_ID,
-        identity_provider: "cognito",
+        identity_provider: "clerk",
         intended_email: "revoked-carer@example.test",
         normalized_email: "revoked-carer@example.test",
         intended_role: "carer",
@@ -315,7 +315,7 @@ try {
         id: FAMILY_INVITATION_ID,
         organization_id: ORGANIZATION_ID,
         activated_membership_id: FAMILY_MEMBERSHIP_ID,
-        identity_provider: "cognito",
+        identity_provider: "clerk",
         intended_email: "family@local.dev",
         normalized_email: "family@local.dev",
         intended_role: "family",
@@ -330,7 +330,7 @@ try {
         id: REVOKED_FAMILY_INVITATION_ID,
         organization_id: ORGANIZATION_ID,
         activated_membership_id: REVOKED_FAMILY_MEMBERSHIP_ID,
-        identity_provider: "cognito",
+        identity_provider: "clerk",
         intended_email: "revoked-family@local.dev",
         normalized_email: "revoked-family@local.dev",
         intended_role: "family",
@@ -345,7 +345,7 @@ try {
         id: UNAUTHORIZED_FAMILY_INVITATION_ID,
         organization_id: ORGANIZATION_ID,
         activated_membership_id: UNAUTHORIZED_FAMILY_MEMBERSHIP_ID,
-        identity_provider: "cognito",
+        identity_provider: "clerk",
         intended_email: "unauthorized-family@local.dev",
         normalized_email: "unauthorized-family@local.dev",
         intended_role: "family",

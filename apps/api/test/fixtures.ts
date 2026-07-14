@@ -1,7 +1,10 @@
 import { PrismaClient, VisitStatus } from '@oasis/db';
 import { TEST_ORGANIZATION_ID, TEST_USERS } from './jwt.mock';
 
-export async function createTestFixtures(prisma: PrismaClient) {
+export async function createTestFixtures(
+  prisma: PrismaClient,
+  identityProvider = 'cognito',
+) {
   // Clean up existing data
   await cleanDatabase(prisma);
 
@@ -71,7 +74,7 @@ export async function createTestFixtures(prisma: PrismaClient) {
     prisma.organizationMembership.create({
       data: {
         organization_id: organization.id,
-        identity_provider: 'cognito',
+        identity_provider: identityProvider,
         auth_subject: TEST_USERS.admin.sub,
         normalized_email: 'admin@example.test',
         role: 'admin',
@@ -81,7 +84,7 @@ export async function createTestFixtures(prisma: PrismaClient) {
     prisma.organizationMembership.create({
       data: {
         organization_id: organization.id,
-        identity_provider: 'cognito',
+        identity_provider: identityProvider,
         auth_subject: TEST_USERS.carer.sub,
         normalized_email: 'jane.doe@oasis.uk',
         role: 'carer',
@@ -92,7 +95,7 @@ export async function createTestFixtures(prisma: PrismaClient) {
     prisma.organizationMembership.create({
       data: {
         organization_id: organization.id,
-        identity_provider: 'cognito',
+        identity_provider: identityProvider,
         auth_subject: TEST_USERS.otherCarer.sub,
         normalized_email: 'john.smith@oasis.uk',
         role: 'carer',
@@ -103,7 +106,7 @@ export async function createTestFixtures(prisma: PrismaClient) {
     prisma.organizationMembership.create({
       data: {
         organization_id: organization.id,
-        identity_provider: 'cognito',
+        identity_provider: identityProvider,
         auth_subject: TEST_USERS.client.sub,
         normalized_email: 'mary.jones@example.test',
         role: 'client',

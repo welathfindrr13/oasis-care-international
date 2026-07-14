@@ -1,5 +1,5 @@
 import { Field, ID, InputType } from '@nestjs/graphql';
-import { IsDateString, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID } from 'class-validator';
 
 @InputType()
 export class CompleteVisitInput {
@@ -11,9 +11,4 @@ export class CompleteVisitInput {
   @IsOptional()
   @IsString()
   notes?: string;
-
-  @Field(() => String, { nullable: true })
-  @IsOptional()
-  @IsDateString()
-  actualEnd?: string;
 }

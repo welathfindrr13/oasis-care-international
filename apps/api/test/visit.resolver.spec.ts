@@ -37,7 +37,7 @@ describe('VisitResolver', () => {
         accessContext: {
           authenticated: true,
           authSubject: 'user-123',
-          identityProvider: 'cognito',
+          identityProvider: 'clerk',
           organizationId: 'org-123',
           membershipId: 'membership-admin',
           membershipState: 'ACTIVE',
@@ -66,7 +66,7 @@ describe('VisitResolver', () => {
         accessContext: {
           authenticated: true,
           authSubject: 'carer-123',
-          identityProvider: 'cognito',
+          identityProvider: 'clerk',
           organizationId: 'org-123',
           membershipId: 'membership-carer',
           membershipState: 'ACTIVE',
@@ -94,7 +94,7 @@ describe('VisitResolver', () => {
         accessContext: {
           authenticated: true,
           authSubject: 'client-123',
-          identityProvider: 'cognito',
+          identityProvider: 'clerk',
           organizationId: 'org-123',
           membershipId: 'membership-client',
           membershipState: 'ACTIVE',
@@ -316,21 +316,23 @@ describe('VisitResolver', () => {
   describe('updateVisit', () => {
     const updateInput = {
       id: 'visit-123',
-      status: VisitStatus.IN_PROGRESS,
-      actualStart: '2024-01-01T09:05:00Z',
+      scheduledStart: '2024-01-01T10:00:00Z',
+      scheduledEnd: '2024-01-01T11:00:00Z',
     };
 
     it('should update a visit successfully', async () => {
       mockVisitService.updateVisit.mockResolvedValue({
         ...mockVisit,
-        status: VisitStatus.IN_PROGRESS,
-        actual_start: new Date('2024-01-01T09:05:00Z'),
+        scheduled_start: new Date(updateInput.scheduledStart),
+        scheduled_end: new Date(updateInput.scheduledEnd),
       });
 
       const result = await resolver.updateVisit(updateInput, mockContext);
 
       expect(service.updateVisit).toHaveBeenCalledWith('visit-123', updateInput, 'user-123', 'admin', 'org-123');
-      expect(result.status).toBe(VisitStatus.IN_PROGRESS);
+      expect(result.scheduledStart).toEqual(
+        new Date(updateInput.scheduledStart),
+      );
     });
   });
 

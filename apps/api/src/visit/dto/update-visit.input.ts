@@ -1,6 +1,5 @@
 import { InputType, Field, ID } from '@nestjs/graphql';
-import { IsUUID, IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
-import { VisitStatus } from '@oasis/db';
+import { IsUUID, IsDateString, IsOptional } from 'class-validator';
 
 @InputType()
 export class UpdateVisitInput {
@@ -17,24 +16,4 @@ export class UpdateVisitInput {
   @IsOptional()
   @IsDateString()
   scheduledEnd?: string;
-
-  @Field({ nullable: true })
-  @IsOptional()
-  @IsDateString()
-  actualStart?: string;
-
-  @Field({ nullable: true })
-  @IsOptional()
-  @IsDateString()
-  actualEnd?: string;
-
-  @Field(() => VisitStatus, { nullable: true })
-  @IsOptional()
-  @IsEnum(VisitStatus)
-  status?: VisitStatus;
-
-  @Field({ nullable: true })
-  @IsOptional()
-  @IsString()
-  notes?: string;
 }

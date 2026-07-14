@@ -13,6 +13,7 @@ import { LegacyOperationalSurface } from '../auth/legacy-operational-access';
 import { CareLogDTO } from '../care-log/dto/care-log.dto';
 import { requireOperationalActor } from '../carer/carer-access.service';
 import { RequireCapabilities } from '../auth/access-capability';
+import { ManualAudit } from '../common/decorators/manual-audit.decorator';
 
 export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => SetMetadata('roles', roles);
 
@@ -118,6 +119,7 @@ export class VisitResolver {
 
   @Mutation(() => VisitDTO)
   @RequireCapabilities('FRONTLINE_VISIT_EXECUTE')
+  @ManualAudit()
   async completeVisit(@Args('input') input: CompleteVisitInput, @Context() ctx: any): Promise<VisitDTO> {
     const { userId, userRole, organizationId, accessContext } = requireOperationalActor(ctx.req.user);
 

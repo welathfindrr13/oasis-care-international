@@ -8,6 +8,10 @@ import { fileURLToPath } from 'node:url';
 import { CLERK_REQUIRED, REQUIRED, validate } from './preflight-env.mjs';
 
 const strongSecret = '01234567'.repeat(4);
+const visitProofSecret = [
+  'aaaa', 'aaaa', 'aaaa', 'aaaa',
+  'aaaa', 'aaaa', 'aaaa', 'aaaa',
+].join(' ');
 const deployDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const scriptPath = path.join(deployDir, 'scripts/preflight-env.mjs');
 
@@ -24,6 +28,8 @@ function validEnv(overrides = {}) {
     SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID: 'shift-current',
     SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET: Buffer.alloc(32, 1).toString('base64'),
     SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON: '[]',
+    VISIT_COMPLETION_PROOF_ACTIVE_KEY_ID: 'production-v1',
+    VISIT_COMPLETION_PROOF_ACTIVE_SECRET: visitProofSecret,
     NEXTAUTH_SECRET: `${strongSecret}nextauth`,
     NEXTAUTH_URL: 'https://care.example.org',
     NEXT_PUBLIC_API_URL: 'https://care.example.org/graphql',
@@ -156,6 +162,20 @@ test('shift idempotency previous keys reject invalid shapes, ids, and secrets', 
       ),
     );
   }
+});
+
+test('visit completion proof rotation requires a distinct complete previous key', () => {
+  const partial = validate(validEnv({
+    VISIT_COMPLETION_PROOF_PREVIOUS_KEY_ID: 'production-v0',
+  }));
+  const collision = validate(validEnv({
+    VISIT_COMPLETION_PROOF_PREVIOUS_KEY_ID: 'production-v1',
+    VISIT_COMPLETION_PROOF_PREVIOUS_SECRET: visitProofSecret,
+  }));
+
+  assert(partial.errors.some((error) => error.includes('configured together')));
+  assert(collision.errors.some((error) => error.includes('identifiers must be unique')));
+  assert(collision.errors.some((error) => error.includes('distinct secrets')));
 });
 
 test('placeholders and localhost fail', () => {

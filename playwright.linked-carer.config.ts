@@ -40,7 +40,7 @@ export default defineConfig({
         LOCAL_AUTH_JWT_SECRET: localAuthSecret,
         LOCAL_AUTH_ENABLED: "true",
         LOCAL_AUTH_ISSUER: "oasis-local-dev",
-        AUTH_IDENTITY_PROVIDER: "cognito",
+        AUTH_IDENTITY_PROVIDER: "clerk",
         TENANT_MEMBERSHIP_REQUIRED: "true",
         API_RATE_LIMIT_MAX: "1000",
         PORT: "4000",

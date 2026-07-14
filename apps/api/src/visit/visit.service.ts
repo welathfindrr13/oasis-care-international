@@ -1,30 +1,25 @@
 import { Injectable, HttpStatus, Logger, Inject } from "@nestjs/common";
-import { VisitRepository } from "./visit.repository";
+import {
+  VisitRepository,
+  type GuidedTaskWriteAtomicResult,
+} from "./visit.repository";
 import { CreateVisitInput } from "./dto/create-visit.input";
 import { UpdateVisitInput } from "./dto/update-visit.input";
 import { VisitFilterArgs } from "./dto/visit-filter.args";
-import {
-  CareLog,
-  CareLogCategory,
-  Visit,
-  VisitTask,
-  VisitStatus,
-} from "@oasis/db";
+import { CareLog, Visit, VisitTask, VisitStatus } from "@oasis/db";
 import { ClsService } from "nestjs-cls";
 import { BaseHttpException } from "../common/errors/base-http.exception";
 import { ErrorCode } from "../common/errors/error-codes";
 import { Counter } from "prom-client";
-import { CareLogService } from "../care-log/care-log.service";
 import { RecordVisitTaskOutcomeInput } from "./dto/record-visit-task-outcome.input";
 import { SubmitVisitCareNoteInput } from "./dto/submit-visit-care-note.input";
 import { CompleteVisitInput } from "./dto/complete-visit.input";
-import { CreateCareLogInput } from "../care-log/dto/create-care-log.input";
 import { VisitTaskOutcome } from "./dto/visit.dto";
-import { VISIT_TASK_OUTCOME_PREFIX } from "./visit.constants";
 import {
   type CanonicalCapabilityActor,
   hasCanonicalActorCapability,
 } from "../auth/access-capability";
+import { ACCESS_UNAVAILABLE_MESSAGE } from "../auth/access-context.service";
 
 @Injectable()
 export class VisitService {
@@ -33,7 +28,6 @@ export class VisitService {
   constructor(
     private readonly visitRepository: VisitRepository,
     private readonly cls: ClsService,
-    private readonly careLogService: CareLogService,
     @Inject("visit_overlap_total") private readonly overlapCounter: Counter,
     @Inject("visits_created_total") private readonly createCounter: Counter,
   ) {}
@@ -50,6 +44,17 @@ export class VisitService {
 
     const scheduledStart = new Date(data.scheduledStart);
     const scheduledEnd = new Date(data.scheduledEnd);
+    if (
+      Number.isNaN(scheduledStart.getTime()) ||
+      Number.isNaN(scheduledEnd.getTime()) ||
+      scheduledStart >= scheduledEnd
+    ) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        "Scheduled start must be before scheduled end",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     const created = await this.visitRepository.createIfAssignable(
       {
         organization: { connect: { id: orgId } },
@@ -57,7 +62,7 @@ export class VisitService {
         client: { connect: { id: data.clientId } },
         scheduled_start: scheduledStart,
         scheduled_end: scheduledEnd,
-        status: data.status || VisitStatus.SCHEDULED,
+        status: VisitStatus.SCHEDULED,
         notes: data.notes,
       },
       {
@@ -117,6 +122,16 @@ export class VisitService {
   ): Promise<Visit> {
     const orgId = await this.requireOrganizationId(organizationId);
     const requestId = this.cls.get("requestId");
+    const unsafeFields = ["actualStart", "actualEnd", "status", "notes"].filter(
+      (field) => Object.prototype.hasOwnProperty.call(data, field),
+    );
+    if (unsafeFields.length > 0) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        "Visit oversight can only change scheduled start and end times",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     const visit = await this.visitRepository.findById(id, orgId);
 
     if (!visit) {
@@ -130,45 +145,54 @@ export class VisitService {
     // Check permissions
     this.checkVisitAccess(visit, userId, userRole, "update");
 
-    // If updating schedule, check for overlaps
-    if (data.scheduledStart || data.scheduledEnd) {
-      const scheduledStart = data.scheduledStart
-        ? new Date(data.scheduledStart)
-        : visit.scheduled_start;
-      const scheduledEnd = data.scheduledEnd
-        ? new Date(data.scheduledEnd)
-        : visit.scheduled_end;
-
-      const overlappingVisits =
-        await this.visitRepository.findOverlappingVisits(
-          visit.carer_id,
-          scheduledStart,
-          scheduledEnd,
-          orgId,
-          visit.id,
-        );
-
-      if (overlappingVisits.length > 0) {
-        throw new BaseHttpException(
-          ErrorCode.VISIT_OVERLAP,
-          "Carer already has a visit scheduled during this time period",
-          HttpStatus.CONFLICT,
-        );
-      }
+    const scheduledStart = data.scheduledStart
+      ? new Date(data.scheduledStart)
+      : null;
+    const scheduledEnd = data.scheduledEnd ? new Date(data.scheduledEnd) : null;
+    const effectiveStart = scheduledStart || visit.scheduled_start;
+    const effectiveEnd = scheduledEnd || visit.scheduled_end;
+    if (
+      Number.isNaN(effectiveStart.getTime()) ||
+      Number.isNaN(effectiveEnd.getTime()) ||
+      effectiveStart >= effectiveEnd
+    ) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        "Scheduled start must be before scheduled end",
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
-    const updateData: any = {};
-    if (data.scheduledStart)
-      updateData.scheduled_start = new Date(data.scheduledStart);
-    if (data.scheduledEnd)
-      updateData.scheduled_end = new Date(data.scheduledEnd);
-    if (data.actualStart) updateData.actual_start = new Date(data.actualStart);
-    if (data.actualEnd) updateData.actual_end = new Date(data.actualEnd);
-    if (data.status) updateData.status = data.status;
-    if (data.notes !== undefined) updateData.notes = data.notes;
-
-    this.logger.log(`Updating visit ${id}`, { requestId, updateData });
-    return this.visitRepository.update(id, updateData, orgId);
+    const result = await this.visitRepository.updateScheduleAtomically({
+      visitId: id,
+      organizationId: orgId,
+      expectedCarerId: visit.carer_id,
+      scheduledStart,
+      scheduledEnd,
+    });
+    if (result.status === "UPDATED") {
+      this.logger.log(`Updated visit schedule ${id}`, { requestId });
+      return result.visit;
+    }
+    if (result.status === "OVERLAP") {
+      throw new BaseHttpException(
+        ErrorCode.VISIT_OVERLAP,
+        "Carer already has a visit scheduled during this time period",
+        HttpStatus.CONFLICT,
+      );
+    }
+    if (result.status === "TERMINAL") {
+      throw new BaseHttpException(
+        ErrorCode.VISIT_COMPLETION_CONFLICT,
+        "Completed or cancelled visits cannot be rescheduled",
+        HttpStatus.CONFLICT,
+      );
+    }
+    throw new BaseHttpException(
+      ErrorCode.VISIT_NOT_FOUND,
+      "Visit not found",
+      HttpStatus.NOT_FOUND,
+    );
   }
 
   async findVisitById(
@@ -244,22 +268,33 @@ export class VisitService {
     organizationId?: string,
   ): Promise<Visit> {
     const orgId = await this.requireOrganizationId(organizationId);
-    const visit = await this.visitRepository.findById(id, orgId);
-
-    if (!visit) {
+    if (userRole !== "admin") {
+      throw new BaseHttpException(
+        ErrorCode.FORBIDDEN_ADMIN_ONLY,
+        "Only administrators can delete scheduled visits",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    const requestId = this.cls.get("requestId");
+    this.logger.log(`Soft deleting visit ${id}`, { requestId });
+    const result = await this.visitRepository.deleteAtomically({
+      visitId: id,
+      organizationId: orgId,
+      actorAuthSubject: userId,
+    });
+    if (result.status === "DELETED") return result.visit;
+    if (result.status === "NOT_FOUND") {
       throw new BaseHttpException(
         ErrorCode.VISIT_NOT_FOUND,
         "Visit not found",
         HttpStatus.NOT_FOUND,
       );
     }
-
-    this.checkVisitAccess(visit, userId, userRole, "delete");
-
-    const requestId = this.cls.get("requestId");
-    this.logger.log(`Soft deleting visit ${id}`, { requestId });
-
-    return this.visitRepository.delete(id, orgId);
+    throw new BaseHttpException(
+      ErrorCode.VISIT_COMPLETION_CONFLICT,
+      "Only scheduled visits can be deleted",
+      HttpStatus.CONFLICT,
+    );
   }
 
   async completeTask(
@@ -270,42 +305,26 @@ export class VisitService {
     organizationId?: string,
     accessContext?: CanonicalCapabilityActor,
   ): Promise<VisitTask> {
-    this.assertFrontlineExecution(accessContext, userId, userRole, organizationId);
+    this.assertFrontlineExecution(
+      accessContext,
+      userId,
+      userRole,
+      organizationId,
+    );
     const orgId = await this.requireOrganizationId(organizationId);
     const requestId = this.cls.get("requestId");
-    const task = await this.visitRepository.findTaskById(taskId, orgId);
-
-    if (!task) {
-      throw new BaseHttpException(
-        ErrorCode.TASK_NOT_FOUND,
-        "Task not found",
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    // Get the visit to check permissions
-    const visit = await this.visitRepository.findById(task.visit_id, orgId);
-    if (!visit) {
-      throw new BaseHttpException(
-        ErrorCode.VISIT_NOT_FOUND,
-        "Visit not found",
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    this.checkVisitAccess(visit, userId, userRole, "update");
-
     this.logger.log(`Completing task ${taskId}`, { requestId });
-
-    return this.visitRepository.updateTask(
+    const result = await this.visitRepository.writeGuidedTaskAtomically({
       taskId,
-      {
-        is_completed: true,
-        completed_at: new Date(),
-        notes: notes || task.notes,
+      organizationId: orgId,
+      expectedCarerId: userId,
+      actor: this.runtimeFrontlineActor(accessContext),
+      write: {
+        kind: "COMPLETE",
+        notes: this.toNonEmpty(notes),
       },
-      orgId,
-    );
+    });
+    return this.resolveGuidedTaskWrite(result);
   }
 
   async startVisit(
@@ -315,38 +334,57 @@ export class VisitService {
     organizationId?: string,
     accessContext?: CanonicalCapabilityActor,
   ): Promise<Visit> {
-    this.assertFrontlineExecution(accessContext, userId, userRole, organizationId);
+    this.assertFrontlineExecution(
+      accessContext,
+      userId,
+      userRole,
+      organizationId,
+    );
     const orgId = await this.requireOrganizationId(organizationId);
-    const visit = await this.visitRepository.findById(visitId, orgId);
-    if (!visit) {
+    const membershipId = this.requireRuntimeMembership(accessContext);
+    const identityProvider = this.requireClerkIdentityProvider(accessContext);
+    const result = await this.visitRepository.startAtomically({
+      visitId,
+      organizationId: orgId,
+      expectedCarerId: userId,
+      actor: {
+        authSubject: accessContext!.authSubject,
+        identityProvider,
+        membershipId,
+      },
+    });
+    if (result.status === "STARTED" || result.status === "IDEMPOTENT") {
+      return result.visit;
+    }
+    if (result.status === "NOT_FOUND") {
       throw new BaseHttpException(
         ErrorCode.VISIT_NOT_FOUND,
         "Visit not found",
         HttpStatus.NOT_FOUND,
       );
     }
-
-    this.checkVisitAccess(visit, userId, userRole, "update");
-
-    if (
-      visit.status === VisitStatus.CANCELLED ||
-      visit.status === VisitStatus.COMPLETED
-    ) {
+    if (result.status === "ACCESS_UNAVAILABLE") {
+      this.denyRuntimeAccess();
+    }
+    if (result.status === "FORBIDDEN") {
+      throw new BaseHttpException(
+        ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
+        "You can only access your own visits",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    if (result.status === "CONFLICT") {
       throw new BaseHttpException(
         ErrorCode.VALIDATION_FAILED,
         "Only scheduled or in-progress visits can be started",
         HttpStatus.BAD_REQUEST,
       );
     }
-
-    const updateData: any = {
-      status: VisitStatus.IN_PROGRESS,
-    };
-    if (!visit.actual_start) {
-      updateData.actual_start = new Date();
-    }
-
-    return this.visitRepository.update(visitId, updateData, orgId);
+    throw new BaseHttpException(
+      ErrorCode.INTERNAL_ERROR,
+      "Visit start returned an unexpected result",
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
   }
 
   async recordVisitTaskOutcome(
@@ -356,52 +394,27 @@ export class VisitService {
     organizationId?: string,
     accessContext?: CanonicalCapabilityActor,
   ): Promise<VisitTask> {
-    this.assertFrontlineExecution(accessContext, userId, userRole, organizationId);
-    const orgId = await this.requireOrganizationId(organizationId);
-    const task = await this.visitRepository.findTaskById(input.taskId, orgId);
-    if (!task) {
-      throw new BaseHttpException(
-        ErrorCode.TASK_NOT_FOUND,
-        "Task not found",
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    const visit = await this.visitRepository.findById(task.visit_id, orgId);
-    if (!visit) {
-      throw new BaseHttpException(
-        ErrorCode.VISIT_NOT_FOUND,
-        "Visit not found",
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    this.checkVisitAccess(visit, userId, userRole, "update");
-
-    const recordedAt = new Date();
-    const noteText = this.toNonEmpty(input.notes);
-    const outcomeMetadata: Record<string, string> = {
-      outcome: input.outcome,
-      recordedAt: recordedAt.toISOString(),
-      recordedBy: userId,
-    };
-    if (noteText) {
-      outcomeMetadata.note = noteText;
-    }
-
-    const metadataLine = `${VISIT_TASK_OUTCOME_PREFIX}${JSON.stringify(outcomeMetadata)}`;
-    const mergedNotes = this.mergeTaskNotes(task.notes, noteText, metadataLine);
-
-    return this.visitRepository.updateTask(
-      task.id,
-      {
-        is_completed: input.outcome === VisitTaskOutcome.DONE,
-        completed_at:
-          input.outcome === VisitTaskOutcome.DONE ? recordedAt : null,
-        notes: mergedNotes,
-      },
-      orgId,
+    this.assertFrontlineExecution(
+      accessContext,
+      userId,
+      userRole,
+      organizationId,
     );
+    const orgId = await this.requireOrganizationId(organizationId);
+    const noteText = this.toNonEmpty(input.notes);
+    const result = await this.visitRepository.writeGuidedTaskAtomically({
+      taskId: input.taskId,
+      organizationId: orgId,
+      expectedCarerId: userId,
+      actor: this.runtimeFrontlineActor(accessContext),
+      write: {
+        kind: "OUTCOME",
+        outcome: input.outcome,
+        completed: input.outcome === VisitTaskOutcome.DONE,
+        notes: noteText,
+      },
+    });
+    return this.resolveGuidedTaskWrite(result);
   }
 
   async submitVisitCareNote(
@@ -411,38 +424,36 @@ export class VisitService {
     organizationId?: string,
     accessContext?: CanonicalCapabilityActor,
   ): Promise<CareLog> {
-    this.assertFrontlineExecution(accessContext, userId, userRole, organizationId);
+    this.assertFrontlineExecution(
+      accessContext,
+      userId,
+      userRole,
+      organizationId,
+    );
     const orgId = await this.requireOrganizationId(organizationId);
-    const visit = await this.visitRepository.findById(input.visitId, orgId);
-    if (!visit) {
+    const occurredAt = input.occurredAt
+      ? new Date(input.occurredAt)
+      : new Date();
+    if (Number.isNaN(occurredAt.getTime())) {
       throw new BaseHttpException(
-        ErrorCode.VISIT_NOT_FOUND,
-        "Visit not found",
-        HttpStatus.NOT_FOUND,
+        ErrorCode.VALIDATION_FAILED,
+        "Care note occurrence time is invalid",
+        HttpStatus.BAD_REQUEST,
       );
     }
-
-    this.checkVisitAccess(visit, userId, userRole, "update");
-
-    const createInput: CreateCareLogInput = {
-      clientId: visit.client_id,
-      carerId: visit.carer_id,
-      visitId: visit.id,
-      occurredAt: input.occurredAt || new Date().toISOString(),
+    const result = await this.visitRepository.createGuidedCareLogAtomically({
+      visitId: input.visitId,
+      organizationId: orgId,
+      expectedCarerId: userId,
+      actor: this.runtimeFrontlineActor(accessContext),
+      occurredAt,
       category: input.category,
       notes: input.notes,
       escalated: input.escalated,
       escalatedTo: input.escalatedTo,
-      source: "visit_workflow",
-    };
-
-    return this.careLogService.createCareLog(
-      createInput,
-      userId,
-      userRole,
-      orgId,
-      accessContext,
-    );
+    });
+    if (result.status === "CREATED") return result.careLog;
+    this.throwGuidedWriteFailure(result.status, "visit");
   }
 
   async completeVisit(
@@ -452,38 +463,51 @@ export class VisitService {
     organizationId?: string,
     accessContext?: CanonicalCapabilityActor,
   ): Promise<Visit> {
-    this.assertFrontlineExecution(accessContext, userId, userRole, organizationId);
+    this.assertFrontlineExecution(
+      accessContext,
+      userId,
+      userRole,
+      organizationId,
+    );
     const orgId = await this.requireOrganizationId(organizationId);
-    const visit = await this.visitRepository.findById(input.visitId, orgId);
-    if (!visit) {
+    const membershipId = this.requireRuntimeMembership(accessContext);
+    const identityProvider = this.requireClerkIdentityProvider(accessContext);
+    const visitNote = this.toNonEmpty(input.notes);
+    const result = await this.visitRepository.completeAtomically({
+      visitId: input.visitId,
+      organizationId: orgId,
+      expectedCarerId: userId,
+      completionNote: visitNote,
+      actor: {
+        authSubject: accessContext!.authSubject,
+        identityProvider,
+        membershipId,
+        role: accessContext!.effectiveRole || userRole,
+        surface: accessContext!.surface,
+      },
+    });
+
+    if (result.status === "COMPLETED" || result.status === "IDEMPOTENT") {
+      return result.visit;
+    }
+    if (result.status === "NOT_FOUND") {
       throw new BaseHttpException(
         ErrorCode.VISIT_NOT_FOUND,
         "Visit not found",
         HttpStatus.NOT_FOUND,
       );
     }
-
-    this.checkVisitAccess(visit, userId, userRole, "update");
-
-    const visitNote = this.toNonEmpty(input.notes);
-    const existingVisitNotes = this.toNonEmpty(visit.notes);
-
-    const [taskOutcomeCount, careLogCount, medicationOutcomeCount] =
-      await Promise.all([
-        this.visitRepository.countTaskOutcomeEntriesForVisit(visit.id, orgId),
-        this.visitRepository.countCareLogsForVisit(visit.id, orgId),
-        this.visitRepository.countMedicationOutcomesForVisit(visit.id, orgId),
-      ]);
-
-    const hasCompletionEvidence = Boolean(
-      visitNote ||
-      existingVisitNotes ||
-      taskOutcomeCount > 0 ||
-      careLogCount > 0 ||
-      medicationOutcomeCount > 0,
-    );
-
-    if (!hasCompletionEvidence) {
+    if (result.status === "FORBIDDEN") {
+      throw new BaseHttpException(
+        ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
+        "You can only access your own visits",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    if (result.status === "ACCESS_UNAVAILABLE") {
+      this.denyRuntimeAccess();
+    }
+    if (result.status === "EVIDENCE_REQUIRED") {
       throw new BaseHttpException(
         ErrorCode.VALIDATION_FAILED,
         "Complete visit requires task outcome, care log, medication outcome, or visit note",
@@ -491,23 +515,24 @@ export class VisitService {
       );
     }
 
-    const updateData: any = {
-      status: VisitStatus.COMPLETED,
-    };
-
-    if (input.actualEnd) {
-      updateData.actual_end = new Date(input.actualEnd);
-    } else if (!visit.actual_end) {
-      updateData.actual_end = new Date();
+    if (result.status !== "CONFLICT") {
+      throw new BaseHttpException(
+        ErrorCode.INTERNAL_ERROR,
+        "Visit completion returned an unexpected result",
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
-
-    if (visitNote) {
-      updateData.notes = existingVisitNotes
-        ? `${existingVisitNotes}\n${visitNote}`
-        : visitNote;
-    }
-
-    return this.visitRepository.update(visit.id, updateData, orgId);
+    const message =
+      result.reason === "CANCELLED"
+        ? "Cancelled visits cannot be completed"
+        : result.reason === "NOT_STARTED"
+          ? "Visit must be started before it can be completed"
+          : "Visit is already completed with different completion details";
+    throw new BaseHttpException(
+      ErrorCode.VISIT_COMPLETION_CONFLICT,
+      message,
+      HttpStatus.CONFLICT,
+    );
   }
 
   private checkVisitAccess(
@@ -575,6 +600,22 @@ export class VisitService {
     );
   }
 
+  private requireRuntimeMembership(
+    accessContext: CanonicalCapabilityActor | undefined,
+  ): string {
+    const membershipId = accessContext?.membershipId?.trim();
+    if (!membershipId) this.denyRuntimeAccess();
+    return membershipId;
+  }
+
+  private denyRuntimeAccess(): never {
+    throw new BaseHttpException(
+      ErrorCode.FORBIDDEN,
+      ACCESS_UNAVAILABLE_MESSAGE,
+      HttpStatus.FORBIDDEN,
+    );
+  }
+
   private async requireOrganizationId(
     organizationId?: string,
   ): Promise<string> {
@@ -595,24 +636,59 @@ export class VisitService {
     return trimmed.length > 0 ? trimmed : null;
   }
 
-  private mergeTaskNotes(
-    existingNotes: string | null | undefined,
-    newFreeTextNote: string | null,
-    metadataLine: string,
-  ): string {
-    const priorNotes = (existingNotes || "")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(
-        (line) =>
-          line.length > 0 && !line.startsWith(VISIT_TASK_OUTCOME_PREFIX),
-      );
-
-    if (newFreeTextNote) {
-      priorNotes.push(newFreeTextNote);
+  private requireClerkIdentityProvider(
+    accessContext?: CanonicalCapabilityActor,
+  ): "clerk" {
+    if (accessContext?.identityProvider !== "clerk") {
+      this.denyRuntimeAccess();
     }
+    return "clerk";
+  }
 
-    priorNotes.push(metadataLine);
-    return priorNotes.join("\n");
+  private runtimeFrontlineActor(accessContext?: CanonicalCapabilityActor): {
+    authSubject: string;
+    identityProvider: "clerk";
+    membershipId: string;
+  } {
+    return {
+      authSubject: accessContext!.authSubject,
+      identityProvider: this.requireClerkIdentityProvider(accessContext),
+      membershipId: this.requireRuntimeMembership(accessContext),
+    };
+  }
+
+  private resolveGuidedTaskWrite(
+    result: GuidedTaskWriteAtomicResult,
+  ): VisitTask {
+    if (result.status === "UPDATED") return result.task;
+    this.throwGuidedWriteFailure(result.status, "task");
+  }
+
+  private throwGuidedWriteFailure(
+    status: "NOT_FOUND" | "FORBIDDEN" | "ACCESS_UNAVAILABLE" | "TERMINAL",
+    resource: "task" | "visit",
+  ): never {
+    if (status === "ACCESS_UNAVAILABLE") this.denyRuntimeAccess();
+    if (status === "FORBIDDEN") {
+      throw new BaseHttpException(
+        ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
+        "You can only access your own visits",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    if (status === "TERMINAL") {
+      throw new BaseHttpException(
+        ErrorCode.VISIT_COMPLETION_CONFLICT,
+        "Completed or cancelled visits cannot accept further care records",
+        HttpStatus.CONFLICT,
+      );
+    }
+    throw new BaseHttpException(
+      resource === "task"
+        ? ErrorCode.TASK_NOT_FOUND
+        : ErrorCode.VISIT_NOT_FOUND,
+      resource === "task" ? "Task not found" : "Visit not found",
+      HttpStatus.NOT_FOUND,
+    );
   }
 }
