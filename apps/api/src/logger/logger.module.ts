@@ -1,4 +1,9 @@
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import {
+  Module,
+  NestModule,
+  MiddlewareConsumer,
+  RequestMethod,
+} from '@nestjs/common';
 import { pinoHttp } from 'pino-http';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
@@ -10,7 +15,7 @@ export class LoggerModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(RequestIdMiddleware)
-      .forRoutes('*');
+      .forRoutes({ path: '{*splat}', method: RequestMethod.ALL });
 
     consumer
       .apply(
@@ -52,6 +57,6 @@ export class LoggerModule implements NestModule {
           },
         }),
       )
-      .forRoutes('*');
+      .forRoutes({ path: '{*splat}', method: RequestMethod.ALL });
   }
 }

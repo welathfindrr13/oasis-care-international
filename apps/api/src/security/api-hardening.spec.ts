@@ -59,20 +59,23 @@ class ProbeTestController {
 class HardeningTestModule {}
 
 describe('API hardening', () => {
-  it('disables GraphQL introspection only in production', () => {
-    expect(getGraphQLSecurityOptions('production')).toMatchObject({
+  it('uses the supported development landing page and disables it in production', () => {
+    const productionOptions = getGraphQLSecurityOptions('production');
+    const testOptions = getGraphQLSecurityOptions('test');
+
+    expect(productionOptions).toMatchObject({
       introspection: false,
       playground: false,
       parseOptions: { maxTokens: 2_000 },
     });
-    expect(getGraphQLSecurityOptions('test')).toMatchObject({
+    expect(testOptions).toMatchObject({
       introspection: true,
-      playground: true,
+      playground: false,
       parseOptions: { maxTokens: 2_000 },
     });
-    expect(
-      getGraphQLSecurityOptions('production').validationRules,
-    ).toHaveLength(1);
+    expect(productionOptions.validationRules).toHaveLength(1);
+    expect(productionOptions.plugins).toHaveLength(1);
+    expect(testOptions.plugins).toHaveLength(2);
   });
 
   it('enables Helmet headers and disables x-powered-by', async () => {

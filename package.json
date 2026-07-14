@@ -39,7 +39,13 @@
     "typescript": "^5.3.3"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.11.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@nestjs/graphql@13.4.2>ws": "8.21.0",
+      "subscriptions-transport-ws@0.11.0>ws": "7.5.11"
+    }
   },
   "dependencies": {
     "@types/pino-http": "^6.1.0",

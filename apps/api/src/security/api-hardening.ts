@@ -4,6 +4,7 @@ import {
   ValidationError,
   ValidationPipe,
 } from '@nestjs/common';
+import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
@@ -48,16 +49,29 @@ function readPositiveInteger(value: string | undefined, fallback: number): numbe
 }
 
 export function getGraphQLSecurityOptions(nodeEnv = process.env.NODE_ENV) {
-  const enabled = nodeEnv !== 'production';
+  const developmentToolsEnabled = nodeEnv !== 'production';
 
   return {
-    introspection: enabled,
-    playground: enabled,
+    introspection: developmentToolsEnabled,
+    playground: false,
     parseOptions: {
       maxTokens: GRAPHQL_OPERATION_LIMITS.maxTokens,
     },
     validationRules: [createGraphQLOperationGuardRule()],
-    plugins: [createGraphQLOperationGuardPlugin()],
+    plugins: [
+      ...(developmentToolsEnabled
+        ? [
+            ApolloServerPluginLandingPageLocalDefault({
+              embed: {
+                endpointIsEditable: false,
+                runTelemetry: false,
+              },
+              footer: false,
+            }),
+          ]
+        : []),
+      createGraphQLOperationGuardPlugin(),
+    ],
   };
 }
 
