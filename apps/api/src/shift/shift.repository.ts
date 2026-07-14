@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService, ShiftVerificationMethod } from '@oasis/db';
+import { Prisma, PrismaService, ShiftVerificationMethod } from '@oasis/db';
 import { assertTenantIdForSensitiveWrite } from '../common/tenant/tenant-ownership';
+
+export type ShiftCloseRequestProof = {
+  hmac: string;
+  keyId: string;
+  version: number;
+};
 
 @Injectable()
 export class ShiftRepository {
@@ -21,6 +27,16 @@ export class ShiftRepository {
         clock_out_at: null,
       }),
       orderBy: { clock_in_at: 'desc' },
+    });
+  }
+
+  async findShiftByIdForCarer(shiftId: string, carerId: string, organizationId: string) {
+    return this.prisma.carerShift.findFirst({
+      where: this.prisma.whereNotDeleted({
+        id: shiftId,
+        organization_id: organizationId,
+        carer_id: carerId,
+      }),
     });
   }
 
@@ -73,25 +89,123 @@ export class ShiftRepository {
       clockOutReasonCode?: string | null;
       notes?: string | null;
     },
+    carerId: string,
     organizationId: string,
+    audit: {
+      authSubject: string;
+      membershipId: string;
+      actorRole: string;
+      requestFingerprint: string;
+      fingerprintKeyId: string;
+      fingerprintVersion: number;
+      notesProvided: boolean;
+    },
   ) {
-    await this.prisma.carerShift.updateMany({
-      where: this.prisma.whereNotDeleted({ id: shiftId, organization_id: organizationId }),
-      data: {
-        clock_out_at: new Date(),
-        clock_out_method: input.clockOutMethod,
-        clock_out_lat: input.clockOutLat,
-        clock_out_lng: input.clockOutLng,
-        clock_out_accuracy_m: input.clockOutAccuracyM,
-        clock_out_source: input.clockOutSource,
-        clock_out_reason_code: input.clockOutReasonCode,
-        notes: input.notes,
-      },
-    });
+    return (this.prisma as any).$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const closedAt = new Date();
+        const result = await tx.carerShift.updateMany({
+          where: {
+            id: shiftId,
+            carer_id: carerId,
+            organization_id: organizationId,
+            clock_out_at: null,
+            deleted_at: null,
+          },
+          data: {
+            clock_out_at: closedAt,
+            clock_out_method: input.clockOutMethod,
+            clock_out_lat: input.clockOutLat,
+            clock_out_lng: input.clockOutLng,
+            clock_out_accuracy_m: input.clockOutAccuracyM,
+            clock_out_source: input.clockOutSource,
+            clock_out_reason_code: input.clockOutReasonCode,
+            notes: input.notes,
+          },
+        });
 
-    return this.prisma.carerShift.findFirst({
-      where: this.prisma.whereNotDeleted({ id: shiftId, organization_id: organizationId }),
-    });
+        if (result.count === 1) {
+          await tx.auditLog.create({
+            data: {
+              organization_id: organizationId,
+              user_id: audit.authSubject,
+              action: 'SHIFT_CLOCKED_OUT',
+              resource_type: 'CarerShift',
+              resource_id: shiftId,
+              old_values: { state: 'OPEN' },
+              new_values: {
+                state: 'CLOSED',
+                membershipId: audit.membershipId,
+                actorRole: audit.actorRole,
+                requestFingerprint: audit.requestFingerprint,
+                fingerprintKeyId: audit.fingerprintKeyId,
+                fingerprintVersion: audit.fingerprintVersion,
+                notesProvided: audit.notesProvided,
+              },
+              timestamp: closedAt,
+            },
+          });
+        }
+
+        const shift = await tx.carerShift.findFirst({
+          where: {
+            id: shiftId,
+            carer_id: carerId,
+            organization_id: organizationId,
+            deleted_at: null,
+          },
+        });
+        if (result.count === 1) {
+          return {
+            applied: true,
+            shift,
+            requestProof: {
+              hmac: audit.requestFingerprint,
+              keyId: audit.fingerprintKeyId,
+              version: audit.fingerprintVersion,
+            } satisfies ShiftCloseRequestProof,
+          };
+        }
+
+        const priorClose = await tx.auditLog.findFirst({
+          where: {
+            organization_id: organizationId,
+            resource_type: 'CarerShift',
+            resource_id: shiftId,
+            action: 'SHIFT_CLOCKED_OUT',
+          },
+          orderBy: { timestamp: 'desc' },
+          select: { new_values: true },
+        });
+        return {
+          applied: false,
+          shift,
+          requestProof: this.closeRequestProof(priorClose?.new_values),
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+    );
+  }
+
+  private closeRequestProof(
+    value: Prisma.JsonValue | null | undefined,
+  ): ShiftCloseRequestProof | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const metadata = value as Prisma.JsonObject;
+    if (
+      !Number.isInteger(metadata.fingerprintVersion) ||
+      typeof metadata.fingerprintKeyId !== 'string' ||
+      !/^[a-z0-9][a-z0-9_-]{0,31}$/.test(metadata.fingerprintKeyId) ||
+      typeof metadata.requestFingerprint !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(metadata.requestFingerprint)
+    ) {
+      return null;
+    }
+    return {
+      hmac: metadata.requestFingerprint,
+      keyId: metadata.fingerprintKeyId,
+      version: metadata.fingerprintVersion as number,
+    };
   }
 
   async countActiveShifts(organizationId: string) {

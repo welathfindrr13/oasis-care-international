@@ -1395,7 +1395,7 @@ export const CLOCK_IN_MUTATION = `
 `;
 
 export const CLOCK_OUT_MUTATION = `
-  mutation ClockOut($input: ClockOutInput) {
+  mutation ClockOut($input: ClockOutInput!) {
     clockOut(input: $input) {
       id
       carerId

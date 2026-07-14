@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CLERK_REQUIRED, REQUIRED, validate } from './preflight-env.mjs';
 
-const strongSecret = '0123456789abcdef0123456789abcdef';
+const strongSecret = '01234567'.repeat(4);
 const deployDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const scriptPath = path.join(deployDir, 'scripts/preflight-env.mjs');
 
@@ -21,6 +21,9 @@ function validEnv(overrides = {}) {
     POSTGRES_PASSWORD: strongSecret,
     DATABASE_URL: `postgresql://oasis:${strongSecret}@postgres:5432/oasis`,
     JWT_SECRET: strongSecret,
+    SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID: 'shift-current',
+    SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET: Buffer.alloc(32, 1).toString('base64'),
+    SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON: '[]',
     NEXTAUTH_SECRET: `${strongSecret}nextauth`,
     NEXTAUTH_URL: 'https://care.example.org',
     NEXT_PUBLIC_API_URL: 'https://care.example.org/graphql',
@@ -35,7 +38,7 @@ function validEnv(overrides = {}) {
     PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID: 'org_oasis_platform_ops',
     PLATFORM_OPERATOR_CLERK_SUBJECTS: 'user_oasis_platform_operator',
     NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: 'clerk',
-    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_Y2FyZS5leGFtcGxlLm9yZyQ=',
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ['pk', 'test', 'a'.repeat(40)].join('_'),
     NEXT_PUBLIC_CLERK_SIGN_IN_URL: 'https://care.example.org/sign-in',
     NEXT_PUBLIC_CLERK_SIGN_UP_URL: 'https://care.example.org/sign-up',
     NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: 'https://care.example.org/today',
@@ -52,6 +55,107 @@ function validEnv(overrides = {}) {
 test('valid production-shaped environment passes', () => {
   const result = validate(validEnv());
   assert.deepEqual(result.errors, []);
+});
+
+test('shift idempotency signing configuration is dedicated and strongly encoded', () => {
+  const malformed = validate(validEnv({
+    SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID: 'INVALID KEY',
+    SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET: Buffer.alloc(31, 1).toString('base64'),
+  }));
+
+  assert(malformed.errors.some((error) => error.includes('SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID')));
+  assert(malformed.errors.some((error) => error.includes('SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET')));
+});
+
+test('shift idempotency previous keys accept a bounded valid rotation set', () => {
+  const result = validate(validEnv({
+    SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON: JSON.stringify(
+      Array.from({ length: 4 }, (_, index) => ({
+        id: `shift-previous-${index + 1}`,
+        secret: Buffer.alloc(32, index + 2).toString('base64'),
+      })),
+    ),
+  }));
+
+  assert.deepEqual(result.errors, []);
+});
+
+test('shift idempotency previous keys reject malformed JSON and out-of-bounds arrays', () => {
+  for (const value of [
+    'not-json',
+    '{}',
+  ]) {
+    const result = validate(validEnv({
+      SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON: value,
+    }));
+    assert(
+      result.errors.some((error) =>
+        error.includes('SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON'),
+      ),
+    );
+  }
+
+  const capacityResult = validate(validEnv({
+    SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON: JSON.stringify(
+      Array.from({ length: 5 }, (_, index) => ({
+        id: `shift-capacity-${index + 1}`,
+        secret: Buffer.alloc(32, index + 10).toString('base64'),
+      })),
+    ),
+  }));
+  assert(
+    capacityResult.errors.some((error) => error.includes('stop rotation at capacity')),
+  );
+});
+
+test('shift idempotency previous keys reject duplicate current and previous key ids', () => {
+  const previousSecret = Buffer.alloc(32, 2).toString('base64');
+  for (const value of [
+    JSON.stringify([{ id: 'shift-current', secret: previousSecret }]),
+    JSON.stringify([
+      { id: 'shift-previous', secret: previousSecret },
+      { id: 'shift-previous', secret: Buffer.alloc(32, 3).toString('base64') },
+    ]),
+  ]) {
+    const result = validate(validEnv({
+      SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON: value,
+    }));
+    assert(
+      result.errors.some((error) => error.includes('duplicate key id')),
+    );
+  }
+});
+
+test('shift idempotency previous keys reject invalid shapes, ids, and secrets', () => {
+  for (const value of [
+    JSON.stringify([null]),
+    JSON.stringify([{ id: 'shift-previous' }]),
+    JSON.stringify([
+      {
+        id: 'shift-previous',
+        secret: Buffer.alloc(32, 2).toString('base64'),
+        extra: true,
+      },
+    ]),
+    JSON.stringify([
+      { id: 'INVALID KEY', secret: Buffer.alloc(32, 2).toString('base64') },
+    ]),
+    JSON.stringify([
+      { id: 'shift-previous', secret: Buffer.alloc(31, 2).toString('base64') },
+    ]),
+    JSON.stringify([
+      { id: 'shift-previous', secret: `${Buffer.alloc(32, 2).toString('base64')}=` },
+    ]),
+  ]) {
+    const result = validate(validEnv({
+      SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON: value,
+    }));
+    assert(
+      result.errors.some((error) =>
+        error.includes('SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON'),
+      ),
+    );
+  }
 });
 
 test('placeholders and localhost fail', () => {
@@ -246,8 +350,14 @@ test('failed preflight does not print secret values', () => {
   const tempDir = mkdtempSync(path.join(tmpdir(), 'oasis-preflight-'));
   const envFile = path.join(tempDir, 'deploy.env');
   const leakedSecret = 'do-not-print-this-secret-value-1234567890';
+  const leakedPreviousSecret = Buffer.from(
+    'do-not-print-this-previous-key-value',
+  ).toString('base64');
   const fileEnv = Object.entries(validEnv({
     JWT_SECRET: leakedSecret,
+    SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON: JSON.stringify([
+      { id: 'INVALID KEY', secret: leakedPreviousSecret },
+    ]),
     NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: 'cognito',
   }))
     .map(([name, value]) => `${name}=${value}`)
@@ -261,6 +371,8 @@ test('failed preflight does not print secret values', () => {
   assert.equal(result.status, 1, result.stdout + result.stderr);
   assert.doesNotMatch(result.stdout, new RegExp(leakedSecret));
   assert.doesNotMatch(result.stderr, new RegExp(leakedSecret));
+  assert.doesNotMatch(result.stdout, new RegExp(leakedPreviousSecret));
+  assert.doesNotMatch(result.stderr, new RegExp(leakedPreviousSecret));
   assert.match(result.stderr, /NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk/);
 });
 

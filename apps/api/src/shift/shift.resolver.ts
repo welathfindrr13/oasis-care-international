@@ -10,6 +10,7 @@ import { Context } from '@nestjs/graphql';
 import { LegacyOperationalSurface } from '../auth/legacy-operational-access';
 import { requireOperationalActor } from '../carer/carer-access.service';
 import { RequireCapabilities } from '../auth/access-capability';
+import { ManualAudit } from '../common/decorators/manual-audit.decorator';
 
 @Resolver()
 @UseGuards(GqlRolesGuard)
@@ -48,9 +49,10 @@ export class ShiftResolver {
 
   @Mutation(() => CarerShiftDto)
   @RequireCapabilities('FRONTLINE_SHIFT_EXECUTE')
+  @ManualAudit()
   async clockOut(
-    @Args('input', { type: () => ClockOutInput, nullable: true })
-    input: ClockOutInput = new ClockOutInput(),
+    @Args('input', { type: () => ClockOutInput })
+    input: ClockOutInput,
     @Context() ctx: any,
   ): Promise<CarerShiftDto> {
     const { userId, userRole, organizationId, accessContext } = requireOperationalActor(ctx.req.user);

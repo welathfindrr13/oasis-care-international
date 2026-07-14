@@ -13,6 +13,9 @@ This matrix is generated from current code references and Deployment V2 template
 | `POSTGRES_PASSWORD` | Postgres | Yes | No | `deploy/v2/docker-compose.yml` | strong random value | Preflight fails if missing, weak, or placeholder. |
 | `DATABASE_URL` | API/db | Yes | No | `libs/db/prisma/schema.prisma`, `libs/db/src/prisma.service.ts`, API config | `postgresql://oasis:<secret>@postgres:5432/oasis` | API/db startup or first query fails. |
 | `JWT_SECRET` | API | Yes | No | `apps/api/src/config/config.module.ts`, `libs/auth/src/jwt.strategy.ts` | 32+ char random secret | API config validation fails if missing/short. |
+| `SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID` | API | Yes | No | shift idempotency key-ring | lowercase stable key id | Shift clock-out fails closed if missing or malformed. |
+| `SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET` | API | Yes | No | shift idempotency key-ring | base64-encoded 32+ random bytes | Shift clock-out fails closed; this key is independent from JWT rotation. |
+| `SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON` | API | No | No | shift idempotency key-ring | bounded JSON key array | Previous keys verify historical proofs only; they never sign new proofs. |
 | `NEXTAUTH_SECRET` | Web/API proxy | Yes | No | web auth/proxy routes, Compose | 32+ char random secret | Sessions/proxy token extraction fail. |
 | `NEXTAUTH_URL` | Web/auth | Yes | No | NextAuth config, Compose | `https://care.example.com` | Auth callbacks and cookies can fail; preflight blocks localhost. |
 | `NEXT_PUBLIC_API_URL` | Web | Yes | Yes | web GraphQL clients and route proxy | `https://care.example.com/graphql` | Web routes proxy to wrong API; build may bake wrong public URL. |
@@ -31,6 +34,17 @@ This matrix is generated from current code references and Deployment V2 template
 | `NEXT_PUBLIC_LOCAL_AUTH_ENABLED` | Web | Yes, must be `false` | Yes | login/local auth mode | `false` | Preflight fails if true in production. |
 | `DEMO_MODE` | API | Yes, must be `false` or absent | No | demo seed guard, health | `false` | Preflight fails if true in production. |
 | `RUN_MIGRATIONS` | API entrypoint | Yes, explicit | No | `apps/api/docker-entrypoint.sh`, Compose | `false` normally, `true` for controlled migration window | Avoids accidental DB mutation on restart. |
+
+Shift idempotency key IDs are permanent identifiers: never reuse an ID for new
+secret material. Clock-out retries currently have no age cutoff, so a verification
+key **must not be removed while any persisted shift proof signed by that key remains
+retryable**. Runtime and preflight accept at most four previous keys to bound JSON
+parsing, retained secret material, and verification configuration. At that capacity,
+stop rotation rather than evicting a referenced key. A further rotation requires
+separate approved evidence that no retryable persisted proof references the key to
+be removed, or an approved product/data change that makes those proofs non-retryable.
+Removing a referenced key makes an exact retry fail closed as a conflict; it never
+silently accepts or overwrites the historical close.
 
 ## Optional Or Feature-Flagged Variables
 

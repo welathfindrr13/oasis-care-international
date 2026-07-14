@@ -743,7 +743,7 @@ describe('Visit E2E Tests', () => {
         .set('Authorization', getBearerToken('carer'))
         .send({
           query: `
-            mutation ClockOut($input: ClockOutInput) {
+            mutation ClockOut($input: ClockOutInput!) {
               clockOut(input: $input) {
                 id
                 carerId
@@ -754,6 +754,7 @@ describe('Visit E2E Tests', () => {
           `,
           variables: {
             input: {
+              shiftId: clockInResponse.body.data.clockIn.id,
               method: 'MANUAL',
               source: 'membership-e2e',
             },

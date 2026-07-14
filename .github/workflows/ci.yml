@@ -149,9 +149,12 @@ jobs:
         ACME_EMAIL=ops@example.org
         POSTGRES_DB=oasis
         POSTGRES_USER=oasis
-        POSTGRES_PASSWORD=0123456789abcdef0123456789abcdef
-        DATABASE_URL=postgresql://oasis:0123456789abcdef0123456789abcdef@postgres:5432/oasis
-        JWT_SECRET=0123456789abcdef0123456789abcdef
+        POSTGRES_PASSWORD=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        DATABASE_URL=postgresql://oasis:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@postgres:5432/oasis
+        JWT_SECRET=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID=shift-synthetic
+        SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET=YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=
+        SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON=[]
         NEXTAUTH_SECRET=0123456789abcdef0123456789abcdefnextauth
         NEXTAUTH_URL=https://care.example.org
         NEXT_PUBLIC_API_URL=https://care.example.org/graphql
@@ -166,7 +169,7 @@ jobs:
         PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID=org_oasis_platform_ops
         PLATFORM_OPERATOR_CLERK_SUBJECTS=user_oasis_platform_operator
         NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk
-        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_c3ludGhldGljLWNsZXJrLm9hc2lzLmludmFsaWQk
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         NEXT_PUBLIC_CLERK_SIGN_IN_URL=https://care.example.org/sign-in
         NEXT_PUBLIC_CLERK_SIGN_UP_URL=https://care.example.org/sign-up
         NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=https://care.example.org/today

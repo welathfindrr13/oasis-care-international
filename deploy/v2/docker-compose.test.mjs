@@ -8,6 +8,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const compose = fs.readFileSync(new URL('./docker-compose.yml', import.meta.url), 'utf8');
+const legacyApiProductionEnv = fs.readFileSync(
+  new URL('../../apps/api/.env.production.example', import.meta.url),
+  'utf8',
+);
 const webDockerfile = fs.readFileSync(new URL('../../apps/web/Dockerfile', import.meta.url), 'utf8');
 const apiDockerfile = fs.readFileSync(new URL('../../apps/api/Dockerfile', import.meta.url), 'utf8');
 const verifyLocalScript = fs.readFileSync(new URL('./scripts/verify-local.sh', import.meta.url), 'utf8');
@@ -145,9 +149,17 @@ test('production deployment config fails fast for required env instead of using 
     'PLATFORM_OPERATOR_CLERK_SUBJECTS',
     'POSTGRES_PASSWORD',
     'JWT_SECRET',
+    'SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID',
+    'SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET',
   ]) {
     assert.match(compose, new RegExp(`\\$\\{${name}:\\?`), `${name} should use required interpolation`);
   }
+});
+
+test('legacy API production env is a superseded marker, not a second deployment template', () => {
+  assert.match(legacyApiProductionEnv, /SUPERSEDED/);
+  assert.match(legacyApiProductionEnv, /deploy\/v2\/\.env\.example/);
+  assert.doesNotMatch(legacyApiProductionEnv, /^[A-Z][A-Z0-9_]*=/m);
 });
 
 test('docker compose config fails when a required variable is missing', () => {

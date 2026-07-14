@@ -50,6 +50,15 @@ test('Deployment V2 CI synthetic env includes required Clerk redirect URLs', () 
   assert.match(workflow, /NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=https:\/\/care\.example\.org\/today/);
 });
 
+test('Deployment V2 CI synthetic env includes the complete shift idempotency key ring', () => {
+  assert.match(workflow, /SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID=shift-synthetic/);
+  assert.match(
+    workflow,
+    /SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET=YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=/,
+  );
+  assert.match(workflow, /SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON=\[\]/);
+});
+
 test('Deployment V2 CI runs tenant nullability dry-run workflow static guard', () => {
   assert.match(workflow, /node --test \.github\/workflows\/tenant-nullability-dry-run\.test\.mjs/);
 });
