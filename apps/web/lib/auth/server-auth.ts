@@ -23,7 +23,7 @@ export interface ServerAuthContext {
 export async function getServerAuthContext(): Promise<ServerAuthContext> {
   const authMode = resolveAuthMode(process.env);
   if (authMode === 'clerk') {
-    const clerkAuth = auth();
+    const clerkAuth = await auth();
     let accessToken: string | null = null;
     if (clerkAuth.userId) {
       try {

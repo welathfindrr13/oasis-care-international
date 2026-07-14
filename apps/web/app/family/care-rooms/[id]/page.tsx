@@ -64,7 +64,8 @@ async function getRoomStoriesSafe(
   }
 }
 
-export default async function FamilyCareRoomPage({ params }: { params: { id: string } }) {
+export default async function FamilyCareRoomPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const roomResult = await getRoomSafe(params.id)
 
   if (!roomResult.room) {

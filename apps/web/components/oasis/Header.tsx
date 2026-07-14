@@ -86,11 +86,7 @@ function NextAuthHeader({ className }: HeaderProps) {
   });
 
   async function handleSignOut() {
-    try {
-      await nextAuthSignOut({ redirect: false });
-    } finally {
-      window.location.assign("/api/auth/cognito-logout");
-    }
+    await nextAuthSignOut({ callbackUrl: "/login" });
   }
 
   return (

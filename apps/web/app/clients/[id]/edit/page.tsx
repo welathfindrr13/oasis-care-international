@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '../../../../components/oasis/Header';
@@ -43,10 +43,11 @@ interface FormData {
 }
 
 interface ClientEditPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
-export default function ClientEditPage({ params }: ClientEditPageProps) {
+export default function ClientEditPage(props: ClientEditPageProps) {
+  const params = use(props.params);
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);

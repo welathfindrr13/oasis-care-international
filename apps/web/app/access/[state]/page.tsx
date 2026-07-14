@@ -24,11 +24,12 @@ const messages = {
   },
 } as const;
 
-export default function AccessStatePage({
-  params,
-}: {
-  params: { state: string };
-}) {
+export default async function AccessStatePage(
+  props: {
+    params: Promise<{ state: string }>;
+  }
+) {
+  const params = await props.params;
   const message = messages[params.state as keyof typeof messages];
   if (!message) notFound();
 

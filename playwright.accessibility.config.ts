@@ -64,8 +64,6 @@ export default defineConfig({
         LOCAL_AUTH_ENABLED: "true",
         NEXT_PUBLIC_LOCAL_AUTH_ENABLED: "true",
         LOCAL_AUTH_ISSUER: "oasis-accessibility-fixture",
-        AUTH_IDENTITY_PROVIDER: "cognito",
-        NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: "cognito",
         NEXT_PUBLIC_API_URL: `http://127.0.0.1:${apiPort}/graphql`,
         OASIS_BROWSER_CLERK_STUB: "true",
       },

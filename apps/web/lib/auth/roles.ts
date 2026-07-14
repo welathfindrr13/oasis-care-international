@@ -18,14 +18,6 @@ export function normalizeAppRoles(raw: unknown): string[] {
   return Array.from(new Set([canonicalRole, ...normalizedRoles]));
 }
 
-export function extractRolesFromClaims(claims: Record<string, any> | null): string[] {
-  if (!claims) return [];
-  const cognitoGroups = claims['cognito:groups'];
-  const realmRoles = claims?.realm_access?.roles;
-  const rawRoles = Array.isArray(cognitoGroups) ? cognitoGroups : realmRoles;
-  return rawRoles ? normalizeAppRoles(rawRoles) : [];
-}
-
 export function hasRole(raw: unknown, role: string): boolean {
   const normalizedRole = String(role).trim().toLowerCase();
   if (!normalizedRole) return false;

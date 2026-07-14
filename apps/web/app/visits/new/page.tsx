@@ -1,12 +1,13 @@
 import NewVisitPageClient from './NewVisitPageClient'
 
 interface NewVisitPageProps {
-  searchParams?: {
+  searchParams?: Promise<{
     clientId?: string
-  }
+  }>
 }
 
-export default function NewVisitPage({ searchParams }: NewVisitPageProps) {
+export default async function NewVisitPage(props: NewVisitPageProps) {
+  const searchParams = await props.searchParams
   const initialClientId =
     typeof searchParams?.clientId === 'string' ? searchParams.clientId : ''
 

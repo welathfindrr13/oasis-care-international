@@ -46,6 +46,25 @@ test('content security policy is driven by Deployment V2 app and Clerk domains',
   assert.doesNotMatch(csp, /oasis-care\.co/)
 })
 
+test('development Clerk browser proof disables only the Next.js dev indicators', () => {
+  const browserProof = loadNextConfig({
+    NODE_ENV: 'development',
+    OASIS_BROWSER_CLERK_STUB: 'true',
+  })
+  const normalDevelopment = loadNextConfig({
+    NODE_ENV: 'development',
+    OASIS_BROWSER_CLERK_STUB: 'false',
+  })
+  const production = loadNextConfig({
+    NODE_ENV: 'production',
+    OASIS_BROWSER_CLERK_STUB: 'true',
+  })
+
+  assert.equal(browserProof.devIndicators, false)
+  assert.equal(normalDevelopment.devIndicators, undefined)
+  assert.equal(production.devIndicators, undefined)
+})
+
 test('service worker registration points at an existing public sw.js asset', () => {
   assert.equal(fs.existsSync(__dirname + '/public/sw.js'), true)
 })

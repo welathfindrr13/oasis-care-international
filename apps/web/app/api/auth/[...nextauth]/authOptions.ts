@@ -1,47 +1,9 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import Cognito from 'next-auth/providers/cognito';
 import { createLocalSessionUser } from '../../../../lib/auth/local-auth.server';
-import { isLocalAuthEnabled, resolveAuthMode } from '../../../../lib/auth/mode';
-
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required auth configuration: ${name}`);
-  }
-  return value;
-}
-
-function getConfiguredCognitoProvider() {
-  const issuer = (process.env.COGNITO_ISSUER || '').trim();
-  const clientId = (process.env.COGNITO_CLIENT_ID || '').trim();
-  const clientSecret = (process.env.COGNITO_CLIENT_SECRET || '').trim();
-
-  if (!issuer || !clientId || !clientSecret) {
-    return null;
-  }
-
-  if (!/^https?:\/\//.test(issuer)) {
-    throw new Error('COGNITO_ISSUER must be an absolute URL');
-  }
-
-  return Cognito({
-    issuer,
-    clientId,
-    clientSecret,
-  });
-}
+import { isLocalAuthEnabled } from '../../../../lib/auth/mode';
 
 const localAuthEnabled = isLocalAuthEnabled(process.env);
-const authMode = resolveAuthMode(process.env);
-const cognitoProvider = getConfiguredCognitoProvider();
-const isProductionBuild = process.env.NEXT_PHASE === 'phase-production-build';
-
-if (!isProductionBuild && !localAuthEnabled && authMode === 'cognito' && !cognitoProvider) {
-  requireEnv('COGNITO_ISSUER');
-  requireEnv('COGNITO_CLIENT_ID');
-  requireEnv('COGNITO_CLIENT_SECRET');
-}
 
 const providers = [];
 
@@ -66,16 +28,6 @@ if (localAuthEnabled) {
       },
     }),
   );
-}
-
-if (cognitoProvider) {
-  providers.push(cognitoProvider);
-}
-
-if (!isProductionBuild && authMode === 'clerk' && !process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL) {
-  // Live Clerk UI/session wiring is completed outside this repo once the Clerk
-  // dashboard exists. API bearer-token verification is still enforced server-side.
-  requireEnv('NEXT_PUBLIC_CLERK_SIGN_IN_URL');
 }
 
 export const authOptions: NextAuthOptions = {
@@ -103,22 +55,13 @@ export const authOptions: NextAuthOptions = {
         return token;
       }
 
-      // On initial sign-in, store the configured provider token.
-      if (account) {
-        token.accessToken = account.access_token;
-        token.idToken = account.id_token;
-        token.refreshToken = account.refresh_token;
-        token.expiresAt = account.expires_at;
-        token.authMode = authMode;
-      }
-
       return token;
     },
     async session({ session, token }) {
       // Expose access token to the client session
       (session as any).accessToken = token.accessToken;
       (session as any).idToken = token.idToken;
-      (session as any).authMode = token.authMode ?? authMode;
+      (session as any).authMode = 'local';
       return session;
     },
   },

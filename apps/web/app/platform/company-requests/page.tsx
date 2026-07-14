@@ -63,11 +63,12 @@ function requestsHref(status: CompanyRequestStatus, offset = 0): string {
 
 export const dynamic = "force-dynamic";
 
-export default async function PlatformCompanyRequestsPage({
-  searchParams,
-}: {
-  searchParams?: { status?: string; offset?: string };
-}) {
+export default async function PlatformCompanyRequestsPage(
+  props: {
+    searchParams?: Promise<{ status?: string; offset?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const status = selectedStatus(searchParams?.status);
   const offset = selectedOffset(searchParams?.offset);
   const data = await query<{

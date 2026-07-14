@@ -14,9 +14,9 @@ import {
 export const dynamic = 'force-dynamic'
 
 interface EvidencePageProps {
-  searchParams?: {
+  searchParams?: Promise<{
     clientId?: string
-  }
+  }>
 }
 
 async function getPeopleSafe(): Promise<ClientListItem[]> {
@@ -46,7 +46,8 @@ function formatRecordDate(value?: string | null): string {
   return formatStoredCalendarDate(value)
 }
 
-export default async function EvidencePage({ searchParams }: EvidencePageProps) {
+export default async function EvidencePage(props: EvidencePageProps) {
+  const searchParams = await props.searchParams
   const people = await getPeopleSafe()
   const selectedPerson = people.find((person) => person.id === searchParams?.clientId) ?? people[0]
   const carePlanning = selectedPerson ? await getEvidenceSafe(selectedPerson.id) : null

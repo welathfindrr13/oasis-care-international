@@ -22,7 +22,8 @@ async function getVerifiedStories(careRoomId: string) {
   return data.verifiedVisitStories
 }
 
-export default async function ClientCareBridgePage({ params }: { params: { id: string } }) {
+export default async function ClientCareBridgePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const room = await getCarebridgeRoomForClient(params.id)
   const stories = room ? await getVerifiedStories(room.id) : []
 
