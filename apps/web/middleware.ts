@@ -46,7 +46,7 @@ const nextAuthMiddleware = withAuth(
 
 const clerkAuthMiddleware = clerkMiddleware(async (auth, req) => {
   if (isPublicRoute(req)) return NextResponse.next()
-  const authObject = auth()
+  const authObject = await auth()
   if (!authObject.userId) return authObject.redirectToSignIn()
   if (shouldBypassAuthoritativeRoute(req.nextUrl.pathname)) {
     return NextResponse.next()

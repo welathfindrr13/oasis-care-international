@@ -91,7 +91,8 @@ function formatShortDate(value?: string | null): string {
   return formatDate(value)
 }
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const params = await props.params;
   const { client } = await getClientSafe(params.id)
   return {
     title: client ? `${client.fullName} - Oasis Care` : 'Person Not Found - Oasis Care',
@@ -99,7 +100,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   }
 }
 
-export default async function ClientDetailPage({ params }: { params: { id: string } }) {
+export default async function ClientDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { roles } = await getServerAuthContext()
   const isAdmin = roles.some((role: unknown) => String(role).toLowerCase() === 'admin')
 

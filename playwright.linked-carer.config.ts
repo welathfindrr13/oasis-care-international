@@ -61,8 +61,6 @@ export default defineConfig({
         LOCAL_AUTH_ENABLED: "true",
         NEXT_PUBLIC_LOCAL_AUTH_ENABLED: "true",
         LOCAL_AUTH_ISSUER: "oasis-local-dev",
-        AUTH_IDENTITY_PROVIDER: "cognito",
-        NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: "cognito",
         NEXT_PUBLIC_SITE_URL: "http://localhost:3002",
         NEXT_PUBLIC_API_URL: "http://localhost:4000/graphql",
       },

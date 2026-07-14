@@ -72,20 +72,23 @@ jobs:
         DATABASE_URL: postgresql://test:test@localhost:5432/oasis_test
         
     - name: Web Lint and Build
-      run: pnpm --filter @oasis/web lint && pnpm --filter @oasis/web build
+      run: |
+        export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_$(printf '%s' 'synthetic-clerk.oasis.invalid$' | base64 | tr -d '\n')"
+        pnpm --filter @oasis/web lint
+        pnpm --filter @oasis/web build
       env:
-        COGNITO_ISSUER: https://cognito-idp.eu-west-2.amazonaws.com/ci-placeholder
-        COGNITO_CLIENT_ID: ci-client-id
-        COGNITO_CLIENT_SECRET: ci-client-secret
+        AUTH_IDENTITY_PROVIDER: clerk
+        NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: clerk
         NEXTAUTH_SECRET: ci-nextauth-secret
         NEXTAUTH_URL: http://localhost:3002
         
     - name: Build
-      run: pnpm turbo run build
+      run: |
+        export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_$(printf '%s' 'synthetic-clerk.oasis.invalid$' | base64 | tr -d '\n')"
+        pnpm turbo run build
       env:
-        COGNITO_ISSUER: https://cognito-idp.eu-west-2.amazonaws.com/ci-placeholder
-        COGNITO_CLIENT_ID: ci-client-id
-        COGNITO_CLIENT_SECRET: ci-client-secret
+        AUTH_IDENTITY_PROVIDER: clerk
+        NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: clerk
         NEXTAUTH_SECRET: ci-nextauth-secret
         NEXTAUTH_URL: http://localhost:3002
       

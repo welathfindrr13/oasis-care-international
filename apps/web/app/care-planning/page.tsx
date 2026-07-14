@@ -20,9 +20,9 @@ import {
 export const dynamic = 'force-dynamic'
 
 interface CarePlanningPageProps {
-  searchParams?: {
+  searchParams?: Promise<{
     clientId?: string
-  }
+  }>
 }
 
 async function getPeopleSafe(): Promise<ClientListItem[]> {
@@ -218,7 +218,8 @@ function EvidencePackList({ evidencePacks }: { evidencePacks: EvidencePackRecord
   )
 }
 
-export default async function CarePlanningPage({ searchParams }: CarePlanningPageProps) {
+export default async function CarePlanningPage(props: CarePlanningPageProps) {
+  const searchParams = await props.searchParams
   const people = await getPeopleSafe()
   const selectedPerson = people.find((person) => person.id === searchParams?.clientId) ?? people[0]
   const carePlanning = selectedPerson ? await getCarePlanningSafe(selectedPerson.id) : null

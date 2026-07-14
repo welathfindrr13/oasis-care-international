@@ -43,7 +43,7 @@ test('resolveGraphQLProxyAccessToken falls back to Clerk session cookie when ser
   assert.equal(token, 'cookie.jwt.value');
 });
 
-test('resolveGraphQLProxyAccessToken preserves NextAuth token order outside Clerk mode', () => {
+test('resolveGraphQLProxyAccessToken preserves local-fixture token order outside Clerk mode', () => {
   assert.equal(
     resolveGraphQLProxyAccessToken({
       clerkMode: false,

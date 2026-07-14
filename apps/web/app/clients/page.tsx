@@ -21,14 +21,16 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic'
 
-interface ClientsPageProps {
-  searchParams: {
-    search?: string;
-    page?: string;
-  };
+interface ClientsSearchParams {
+  search?: string;
+  page?: string;
 }
 
-async function getClients(searchParams: ClientsPageProps['searchParams']): Promise<{ clients: ClientListItem[]; total: number }> {
+interface ClientsPageProps {
+  searchParams: Promise<ClientsSearchParams>;
+}
+
+async function getClients(searchParams: ClientsSearchParams): Promise<{ clients: ClientListItem[]; total: number }> {
   try {
     const page = parseInt(searchParams.page || '1', 10);
     const skip = getSkipFromPage(page);
@@ -107,7 +109,8 @@ function formatVisitDate(dateString: string | undefined | null): string {
   });
 }
 
-export default async function ClientsPage({ searchParams }: ClientsPageProps) {
+export default async function ClientsPage(props: ClientsPageProps) {
+  const searchParams = await props.searchParams;
   const { roles } = await getServerAuthContext()
   const isAdmin = roles.some((role: unknown) => String(role).toLowerCase() === 'admin')
 

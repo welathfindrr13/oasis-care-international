@@ -30,18 +30,20 @@ export const metadata: Metadata = {
   description: 'Care visits available to your Oasis account',
 }
 
+interface VisitsSearchParams {
+  date?: string
+  carerId?: string
+  clientId?: string
+  status?: string
+  page?: string
+}
+
 interface VisitsPageProps {
-  searchParams: {
-    date?: string
-    carerId?: string
-    clientId?: string
-    status?: string
-    page?: string
-  }
+  searchParams: Promise<VisitsSearchParams>
 }
 
 async function getVisits(
-  searchParams: VisitsPageProps['searchParams'],
+  searchParams: VisitsSearchParams,
 ): Promise<{ visits: Visit[]; total: number }> {
   const page = parseInt(searchParams.page || '1', 10)
   const skip = getSkipFromPage(page)
@@ -252,7 +254,8 @@ function EmptyState({ isAdmin }: { isAdmin: boolean }) {
   )
 }
 
-export default async function VisitsPage({ searchParams }: VisitsPageProps) {
+export default async function VisitsPage(props: VisitsPageProps) {
+  const searchParams = await props.searchParams
   const { accessSnapshot } = await getServerAuthContext()
   const isAdmin = hasAccessCapability(
     accessSnapshot.capabilities,
