@@ -1,9 +1,13 @@
 import { Field, InputType } from '@nestjs/graphql';
-import { IsEnum, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { ShiftVerificationMethod } from '@oasis/db';
 
 @InputType()
 export class ClockOutInput {
+  @Field(() => String)
+  @IsUUID()
+  shiftId!: string;
+
   @Field(() => ShiftVerificationMethod, { defaultValue: ShiftVerificationMethod.GPS })
   @IsEnum(ShiftVerificationMethod)
   method: ShiftVerificationMethod = ShiftVerificationMethod.GPS;

@@ -144,6 +144,11 @@ export default function ShiftPage() {
   }, [consentChecked, getLocationPayload, loadData]);
 
   const handleClockOut = useCallback(async () => {
+    if (!activeShift?.id) {
+      setError('No active shift is available to clock out.');
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     setSuccess(null);
@@ -152,6 +157,7 @@ export default function ShiftPage() {
       const payload = await getLocationPayload();
       const result = await clientQuery<ClockOutMutationResponse>(CLOCK_OUT_MUTATION, {
         input: {
+          shiftId: activeShift.id,
           ...payload,
           source: 'web',
           notes: payload.method === 'MANUAL' ? 'Manual verification fallback used' : undefined,
@@ -165,7 +171,7 @@ export default function ShiftPage() {
     } finally {
       setSubmitting(false);
     }
-  }, [getLocationPayload, loadData]);
+  }, [activeShift, getLocationPayload, loadData]);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -249,7 +255,12 @@ export default function ShiftPage() {
                     </Button>
                   )}
 
-                  <Button variant="ghost" onClick={() => loadData()} disabled={loading || submitting}>
+                  <Button
+                    variant="ghost"
+                    onClick={loadData}
+                    disabled={loading || submitting}
+                    aria-label="Refresh shift status and recent shifts"
+                  >
                     Refresh
                   </Button>
                 </div>

@@ -6,6 +6,12 @@ import { fileURLToPath } from 'node:url';
 const PLACEHOLDER_RE = /(<[^>]+>|replace-me|changeme|change-me|placeholder|example\.com|example\.invalid|oasis-care\.local|your-domain|your-|ci-|dummy|test-secret)/i;
 const LOCALHOST_RE = /(^|[/:@])(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?=$|[/:?#])/i;
 const WEAK_SECRET_RE = /^(password|secret|jwt-secret|nextauth-secret|postgres|oasis|admin|changeme|replace-me)$/i;
+const SHIFT_KEY_ID_RE = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+const SHIFT_SECRET_RE = /^[A-Za-z0-9+/]+={0,2}$/;
+const SHIFT_MINIMUM_SECRET_BYTES = 32;
+// Match the runtime bound. Rotation must stop rather than evict a key that may
+// still sign a retryable persisted proof.
+const SHIFT_MAXIMUM_PREVIOUS_KEYS = 4;
 const RUN_MIGRATIONS_NOT_TRUE = 'RUN_MIGRATIONS_NOT_TRUE';
 const RUN_MIGRATIONS_TRUE = 'RUN_MIGRATIONS_TRUE';
 const RUN_MIGRATIONS_UNKNOWN = 'RUN_MIGRATIONS_UNKNOWN';
@@ -18,6 +24,8 @@ const REQUIRED = [
   'POSTGRES_PASSWORD',
   'DATABASE_URL',
   'JWT_SECRET',
+  'SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID',
+  'SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET',
   'NEXTAUTH_SECRET',
   'NEXTAUTH_URL',
   'NEXT_PUBLIC_API_URL',
@@ -47,6 +55,7 @@ const CLERK_REQUIRED = [
 const SECRET_NAMES = new Set([
   'POSTGRES_PASSWORD',
   'JWT_SECRET',
+  'SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET',
   'NEXTAUTH_SECRET',
   'COGNITO_CLIENT_SECRET',
   'LOCAL_AUTH_JWT_SECRET',
@@ -83,6 +92,7 @@ const AUDITED_OPTIONAL_NAMES = new Set([
   'LOCAL_AUTH_ISSUER',
   'LOCAL_AUTH_JWT_SECRET',
   'CLERK_AUDIENCE',
+  'SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON',
 ]);
 
 const AUDITED_NAMES = new Set([
@@ -115,6 +125,75 @@ function parseEnvFile(filePath) {
 
 function add(errors, message) {
   errors.push(message);
+}
+
+function isCanonicalShiftSecret(value) {
+  const encoded = String(value || '').trim();
+  if (!SHIFT_SECRET_RE.test(encoded) || encoded.length % 4 !== 0) return false;
+  const decoded = Buffer.from(encoded, 'base64');
+  return (
+    decoded.length >= SHIFT_MINIMUM_SECRET_BYTES &&
+    decoded.toString('base64') === encoded
+  );
+}
+
+function validateShiftIdempotencyKeyRing(values, errors) {
+  const currentKeyId = String(values.SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID || '').trim();
+  if (currentKeyId && !SHIFT_KEY_ID_RE.test(currentKeyId)) {
+    add(errors, 'SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID must use the approved key-id format');
+  }
+
+  const currentSecret = String(values.SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET || '').trim();
+  if (currentSecret && !isCanonicalShiftSecret(currentSecret)) {
+    add(errors, 'SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET must be canonical base64 for at least 32 bytes');
+  }
+
+  let previousKeys;
+  try {
+    previousKeys = JSON.parse(
+      String(values.SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON || '[]'),
+    );
+  } catch {
+    add(errors, 'SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON must be a valid key array');
+    return;
+  }
+
+  if (!Array.isArray(previousKeys) || previousKeys.length > SHIFT_MAXIMUM_PREVIOUS_KEYS) {
+    add(errors, 'SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON must contain at most 4 previous keys; stop rotation at capacity');
+    return;
+  }
+
+  const seenKeyIds = new Set(currentKeyId ? [currentKeyId] : []);
+  for (const value of previousKeys) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      add(errors, 'SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON entries must contain only id and secret');
+      return;
+    }
+    const keys = Object.keys(value);
+    if (
+      keys.some((key) => !['id', 'secret'].includes(key)) ||
+      !Object.prototype.hasOwnProperty.call(value, 'id') ||
+      !Object.prototype.hasOwnProperty.call(value, 'secret')
+    ) {
+      add(errors, 'SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON entries must contain only id and secret');
+      return;
+    }
+
+    const keyId = String(value.id || '').trim();
+    if (!SHIFT_KEY_ID_RE.test(keyId)) {
+      add(errors, 'SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON contains an invalid key id');
+      return;
+    }
+    if (!isCanonicalShiftSecret(value.secret)) {
+      add(errors, 'SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON contains an invalid secret');
+      return;
+    }
+    if (seenKeyIds.has(keyId)) {
+      add(errors, 'SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON contains a duplicate key id');
+      return;
+    }
+    seenKeyIds.add(keyId);
+  }
 }
 
 function isTruthy(value) {
@@ -190,6 +269,7 @@ function validate(values) {
 
   const proof = authModeProof(values);
   const authProvider = normalizeProvider(values.AUTH_IDENTITY_PROVIDER);
+  validateShiftIdempotencyKeyRing(values, errors);
   if (isProductionLike && !proof.authProviderIsClerk) {
     add(errors, 'AUTH_IDENTITY_PROVIDER=clerk is required for production Deployment V2 auth');
   }
