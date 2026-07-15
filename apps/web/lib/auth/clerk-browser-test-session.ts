@@ -1,9 +1,9 @@
 import { cookies } from "next/headers";
 
-export function getBrowserClerkFixtureSession(): {
+export async function getBrowserClerkFixtureSession(): Promise<{
   userId: string | null;
   token: string | null;
-} {
+}> {
   if (
     process.env.NODE_ENV !== "development" ||
     process.env.OASIS_BROWSER_CLERK_STUB !== "true"
@@ -11,7 +11,7 @@ export function getBrowserClerkFixtureSession(): {
     return { userId: null, token: null };
   }
 
-  const token = cookies().get("__session")?.value?.trim() || null;
+  const token = (await cookies()).get("__session")?.value?.trim() || null;
   return { userId: subjectFromToken(token), token };
 }
 

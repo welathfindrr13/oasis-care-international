@@ -24,7 +24,7 @@ export interface ServerAuthContext {
 export async function getServerAuthContext(): Promise<ServerAuthContext> {
   const authMode = resolveAuthMode(process.env);
   if (authMode === 'clerk') {
-    const fixtureSession = getBrowserClerkFixtureSession();
+    const fixtureSession = await getBrowserClerkFixtureSession();
     if (fixtureSession.userId && fixtureSession.token) {
       return buildContext(
         authMode,
