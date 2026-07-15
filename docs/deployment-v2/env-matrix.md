@@ -31,6 +31,7 @@ This matrix is generated from current code references and Deployment V2 template
 | `CLERK_SECRET_KEY` | Web auth | Yes | No | Clerk middleware/provider, preflight | `sk_live_...` | Clerk server-side middleware cannot verify authenticated sessions safely. |
 | `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER` | Web auth | Yes | Yes | login/auth mode, Compose | `clerk` | Login may render the wrong provider path. |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Web auth | Yes | Yes | Compose/build args, preflight | `pk_live_...` | Clerk browser session cannot be initialized once live Clerk UI is wired. |
+| `NEXT_PUBLIC_CLERK_CSP_ORIGINS` | Web auth/CSP | Yes | Yes | Next.js CSP, Compose/build args, preflight | `https://<clerk-fapi-host>` | Production build fails closed unless one exact HTTPS Clerk FAPI origin is configured; wildcards and paths are rejected. |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Web auth | Yes | Yes | login page, Compose/build args, preflight | `https://care.example.com/sign-in` | Staff/family users cannot reach Clerk sign-in. |
 | `LOCAL_AUTH_ENABLED` | Web/API | Yes, must be `false` | No | local auth mode checks | `false` | Preflight fails if true in production. |
 | `NEXT_PUBLIC_LOCAL_AUTH_ENABLED` | Web | Yes, must be `false` | Yes | login/local auth mode | `false` | Preflight fails if true in production. |

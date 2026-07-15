@@ -15,6 +15,14 @@ const legacyApiProductionEnv = fs.readFileSync(
 const webDockerfile = fs.readFileSync(new URL('../../apps/web/Dockerfile', import.meta.url), 'utf8');
 const apiDockerfile = fs.readFileSync(new URL('../../apps/api/Dockerfile', import.meta.url), 'utf8');
 const verifyLocalScript = fs.readFileSync(new URL('./scripts/verify-local.sh', import.meta.url), 'utf8');
+const stagingDockerDeployScript = fs.readFileSync(
+  new URL('../../infrastructure/scripts/docker-deploy.sh', import.meta.url),
+  'utf8',
+);
+const deploymentReadme = fs.readFileSync(
+  new URL('../../docs/deployment-v2/README.md', import.meta.url),
+  'utf8',
+);
 const deployDir = path.dirname(fileURLToPath(import.meta.url));
 
 function serviceBlock(name) {
@@ -39,16 +47,18 @@ test('web service receives Clerk runtime environment for protected routes', () =
   assert.match(webBlock, /CLERK_SECRET_KEY:\s*\$\{CLERK_SECRET_KEY:\?/);
   assert.doesNotMatch(webBlock, /CLERK_SECRET_KEY:[^\n]*sk_test_synthetic_clerk_secret/);
   assert.match(webBlock, /NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:\s*\$\{NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY/);
+  assert.match(webBlock, /NEXT_PUBLIC_CLERK_CSP_ORIGINS:\s*\$\{NEXT_PUBLIC_CLERK_CSP_ORIGINS/);
   assert.match(webBlock, /NEXT_PUBLIC_CLERK_SIGN_IN_URL:\s*\$\{NEXT_PUBLIC_CLERK_SIGN_IN_URL/);
   assert.match(webBlock, /NEXT_PUBLIC_CLERK_SIGN_UP_URL:\s*\$\{NEXT_PUBLIC_CLERK_SIGN_UP_URL/);
   assert.match(webBlock, /NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL:\s*\$\{NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL/);
   assert.match(webBlock, /NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL:\s*\$\{NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL/);
 });
 
-test('web build receives every Clerk public redirect URL used by Next.js config', () => {
+test('web build receives every Clerk public value used by Next.js config', () => {
   const webBlock = serviceBlock('web');
 
   for (const name of [
+    'NEXT_PUBLIC_CLERK_CSP_ORIGINS',
     'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
     'NEXT_PUBLIC_CLERK_SIGN_UP_URL',
     'NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL',
@@ -58,7 +68,7 @@ test('web build receives every Clerk public redirect URL used by Next.js config'
   }
 });
 
-test('web Dockerfile promotes every Clerk public redirect build arg into build env', () => {
+test('web Dockerfile promotes every Clerk public build arg into build env', () => {
   for (const name of [
     'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
     'NEXT_PUBLIC_CLERK_SIGN_UP_URL',
@@ -70,9 +80,29 @@ test('web Dockerfile promotes every Clerk public redirect build arg into build e
   }
 
   assert.match(webDockerfile, /ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY\n/);
+  assert.match(webDockerfile, /ARG NEXT_PUBLIC_CLERK_CSP_ORIGINS\n/);
+  assert.match(webDockerfile, /ENV NEXT_PUBLIC_CLERK_CSP_ORIGINS=\$NEXT_PUBLIC_CLERK_CSP_ORIGINS/);
   assert.doesNotMatch(webDockerfile, /ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=/);
   assert.doesNotMatch(webDockerfile, /test -n "\$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"/);
-  assert.match(verifyLocalScript, /docker build -f apps\/web\/Dockerfile -t oasis-web:v2 \./);
+  assert.match(
+    verifyLocalScript,
+    /docker build --build-arg NEXT_PUBLIC_CLERK_CSP_ORIGINS=https:\/\/care\.example\.org -f apps\/web\/Dockerfile -t oasis-web:v2 \./,
+  );
+  assert.match(
+    verifyLocalScript,
+    /NEXT_PUBLIC_CLERK_CSP_ORIGINS=https:\/\/care\.example\.org pnpm --filter @oasis\/web build/,
+  );
+});
+
+test('maintained web Docker build entrypoints require the Clerk CSP origin', () => {
+  assert.match(
+    stagingDockerDeployScript,
+    /docker build -t "\$\{ACCOUNT_ID\}\.dkr\.ecr\.\$\{AWS_REGION\}\.amazonaws\.com\/\$\{WEB_REPO\}:\$\{TAG\}" \\\n  --build-arg "NEXT_PUBLIC_CLERK_CSP_ORIGINS=\$\{NEXT_PUBLIC_CLERK_CSP_ORIGINS:\?NEXT_PUBLIC_CLERK_CSP_ORIGINS is required\}" \\\n  -f apps\/web\/Dockerfile \./,
+  );
+  assert.match(
+    deploymentReadme,
+    /docker build --build-arg "NEXT_PUBLIC_CLERK_CSP_ORIGINS=\$\{NEXT_PUBLIC_CLERK_CSP_ORIGINS:\?NEXT_PUBLIC_CLERK_CSP_ORIGINS is required\}" -f apps\/web\/Dockerfile -t oasis-web:v2 \./,
+  );
 });
 
 test('web and api services expose only safe live revision metadata to health endpoints', () => {
@@ -138,6 +168,7 @@ test('production deployment config fails fast for required env instead of using 
     'ACME_EMAIL',
     'NEXTAUTH_SECRET',
     'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
+    'NEXT_PUBLIC_CLERK_CSP_ORIGINS',
     'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
     'NEXT_PUBLIC_CLERK_SIGN_UP_URL',
     'NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL',

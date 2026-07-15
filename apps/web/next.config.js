@@ -2,6 +2,7 @@
 const path = require('node:path')
 
 const isDevelopment = process.env.NODE_ENV === 'development'
+const isProduction = process.env.NODE_ENV === 'production'
 const useBrowserClerkStub =
   isDevelopment && process.env.OASIS_BROWSER_CLERK_STUB === 'true'
 
@@ -16,15 +17,49 @@ const originFromUrl = (value) => {
   }
 }
 
-const csvValues = (value) =>
-  String(value || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
+const configuredClerkOrigin = (value) => {
+  const raw = String(value || '').trim()
+  if (!raw) {
+    if (isProduction) {
+      throw new Error(
+        'NEXT_PUBLIC_CLERK_CSP_ORIGINS is required in production and must be one exact HTTPS origin',
+      )
+    }
+    return null
+  }
 
+  let url
+  try {
+    url = new URL(raw)
+  } catch {
+    throw new Error(
+      'NEXT_PUBLIC_CLERK_CSP_ORIGINS must be one exact HTTPS origin',
+    )
+  }
+
+  if (
+    url.protocol !== 'https:' ||
+    url.username ||
+    url.password ||
+    url.hostname.includes('*') ||
+    url.pathname !== '/' ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error(
+      'NEXT_PUBLIC_CLERK_CSP_ORIGINS must be one exact HTTPS origin without credentials, wildcard, path, query, or fragment',
+    )
+  }
+
+  return url.origin
+}
+
+const productionClerkOrigin = configuredClerkOrigin(
+  process.env.NEXT_PUBLIC_CLERK_CSP_ORIGINS,
+)
 const configuredClerkOrigins = unique([
-  ...csvValues(process.env.NEXT_PUBLIC_CLERK_CSP_ORIGINS),
-  'https://*.clerk.accounts.dev',
+  productionClerkOrigin,
+  ...(isDevelopment ? ['https://*.clerk.accounts.dev'] : []),
 ])
 
 const configuredAppOrigins = unique([

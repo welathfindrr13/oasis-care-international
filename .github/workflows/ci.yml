@@ -74,6 +74,7 @@ jobs:
     - name: Web Lint and Build
       run: |
         export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_$(printf '%s' 'synthetic-clerk.oasis.invalid$' | base64 | tr -d '\n')"
+        export NEXT_PUBLIC_CLERK_CSP_ORIGINS="https://synthetic-clerk.oasis.invalid"
         pnpm --filter @oasis/web lint
         pnpm --filter @oasis/web build
       env:
@@ -85,6 +86,7 @@ jobs:
     - name: Build
       run: |
         export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_$(printf '%s' 'synthetic-clerk.oasis.invalid$' | base64 | tr -d '\n')"
+        export NEXT_PUBLIC_CLERK_CSP_ORIGINS="https://synthetic-clerk.oasis.invalid"
         pnpm turbo run build
       env:
         AUTH_IDENTITY_PROVIDER: clerk
@@ -94,6 +96,8 @@ jobs:
       
     - name: Lint
       run: pnpm turbo run lint
+      env:
+        NEXT_PUBLIC_CLERK_CSP_ORIGINS: https://synthetic-clerk.oasis.invalid
       
     - name: Unit Tests
       run: pnpm turbo run test
@@ -175,6 +179,7 @@ jobs:
         PLATFORM_OPERATOR_CLERK_SUBJECTS=user_oasis_platform_operator
         NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        NEXT_PUBLIC_CLERK_CSP_ORIGINS=https://synthetic-clerk.oasis.invalid
         NEXT_PUBLIC_CLERK_SIGN_IN_URL=https://care.example.org/sign-in
         NEXT_PUBLIC_CLERK_SIGN_UP_URL=https://care.example.org/sign-up
         NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=https://care.example.org/today

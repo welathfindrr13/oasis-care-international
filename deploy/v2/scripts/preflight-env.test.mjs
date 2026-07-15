@@ -45,6 +45,7 @@ function validEnv(overrides = {}) {
     PLATFORM_OPERATOR_CLERK_SUBJECTS: 'user_oasis_platform_operator',
     NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: 'clerk',
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ['pk', 'test', 'a'.repeat(40)].join('_'),
+    NEXT_PUBLIC_CLERK_CSP_ORIGINS: 'https://bright-gull-23.clerk.accounts.dev',
     NEXT_PUBLIC_CLERK_SIGN_IN_URL: 'https://care.example.org/sign-in',
     NEXT_PUBLIC_CLERK_SIGN_UP_URL: 'https://care.example.org/sign-up',
     NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: 'https://care.example.org/today',
@@ -197,6 +198,25 @@ test('production-like public URLs must use HTTPS', () => {
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_SITE_URL must use https')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_API_URL must use https')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_SIGN_IN_URL must use https')));
+});
+
+test('Clerk CSP configuration requires one exact HTTPS FAPI origin', () => {
+  for (const value of [
+    'http://bright-gull-23.clerk.accounts.dev',
+    'https://user@bright-gull-23.clerk.accounts.dev',
+    'https://*.clerk.accounts.dev',
+    'https://bright-gull-23.clerk.accounts.dev/path',
+    'https://bright-gull-23.clerk.accounts.dev?region=eu',
+    'https://bright-gull-23.clerk.accounts.dev#fragment',
+    'https://first.example.org,https://second.example.org',
+  ]) {
+    const result = validate(validEnv({ NEXT_PUBLIC_CLERK_CSP_ORIGINS: value }));
+    assert(
+      result.errors.some((error) =>
+        error.includes('NEXT_PUBLIC_CLERK_CSP_ORIGINS'),
+      ),
+    );
+  }
 });
 
 test('production-like app domain, NextAuth URL, and allowed origins must match the web origin', () => {
@@ -406,6 +426,7 @@ test('Clerk production env requires issuer, JWKS, public key, sign-in URL, and a
     CLERK_AUDIENCE: '',
     CLERK_AUTHORIZED_PARTIES: '',
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: '',
+    NEXT_PUBLIC_CLERK_CSP_ORIGINS: '',
     NEXT_PUBLIC_CLERK_SIGN_IN_URL: '',
     NEXT_PUBLIC_CLERK_SIGN_UP_URL: '',
     NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: '',
@@ -418,6 +439,7 @@ test('Clerk production env requires issuer, JWKS, public key, sign-in URL, and a
   assert(result.errors.some((error) => error.includes('PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID')));
   assert(result.errors.some((error) => error.includes('PLATFORM_OPERATOR_CLERK_SUBJECTS')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY')));
+  assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_CSP_ORIGINS')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_SIGN_IN_URL')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_SIGN_UP_URL')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL')));
