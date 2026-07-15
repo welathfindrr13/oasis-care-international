@@ -75,9 +75,21 @@ test('Deployment V2 CI Caddy validation uses the generated env file', () => {
 });
 
 test('Deployment V2 CI synthetic env includes required Clerk redirect URLs', () => {
+  assert.match(workflow, /NEXT_PUBLIC_CLERK_CSP_ORIGINS=https:\/\/synthetic-clerk\.oasis\.invalid/);
   assert.match(workflow, /NEXT_PUBLIC_CLERK_SIGN_UP_URL=https:\/\/care\.example\.org\/sign-up/);
   assert.match(workflow, /NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=https:\/\/care\.example\.org\/today/);
   assert.match(workflow, /NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=https:\/\/care\.example\.org\/today/);
+});
+
+test('CI production web builds configure the synthetic Clerk FAPI CSP origin', () => {
+  const exports = workflow.match(
+    /export NEXT_PUBLIC_CLERK_CSP_ORIGINS="https:\/\/synthetic-clerk\.oasis\.invalid"/g,
+  ) ?? [];
+  assert.equal(exports.length, 2);
+  assert.match(
+    workflow,
+    /- name: Lint\n\s+run: pnpm turbo run lint\n\s+env:\n\s+NEXT_PUBLIC_CLERK_CSP_ORIGINS: https:\/\/synthetic-clerk\.oasis\.invalid/,
+  );
 });
 
 test('Deployment V2 CI synthetic env includes the complete shift idempotency key ring', () => {

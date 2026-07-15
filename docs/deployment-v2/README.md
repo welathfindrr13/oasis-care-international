@@ -83,7 +83,7 @@ Build and validate configuration:
 ```bash
 docker compose -f deploy/v2/docker-compose.yml config
 docker build -f apps/api/Dockerfile -t oasis-api:v2 .
-docker build -f apps/web/Dockerfile -t oasis-web:v2 .
+docker build --build-arg "NEXT_PUBLIC_CLERK_CSP_ORIGINS=${NEXT_PUBLIC_CLERK_CSP_ORIGINS:?NEXT_PUBLIC_CLERK_CSP_ORIGINS is required}" -f apps/web/Dockerfile -t oasis-web:v2 .
 ```
 
 Start the stack only after replacing placeholders in `deploy/v2/.env`:

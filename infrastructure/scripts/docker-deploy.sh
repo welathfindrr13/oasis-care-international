@@ -33,6 +33,7 @@ docker push "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${API_REPO}:${TAG
 echo "== 3) Build & push WEB =="
 # IMPORTANT: Build context must be repo root (.) because Dockerfile does COPY . .
 docker build -t "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${WEB_REPO}:${TAG}" \
+  --build-arg "NEXT_PUBLIC_CLERK_CSP_ORIGINS=${NEXT_PUBLIC_CLERK_CSP_ORIGINS:?NEXT_PUBLIC_CLERK_CSP_ORIGINS is required}" \
   -f apps/web/Dockerfile .
 docker push "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${WEB_REPO}:${TAG}"
 

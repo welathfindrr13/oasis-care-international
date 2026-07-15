@@ -48,6 +48,7 @@ const CLERK_REQUIRED = [
   'PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID',
   'PLATFORM_OPERATOR_CLERK_SUBJECTS',
   'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
+  'NEXT_PUBLIC_CLERK_CSP_ORIGINS',
   'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
   'NEXT_PUBLIC_CLERK_SIGN_UP_URL',
   'NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL',
@@ -75,6 +76,7 @@ const URL_NAMES = new Set([
   'COGNITO_ISSUER',
   'CLERK_ISSUER',
   'CLERK_JWKS_URL',
+  'NEXT_PUBLIC_CLERK_CSP_ORIGINS',
   'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
   'NEXT_PUBLIC_CLERK_SIGN_UP_URL',
   'NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL',
@@ -242,6 +244,25 @@ function requireHttpsUrl(name, value, errors) {
   return url;
 }
 
+function requireExactHttpsOrigin(name, value, errors) {
+  const url = requireHttpsUrl(name, value, errors);
+  if (!url) return null;
+
+  if (
+    url.username ||
+    url.password ||
+    url.hostname.includes('*') ||
+    url.pathname !== '/' ||
+    url.search ||
+    url.hash
+  ) {
+    add(errors, `${name} must be one exact HTTPS origin without credentials, wildcard, path, query, or fragment`);
+    return null;
+  }
+
+  return url;
+}
+
 function normalizeOrigin(url) {
   return url ? url.origin.replace(/\/$/, '') : '';
 }
@@ -396,6 +417,11 @@ function validate(values) {
     const nextAuthUrl = requireHttpsUrl('NEXTAUTH_URL', values.NEXTAUTH_URL, errors);
     requireHttpsUrl('NEXT_PUBLIC_API_URL', values.NEXT_PUBLIC_API_URL, errors);
     const clerkSignInUrl = requireHttpsUrl('NEXT_PUBLIC_CLERK_SIGN_IN_URL', values.NEXT_PUBLIC_CLERK_SIGN_IN_URL, errors);
+    requireExactHttpsOrigin(
+      'NEXT_PUBLIC_CLERK_CSP_ORIGINS',
+      values.NEXT_PUBLIC_CLERK_CSP_ORIGINS,
+      errors,
+    );
 
     const siteOrigin = normalizeOrigin(siteUrl);
     if (siteUrl && appDomain && siteUrl.hostname.toLowerCase() !== appDomain) {
