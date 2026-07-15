@@ -33,7 +33,7 @@ The exact green foundation-sprint main revision is `c7e425a0a35fe579e408c25909c2
 | Tenant/auth matrix | Blocked | Synthetic Clerk-shaped two-tenant browser and direct-API proof for Manager, assigned/unassigned Carer, Family grant/revocation and cross-organization denial. |
 | Medication integrity | Unsafe for pilot | Qualified care-policy decision, stable scheduled-dose occurrence, atomic first outcome, append-only correction, deterministic visit binding and approved Family projection. |
 | Privacy and data rights | Blocked | Approved retention, erasure, legal-hold, safeguarding-redaction and SAR operating decisions. Do not claim GDPR compliance. |
-| Recovery and operations | Blocked | Repository controls require an empty production database, encrypted archive, verified retrieval and disposable restore before any real record exists. Still required: execute that proof on the approved VPS, choose and prove separate offsite storage/key custody, approve RPO/RTO, prove alert delivery/ownership/escalation, and name incident/support owners. |
+| Recovery and operations | Blocked | Revision-bound runtime, synthetic alert delivery/ownership/escalation, approved RPO/RTO, disposable restore evidence and named incident/support ownership. |
 | External secrets proof | Blocked | Redacted findings disposition, approval-controlled rotation where required, and verified GitHub ruleset/required-check protection. |
 | Performance evidence | Not established | Reproducible representative fixtures first; deterministic query-count, pagination and bounded-operation assertions before any wall-clock budget. |
 
