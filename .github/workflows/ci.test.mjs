@@ -27,6 +27,31 @@ test('CI executes Prisma migrations before the linked-carer browser journey', ()
   assert.match(workflow, /run: pnpm test:browser:linked-carer/);
 });
 
+test('CI runs the Clerk tenant auth browser proof after migrations and Chromium install', () => {
+  const migrationIndex = workflow.indexOf(
+    'run: pnpm --filter @oasis/db exec prisma migrate deploy',
+  );
+  const installIndex = workflow.indexOf(
+    'run: pnpm exec playwright install --with-deps chromium',
+  );
+  const clerkJourneyIndex = workflow.indexOf(
+    'run: pnpm test:browser:clerk-tenant-auth',
+  );
+  assert.notEqual(migrationIndex, -1);
+  assert.notEqual(installIndex, -1);
+  assert.notEqual(clerkJourneyIndex, -1);
+  assert.ok(clerkJourneyIndex > migrationIndex);
+  assert.ok(clerkJourneyIndex > installIndex);
+  assert.match(
+    packageJson.scripts['test:browser:clerk-tenant-auth'],
+    /^node --test scripts\/test\/assert-safe-test-database\.test\.mjs && /,
+  );
+  assert.match(
+    workflow,
+    /run: pnpm test:browser:clerk-tenant-auth\n\s+env:\n\s+DATABASE_URL: postgresql:\/\/test:test@localhost:5432\/oasis_test\n\s+OASIS_TEST_DATABASE_SEED_ACK: reset-test-data/,
+  );
+});
+
 test('CI composes the maintained accessibility gate into its browser journey', () => {
   assert.equal(
     packageJson.scripts['test:browser:accessibility'],

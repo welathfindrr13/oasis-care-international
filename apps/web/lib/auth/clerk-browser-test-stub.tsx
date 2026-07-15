@@ -1,38 +1,61 @@
-'use client';
+"use client";
 
-import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 
-const SESSION_KEY = 'oasis.synthetic-clerk-session';
-const ORGANIZATION_KEY = 'oasis.synthetic-clerk-organization';
+const SESSION_KEY = "oasis.synthetic-clerk-session";
+const ORGANIZATION_KEY = "oasis.synthetic-clerk-organization";
 
 type SyntheticSession = {
   signedIn: boolean;
   userId: string;
+  token: string;
 };
 
 function readSession(): SyntheticSession {
-  if (typeof window === 'undefined') return { signedIn: false, userId: '' };
+  if (typeof window === "undefined") {
+    return { signedIn: false, userId: "", token: "" };
+  }
   try {
-    const stored = JSON.parse(window.localStorage.getItem(SESSION_KEY) || '{}');
+    const stored = JSON.parse(window.localStorage.getItem(SESSION_KEY) || "{}");
+    const token = typeof stored.token === "string" ? stored.token : "";
     return {
       signedIn: stored.signedIn === true,
-      userId: typeof stored.userId === 'string' ? stored.userId : '',
+      userId:
+        subjectFromToken(token) ||
+        (typeof stored.userId === "string" ? stored.userId : ""),
+      token,
     };
   } catch {
-    return { signedIn: false, userId: '' };
+    return { signedIn: false, userId: "", token: "" };
+  }
+}
+
+function subjectFromToken(token: string): string {
+  try {
+    const encoded = token.split(".")[1] || "";
+    const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const base64 = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      "=",
+    );
+    const payload = JSON.parse(window.atob(base64));
+    return typeof payload?.sub === "string" ? payload.sub : "";
+  } catch {
+    return "";
   }
 }
 
 function writeSession(session: SyntheticSession) {
   window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  window.dispatchEvent(new Event('oasis-synthetic-clerk-session'));
+  window.dispatchEvent(new Event("oasis-synthetic-clerk-session"));
 }
 
 function useSyntheticSession() {
   const [session, setSession] = useState<SyntheticSession>({
     signedIn: false,
-    userId: '',
+    userId: "",
+    token: "",
   });
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -43,11 +66,11 @@ function useSyntheticSession() {
       (window as any).__OASIS_SYNTHETIC_CLERK_READY__ = true;
     };
     update();
-    window.addEventListener('storage', update);
-    window.addEventListener('oasis-synthetic-clerk-session', update);
+    window.addEventListener("storage", update);
+    window.addEventListener("oasis-synthetic-clerk-session", update);
     return () => {
-      window.removeEventListener('storage', update);
-      window.removeEventListener('oasis-synthetic-clerk-session', update);
+      window.removeEventListener("storage", update);
+      window.removeEventListener("oasis-synthetic-clerk-session", update);
     };
   }, []);
 
@@ -65,8 +88,10 @@ export function useAuth() {
     isSignedIn: session.signedIn,
     userId: session.userId || null,
     orgId: null,
-    getToken: async () =>
-      session.signedIn ? `synthetic-clerk-token:${session.userId}` : null,
+    getToken: async () => {
+      if (!session.signedIn) return null;
+      return session.token || `synthetic-clerk-token:${session.userId}`;
+    },
   };
 }
 
@@ -78,8 +103,8 @@ export function useUser() {
     user: session.signedIn
       ? {
           id: session.userId,
-          fullName: 'Synthetic Clerk User',
-          primaryEmailAddress: { emailAddress: 'invited@example.test' },
+          fullName: "Synthetic Clerk User",
+          primaryEmailAddress: { emailAddress: "invited@example.test" },
         }
       : null,
   };
@@ -91,7 +116,7 @@ export function useClerk() {
       window.localStorage.setItem(ORGANIZATION_KEY, organization);
     },
     signOut: async ({ redirectUrl }: { redirectUrl?: string } = {}) => {
-      writeSession({ signedIn: false, userId: '' });
+      writeSession({ signedIn: false, userId: "", token: "" });
       if (redirectUrl) window.location.assign(redirectUrl);
     },
     openUserProfile: () => undefined,
@@ -107,10 +132,12 @@ export function SignIn({
   appearance?: unknown;
 }) {
   const scenario =
-    typeof window === 'undefined'
-      ? ''
-      : new URLSearchParams(window.location.search).get('browser_clerk_scenario');
-  const isNew = scenario === 'new';
+    typeof window === "undefined"
+      ? ""
+      : new URLSearchParams(window.location.search).get(
+          "browser_clerk_scenario",
+        );
+  const isNew = scenario === "new";
   return (
     <button
       type="button"
@@ -118,12 +145,13 @@ export function SignIn({
       onClick={() => {
         writeSession({
           signedIn: true,
-          userId: isNew ? 'user_synthetic_new' : 'user_synthetic_existing',
+          userId: isNew ? "user_synthetic_new" : "user_synthetic_existing",
+          token: "",
         });
-        window.location.assign(forceRedirectUrl || '/');
+        window.location.assign(forceRedirectUrl || "/");
       }}
     >
-      {isNew ? 'Create invited account' : 'Continue with existing account'}
+      {isNew ? "Create invited account" : "Continue with existing account"}
     </button>
   );
 }

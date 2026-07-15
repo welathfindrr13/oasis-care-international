@@ -116,6 +116,14 @@ jobs:
       run: pnpm test:browser:linked-carer
       env:
         DATABASE_URL: postgresql://test:test@localhost:5432/oasis_test
+        OASIS_TEST_DATABASE_SEED_ACK: reset-test-data
+        CI: true
+
+    - name: Clerk tenant auth browser journey
+      run: pnpm test:browser:clerk-tenant-auth
+      env:
+        DATABASE_URL: postgresql://test:test@localhost:5432/oasis_test
+        OASIS_TEST_DATABASE_SEED_ACK: reset-test-data
         CI: true
         
     # - name: Upload coverage
