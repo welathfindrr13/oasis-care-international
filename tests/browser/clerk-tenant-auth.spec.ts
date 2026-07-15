@@ -26,6 +26,24 @@ async function tokenFor(
   return token;
 }
 
+async function gotoAppRoute(page: Page, pathname: string) {
+  try {
+    await page.goto(pathname);
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !error.message.includes("net::ERR_ABORTED")
+    ) {
+      throw error;
+    }
+
+    await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+    if (new URL(page.url()).pathname !== pathname) {
+      await page.goto(pathname);
+    }
+  }
+}
+
 async function activateSignedProfile(page: Page, profile: Profile) {
   const token = await tokenFor(page.request, profile);
 
@@ -40,7 +58,7 @@ async function activateSignedProfile(page: Page, profile: Profile) {
     },
   ]);
   if (!page.url().startsWith("http://localhost:3004")) {
-    await page.goto("/login");
+    await gotoAppRoute(page, "/login");
   }
   await page.evaluate(
     ({ key, signedToken }) => {
@@ -106,12 +124,12 @@ test("a server-signed management session reaches the normal Clerk verifier and s
     resolution: "READY",
   });
 
-  await page.goto("/people");
+  await gotoAppRoute(page, "/people");
   await expect(
     page.getByText("Assigned Fake Client", { exact: true }),
   ).toBeVisible();
 
-  await page.goto(`/people/${SENTINEL_CLIENT_ID}`);
+  await gotoAppRoute(page, `/people/${SENTINEL_CLIENT_ID}`);
   await expect(
     page.getByRole("heading", {
       name: /Person Not Found|Unable to Load Person/,
@@ -136,7 +154,7 @@ test("a token carrying an admin claim is reduced to its linked Carer assignment"
     resolution: "READY",
   });
 
-  await page.goto("/visits");
+  await gotoAppRoute(page, "/visits");
   await expect(
     page.getByText("Assigned Fake Client", { exact: true }),
   ).toBeVisible();
@@ -164,11 +182,11 @@ test("Family access is grant-bound, tenant-safe, and revoked immediately with th
     resolution: "READY",
   });
 
-  await page.goto("/family");
+  await gotoAppRoute(page, "/family");
   await expect(
     page.getByText("A comfortable morning visit", { exact: true }).first(),
   ).toBeVisible();
-  await page.goto(`/family/care-rooms/${SENTINEL_CARE_ROOM_ID}`);
+  await gotoAppRoute(page, `/family/care-rooms/${SENTINEL_CARE_ROOM_ID}`);
   await expect(
     page.getByRole("heading", { name: "Updates temporarily unavailable" }),
   ).toBeVisible();
@@ -202,7 +220,7 @@ test("Family access is grant-bound, tenant-safe, and revoked immediately with th
     resolution: "DENIED",
   });
 
-  await page.goto(`/family/care-rooms/${CARE_ROOM_ID}`);
+  await gotoAppRoute(page, `/family/care-rooms/${CARE_ROOM_ID}`);
   await expect(page).toHaveURL(/\/access\/unavailable$/);
   await expect(
     page.getByText("No care information has been loaded."),
