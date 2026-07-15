@@ -379,6 +379,7 @@ describe("synthetic Clerk tenant and authorization matrix", () => {
         external_invitation_id: "clerk_invitation_matrix_family",
         bound_auth_subject: familySubject,
         expires_at: new Date("2099-07-20T00:00:00.000Z"),
+        created_at: new Date("2026-07-12T07:59:00.000Z"),
         accepted_at: new Date("2026-07-12T08:00:00.000Z"),
       },
     });
