@@ -264,7 +264,7 @@ describe('Visit E2E Tests', () => {
             },
           },
         })
-        .expect(200);
+        .expect(400);
 
       expect(response.body.data).toBeUndefined();
       expect(response.body.errors?.[0]?.message).toContain(
@@ -1134,7 +1134,7 @@ describe('Visit E2E Tests', () => {
             },
           },
         })
-        .expect(200);
+        .expect(400);
 
       expect(response.body.errors).toHaveLength(1);
       await expect(
@@ -1903,7 +1903,7 @@ describe('Visit E2E Tests', () => {
             },
           },
         })
-        .expect(200);
+        .expect(400);
 
       expect(response.body.errors).toHaveLength(4);
       await expect(
