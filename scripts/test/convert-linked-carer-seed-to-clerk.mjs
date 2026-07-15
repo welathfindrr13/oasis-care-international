@@ -1,9 +1,9 @@
 import { PrismaClient } from "../../libs/db/src/generated/client/index.js";
+import { pathToFileURL } from "node:url";
 import { assertSafeTestDatabaseSeed } from "./assert-safe-test-database.mjs";
 
-assertSafeTestDatabaseSeed();
-const prisma = new PrismaClient();
 const externalOrganizationId = "org_clerk_browser_primary";
+const organizationId = "org-browser-linked-carer";
 
 const memberships = [
   ["44444444-4444-4444-8444-444444444444", "user_clerk_carer_browser"],
@@ -37,33 +37,90 @@ const familyBindings = [
   },
 ];
 
-try {
-  await prisma.$transaction([
-    ...memberships.map(([id, subject]) =>
-      prisma.organizationMembership.update({
+export async function convertLinkedCarerSeedToClerk(prisma) {
+  const invitationIds = familyBindings.map(({ invitationId }) => invitationId);
+  const [invitations, careRoomMembershipBindings] = await Promise.all([
+    prisma.organizationMembershipInvitation.findMany({
+      where: { id: { in: invitationIds } },
+    }),
+    prisma.careRoomMembership.findMany({
+      where: { organization_membership_invitation_id: { in: invitationIds } },
+      select: { id: true, organization_membership_invitation_id: true },
+    }),
+  ]);
+  if (invitations.length !== invitationIds.length) {
+    throw new Error(
+      "Clerk browser seed is missing a family invitation binding",
+    );
+  }
+
+  const subjectsByInvitation = new Map(
+    familyBindings.map(({ invitationId, subject }) => [invitationId, subject]),
+  );
+
+  await prisma.$transaction(async (tx) => {
+    await tx.careRoomMembership.updateMany({
+      where: { organization_membership_invitation_id: { in: invitationIds } },
+      data: { organization_membership_invitation_id: null },
+    });
+    await tx.organizationMembershipInvitation.deleteMany({
+      where: { id: { in: invitationIds } },
+    });
+
+    for (const [id, subject] of memberships) {
+      await tx.organizationMembership.update({
         where: { id },
         data: {
           identity_provider: "clerk",
           auth_subject: subject,
           external_organization_id: externalOrganizationId,
         },
-      }),
-    ),
-    prisma.organizationMembershipInvitation.updateMany({
-      where: { organization_id: "org-browser-linked-carer" },
+      });
+    }
+
+    await tx.organizationMembershipInvitation.updateMany({
+      where: { organization_id: organizationId },
       data: { identity_provider: "clerk" },
-    }),
-    ...familyBindings.flatMap(({ invitationId, contactId, subject }) => [
-      prisma.organizationMembershipInvitation.update({
-        where: { id: invitationId },
-        data: { bound_auth_subject: subject },
-      }),
-      prisma.familyContact.update({
+    });
+    await tx.organizationMembershipInvitation.createMany({
+      data: invitations.map((invitation) => ({
+        ...invitation,
+        identity_provider: "clerk",
+        bound_auth_subject: subjectsByInvitation.get(invitation.id),
+      })),
+    });
+
+    for (const { contactId, subject } of familyBindings) {
+      await tx.familyContact.update({
         where: { id: contactId },
         data: { auth_subject: subject },
-      }),
-    ]),
-  ]);
-} finally {
-  await prisma.$disconnect();
+      });
+    }
+    for (const binding of careRoomMembershipBindings) {
+      await tx.careRoomMembership.update({
+        where: { id: binding.id },
+        data: {
+          organization_membership_invitation_id:
+            binding.organization_membership_invitation_id,
+        },
+      });
+    }
+  });
+}
+
+async function main() {
+  assertSafeTestDatabaseSeed();
+  const prisma = new PrismaClient();
+  try {
+    await convertLinkedCarerSeedToClerk(prisma);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  await main();
 }

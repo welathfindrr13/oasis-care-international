@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 import { assertSafeTestDatabaseSeed } from "./assert-safe-test-database.mjs";
+import { convertLinkedCarerSeedToClerk } from "./convert-linked-carer-seed-to-clerk.mjs";
 
 const safeEnv = {
   DATABASE_URL: "postgresql://test:test@127.0.0.1:5432/oasis_test",
@@ -98,4 +99,79 @@ test("every mutating browser seed invokes the shared guard before Prisma constru
       `${relativePath} must guard before Prisma construction`,
     );
   }
+});
+
+test("Clerk conversion detaches and recreates invitation references around identity updates", async () => {
+  const calls = [];
+  const invitations = [
+    "acacacac-acac-4cac-8cac-acacacacacac",
+    "acacacac-acac-4cac-8cac-bcbcbcbcbcbc",
+    "acacacac-acac-4cac-8cac-cdcdcdcdcdcd",
+  ].map((id) => ({ id, identity_provider: "clerk" }));
+  const tx = {
+    careRoomMembership: {
+      updateMany: async () => calls.push("detach"),
+      update: async () => calls.push("rebind"),
+    },
+    organizationMembershipInvitation: {
+      deleteMany: async () => calls.push("delete invitations"),
+      updateMany: async () => calls.push("update remaining invitations"),
+      createMany: async (input) => {
+        calls.push("recreate invitations");
+        assert.deepEqual(
+          input.data.map(({ identity_provider, bound_auth_subject }) => ({
+            identity_provider,
+            bound_auth_subject,
+          })),
+          [
+            {
+              identity_provider: "clerk",
+              bound_auth_subject: "user_clerk_family_browser",
+            },
+            {
+              identity_provider: "clerk",
+              bound_auth_subject: "user_clerk_revoked_family_browser",
+            },
+            {
+              identity_provider: "clerk",
+              bound_auth_subject: "user_clerk_unauthorized_family_browser",
+            },
+          ],
+        );
+      },
+    },
+    organizationMembership: {
+      update: async () => calls.push("update membership identity"),
+    },
+    familyContact: {
+      update: async () => calls.push("update family contact"),
+    },
+  };
+  const prisma = {
+    organizationMembershipInvitation: {
+      findMany: async () => invitations,
+    },
+    careRoomMembership: {
+      findMany: async () => [
+        {
+          id: "care-room-membership",
+          organization_membership_invitation_id: invitations[0].id,
+        },
+      ],
+    },
+    $transaction: async (callback) => callback(tx),
+  };
+
+  await convertLinkedCarerSeedToClerk(prisma);
+
+  assert.ok(calls.indexOf("detach") < calls.indexOf("delete invitations"));
+  assert.ok(
+    calls.indexOf("delete invitations") <
+      calls.indexOf("update membership identity"),
+  );
+  assert.ok(
+    calls.lastIndexOf("update membership identity") <
+      calls.indexOf("recreate invitations"),
+  );
+  assert.ok(calls.indexOf("recreate invitations") < calls.indexOf("rebind"));
 });
