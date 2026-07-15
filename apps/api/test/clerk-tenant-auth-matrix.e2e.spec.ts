@@ -21,6 +21,7 @@ import { CarebridgeService } from "../src/carebridge/carebridge.service";
 import { FamilyInvitationService } from "../src/carebridge/family-invitation.service";
 import { CareLogService } from "../src/care-log/care-log.service";
 import { MedicationRepository } from "../src/medication/medication.repository";
+import { VisitCompletionProofKeyring } from "../src/visit/visit-completion-proof-keyring";
 import { VisitRepository } from "../src/visit/visit.repository";
 import { VisitResolver } from "../src/visit/visit.resolver";
 import { VisitService } from "../src/visit/visit.service";
@@ -72,6 +73,9 @@ describe("synthetic Clerk tenant and authorization matrix", () => {
     container = started.container;
     process.env.DATABASE_URL = started.dbUrl;
     configureSyntheticClerkAuth();
+    process.env.VISIT_COMPLETION_PROOF_ACTIVE_KEY_ID = "test-v1";
+    process.env.VISIT_COMPLETION_PROOF_ACTIVE_SECRET =
+      "visit-completion-proof-test-secret-32-bytes-minimum";
 
     const moduleRef = await Test.createTestingModule({
       imports: [
@@ -106,6 +110,7 @@ describe("synthetic Clerk tenant and authorization matrix", () => {
         VisitResolver,
         VisitService,
         VisitRepository,
+        VisitCompletionProofKeyring,
         // Care-note creation is unrelated to the startVisit authorization path.
         { provide: CareLogService, useValue: { createCareLog: jest.fn() } },
         // Family invitation writes are outside this matrix; family-safe reads
