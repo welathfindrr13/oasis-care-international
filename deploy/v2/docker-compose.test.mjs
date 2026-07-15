@@ -81,7 +81,10 @@ test('web Dockerfile promotes every Clerk public build arg into build env', () =
 
   assert.match(webDockerfile, /ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY\n/);
   assert.match(webDockerfile, /ARG NEXT_PUBLIC_CLERK_CSP_ORIGINS\n/);
-  assert.match(webDockerfile, /ENV NEXT_PUBLIC_CLERK_CSP_ORIGINS=\$NEXT_PUBLIC_CLERK_CSP_ORIGINS/);
+  assert.equal(
+    (webDockerfile.match(/ENV NEXT_PUBLIC_CLERK_CSP_ORIGINS=\$NEXT_PUBLIC_CLERK_CSP_ORIGINS/g) ?? []).length,
+    2,
+  );
   assert.doesNotMatch(webDockerfile, /ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=/);
   assert.doesNotMatch(webDockerfile, /test -n "\$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"/);
   assert.match(
