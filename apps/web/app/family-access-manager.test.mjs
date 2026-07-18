@@ -52,13 +52,29 @@ test('resend cancels and completes cleanup before creating a zero-access replace
   assert.match(resend, /router\.refresh\(\)/)
 })
 
+test('refreshed canonical room props replace stale invitation state after uncertain resend outcomes', () => {
+  assert.match(manager, /useEffect\(\(\) => \{\s*setRoom\(initialRoom\)\s*\}, \[initialRoom\]\)/)
+})
+
 test('errors retain values, link to controls, announce status, and confirmations restore focus', () => {
   assert.match(manager, /your entries have been kept/i)
   assert.match(manager, /your selections have been kept/i)
   assert.match(manager, /tabIndex=\{-1\}/)
   assert.match(manager, /href=\{`#family-\$\{field\}`\}/)
+  assert.match(manager, /href=\{`#\$\{pageError\.targetId\}`\}/)
+  assert.match(manager, /family-invite-form/)
+  assert.match(manager, /family-grants-/)
+  assert.match(manager, /family-members-heading/)
   assert.match(manager, /<Alert live tone="success"/)
   assert.match(confirmDialog, /openerRef/)
   assert.match(confirmDialog, /opener\?\.isConnected/)
-  assert.match(confirmDialog, /opener\.focus\(\)/)
+  assert.match(confirmDialog, /returnFocusId/)
+  assert.match(confirmDialog, /target\?\.focus\(\)/)
+})
+
+test('delivery outcomes only announce sent after confirmed delivery', () => {
+  assert.match(manager, /deliveryStatus === 'DELIVERED'/)
+  assert.match(manager, /deliveryStatus === 'RETRYABLE'/)
+  assert.match(manager, /deliveryStatus === 'NEEDS_ATTENTION'/)
+  assert.match(manager, /was not delivered\. Use Retry delivery/)
 })

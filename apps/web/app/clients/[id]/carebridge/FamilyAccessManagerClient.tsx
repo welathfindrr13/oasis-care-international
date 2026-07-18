@@ -34,6 +34,11 @@ type ConfirmAction =
   | { kind: 'resend'; membership: CarebridgeMembership }
   | { kind: 'revoke'; membership: CarebridgeMembership }
 
+type OperationError = {
+  message: string
+  targetId: string
+}
+
 const emptyInvite: InviteDraft = {
   fullName: '',
   email: '',
@@ -57,7 +62,7 @@ export function FamilyAccessManagerClient({
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<keyof InviteDraft, string>>
   >({})
-  const [pageError, setPageError] = useState<string | null>(null)
+  const [pageError, setPageError] = useState<OperationError | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
@@ -68,9 +73,44 @@ export function FamilyAccessManagerClient({
       errorSummaryRef.current?.focus()
   }, [fieldErrors, pageError])
 
+  useEffect(() => {
+    setRoom(initialRoom)
+  }, [initialRoom])
+
   function resetOutcome() {
     setPageError(null)
     setNotice(null)
+  }
+
+  function reportError(message: string, targetId: string) {
+    setPageError({ message, targetId })
+  }
+
+  function reportDeliveryOutcome(
+    membership: CarebridgeMembership,
+    deliveredMessage: string,
+  ) {
+    if (membership.deliveryStatus === 'DELIVERED') {
+      setNotice(deliveredMessage)
+      return
+    }
+    if (membership.deliveryStatus === 'RETRYABLE') {
+      reportError(
+        `${membership.familyContact.fullName} was added with no access, but the invitation email was not delivered. Use Retry delivery.`,
+        `family-retry-${membership.id}`,
+      )
+      return
+    }
+    if (membership.deliveryStatus === 'NEEDS_ATTENTION') {
+      reportError(
+        `${membership.familyContact.fullName} was added with no access, but invitation delivery needs attention. Use Retry delivery or ask an administrator for help.`,
+        `family-retry-${membership.id}`,
+      )
+      return
+    }
+    setNotice(
+      `${membership.familyContact.fullName} was added with no access. Invitation delivery is still being processed.`,
+    )
   }
 
   function replaceMembership(next: CarebridgeMembership) {
@@ -102,7 +142,10 @@ export function FamilyAccessManagerClient({
       setRoom(data.createCareRoom)
       setNotice(`Family access is ready to set up for ${personName}.`)
     } catch {
-      setPageError('We could not set up family access. Please try again.')
+      reportError(
+        'We could not set up family access. Please try again.',
+        'family-room-setup',
+      )
     } finally {
       setBusy(null)
     }
@@ -146,12 +189,14 @@ export function FamilyAccessManagerClient({
       replaceMembership(data.inviteFamilyContact)
       setInvite(emptyInvite)
       setFieldErrors({})
-      setNotice(
+      reportDeliveryOutcome(
+        data.inviteFamilyContact,
         `Invitation sent to ${data.inviteFamilyContact.familyContact.fullName}. Access starts with nothing shared.`,
       )
     } catch {
-      setPageError(
+      reportError(
         'We could not send the invitation. Check the details and try again; your entries have been kept.',
+        'family-invite-form',
       )
     } finally {
       setBusy(null)
@@ -171,12 +216,14 @@ export function FamilyAccessManagerClient({
       if (!data.retryFamilyInvitationDelivery)
         throw new Error('Missing retry result')
       replaceMembership(data.retryFamilyInvitationDelivery)
-      setNotice(
-        `Invitation delivery retried for ${membership.familyContact.fullName}.`,
+      reportDeliveryOutcome(
+        data.retryFamilyInvitationDelivery,
+        `Invitation sent to ${membership.familyContact.fullName}.`,
       )
     } catch {
-      setPageError(
+      reportError(
         'We could not retry delivery. The invitation has not been changed.',
+        `family-retry-${membership.id}`,
       )
     } finally {
       setBusy(null)
@@ -207,8 +254,9 @@ export function FamilyAccessManagerClient({
         `Sharing choices saved for ${membership.familyContact.fullName}.`,
       )
     } catch {
-      setPageError(
+      reportError(
         'We could not save these sharing choices. Your selections have been kept.',
+        `family-grants-${membership.id}`,
       )
       throw new Error('grant-save-failed')
     } finally {
@@ -256,8 +304,9 @@ export function FamilyAccessManagerClient({
       }
 
       if (revoked.revokeFamilyInvitation.cleanupStatus !== 'COMPLETE') {
-        setPageError(
+        reportError(
           'The old invitation was cancelled internally, but external cleanup needs attention. No replacement was sent.',
+          `family-membership-${action.membership.id}`,
         )
         return
       }
@@ -280,14 +329,16 @@ export function FamilyAccessManagerClient({
       if (!replacement.inviteFamilyContact)
         throw new Error('Missing replacement result')
       replaceMembership(replacement.inviteFamilyContact)
-      setNotice(
+      reportDeliveryOutcome(
+        replacement.inviteFamilyContact,
         `A new invitation was sent to ${action.membership.familyContact.fullName}. It starts with nothing shared.`,
       )
     } catch {
-      setPageError(
+      reportError(
         action.kind === 'resend'
           ? 'We could not safely resend the invitation. Access may have changed while you were working, so the latest status will be reloaded.'
           : 'We could not complete that action. Nothing further was changed.',
+        'family-members-heading',
       )
       router.refresh()
     } finally {
@@ -323,7 +374,14 @@ export function FamilyAccessManagerClient({
             There is a problem
           </h3>
           {pageError ? (
-            <p className="mt-2 text-sm text-oasis-danger">{pageError}</p>
+            <p className="mt-2 text-sm text-oasis-danger">
+              <a
+                className="font-medium underline"
+                href={`#${pageError.targetId}`}
+              >
+                {pageError.message}
+              </a>
+            </p>
           ) : null}
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
             {Object.entries(fieldErrors).map(([field, message]) => (
@@ -355,6 +413,7 @@ export function FamilyAccessManagerClient({
               manager must set up access here.
             </p>
             <Button
+              id="family-room-setup"
               className="mt-4"
               disabled={busy === 'room'}
               onClick={setUpRoom}
@@ -376,7 +435,13 @@ export function FamilyAccessManagerClient({
               </p>
             </CardHeader>
             <CardContent>
-              <form className="space-y-4" onSubmit={submitInvite} noValidate>
+              <form
+                id="family-invite-form"
+                tabIndex={-1}
+                className="space-y-4 outline-none"
+                onSubmit={submitInvite}
+                noValidate
+              >
                 <div className="grid gap-4 md:grid-cols-2">
                   <InviteField
                     id="fullName"
@@ -456,7 +521,11 @@ export function FamilyAccessManagerClient({
           </Card>
 
           <div className="space-y-4">
-            <h3 className="font-heading text-xl font-semibold text-oasis-ink">
+            <h3
+              id="family-members-heading"
+              tabIndex={-1}
+              className="font-heading text-xl font-semibold text-oasis-ink outline-none"
+            >
               Family members
             </h3>
             {room.memberships.length === 0 ? (
@@ -494,6 +563,7 @@ export function FamilyAccessManagerClient({
         title={confirmation.title}
         description={confirmation.description}
         confirmLabel={confirmation.confirmLabel}
+        returnFocusId="family-members-heading"
         onCancel={() => setConfirmAction(null)}
         onConfirm={runConfirmedAction}
       />
@@ -588,7 +658,11 @@ function MembershipCard({
   }, [activeScopes])
 
   return (
-    <Card>
+    <Card
+      id={`family-membership-${membership.id}`}
+      tabIndex={-1}
+      className="outline-none"
+    >
       <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h4 className="font-semibold text-oasis-ink">
@@ -616,7 +690,11 @@ function MembershipCard({
         ) : null}
 
         {isActive ? (
-          <fieldset className="space-y-3">
+          <fieldset
+            id={`family-grants-${membership.id}`}
+            tabIndex={-1}
+            className="space-y-3 outline-none"
+          >
             <legend className="font-semibold text-oasis-ink">
               What this person can access
             </legend>
@@ -645,9 +723,18 @@ function MembershipCard({
           </fieldset>
         ) : null}
 
-        <div className="flex flex-wrap gap-2">
+        <div
+          id={`family-actions-${membership.id}`}
+          tabIndex={-1}
+          className="flex flex-wrap gap-2 outline-none"
+        >
           {canRetry ? (
-            <Button disabled={busy} variant="secondary" onClick={onRetry}>
+            <Button
+              id={`family-retry-${membership.id}`}
+              disabled={busy}
+              variant="secondary"
+              onClick={onRetry}
+            >
               Retry delivery
             </Button>
           ) : null}

@@ -9,6 +9,7 @@ export function ConfirmDialog({
   onCancel,
   onConfirm,
   open,
+  returnFocusId,
   title,
 }: {
   confirmLabel: string;
@@ -16,6 +17,7 @@ export function ConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
   open: boolean;
+  returnFocusId?: string;
   title: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -39,10 +41,18 @@ export function ConfirmDialog({
       const opener = openerRef.current;
       openerRef.current = null;
       queueMicrotask(() => {
-        if (opener?.isConnected) opener.focus();
+        const openerIsEnabled =
+          opener?.isConnected &&
+          !(opener instanceof HTMLButtonElement && opener.disabled);
+        const target = openerIsEnabled
+          ? opener
+          : returnFocusId
+            ? document.getElementById(returnFocusId)
+            : null;
+        target?.focus();
       });
     }
-  }, [open]);
+  }, [open, returnFocusId]);
 
   return (
     <dialog
