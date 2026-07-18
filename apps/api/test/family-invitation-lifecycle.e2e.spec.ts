@@ -96,6 +96,8 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     adminClerk.revokeOrganizationInvitationByInternalId.mockResolvedValue(undefined);
 
     await prisma.auditLog.deleteMany();
+    await prisma.concernMessage.deleteMany();
+    await prisma.concernEvent.deleteMany();
     await prisma.concern.deleteMany();
     await prisma.verifiedVisitStory.deleteMany();
     await prisma.accessGrant.deleteMany();
