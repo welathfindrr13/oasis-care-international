@@ -132,9 +132,9 @@ test("production identity and healthy postgres are proven before backup creation
   assert.match(workflow, /docker inspect --format/);
 });
 
-test("production proof requires synthetic-only classification and the deploy host lock", () => {
+test("production proof requires empty-production classification and the deploy host lock", () => {
   const lock = indexOfRequired("oasis-deploy/production-vps-mutation.lock");
-  const dataClass = indexOfRequired("PRODUCTION_DATA_CLASS_SYNTHETIC_ONLY");
+  const dataClass = indexOfRequired("PRODUCTION_DATA_CLASS_EMPTY");
   const shaProof = indexOfRequired("PRODUCTION_CODE_SHA_OK");
   const backupCall = workflow.lastIndexOf('"$helper_dir/backup-postgres.sh"');
 
@@ -143,8 +143,19 @@ test("production proof requires synthetic-only classification and the deploy hos
   assert(lock < backupCall);
   assert.match(workflow, /\/etc\/oasis\/controlled-data-class/);
   assert.match(workflow, /= 0:0:600/);
-  assert.match(workflow, /= synthetic-only/);
+  assert.match(workflow, /= empty-production/);
   assert.doesNotMatch(workflow, /oasis-production-backup-proof\.lock/);
+});
+
+test("production proof independently rejects application rows before backup creation", () => {
+  const empty = indexOfRequired("PRODUCTION_DATABASE_EMPTY");
+  const backupCall = workflow.lastIndexOf('"$helper_dir/backup-postgres.sh"');
+
+  assert(empty < backupCall);
+  assert.match(workflow, /FROM pg_tables/);
+  assert.match(workflow, /tablename <> .*_prisma_migrations/);
+  assert.match(workflow, /SELECT EXISTS \(SELECT 1 FROM %I\.%I LIMIT 1\)/);
+  assert.match(workflow, /PRODUCTION_DATABASE_NOT_EMPTY/);
 });
 
 test("durable production key and archive are regular root-only files", () => {
@@ -205,11 +216,13 @@ test("disposable restore requires all authentication query and destruction marke
     "DISPOSABLE_POSTGRES_READY",
     "DISPOSABLE_RESTORE_COMPLETE",
     "DISPOSABLE_RESTORE_QUERY_OK",
+    "DISPOSABLE_RESTORE_EMPTY",
     "DISPOSABLE_RESTORE_DESTROYED",
   ]) {
     assert.match(workflow, new RegExp(marker));
   }
   assert.match(workflow, /PRODUCTION_BACKUP_RESTORE_PROOF_PASS/);
+  assert.match(workflow, /REQUIRE_EMPTY_APPLICATION_DATA=true/);
   assert.match(workflow, /PRODUCTION_BACKUP_DISPOSABLE_RESTORE_FAILED/);
   assert.match(workflow, /PRODUCTION_BACKUP_REHEARSAL_OUTPUT_INVALID/);
 });
@@ -319,7 +332,7 @@ test("remote proof creates restores rotates and fails closed on SHA mismatch", (
   );
   fs.writeFileSync(
     path.join(etc, "controlled-data-class"),
-    "synthetic-only\n",
+    "empty-production\n",
     {
       mode: 0o600,
     },
@@ -355,6 +368,7 @@ printf '%s\\n' \\
   DISPOSABLE_POSTGRES_READY \\
   DISPOSABLE_RESTORE_COMPLETE \\
   DISPOSABLE_RESTORE_QUERY_OK \\
+  DISPOSABLE_RESTORE_EMPTY \\
   DISPOSABLE_RESTORE_DESTROYED
 `,
   );
@@ -399,6 +413,7 @@ case "$*" in
   *" config --quiet"*) exit 0 ;;
   *" ps -q postgres"*) printf 'synthetic-postgres-container\\n' ;;
   *"inspect --format"*) printf 'healthy\\n' ;;
+  *"FROM pg_tables"*) [[ "\${NONEMPTY_APP_DATA:-false}" != true ]] ;;
   *"exec synthetic-postgres-container sh -lc"*) printf '1024\\n' ;;
   *) exit 2 ;;
 esac
@@ -458,7 +473,8 @@ printf '%064d  %s\\n' 0 "\${1:-synthetic}"
     },
   );
   assert.equal(success.status, 0, success.stderr || success.stdout);
-  assert.match(success.stdout, /PRODUCTION_DATA_CLASS_SYNTHETIC_ONLY/);
+  assert.match(success.stdout, /PRODUCTION_DATA_CLASS_EMPTY/);
+  assert.match(success.stdout, /PRODUCTION_DATABASE_EMPTY/);
   assert.match(success.stdout, /PRODUCTION_BACKUP_CAPACITY_OK/);
   assert.match(success.stdout, /DISPOSABLE_RESTORE_DESTROYED/);
   assert.match(success.stdout, /PRODUCTION_BACKUP_STAGED_READY/);
@@ -542,6 +558,31 @@ printf '%064d  %s\\n' 0 "\${1:-synthetic}"
   assert.notEqual(wrongStorageOwner.status, 0);
   assert.match(wrongStorageOwner.stderr, /PRODUCTION_BACKUP_STORAGE_INVALID/);
 
+  const nonemptyDatabase = spawnSync(
+    "/bin/bash",
+    [
+      "-c",
+      remoteProof,
+      "remote-proof",
+      targetSha,
+      helperDir,
+      backupFile,
+      keyFile,
+      retrievalFile,
+    ],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        NONEMPTY_APP_DATA: "true",
+        PATH: `${bin}:/usr/bin:/bin`,
+      },
+    },
+  );
+  assert.equal(nonemptyDatabase.status, 1);
+  assert.match(nonemptyDatabase.stderr, /PRODUCTION_DATABASE_NOT_EMPTY/);
+  assert.equal(fs.existsSync(backupFile), false);
+
   const mismatchFile = path.join(
     backups,
     ".proof-staging",
@@ -602,9 +643,10 @@ case "$*" in
   *"${targetSha}"*)
     printf '%s\\n' \\
       DEPLOY_TARGET_PRODUCTION \\
-      PRODUCTION_DATA_CLASS_SYNTHETIC_ONLY \\
+      PRODUCTION_DATA_CLASS_EMPTY \\
       PRODUCTION_CODE_SHA_OK \\
       PRODUCTION_BACKUP_KEY_READY \\
+      PRODUCTION_DATABASE_EMPTY \\
       PRODUCTION_BACKUP_CAPACITY_OK \\
       BACKUP_CREATED_ENCRYPTED \\
       PRODUCTION_BACKUP_ARCHIVE_READY \\
@@ -612,6 +654,7 @@ case "$*" in
       DISPOSABLE_POSTGRES_READY \\
       DISPOSABLE_RESTORE_COMPLETE \\
       DISPOSABLE_RESTORE_QUERY_OK \\
+      DISPOSABLE_RESTORE_EMPTY \\
       DISPOSABLE_RESTORE_DESTROYED \\
       PRODUCTION_BACKUP_STAGED_READY
     ;;
@@ -667,6 +710,7 @@ printf '%s\\n' \\
   DISPOSABLE_POSTGRES_READY \\
   DISPOSABLE_RESTORE_COMPLETE \\
   DISPOSABLE_RESTORE_QUERY_OK \\
+  DISPOSABLE_RESTORE_EMPTY \\
   DISPOSABLE_RESTORE_DESTROYED
 `,
   );
@@ -702,9 +746,10 @@ printf '%s\\n' \\
     result.stdout,
     [
       "DEPLOY_TARGET_PRODUCTION",
-      "PRODUCTION_DATA_CLASS_SYNTHETIC_ONLY",
+      "PRODUCTION_DATA_CLASS_EMPTY",
       "PRODUCTION_CODE_SHA_OK",
       "PRODUCTION_BACKUP_KEY_READY",
+      "PRODUCTION_DATABASE_EMPTY",
       "PRODUCTION_BACKUP_CAPACITY_OK",
       "BACKUP_CREATED_ENCRYPTED",
       "PRODUCTION_BACKUP_ARCHIVE_READY",
@@ -712,6 +757,7 @@ printf '%s\\n' \\
       "DISPOSABLE_POSTGRES_READY",
       "DISPOSABLE_RESTORE_COMPLETE",
       "DISPOSABLE_RESTORE_QUERY_OK",
+      "DISPOSABLE_RESTORE_EMPTY",
       "DISPOSABLE_RESTORE_DESTROYED",
       "PRODUCTION_BACKUP_STAGED_READY",
       "PRODUCTION_BACKUP_RETRIEVED_VERIFIED",

@@ -7,6 +7,7 @@ CRYPTO_HELPER="${CRYPTO_HELPER:-${SCRIPT_DIR}/backup-crypto.mjs}"
 APPROVED_POSTGRES_IMAGE="pgvector/pgvector@sha256:5af280ae11fab7b9bd4e2eadb2f6e671fa728204741d56eb56b14817a0a74a06"
 POSTGRES_IMAGE="${POSTGRES_IMAGE:-$APPROVED_POSTGRES_IMAGE}"
 BACKUP_ENCRYPTION_KEY_FILE="${BACKUP_ENCRYPTION_KEY_FILE:-}"
+REQUIRE_EMPTY_APPLICATION_DATA="${REQUIRE_EMPTY_APPLICATION_DATA:-false}"
 BACKUP_FILE="${1:-}"
 
 if [[ -z "$BACKUP_FILE" || -z "$BACKUP_ENCRYPTION_KEY_FILE" ]]; then
@@ -15,6 +16,10 @@ if [[ -z "$BACKUP_FILE" || -z "$BACKUP_ENCRYPTION_KEY_FILE" ]]; then
 fi
 if [[ "$POSTGRES_IMAGE" != "$APPROVED_POSTGRES_IMAGE" ]]; then
   echo "REHEARSAL_IMAGE_INVALID" >&2
+  exit 2
+fi
+if [[ "$REQUIRE_EMPTY_APPLICATION_DATA" != "true" && "$REQUIRE_EMPTY_APPLICATION_DATA" != "false" ]]; then
+  echo "REHEARSAL_CONFIGURATION_INVALID" >&2
   exit 2
 fi
 if [[ ! -f "$BACKUP_FILE" || -L "$BACKUP_FILE" ]]; then
@@ -131,6 +136,19 @@ if [[ "${query_result//$'\r'/}" != "RESTORE_QUERY_OK" ]]; then
   exit 1
 fi
 echo "DISPOSABLE_RESTORE_QUERY_OK"
+
+if [[ "$REQUIRE_EMPTY_APPLICATION_DATA" == "true" ]]; then
+  if ! docker exec "$container_name" psql \
+      --username oasis_restore \
+      --dbname oasis_restore \
+      --set ON_ERROR_STOP=1 \
+      --command "DO \$oasis\$ DECLARE candidate record; contains_rows boolean; BEGIN FOR candidate IN SELECT schemaname, tablename FROM pg_tables WHERE schemaname = \$value\$public\$value\$ AND tablename <> \$value\$_prisma_migrations\$value\$ LOOP EXECUTE format(\$query\$SELECT EXISTS (SELECT 1 FROM %I.%I LIMIT 1)\$query\$, candidate.schemaname, candidate.tablename) INTO contains_rows; IF contains_rows THEN RAISE EXCEPTION \$message\$application table contains rows\$message\$; END IF; END LOOP; END \$oasis\$;" \
+      >/dev/null 2>&1; then
+    echo "DISPOSABLE_RESTORE_NOT_EMPTY" >&2
+    exit 1
+  fi
+  echo "DISPOSABLE_RESTORE_EMPTY"
+fi
 
 mount_result="$(docker inspect --format '{{range .Mounts}}{{println .Type .Destination}}{{end}}' "$container_name" 2>/dev/null)"
 if [[ "$mount_result" != "tmpfs /var/lib/postgresql/data" ]]; then

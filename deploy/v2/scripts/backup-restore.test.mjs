@@ -60,6 +60,10 @@ case "$FAKE_DOCKER_MODE" in
           exit 0
         fi
         if [[ "$*" == *" psql "* ]]; then
+          if [[ "$*" == *"FROM pg_tables"* ]]; then
+            [[ "\${FAKE_DOCKER_NONEMPTY:-false}" != "true" ]]
+            exit
+          fi
           printf '%s\\n' "\${FAKE_DOCKER_QUERY_RESULT:-RESTORE_QUERY_OK}"
           exit 0
         fi
@@ -310,6 +314,7 @@ test("disposable rehearsal restores, queries, and destroys its isolated Postgres
     DOCKER_ARGUMENTS_LOG: dockerArgumentsLog,
     FAKE_DOCKER_MODE: "rehearsal",
     FAKE_DOCKER_STATE: fakeDockerState,
+    REQUIRE_EMPTY_APPLICATION_DATA: "true",
     RESTORE_INPUT_LOG: restoreInputLog,
   });
 
@@ -321,6 +326,7 @@ test("disposable rehearsal restores, queries, and destroys its isolated Postgres
       "DISPOSABLE_POSTGRES_READY",
       "DISPOSABLE_RESTORE_COMPLETE",
       "DISPOSABLE_RESTORE_QUERY_OK",
+      "DISPOSABLE_RESTORE_EMPTY",
       "DISPOSABLE_RESTORE_DESTROYED",
       "",
     ].join("\n"),
@@ -340,8 +346,30 @@ test("disposable rehearsal restores, queries, and destroys its isolated Postgres
   assert.match(argumentsLog, /--single-transaction/);
   assert.match(argumentsLog, /psql/);
   assert.match(argumentsLog, /count\(\*\) FROM public\._prisma_migrations/);
+  assert.match(argumentsLog, /FROM pg_tables/);
+  assert.match(argumentsLog, /_prisma_migrations/);
   assert.match(argumentsLog, /rm\n-fv\noasis-restore-rehearsal-/);
   assert.match(argumentsLog, /inspect\noasis-restore-rehearsal-/);
+});
+
+test("empty-production rehearsal rejects an archive containing application rows", (t) => {
+  const harness = createHarness(t);
+  const backupFile = path.join(harness.tempDir, "synthetic.dump.enc");
+  const restoreInputLog = path.join(harness.tempDir, "restore-input.dump");
+  const fakeDockerState = path.join(harness.tempDir, "container.state");
+  encryptFixture(harness, backupFile);
+
+  const result = runScript("rehearse-backup-restore.sh", [backupFile], harness, {
+    FAKE_DOCKER_MODE: "rehearsal",
+    FAKE_DOCKER_NONEMPTY: "true",
+    FAKE_DOCKER_STATE: fakeDockerState,
+    REQUIRE_EMPTY_APPLICATION_DATA: "true",
+    RESTORE_INPUT_LOG: restoreInputLog,
+  });
+
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stderr, /DISPOSABLE_RESTORE_NOT_EMPTY/);
+  assert.equal(existsSync(fakeDockerState), false);
 });
 
 test("failed rehearsal reports a container destruction failure", (t) => {
