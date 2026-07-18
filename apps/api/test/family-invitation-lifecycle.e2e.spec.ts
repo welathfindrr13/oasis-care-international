@@ -457,7 +457,7 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     expect(familyView.body.data.familyVerifiedVisitStories).toEqual([
       {
         title: 'Care visit update',
-        body: 'The scheduled care visit was completed. One care task was recorded as completed. 1 care task needs follow-up.',
+        body: 'The scheduled care visit was completed. 0 care tasks were recorded as completed. 1 care task needs follow-up.',
         publishedAt: familyPublishedAt,
       },
       {
