@@ -105,10 +105,52 @@ test("a linked fake carer follows the database role despite an admin token claim
   await expect(page.getByText("Browser Carer", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Visit details" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Step 3. Care notes" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /medication|eMAR/i })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /medication|eMAR/i })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: /medication|eMAR/i })).toHaveCount(0);
-  await expect(page.getByRole("option", { name: /medication|eMAR/i })).toHaveCount(0);
+  const visibleWorkspaceText = await page.locator("main").evaluate((workspace) => {
+    const textWalker = document.createTreeWalker(workspace, NodeFilter.SHOW_TEXT);
+    const visibleText: string[] = [];
+    let textNode = textWalker.nextNode();
+
+    while (textNode) {
+      const parent = textNode.parentElement;
+      const text = textNode.textContent?.trim();
+      if (parent && text && !["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"].includes(parent.tagName)) {
+        const style = window.getComputedStyle(parent);
+        const range = document.createRange();
+        range.selectNodeContents(textNode);
+        if (
+          style.display !== "none" &&
+          style.visibility !== "hidden" &&
+          style.opacity !== "0" &&
+          range.getClientRects().length > 0
+        ) {
+          visibleText.push(text);
+        }
+      }
+      textNode = textWalker.nextNode();
+    }
+
+    return visibleText.join(" ");
+  });
+  expect(visibleWorkspaceText).not.toMatch(/medication|eMAR/i);
+
+  const launchExcludedRoles = [
+    "link",
+    "button",
+    "heading",
+    "option",
+    "checkbox",
+    "radio",
+    "tab",
+    "menuitem",
+    "textbox",
+    "combobox",
+    "switch",
+  ] as const;
+  for (const role of launchExcludedRoles) {
+    await expect(page.getByRole(role, { name: /medication|eMAR/i })).toHaveCount(0);
+  }
+  await expect(page.getByLabel(/medication|eMAR/i)).toHaveCount(0);
+  await expect(page.getByPlaceholder(/medication|eMAR/i)).toHaveCount(0);
   await expect(
     page.getByText("Confirm assigned visit", { exact: true }),
   ).toBeVisible();
