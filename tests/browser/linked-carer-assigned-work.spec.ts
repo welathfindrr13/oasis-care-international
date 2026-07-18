@@ -674,7 +674,9 @@ test("tenant and family room guessing stays isolated", async ({ page }) => {
     role: "admin",
   });
   await page.goto(`/schedule/${SENTINEL_VISIT_ID}`);
-  await expect(page.getByRole("alert")).toContainText(/not found|do not have access/i);
+  await expect(page.locator("main").getByRole("alert")).toContainText(
+    /not found|do not have access/i,
+  );
   await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
 
   await signIn(page, {
