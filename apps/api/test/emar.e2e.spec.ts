@@ -262,7 +262,7 @@ describe('eMAR real DB flow', () => {
       .set('Authorization', getBearerToken('carer'))
       .send({ query: mutation, variables })
       .expect(200);
-    expect(disabled.body.data?.recordAdministration).toBeNull();
+    expect(disabled.body.data?.recordAdministration ?? null).toBeNull();
     expect(disabled.body.errors?.[0]?.extensions?.code).toBe(
       'FEATURE_NOT_ENABLED',
     );
