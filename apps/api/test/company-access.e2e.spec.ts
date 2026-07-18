@@ -643,7 +643,8 @@ describe("company access bootstrap", () => {
         external_membership_id: "membership_ambiguous_two",
       },
     });
-    const acceptedAt = new Date();
+    const createdAt = new Date();
+    const acceptedAt = new Date(createdAt.getTime() + 1_000);
     await prisma.organizationMembershipInvitation.create({
       data: {
         organization_id: setup.organizationId,
@@ -657,8 +658,8 @@ describe("company access bootstrap", () => {
         external_invitation_id: "orginv_ambiguous_two",
         bound_auth_subject: secondMembership.auth_subject,
         created_by_subject: operatorSubject,
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        delivered_at: acceptedAt,
+        expires_at: new Date(createdAt.getTime() + 24 * 60 * 60 * 1000),
+        created_at: createdAt,
         accepted_at: acceptedAt,
       },
     });
