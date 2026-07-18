@@ -9,6 +9,13 @@ const authorizedParty =
   process.env.CLERK_FIXTURE_AUTHORIZED_PARTY || "http://localhost:3004";
 const keyId = `oasis-browser-${randomUUID()}`;
 const profiles = Object.freeze({
+  platform_operator: {
+    claims: {
+      sub: "user_platform_operator_browser",
+      org_role: "org:member",
+    },
+    overrides: { org_id: "org_platform_ops_browser" },
+  },
   manager: {
     claims: { sub: "user_clerk_manager_browser", org_role: "org:admin" },
   },

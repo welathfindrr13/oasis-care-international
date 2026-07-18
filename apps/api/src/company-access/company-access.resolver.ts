@@ -72,6 +72,18 @@ export class CompanyAccessResolver {
     );
   }
 
+  @Mutation(() => PlatformCompanyAccessRequestDTO)
+  @ManualAudit()
+  revokeBootstrapManagerAccess(
+    @Args("id") id: string,
+    @Context() context: any,
+  ): Promise<PlatformCompanyAccessRequestDTO> {
+    return this.companyAccess.revokeBootstrapManagerAccess(
+      id,
+      this.operatorSubject(context),
+    );
+  }
+
   private operatorSubject(context: any): string {
     return String(context?.req?.user?.sub || context?.req?.user?.id || "");
   }

@@ -70,6 +70,60 @@ async function refreshMountedNextAuthSession(
   });
 }
 
+test("an administrator creates a person and schedules an accepted Carer", async ({
+  page,
+}) => {
+  await signIn(page, {
+    email: "admin@local.dev",
+    name: "Local Admin",
+    role: "user",
+    callbackUrl: "http://localhost:3002/people/new",
+  });
+
+  await page.goto("/people/new");
+  await expect(page.getByRole("heading", { name: "Add person" })).toBeVisible();
+  await page.getByLabel("Full Name *").fill("Browser Journey Person");
+  await page.getByLabel("Address Line 1 *").fill("18 Acceptance Lane");
+  await page.getByLabel("City *").fill("Leeds");
+  await page.getByLabel("Postcode *").fill("LS1 2AB");
+  await page.getByLabel(/I confirm that the person has been informed/).check();
+  await page.getByRole("button", { name: "Create person" }).click();
+
+  await expect(page).toHaveURL(/\/people$/);
+  const personRow = page.getByRole("row").filter({
+    hasText: "Browser Journey Person",
+  });
+  await expect(personRow).toContainText("18 Acceptance Lane");
+  await personRow.getByRole("link", { name: "Schedule" }).click();
+
+  await expect(page).toHaveURL(/\/visits\/new\?clientId=/);
+  await expect(page.getByLabel("Person *")).toHaveValue(/.+/);
+  await expect(
+    page.getByLabel("Person *").locator("option:checked"),
+  ).toHaveText(/Browser Journey Person/);
+  await page.getByLabel("Carer *").selectOption({ label: "Browser Carer" });
+  const futureStart = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  futureStart.setUTCHours(10, 0, 0, 0);
+  const futureEnd = new Date(futureStart.getTime() + 60 * 60 * 1000);
+  await page
+    .getByLabel("Start Time *")
+    .fill(futureStart.toISOString().slice(0, 16));
+  await page
+    .getByLabel("End Time *")
+    .fill(futureEnd.toISOString().slice(0, 16));
+  await page
+    .getByLabel("Visit Notes")
+    .fill("Browser journey scheduled after Carer acceptance");
+  await page.getByRole("button", { name: "Schedule Visit" }).click();
+
+  await expect(page).toHaveURL(/\/schedule\?clientId=/);
+  const visitRow = page.getByRole("row").filter({
+    hasText: "Browser Journey Person",
+  });
+  await expect(visitRow).toContainText("Browser Carer");
+  await expect(visitRow).toContainText("Scheduled");
+});
+
 test("a linked fake carer follows the database role despite an admin token claim", async ({
   page,
 }) => {
@@ -89,48 +143,67 @@ test("a linked fake carer follows the database role despite an admin token claim
 
   await expect(page).toHaveURL("/today");
   await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
-  await expect(page.getByText("Next visit", { exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByText("Next visit", { exact: true }).first(),
+  ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Workforce", exact: true }),
   ).toHaveCount(0);
 
-  await expect(page.getByText("Assigned Fake Client", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Assigned Fake Client", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.locator(`a[href="/schedule/${UNASSIGNED_VISIT_ID}"]`),
   ).toHaveCount(0);
   await page.getByRole("link", { name: "Open visit" }).click();
 
   await expect(page).toHaveURL(`/schedule/${VISIT_ID}`);
-  await expect(page.getByRole("heading", { name: "Assigned Fake Client" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Assigned Fake Client" }),
+  ).toBeVisible();
   await expect(page.getByText("Browser Carer", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Visit details" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Step 3. Care notes" })).toBeVisible();
-  const visibleWorkspaceText = await page.locator("main").evaluate((workspace) => {
-    const textWalker = document.createTreeWalker(workspace, NodeFilter.SHOW_TEXT);
-    const visibleText: string[] = [];
-    let textNode = textWalker.nextNode();
+  await expect(
+    page.getByRole("heading", { name: "Visit details" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Step 3. Care notes" }),
+  ).toBeVisible();
+  const visibleWorkspaceText = await page
+    .locator("main")
+    .evaluate((workspace) => {
+      const textWalker = document.createTreeWalker(
+        workspace,
+        NodeFilter.SHOW_TEXT,
+      );
+      const visibleText: string[] = [];
+      let textNode = textWalker.nextNode();
 
-    while (textNode) {
-      const parent = textNode.parentElement;
-      const text = textNode.textContent?.trim();
-      if (parent && text && !["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"].includes(parent.tagName)) {
-        const style = window.getComputedStyle(parent);
-        const range = document.createRange();
-        range.selectNodeContents(textNode);
+      while (textNode) {
+        const parent = textNode.parentElement;
+        const text = textNode.textContent?.trim();
         if (
-          style.display !== "none" &&
-          style.visibility !== "hidden" &&
-          style.opacity !== "0" &&
-          range.getClientRects().length > 0
+          parent &&
+          text &&
+          !["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"].includes(parent.tagName)
         ) {
-          visibleText.push(text);
+          const style = window.getComputedStyle(parent);
+          const range = document.createRange();
+          range.selectNodeContents(textNode);
+          if (
+            style.display !== "none" &&
+            style.visibility !== "hidden" &&
+            style.opacity !== "0" &&
+            range.getClientRects().length > 0
+          ) {
+            visibleText.push(text);
+          }
         }
+        textNode = textWalker.nextNode();
       }
-      textNode = textWalker.nextNode();
-    }
 
-    return visibleText.join(" ");
-  });
+      return visibleText.join(" ");
+    });
   expect(visibleWorkspaceText).not.toMatch(/medication|eMAR/i);
 
   const launchExcludedRoles = [
@@ -147,7 +220,9 @@ test("a linked fake carer follows the database role despite an admin token claim
     "switch",
   ] as const;
   for (const role of launchExcludedRoles) {
-    await expect(page.getByRole(role, { name: /medication|eMAR/i })).toHaveCount(0);
+    await expect(
+      page.getByRole(role, { name: /medication|eMAR/i }),
+    ).toHaveCount(0);
   }
   await expect(page.getByLabel(/medication|eMAR/i)).toHaveCount(0);
   await expect(page.getByPlaceholder(/medication|eMAR/i)).toHaveCount(0);
@@ -162,6 +237,57 @@ test("a linked fake carer follows the database role despite an admin token claim
   await expect(page.getByText("Visit started.", { exact: true })).toBeVisible();
   await expect(page.getByText("in progress", { exact: true })).toHaveCount(2);
   await expect(page.getByRole("button", { name: "Mark done" })).toBeEnabled();
+
+  await page.getByRole("button", { name: "Mark done" }).click();
+  await expect(
+    page.getByText("Care action marked done.", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Done", { exact: true })).toBeVisible();
+
+  await page
+    .getByPlaceholder(
+      "Record care delivered, person response, and any handover details.",
+    )
+    .fill("Browser journey care note recorded by the assigned Carer.");
+  await page.getByRole("button", { name: "Record care note" }).click();
+  await expect(
+    page.getByText("Care note recorded.", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "Browser journey care note recorded by the assigned Carer.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+
+  await page
+    .getByPlaceholder("Add optional handover details for completion.")
+    .fill("Browser journey completed with planned care delivered.");
+  await page.getByRole("button", { name: "Complete visit" }).click();
+  await expect(
+    page.getByText("Visit completed.", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("completed", { exact: true })).toHaveCount(2);
+
+  await signIn(page, {
+    email: "admin@local.dev",
+    name: "Local Admin",
+    role: "user",
+    callbackUrl: `http://localhost:3002/schedule/${VISIT_ID}`,
+  });
+  await page.goto(`/schedule/${VISIT_ID}`);
+  await expect(
+    page.getByRole("heading", { name: "Admin visit oversight" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "Browser journey care note recorded by the assigned Carer.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(page.getByText(/Recorded note:/)).toContainText(
+    "Browser journey completed with planned care delivered.",
+  );
 });
 
 test("account switching clears stale capabilities and follows each database membership", async ({
@@ -243,30 +369,60 @@ test("account switching clears stale capabilities and follows each database memb
   await expect(
     page.getByRole("heading", { name: "Stay up to date with their care" }),
   ).toBeVisible();
-  await expect(page.getByText("A comfortable morning visit", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Family Assurance Room", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText("A comfortable morning visit", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Family Assurance Room", { exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByText(/proof-of-care/i)).toHaveCount(0);
 
   await page.getByRole("link", { name: "View updates" }).click();
   await expect(page).toHaveURL(`/family/care-rooms/${CARE_ROOM_ID}`);
-  await expect(page.getByRole("heading", { name: "Assigned Fake Client" })).toBeVisible();
-  await expect(page.getByText("The morning visit went well and the planned support was completed.")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Assigned Fake Client" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "The morning visit went well and the planned support was completed.",
+    ),
+  ).toBeVisible();
   await page.getByLabel("What is this about?").selectOption("WELLBEING_CHANGE");
   await page.getByLabel("How important is it?").selectOption("MEDIUM");
   await page.getByLabel("Short summary").fill("A question about today");
-  await page.getByLabel("Tell us more (optional)").fill("Please call when someone is available.");
-  await page.getByRole("button", { name: "Send concern to the care team" }).click();
-  await expect(page.getByRole("heading", { name: "Your concern has been sent" })).toBeVisible();
-  await expect(page.getByText(/The care team has received “A question about today”/)).toBeVisible();
+  await page
+    .getByLabel("Tell us more (optional)")
+    .fill("Please call when someone is available.");
+  await page
+    .getByRole("button", { name: "Send concern to the care team" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Your concern has been sent" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/The care team has received “A question about today”/),
+  ).toBeVisible();
 });
 
 test("manager, care manager, and office memberships stay outside admin and Carer workspaces", async ({
   page,
 }) => {
   const profiles = [
-    { email: "manager@local.dev", name: "Local Manager", workspace: "Manager workspace" },
-    { email: "care-manager@local.dev", name: "Local Care Manager", workspace: "Care manager workspace" },
-    { email: "office@local.dev", name: "Local Office", workspace: "Office workspace" },
+    {
+      email: "manager@local.dev",
+      name: "Local Manager",
+      workspace: "Manager workspace",
+    },
+    {
+      email: "care-manager@local.dev",
+      name: "Local Care Manager",
+      workspace: "Care manager workspace",
+    },
+    {
+      email: "office@local.dev",
+      name: "Local Office",
+      workspace: "Office workspace",
+    },
   ];
 
   for (const profile of profiles) {
@@ -280,11 +436,21 @@ test("manager, care manager, and office memberships stay outside admin and Carer
 
     await expect(page).toHaveURL("/settings");
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-    await expect(page.getByLabel(`Oasis Care, ${profile.workspace}`)).toBeVisible();
-    await expect(page.getByText("Profile and settings access", { exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Workforce", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "My visits", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Updates", exact: true })).toHaveCount(0);
+    await expect(
+      page.getByLabel(`Oasis Care, ${profile.workspace}`),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Profile and settings access", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Workforce", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "My visits", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Updates", exact: true }),
+    ).toHaveCount(0);
   }
 });
 
@@ -307,12 +473,24 @@ test("an administrator sees the real company journey without internal setup lang
   await expect(
     page.getByText("Linked Carer Browser Proof", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("org-browser-linked-carer", { exact: true })).toHaveCount(0);
-  await expect(page.getByText(/synthetic|canary|fixture|seed|billing/i)).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Add a person", exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Invite a carer", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Schedule a visit", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "View people", exact: true })).toBeVisible();
+  await expect(
+    page.getByText("org-browser-linked-carer", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText(/synthetic|canary|fixture|seed|billing/i),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "Add a person", exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Invite a carer", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Schedule a visit", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "View people", exact: true }),
+  ).toBeVisible();
 });
 
 test("Admin Today prioritizes visit exceptions at mobile and desktop sizes", async ({
@@ -332,16 +510,38 @@ test("Admin Today prioritizes visit exceptions at mobile and desktop sizes", asy
     await page.setViewportSize(viewport);
     await page.goto("/today");
     await expect(page).toHaveURL("/today");
-    await expect(page.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Open today's schedule" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Needs attention" })).toBeVisible();
-    await expect(page.getByText("Late or missed visits", { exact: true })).toBeVisible();
-    await expect(page.getByText("Assignments not ready", { exact: true })).toBeVisible();
-    await expect(page.getByText("Incomplete visit records", { exact: true })).toBeVisible();
-    await expect(page.getByText("AI Health Summaries", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("Care plan reviews due soon", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("Medication exceptions", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("Review visits assigned to a Carer whose account is not ready.")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Today", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Open today's schedule" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Needs attention" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Late or missed visits", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Assignments not ready", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Incomplete visit records", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("AI Health Summaries", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText("Care plan reviews due soon", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText("Medication exceptions", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText(
+        "Review visits assigned to a Carer whose account is not ready.",
+      ),
+    ).toBeVisible();
 
     const accessibility = await new AxeBuilder({ page }).analyze();
     expect(accessibility.violations).toEqual([]);
@@ -664,7 +864,9 @@ test("tenant and family room guessing stays isolated", async ({ page }) => {
   });
   await page.goto(`/people/${SENTINEL_CLIENT_ID}`);
   await expect(
-    page.getByRole("heading", { name: /Person Not Found|Unable to Load Person/ }),
+    page.getByRole("heading", {
+      name: /Person Not Found|Unable to Load Person/,
+    }),
   ).toBeVisible();
   await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
 
@@ -685,15 +887,21 @@ test("tenant and family room guessing stays isolated", async ({ page }) => {
     role: "user",
   });
   await page.goto(`/family/care-rooms/${SENTINEL_CARE_ROOM_ID}`);
-  await expect(page.getByRole("heading", { name: "Updates unavailable", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Updates unavailable", exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
 
   await page.goto("/family/care-rooms/aaaaaaaa-aaaa-4aaa-8aaa-cccccccccccc");
-  await expect(page.getByRole("heading", { name: "Updates unavailable", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Updates unavailable", exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
 });
 
-test("an unauthorized family identity receives zero rooms and sanitized denial", async ({ page }) => {
+test("an unauthorized family identity receives zero rooms and sanitized denial", async ({
+  page,
+}) => {
   await signIn(page, {
     email: "unauthorized-family@local.dev",
     name: "Unauthorized Family",
@@ -701,15 +909,21 @@ test("an unauthorized family identity receives zero rooms and sanitized denial",
     callbackUrl: "http://localhost:3002/family",
   });
   await page.goto("/family");
-  await expect(page.getByText(/You do not have access to anyone’s updates yet\./)).toBeVisible();
+  await expect(
+    page.getByText(/You do not have access to anyone’s updates yet\./),
+  ).toBeVisible();
   await expect(page.getByText("Assigned Fake Client")).toHaveCount(0);
 
   await page.goto(`/family/care-rooms/${CARE_ROOM_ID}`);
-  await expect(page.getByRole("heading", { name: /Updates (?:temporarily )?unavailable/ })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /Updates (?:temporarily )?unavailable/ }),
+  ).toBeVisible();
   await expect(page.getByText("Assigned Fake Client")).toHaveCount(0);
 });
 
-test("a revoked family identity immediately loses room access", async ({ page }) => {
+test("a revoked family identity immediately loses room access", async ({
+  page,
+}) => {
   await signIn(page, {
     email: "revoked-family@local.dev",
     name: "Revoked Family",
@@ -719,11 +933,15 @@ test("a revoked family identity immediately loses room access", async ({ page })
   await page.goto(`/family/care-rooms/${CARE_ROOM_ID}`);
 
   await expect(page).toHaveURL(/\/access\/unavailable$/);
-  await expect(page.getByText("No care information has been loaded.")).toBeVisible();
+  await expect(
+    page.getByText("No care information has been loaded."),
+  ).toBeVisible();
   await expect(page.getByText("Assigned Fake Client")).toHaveCount(0);
 });
 
-test("sign-out, Back, and refresh do not reveal protected content", async ({ page }) => {
+test("sign-out, Back, and refresh do not reveal protected content", async ({
+  page,
+}) => {
   await signIn(page, {
     email: "admin@local.dev",
     name: "Local Admin",
@@ -731,22 +949,30 @@ test("sign-out, Back, and refresh do not reveal protected content", async ({ pag
     callbackUrl: "http://localhost:3002/people",
   });
   await page.goto("/people");
-  await expect(page.getByText("Assigned Fake Client", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Assigned Fake Client", { exact: true }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Open account menu" }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
-  await expect(page.getByText("Assigned Fake Client", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText("Assigned Fake Client", { exact: true }),
+  ).toHaveCount(0);
 
   await page.goBack();
   await expect(page).not.toHaveURL(/\/people(?:\?|$)/);
-  await expect(page.getByText("Assigned Fake Client", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText("Assigned Fake Client", { exact: true }),
+  ).toHaveCount(0);
 
   await page.goto("/people");
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
   await page.reload();
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
-  await expect(page.getByText("Assigned Fake Client", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText("Assigned Fake Client", { exact: true }),
+  ).toHaveCount(0);
 });
 
 test("deactivation immediately denies a previously signed-in Carer", async ({

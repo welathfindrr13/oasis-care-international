@@ -9,7 +9,7 @@ const CLIENT_ID = "client-browser-linked-carer";
 const SENTINEL_CLIENT_ID = "client-browser-sentinel";
 const SENTINEL_CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-bbbbbbbbbbbb";
 
-type Profile = "manager" | "carer" | "family";
+type Profile = "platform_operator" | "manager" | "carer" | "family";
 type RejectedProfile =
   | "invalid_signature"
   | "invalid_issuer"
@@ -300,4 +300,114 @@ test("Family access is grant-bound, tenant-safe, and revoked immediately with th
     page.getByText("No care information has been loaded."),
   ).toBeVisible();
   await expect(page.getByText("Assigned Fake Client")).toHaveCount(0);
+});
+
+test("a Platform Owner revokes the exact first Manager before cleanup and the same Manager session loses authority", async ({
+  browser,
+}) => {
+  const managerContext = await browser.newContext({
+    baseURL: "http://localhost:3004",
+  });
+  const managerPage = await managerContext.newPage();
+  const managerToken = await activateSignedProfile(managerPage, "manager");
+  await gotoAppRoute(managerPage, "/people");
+  await expect(
+    managerPage.getByText("Assigned Fake Client", { exact: true }),
+  ).toBeVisible();
+
+  const operatorContext = await browser.newContext({
+    baseURL: "http://localhost:3004",
+  });
+  const operatorPage = await operatorContext.newPage();
+  const operatorToken = await activateSignedProfile(
+    operatorPage,
+    "platform_operator",
+  );
+  await gotoAppRoute(
+    operatorPage,
+    "/platform/company-requests?status=APPROVED",
+  );
+  await expect(
+    operatorPage.getByRole("heading", { name: "Company access requests" }),
+  ).toBeVisible();
+
+  const company = operatorPage
+    .getByRole("article")
+    .filter({ hasText: "Linked Carer Browser Proof" });
+  await expect(company.getByText("admin@local.dev")).toBeVisible();
+  const revokeButton = company.getByRole("button", {
+    name: "Revoke first Manager",
+  });
+  await revokeButton.click();
+  const cancelledDialog = operatorPage.getByRole("dialog", {
+    name: "Revoke access for admin@local.dev?",
+  });
+  await expect(cancelledDialog).toContainText(
+    "This stops the first Manager's access to Linked Carer Browser Proof immediately.",
+  );
+  await expect(cancelledDialog).toContainText(
+    "No replacement Manager will be created.",
+  );
+  await cancelledDialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(revokeButton).toBeFocused();
+
+  await revokeButton.click();
+  const confirmedDialog = operatorPage.getByRole("dialog", {
+    name: "Revoke access for admin@local.dev?",
+  });
+  await confirmedDialog
+    .getByRole("button", { name: "Revoke first Manager", exact: true })
+    .click();
+  await expect(
+    operatorPage.getByRole("status").filter({
+      hasText:
+        "First Manager access revoked for Linked Carer Browser Proof. Clerk cleanup still needs attention.",
+    }),
+  ).toBeVisible();
+  await expect(
+    operatorPage.getByRole("heading", { name: "Company access requests" }),
+  ).toBeFocused();
+
+  expect(managerToken).toContain(".");
+  const deniedResponse = await managerPage.request.get("/api/access-context");
+  expect(deniedResponse.status()).toBe(200);
+  await expect(deniedResponse.json()).resolves.toMatchObject({
+    membershipState: "INACTIVE",
+    surface: "NONE",
+    onboardingState: "BLOCKED",
+    resolution: "DENIED",
+  });
+  await gotoAppRoute(managerPage, "/people");
+  await expect(managerPage).toHaveURL(/\/access\/disabled$/);
+  await expect(managerPage.getByText("Assigned Fake Client")).toHaveCount(0);
+
+  await gotoAppRoute(
+    operatorPage,
+    "/platform/company-requests?status=DISABLED",
+  );
+  const disabledCompany = operatorPage
+    .getByRole("article")
+    .filter({ hasText: "Linked Carer Browser Proof" });
+  await expect(
+    disabledCompany.getByText("Cleanup needs attention"),
+  ).toBeVisible();
+  await expect(
+    disabledCompany.getByText("Safe code: CLERK_MEMBERSHIP_BINDING_MISMATCH"),
+  ).toBeVisible();
+  await disabledCompany
+    .getByRole("button", { name: "Retry Clerk cleanup" })
+    .click();
+  await expect(
+    operatorPage.getByRole("status").filter({
+      hasText:
+        "Oasis access remains revoked for Linked Carer Browser Proof. Clerk cleanup still needs attention.",
+    }),
+  ).toBeVisible();
+  await expect(
+    disabledCompany.getByText("Cleanup needs attention"),
+  ).toBeVisible();
+
+  expect(operatorToken).toContain(".");
+  await operatorContext.close();
+  await managerContext.close();
 });

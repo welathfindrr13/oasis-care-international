@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { DbModule } from "@oasis/db";
 import { AuthAccessModule } from "../auth/auth-access.module";
+import { InvitationLifecycleModule } from "../invitation-lifecycle/invitation-lifecycle.module";
 import { createCompanyAccessRequestRateLimiter } from "../security/api-hardening";
 import { ClerkProvisioningAdapter } from "./clerk-provisioning.adapter";
 import { CompanyAccessController } from "./company-access.controller";
@@ -32,7 +33,7 @@ function requireCompanyAccessJson(req: any, res: any, next: () => void): void {
 }
 
 @Module({
-  imports: [DbModule, AuthAccessModule],
+  imports: [DbModule, AuthAccessModule, InvitationLifecycleModule],
   controllers: [CompanyAccessController],
   providers: [
     ClerkProvisioningAdapter,

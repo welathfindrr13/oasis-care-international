@@ -23,6 +23,10 @@ const COMPANY_REQUESTS = `
         provisioningStatus
         provisioningAttemptCount
         provisioningErrorCode
+        bootstrapManagerEmail
+        bootstrapManagerAccessStatus
+        bootstrapManagerCleanupStatus
+        bootstrapManagerCleanupErrorCode
         requestedAt
       }
       total
@@ -63,11 +67,9 @@ function requestsHref(status: CompanyRequestStatus, offset = 0): string {
 
 export const dynamic = "force-dynamic";
 
-export default async function PlatformCompanyRequestsPage(
-  props: {
-    searchParams?: Promise<{ status?: string; offset?: string }>;
-  }
-) {
+export default async function PlatformCompanyRequestsPage(props: {
+  searchParams?: Promise<{ status?: string; offset?: string }>;
+}) {
   const searchParams = await props.searchParams;
   const status = selectedStatus(searchParams?.status);
   const offset = selectedOffset(searchParams?.offset);
@@ -88,7 +90,11 @@ export default async function PlatformCompanyRequestsPage(
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-800">
           Oasis platform operations
         </p>
-        <h1 className="font-heading text-4xl font-black tracking-tight">
+        <h1
+          id="company-requests-heading"
+          tabIndex={-1}
+          className="font-heading text-4xl font-black tracking-tight"
+        >
           Company access requests
         </h1>
         <p className="mb-8 max-w-3xl text-slate-600">

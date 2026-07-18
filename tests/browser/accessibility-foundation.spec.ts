@@ -158,7 +158,9 @@ async function expectSequentialKeyboardTraversal(page: Page) {
   await page.evaluate(() => {
     document
       .querySelectorAll("[data-accessibility-focus-id]")
-      .forEach((element) => element.removeAttribute("data-accessibility-focus-id"));
+      .forEach((element) =>
+        element.removeAttribute("data-accessibility-focus-id"),
+      );
   });
 }
 
@@ -179,7 +181,10 @@ async function expectMainContentBypass(page: Page) {
 
 async function expectAccessibilityFoundation(
   page: Page,
-  options: { repeatedHeader?: boolean } = {},
+  options: {
+    repeatedHeader?: boolean;
+    sequentialKeyboardTraversal?: boolean;
+  } = {},
 ) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(page.locator("main")).toBeVisible();
@@ -200,21 +205,21 @@ async function expectAccessibilityFoundation(
     );
   expect(positiveTabIndexes).toEqual([]);
 
-  await expectSequentialKeyboardTraversal(page);
+  if (options.sequentialKeyboardTraversal !== false) {
+    await expectSequentialKeyboardTraversal(page);
+  }
   if (options.repeatedHeader) await expectMainContentBypass(page);
 
   const motion = await page.evaluate(() => ({
     reduce: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    longRunningAnimations: document
-      .getAnimations()
-      .filter((animation) => {
-        const timing = animation.effect?.getComputedTiming();
-        return (
-          animation.playState === "running" &&
-          typeof timing?.duration === "number" &&
-          timing.duration > 50
-        );
-      }).length,
+    longRunningAnimations: document.getAnimations().filter((animation) => {
+      const timing = animation.effect?.getComputedTiming();
+      return (
+        animation.playState === "running" &&
+        typeof timing?.duration === "number" &&
+        timing.duration > 50
+      );
+    }).length,
   }));
   expect(motion.reduce).toBe(true);
   expect(motion.longRunningAnimations).toBe(0);
@@ -239,18 +244,26 @@ test("Public", async ({ page }) => {
   await expect(
     page.getByRole("link", { name: "Request company access" }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "Open Manager Today" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Review family updates" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Open Manager Today" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Review family updates" }),
+  ).toBeVisible();
   await expect(page.getByRole("contentinfo")).toBeVisible();
   await expectAccessibilityFoundation(page);
 });
 
 test("Login", async ({ page }) => {
   await page.goto("/login");
-  await expect(page.getByRole("heading", { name: "Sign in to Oasis Care" })).toBeVisible();
-  const headingLevels = await page.locator("h1, h2, h3, h4, h5, h6").evaluateAll((headings) =>
-    headings.map((heading) => Number(heading.tagName.slice(1))),
-  );
+  await expect(
+    page.getByRole("heading", { name: "Sign in to Oasis Care" }),
+  ).toBeVisible();
+  const headingLevels = await page
+    .locator("h1, h2, h3, h4, h5, h6")
+    .evaluateAll((headings) =>
+      headings.map((heading) => Number(heading.tagName.slice(1))),
+    );
   expect(headingLevels).toEqual([1, 2]);
   await expect(page.getByLabel("Workspace")).toBeVisible();
   await expect(page.getByRole("contentinfo")).toBeVisible();
@@ -261,8 +274,12 @@ test("Tenant admin Today", async ({ page }) => {
   await signIn(page, profiles.tenantAdmin);
   await page.goto("/today");
   await expect(page).toHaveURL(/\/today$/);
-  await expect(page.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Needs attention" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Today", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Needs attention" }),
+  ).toBeVisible();
   await expect(page.getByText("No visits scheduled today")).toBeVisible();
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
 });
@@ -271,57 +288,270 @@ test("Tenant admin company setup", async ({ page }) => {
   await signIn(page, profiles.tenantAdmin);
   await page.goto("/admin/setup");
   await expect(page).toHaveURL(/\/admin\/setup$/);
-  await expect(page.getByRole("heading", { name: "Set up your company" })).toBeVisible();
-  await expect(page.getByText("Meadow Care Services", { exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Add a person", exact: true }).first()).toBeVisible();
-  await expect(page.getByText(/must accept the invitation before you can assign/)).toBeVisible();
-  await expect(page.getByText(/synthetic|canary|fixture|seed|internal organization ID/i)).toHaveCount(0);
-  const primarySize = await page.getByRole("link", { name: "Add a person", exact: true }).first().evaluate((element) => {
-    const bounds = element.getBoundingClientRect();
-    return { width: bounds.width, height: bounds.height };
-  });
+  await expect(
+    page.getByRole("heading", { name: "Set up your company" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Meadow Care Services", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Add a person", exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/must accept the invitation before you can assign/),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/synthetic|canary|fixture|seed|internal organization ID/i),
+  ).toHaveCount(0);
+  const primarySize = await page
+    .getByRole("link", { name: "Add a person", exact: true })
+    .first()
+    .evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return { width: bounds.width, height: bounds.height };
+    });
   expect(primarySize.height).toBeGreaterThanOrEqual(44);
   expect(primarySize.width).toBeGreaterThanOrEqual(44);
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
 });
 
-test("Tenant admin manages Family access from the selected person", async ({ page }) => {
+test("Platform Owner first Manager revocation is explicit and recoverable", async ({
+  page,
+}) => {
+  await signIn(page, profiles.tenantAdmin);
+  await page.goto("/platform/company-requests?status=APPROVED");
+  await expect(
+    page.getByRole("heading", { name: "Company access requests" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Meadow Care Services", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("manager@example.test", { exact: true }),
+  ).toBeVisible();
+
+  const revoke = page.getByRole("button", { name: "Revoke first Manager" });
+  const revokeSize = await revoke.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return { width: bounds.width, height: bounds.height };
+  });
+  expect(revokeSize.width).toBeGreaterThanOrEqual(44);
+  expect(revokeSize.height).toBeGreaterThanOrEqual(44);
+
+  await revoke.focus();
+  await revoke.click();
+  const dialog = page.getByRole("dialog", {
+    name: "Revoke access for manager@example.test?",
+  });
+  await expect(dialog).toContainText(
+    "This stops the first Manager's access to Meadow Care Services immediately.",
+  );
+  await expect(dialog).toContainText(
+    "The company and care records will remain.",
+  );
+  await expect(dialog).toContainText("No replacement Manager will be created.");
+  const dialogAccessibility = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+    .analyze();
+  expect(dialogAccessibility.violations).toEqual([]);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(revoke).toBeFocused();
+
+  await page.route("**/api/graphql", async (route) => {
+    const payload = route.request().postDataJSON() as { query?: string };
+    if (payload.query?.includes("RevokeBootstrapManager")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          errors: [{ message: "Fixture revocation failure" }],
+        }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await revoke.click();
+  await page
+    .getByRole("dialog", { name: "Revoke access for manager@example.test?" })
+    .getByRole("button", { name: "Revoke first Manager" })
+    .click();
+  const problem = page
+    .getByRole("alert")
+    .filter({ hasText: "We could not revoke this first Manager safely" });
+  await expect(problem).toBeFocused();
+  const problemLink = problem.getByRole("link", {
+    name: /We could not revoke this first Manager safely/,
+  });
+  await expect(problemLink).toHaveAttribute(
+    "href",
+    "#bootstrap-manager-10101010-1010-4010-8010-101010101010",
+  );
+  await problemLink.click();
+  await expect(
+    page.locator("#bootstrap-manager-10101010-1010-4010-8010-101010101010"),
+  ).toBeFocused();
+  await expect(
+    page.getByText("manager@example.test", { exact: true }),
+  ).toBeVisible();
+  await expectAccessibilityFoundation(page, {
+    sequentialKeyboardTraversal: false,
+  });
+});
+
+test("Platform Owner cleanup attention remains truthful and retryable", async ({
+  page,
+}) => {
+  await signIn(page, profiles.tenantAdmin);
+  await page.goto("/platform/company-requests?status=DISABLED");
+  await expect(
+    page.getByText("Cleanup needs attention", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Safe code: CLERK_MEMBERSHIP_BINDING_MISMATCH"),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/No replacement Manager was created/),
+  ).toBeVisible();
+
+  await page.route("**/api/graphql", async (route) => {
+    const payload = route.request().postDataJSON() as { query?: string };
+    if (payload.query?.includes("RevokeBootstrapManager")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            revokeBootstrapManagerAccess: {
+              id: "10101010-1010-4010-8010-101010101010",
+              companyName: "Meadow Care Services",
+              contactName: "Avery Morgan",
+              businessEmail: "avery@example.test",
+              operationalNote: null,
+              status: "DISABLED",
+              organizationId: "org-accessibility-fixture",
+              provisioningStatus: "ACTIVATED",
+              provisioningAttemptCount: 1,
+              provisioningErrorCode: null,
+              bootstrapManagerEmail: "manager@example.test",
+              bootstrapManagerAccessStatus: "REVOKED",
+              bootstrapManagerCleanupStatus: "NEEDS_ATTENTION",
+              bootstrapManagerCleanupErrorCode:
+                "CLERK_MEMBERSHIP_BINDING_MISMATCH",
+              requestedAt: "2026-07-18T09:00:00.000Z",
+            },
+          },
+        }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  const retry = page.getByRole("button", { name: "Retry Clerk cleanup" });
+  const retrySize = await retry.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return { width: bounds.width, height: bounds.height };
+  });
+  expect(retrySize.width).toBeGreaterThanOrEqual(44);
+  expect(retrySize.height).toBeGreaterThanOrEqual(44);
+  await retry.click();
+  await expect(
+    page.getByRole("status").filter({
+      hasText:
+        "Oasis access remains revoked for Meadow Care Services. Clerk cleanup still needs attention.",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Cleanup needs attention", { exact: true }),
+  ).toBeVisible();
+  await expectAccessibilityFoundation(page, {
+    sequentialKeyboardTraversal: false,
+  });
+
+  await page.setViewportSize({ width: 320, height: 844 });
+  const reflow = await page.evaluate(() => ({
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+  expect(reflow.documentWidth).toBeLessThanOrEqual(reflow.viewportWidth);
+});
+
+test("Tenant admin manages Family access from the selected person", async ({
+  page,
+}) => {
   await signIn(page, profiles.tenantAdmin);
   await page.goto(`/clients/${PERSON_ID}/carebridge`);
   await expect(page).toHaveURL(new RegExp(`/clients/${PERSON_ID}/carebridge$`));
-  await expect(page.getByRole("heading", { name: "Family access for Jordan Ellis" })).toBeVisible();
-  await expect(page.getByText("Invitations begin with no access.")).toBeVisible();
-  await expect(page.getByRole("checkbox", { name: /Approved care updates/ })).toBeVisible();
-  await expect(page.getByRole("checkbox", { name: /Send concerns/ })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Family access for Jordan Ellis" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Invitations begin with no access."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("checkbox", { name: /Approved care updates/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("checkbox", { name: /Send concerns/ }),
+  ).toBeVisible();
 
-  await page.getByRole("button", { name: "Send invitation", exact: true }).click();
-  const problem = page.getByRole("alert").filter({ hasText: "There is a problem" });
+  await page
+    .getByRole("button", { name: "Send invitation", exact: true })
+    .click();
+  const problem = page
+    .getByRole("alert")
+    .filter({ hasText: "There is a problem" });
   await expect(problem).toBeFocused();
-  await expect(problem.getByRole("link", { name: "Enter the family member’s name." })).toHaveAttribute("href", "#family-fullName");
-  await expect(problem.getByRole("link", { name: "Enter a valid email address." })).toHaveAttribute("href", "#family-email");
+  await expect(
+    problem.getByRole("link", { name: "Enter the family member’s name." }),
+  ).toHaveAttribute("href", "#family-fullName");
+  await expect(
+    problem.getByRole("link", { name: "Enter a valid email address." }),
+  ).toHaveAttribute("href", "#family-email");
 
   const resend = page.getByRole("button", { name: "Resend invitation" });
   await resend.focus();
   await resend.click();
-  await expect(page.getByRole("dialog", { name: "Resend invitation to Alex Ellis?" })).toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "Resend invitation to Alex Ellis?" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(resend).toBeFocused();
 
-  const undersized = await page.locator("button, input:not([type=checkbox]), select, textarea").evaluateAll((controls) =>
-    controls.filter((control) => {
-      const bounds = control.getBoundingClientRect();
-      return bounds.width > 0 && bounds.height > 0 && (bounds.width < 44 || bounds.height < 44);
-    }).map((control) => ({ tag: control.tagName, text: control.textContent })),
-  );
+  const undersized = await page
+    .locator("button, input:not([type=checkbox]), select, textarea")
+    .evaluateAll((controls) =>
+      controls
+        .filter((control) => {
+          const bounds = control.getBoundingClientRect();
+          return (
+            bounds.width > 0 &&
+            bounds.height > 0 &&
+            (bounds.width < 44 || bounds.height < 44)
+          );
+        })
+        .map((control) => ({
+          tag: control.tagName,
+          text: control.textContent,
+        })),
+    );
   expect(undersized).toEqual([]);
-  const checkboxTargets = await page.getByRole("checkbox").evaluateAll((checkboxes) =>
-    checkboxes.map((checkbox) => {
-      const label = checkbox.closest("label");
-      const bounds = label?.getBoundingClientRect();
-      return { width: bounds?.width || 0, height: bounds?.height || 0 };
-    }),
-  );
-  expect(checkboxTargets.every((target) => target.width >= 44 && target.height >= 44)).toBe(true);
+  const checkboxTargets = await page
+    .getByRole("checkbox")
+    .evaluateAll((checkboxes) =>
+      checkboxes.map((checkbox) => {
+        const label = checkbox.closest("label");
+        const bounds = label?.getBoundingClientRect();
+        return { width: bounds?.width || 0, height: bounds?.height || 0 };
+      }),
+    );
+  expect(
+    checkboxTargets.every(
+      (target) => target.width >= 44 && target.height >= 44,
+    ),
+  ).toBe(true);
 
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
   await page.setViewportSize({ width: 320, height: 844 });
@@ -332,7 +562,9 @@ test("Tenant admin manages Family access from the selected person", async ({ pag
   expect(reflow.documentWidth).toBeLessThanOrEqual(reflow.viewportWidth);
 });
 
-test("Tenant admin receives truthful Family delivery and linked operation errors", async ({ page }) => {
+test("Tenant admin receives truthful Family delivery and linked operation errors", async ({
+  page,
+}) => {
   await signIn(page, profiles.tenantAdmin);
   await page.goto(`/clients/${PERSON_ID}/carebridge`);
 
@@ -373,7 +605,9 @@ test("Tenant admin receives truthful Family delivery and linked operation errors
 
   await page.getByLabel("Full name").fill("Casey Ellis");
   await page.getByLabel("Email address").fill("casey@example.test");
-  await page.getByRole("button", { name: "Send invitation", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Send invitation", exact: true })
+    .click();
 
   const deliveryProblem = page
     .getByRole("alert")
@@ -392,7 +626,9 @@ test("Tenant admin receives truthful Family delivery and linked operation errors
   await expect(retry).toBeFocused();
 });
 
-test("Tenant admin keeps grant choices and focus through failed and confirmed actions", async ({ page }) => {
+test("Tenant admin keeps grant choices and focus through failed and confirmed actions", async ({
+  page,
+}) => {
   await signIn(page, profiles.tenantAdmin);
   await page.goto(`/clients/${PERSON_ID}/carebridge`);
 
@@ -402,7 +638,9 @@ test("Tenant admin keeps grant choices and focus through failed and confirmed ac
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ errors: [{ message: "Fixture grant failure" }] }),
+        body: JSON.stringify({
+          errors: [{ message: "Fixture grant failure" }],
+        }),
       });
       return;
     }
@@ -464,7 +702,9 @@ test("Tenant admin keeps grant choices and focus through failed and confirmed ac
     .getByRole("button", { name: "Revoke access" })
     .click();
   await expect(page.locator("#family-members-heading")).toBeFocused();
-  await expect(page.getByText("Access revoked for Morgan Ellis.")).toBeVisible();
+  await expect(
+    page.getByText("Access revoked for Morgan Ellis."),
+  ).toBeVisible();
 });
 
 for (const route of ["/emar", "/medication"]) {
@@ -473,7 +713,9 @@ for (const route of ["/emar", "/medication"]) {
     await page.goto(route);
     await expect(page).toHaveURL(/\/access\/feature-not-enabled$/);
     await expect(
-      page.getByRole("heading", { name: "Medication and eMAR are not available" }),
+      page.getByRole("heading", {
+        name: "Medication and eMAR are not available",
+      }),
     ).toBeVisible();
     await expectAccessibilityFoundation(page);
   });
@@ -483,8 +725,12 @@ test("Carer Today", async ({ page }) => {
   await signIn(page, profiles.carer);
   await page.goto("/today");
   await expect(page).toHaveURL(/\/today$/);
-  await expect(page.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "No visits assigned today" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Today", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "No visits assigned today" }),
+  ).toBeVisible();
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
 });
 
@@ -492,8 +738,12 @@ test("visit detail", async ({ page }) => {
   await signIn(page, profiles.carer);
   await page.goto(`/visits/${VISIT_ID}`);
   await expect(page).toHaveURL(new RegExp(`/visits/${VISIT_ID}$`));
-  await expect(page.getByRole("heading", { name: "Jordan Ellis" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Visit details" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Jordan Ellis" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Visit details" }),
+  ).toBeVisible();
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
 });
 
@@ -504,7 +754,9 @@ test("Family home", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Stay up to date with their care" }),
   ).toBeVisible();
-  await expect(page.getByText("You do not have access to anyone’s updates yet.")).toBeVisible();
+  await expect(
+    page.getByText("You do not have access to anyone’s updates yet."),
+  ).toBeVisible();
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
 });
 
@@ -517,6 +769,8 @@ test("Tenant admin family concerns", async ({ page }) => {
       name: "Work family concerns from one operational queue",
     }),
   ).toBeVisible();
-  await expect(page.getByRole("heading", { name: "No concerns in this view" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "No concerns in this view" }),
+  ).toBeVisible();
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
 });
