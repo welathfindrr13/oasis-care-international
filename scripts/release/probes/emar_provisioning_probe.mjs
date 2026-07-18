@@ -2,12 +2,13 @@ import fs from 'fs/promises';
 import path from 'path';
 import { chromium } from 'playwright';
 import { getLiveProbeAccount, getLiveProbeBaseUrl } from './live-probe-env.mjs';
+import { loginLiveProbeAccount } from './live-probe-login.mjs';
 
 const BASE_URL = getLiveProbeBaseUrl();
 const OUT_DIR = 'output/playwright/e2e-live';
 const TS = Date.now();
 const RESULT_PREFIX = 'PROBE_RESULT_JSON:';
-const REQUIRED_CHECKS = ['clientLookup', 'createMedication', 'createPrescription', 'readBack'];
+const REQUIRED_CHECKS = ['emarRouteExcluded', 'medicationRouteExcluded', 'createMedicationExcluded', 'createPrescriptionExcluded', 'readExcluded'];
 
 const ACCOUNT = getLiveProbeAccount('admin');
 
@@ -15,45 +16,10 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 async function screenshot(page, label) {
   const file = path.join(OUT_DIR, `${TS}_admin_${label}.png`);
   await page.screenshot({ path: file, fullPage: true });
   return file;
-}
-
-async function waitForPostLogin(page) {
-  await page.waitForLoadState('domcontentloaded');
-  for (let i = 0; i < 80; i += 1) {
-    const u = page.url();
-    if (u.startsWith(BASE_URL) && !u.includes('/login')) return;
-    await page.waitForTimeout(500);
-  }
-  throw new Error(`Timed out waiting for login redirect. URL=${page.url()}`);
-}
-
-async function login(page) {
-  await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-
-  await page.locator('button:has-text("Sign in securely")').first().click({ timeout: 20000 });
-  await page.waitForURL(/amazoncognito\.com/, { timeout: 60000 });
-
-  const userInput = page.locator('input[name="username"], input#username, input[type="email"]').first();
-  await userInput.waitFor({ state: 'visible', timeout: 30000 });
-  await userInput.fill(ACCOUNT.email);
-
-  await page.getByRole('button', { name: /next|continue|sign in|log in/i }).first().click({ timeout: 15000 });
-
-  const passInput = page.locator('input[name="password"], input#password, input[type="password"]').first();
-  await passInput.waitFor({ state: 'visible', timeout: 30000 });
-  await passInput.fill(ACCOUNT.password);
-
-  await page.getByRole('button', { name: /continue|sign in|log in|login/i }).first().click({ timeout: 15000 });
-  await waitForPostLogin(page);
-  await page.waitForLoadState('networkidle', { timeout: 40000 }).catch(() => {});
 }
 
 async function gql(page, query, variables = {}) {
@@ -77,8 +43,10 @@ async function gql(page, query, variables = {}) {
   }, { query, variables });
 }
 
-function hasErrors(res) {
-  return Array.isArray(res?.body?.errors) && res.body.errors.length > 0;
+function isFeatureNotEnabled(res, field) {
+  return res?.status === 200 &&
+    res?.body?.data?.[field] === null &&
+    res?.body?.errors?.[0]?.extensions?.code === 'FEATURE_NOT_ENABLED';
 }
 
 async function main() {
@@ -97,58 +65,43 @@ async function main() {
   };
 
   try {
-    await login(page);
+    await loginLiveProbeAccount(page, {
+      baseUrl: BASE_URL,
+      account: ACCOUNT,
+      localRole: 'admin',
+    });
     await page.goto(`${BASE_URL}/emar`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await page.waitForURL(/\/access\/feature-not-enabled$/, { timeout: 30000 });
     report.emarPageScreenshot = await screenshot(page, 'emar_page');
-
-    const clientsRes = await gql(page, `
-      query ClientsForProbe {
-        clients(skip: 0, take: 1) {
-          items { id fullName }
-        }
-      }
-    `);
-    const client = clientsRes?.body?.data?.clients?.items?.[0] || null;
-
-    report.checks.clientLookup = {
-      pass: clientsRes.status === 200 && !hasErrors(clientsRes) && Boolean(client?.id),
-      actual: { status: clientsRes.status, errors: clientsRes?.body?.errors || null, client: client || null },
+    report.checks.emarRouteExcluded = {
+      pass: new URL(page.url()).pathname === '/access/feature-not-enabled',
+      actual: { currentUrl: page.url() },
     };
 
-    if (!client?.id) {
-      throw new Error('No client available for eMAR probe');
-    }
+    await page.goto(`${BASE_URL}/medication`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await page.waitForURL(/\/access\/feature-not-enabled$/, { timeout: 30000 });
+    report.checks.medicationRouteExcluded = {
+      pass: new URL(page.url()).pathname === '/access/feature-not-enabled',
+      actual: { currentUrl: page.url() },
+    };
 
-    const medicationName = `E2E_MED_${TS}`;
     const createMedicationRes = await gql(page, `
       mutation CreateMedication($input: CreateMedicationInput!) {
         createMedication(input: $input) { id name dosage unit }
       }
     `, {
       input: {
-        name: medicationName,
-        dosage: '10',
-        unit: 'mg',
-        instructions: 'Probe created medication',
+        name: '',
+        dosage: '',
+        unit: '',
       },
     });
 
     const medicationId = createMedicationRes?.body?.data?.createMedication?.id || null;
-    report.checks.createMedication = {
-      pass: createMedicationRes.status === 200 && !hasErrors(createMedicationRes) && Boolean(medicationId),
+    report.checks.createMedicationExcluded = {
+      pass: isFeatureNotEnabled(createMedicationRes, 'createMedication') && medicationId === null,
       actual: { status: createMedicationRes.status, errors: createMedicationRes?.body?.errors || null, medicationId },
     };
-
-    if (!medicationId) {
-      throw new Error('Medication creation failed');
-    }
-
-    const start = new Date();
-    start.setUTCHours(0, 0, 0, 0);
-    const end = new Date(start);
-    end.setUTCDate(end.getUTCDate() + 6);
-    end.setUTCHours(23, 59, 59, 999);
 
     const createPrescriptionRes = await gql(page, `
       mutation CreatePrescription($input: CreatePrescriptionInput!) {
@@ -161,23 +114,19 @@ async function main() {
       }
     `, {
       input: {
-        clientId: client.id,
-        medicationId,
-        startDate: start.toISOString(),
-        endDate: end.toISOString(),
-        frequencyPerDay: 1,
-        administrationTimes: ['08:00'],
-        specialInstructions: 'Probe prescription',
+        clientId: '00000000-0000-4000-8000-000000000001',
+        medicationId: '00000000-0000-4000-8000-000000000002',
+        startDate: 'not-a-date',
+        endDate: 'not-a-date',
+        frequencyPerDay: 0,
+        administrationTimes: [],
         isActive: true,
       },
     });
 
     const prescriptionId = createPrescriptionRes?.body?.data?.createPrescription?.id || null;
-    report.checks.createPrescription = {
-      pass:
-        createPrescriptionRes.status === 200 &&
-        !hasErrors(createPrescriptionRes) &&
-        Boolean(prescriptionId),
+    report.checks.createPrescriptionExcluded = {
+      pass: isFeatureNotEnabled(createPrescriptionRes, 'createPrescription') && prescriptionId === null,
       actual: { status: createPrescriptionRes.status, errors: createPrescriptionRes?.body?.errors || null, prescriptionId },
     };
 
@@ -193,19 +142,13 @@ async function main() {
           }
         }
       }
-    `, { date: todayIsoDate() });
+    `, { date: 'not-a-date' });
 
-    const meds = dueMedsRes?.body?.data?.getTodaysMedicationsByClient || [];
-    const found = meds.find(
-      (row) => row?.prescription?.medication?.id === medicationId && row?.prescription?.client?.id === client.id,
-    );
-    report.checks.readBack = {
-      pass: dueMedsRes.status === 200 && !hasErrors(dueMedsRes) && Boolean(found),
+    report.checks.readExcluded = {
+      pass: isFeatureNotEnabled(dueMedsRes, 'getTodaysMedicationsByClient'),
       actual: {
         status: dueMedsRes.status,
         errors: dueMedsRes?.body?.errors || null,
-        total: meds.length,
-        found: found || null,
       },
     };
     report.finalScreenshot = await screenshot(page, 'emar_probe_final');
@@ -242,7 +185,7 @@ async function main() {
   report.missingChecks = missingChecks;
   report.verdict = report.failedChecks === 0 ? 'PASS' : 'FAIL';
 
-  const outJson = path.join(OUT_DIR, `${TS}_emar_provisioning_probe.json`);
+  const outJson = path.join(OUT_DIR, `${TS}_medication_exclusion_probe.json`);
   await fs.writeFile(outJson, JSON.stringify(report, null, 2));
 
   const result = {
@@ -261,6 +204,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('EMAR_PROVISIONING_PROBE_FAILED', err && err.stack ? err.stack : err);
+  console.error('MEDICATION_EXCLUSION_PROBE_FAILED', err && err.stack ? err.stack : err);
   process.exit(1);
 });

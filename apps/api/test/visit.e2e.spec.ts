@@ -36,6 +36,7 @@ import { ShiftRepository } from '../src/shift/shift.repository';
 import { MedicationResolver } from '../src/medication/medication.resolver';
 import { MedicationService } from '../src/medication/medication.service';
 import { MedicationRepository } from '../src/medication/medication.repository';
+import { MedicationLaunchGuard } from '../src/medication/medication-launch.guard';
 import { AuthAccessModule } from '../src/auth/auth-access.module';
 import type { CanonicalAccessContext } from '../src/auth/access-context.service';
 import { CarerInvitationService } from '../src/carer/carer-invitation.service';
@@ -127,6 +128,7 @@ describe('Visit E2E Tests', () => {
         MedicationResolver,
         MedicationService,
         MedicationRepository,
+        MedicationLaunchGuard,
         PrismaService,
         // Stub the Prometheus counters for testing
         { provide: 'visit_overlap_total', useValue: { inc: jest.fn() } },
@@ -1767,6 +1769,14 @@ describe('Visit E2E Tests', () => {
   });
 
   describe('Linked Carer Medication Support', () => {
+    beforeAll(() => {
+      process.env.MEDICATION_EMAR_ENABLED = 'true';
+    });
+
+    afterAll(() => {
+      process.env.MEDICATION_EMAR_ENABLED = 'false';
+    });
+
     it('persists the domain Carer UUID while auditing the authenticated subject', async () => {
       const medication = await prisma.medication.create({
         data: {

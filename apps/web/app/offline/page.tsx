@@ -9,7 +9,7 @@ export default function OfflinePage() {
           Oasis Care needs an internet connection for live care data and secure clinical workflows.
         </p>
         <p className="text-sm text-slate-500 mb-6">
-          Reconnect to continue using visits, care logs, eMAR, and summary features.
+          Reconnect to continue using visits, care logs, and summary features.
         </p>
         <Link
           href="/today"

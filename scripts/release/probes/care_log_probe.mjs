@@ -258,7 +258,6 @@ async function verifyMonthlySummary(page, clientId, bounds, markerPresent) {
       monthEnd
       totalCareLogs
       byCategory { category count }
-      medication { total scheduled administered missed refused cancelled }
       highlights
     }
   }`;
@@ -384,7 +383,6 @@ async function probeRole(browser, role, preferredClientId = null) {
       moodCount: monthlyCheck.moodCount,
       monthStart: monthlyCheck.summary?.monthStart ?? null,
       monthEnd: monthlyCheck.summary?.monthEnd ?? null,
-      medication: monthlyCheck.summary?.medication ?? null,
       highlights: monthlyCheck.summary?.highlights ?? null,
     };
 

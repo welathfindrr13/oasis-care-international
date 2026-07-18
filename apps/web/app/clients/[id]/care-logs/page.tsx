@@ -21,7 +21,6 @@ type CareLogCategory =
   | 'SLEEP'
   | 'MOOD'
   | 'MOBILITY'
-  | 'MEDICATION'
   | 'SKIN'
   | 'PAIN'
   | 'INCIDENT'
@@ -58,14 +57,6 @@ interface MonthlySummary {
   monthEnd: string;
   totalCareLogs: number;
   byCategory: MonthlyCategoryCount[];
-  medication: {
-    total: number;
-    scheduled: number;
-    administered: number;
-    missed: number;
-    refused: number;
-    cancelled: number;
-  };
   highlights: string[];
 }
 
@@ -106,7 +97,6 @@ const MONTHLY_SUMMARY_QUERY = `
       monthEnd
       totalCareLogs
       byCategory { category count }
-      medication { total scheduled administered missed refused cancelled }
       highlights
     }
   }
@@ -231,7 +221,11 @@ export default function ClientCareLogsPage() {
       }
 
       if (logsResult.status === 'fulfilled') {
-        setLogs(logsResult.value.careLogs?.items || []);
+        setLogs(
+          (logsResult.value.careLogs?.items || []).filter(
+            (item) => item.category !== ('MEDICATION' as CareLogCategory),
+          ),
+        );
       } else {
         setLogs([]);
         setLogsError(logsResult.reason?.message || 'Failed to load care log entries');
@@ -375,21 +369,10 @@ export default function ClientCareLogsPage() {
         )}
 
         {summary && (
-          <section className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <section className="mb-8 grid grid-cols-1 gap-4">
             <div className="bg-white border border-slate-200 rounded-xl p-4">
               <p className="text-sm text-slate-500">Care logs this month</p>
               <p className="text-2xl font-semibold text-slate-900">{summary.totalCareLogs}</p>
-            </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <p className="text-sm text-slate-500">Meds administered</p>
-              <p className="text-2xl font-semibold text-slate-900">{summary.medication.administered}</p>
-              <p className="text-xs text-slate-500 mt-1">of {summary.medication.total} total</p>
-            </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <p className="text-sm text-slate-500">Missed/refused meds</p>
-              <p className="text-2xl font-semibold text-slate-900">
-                {summary.medication.missed + summary.medication.refused}
-              </p>
             </div>
           </section>
         )}
@@ -398,7 +381,7 @@ export default function ClientCareLogsPage() {
           <section className="mb-8 bg-white border border-slate-200 rounded-xl p-4">
             <h2 className="text-lg font-semibold text-slate-900 mb-3">Category coverage</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              {summary.byCategory.map((row) => (
+              {summary.byCategory.filter((row) => row.category !== ('MEDICATION' as CareLogCategory)).map((row) => (
                 <div key={row.category} className="rounded-lg border border-slate-200 px-3 py-2">
                   <p className="text-xs text-slate-500">{row.category.toLowerCase()}</p>
                   <p className="text-lg font-semibold text-slate-900">{row.count}</p>
@@ -438,7 +421,7 @@ export default function ClientCareLogsPage() {
                 >
                   {[
                     'TOILETING', 'NUTRITION', 'HYDRATION', 'SLEEP', 'MOOD',
-                    'MOBILITY', 'MEDICATION', 'SKIN', 'PAIN', 'INCIDENT', 'OTHER',
+                    'MOBILITY', 'SKIN', 'PAIN', 'INCIDENT', 'OTHER',
                   ].map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}

@@ -11,6 +11,10 @@ import {
   type CanonicalCapabilityActor,
   hasCanonicalActorCapability,
 } from '../auth/access-capability';
+import {
+  assertMedicationEmarEnabled,
+  isMedicationEmarEnabled,
+} from '../common/features/medication-emar';
 
 @Injectable()
 export class CareLogService {
@@ -60,6 +64,13 @@ export class CareLogService {
         'Carers can only create care logs for themselves',
         HttpStatus.FORBIDDEN,
       );
+    }
+
+    if (
+      input.category === CareLogCategory.MEDICATION ||
+      Boolean(input.medicationAdministrationId)
+    ) {
+      assertMedicationEmarEnabled();
     }
 
     await this.assertClientAccess(input.clientId, userId, role, orgId);
@@ -191,6 +202,10 @@ export class CareLogService {
       await this.assertClientAccess(filter.clientId, userId, role, orgId);
     }
 
+    if (filter.category === CareLogCategory.MEDICATION) {
+      assertMedicationEmarEnabled();
+    }
+
     const where: Prisma.CareLogWhereInput = {
       organization_id: orgId,
     };
@@ -198,7 +213,23 @@ export class CareLogService {
     if (filter.clientId) where.client_id = filter.clientId;
     if (filter.carerId) where.carer_id = filter.carerId;
     if (filter.visitId) where.visit_id = filter.visitId;
-    if (filter.category) where.category = filter.category as CareLogCategory;
+    if (filter.category) {
+      where.category = filter.category as CareLogCategory;
+    } else if (!isMedicationEmarEnabled()) {
+      where.category = { not: CareLogCategory.MEDICATION };
+    }
+    if (!isMedicationEmarEnabled()) {
+      where.medication_administration_id = null;
+      where.OR = [
+        { notes: null },
+        {
+          NOT: [
+            { notes: { contains: 'medication', mode: 'insensitive' } },
+            { notes: { contains: 'emar', mode: 'insensitive' } },
+          ],
+        },
+      ];
+    }
 
     if (filter.occurredFrom || filter.occurredTo) {
       where.occurred_at = {};
@@ -254,30 +285,39 @@ export class CareLogService {
     );
     const monthEnd = new Date(monthEndExclusive.getTime() - 1);
 
-    const [logs, meds] = await Promise.all([
-      this.prisma.careLog.findMany({
-        where: this.prisma.whereNotDeleted({
-          organization_id: orgId,
-          client_id: clientId,
-          occurred_at: { gte: monthStart, lt: monthEndExclusive },
-        }),
-        select: { category: true },
+    const medicationEnabled = isMedicationEmarEnabled();
+    const logsPromise = this.prisma.careLog.findMany({
+      where: this.prisma.whereNotDeleted({
+        organization_id: orgId,
+        client_id: clientId,
+        occurred_at: { gte: monthStart, lt: monthEndExclusive },
+        ...(medicationEnabled
+          ? {}
+          : {
+              category: { not: CareLogCategory.MEDICATION },
+              medication_administration_id: null,
+            }),
       }),
-      this.prisma.medicationAdministration.findMany({
-        where: {
-          deleted_at: null,
-          scheduled_time: { gte: monthStart, lt: monthEndExclusive },
-          prescription: {
-            client_id: clientId,
+      select: { category: true },
+    });
+    const medsPromise: Promise<Array<{ status: MedicationStatus }>> = medicationEnabled
+      ? this.prisma.medicationAdministration.findMany({
+          where: {
             deleted_at: null,
-            client: { organization_id: orgId, deleted_at: null },
+            scheduled_time: { gte: monthStart, lt: monthEndExclusive },
+            prescription: {
+              client_id: clientId,
+              deleted_at: null,
+              client: { organization_id: orgId, deleted_at: null },
+            },
           },
-        },
-        select: { status: true },
-      }),
-    ]);
+          select: { status: true },
+        })
+      : Promise.resolve([]);
+    const [logs, meds] = await Promise.all([logsPromise, medsPromise]);
 
-    const categories = Object.values(CareLogCategory) as CareLogCategory[];
+    const categories = (Object.values(CareLogCategory) as CareLogCategory[])
+      .filter((category) => medicationEnabled || category !== CareLogCategory.MEDICATION);
     const byCategory = categories.map((category) => ({
       category,
       count: logs.filter((log) => log.category === category).length,
@@ -302,7 +342,6 @@ export class CareLogService {
       CareLogCategory.NUTRITION,
       CareLogCategory.SLEEP,
       CareLogCategory.MOOD,
-      CareLogCategory.MEDICATION,
     ];
     const missingAreas = requiredPlanAreas.filter(
       (area) => !byCategory.some((row) => row.category === area && row.count > 0),
@@ -315,8 +354,12 @@ export class CareLogService {
     const highlights: string[] = [
       `Total care logs recorded: ${logs.length}`,
       `Most logged category: ${topCategory.category.toLowerCase()} (${topCategory.count})`,
-      `Medication adherence: ${adherence}% (${medication.administered}/${medication.total})`,
     ];
+    if (medicationEnabled) {
+      highlights.push(
+        `Medication adherence: ${adherence}% (${medication.administered}/${medication.total})`,
+      );
+    }
     if (missingAreas.length > 0) {
       highlights.push(
         `Missing care-plan areas this month: ${missingAreas.map((a) => a.toLowerCase()).join(', ')}`,

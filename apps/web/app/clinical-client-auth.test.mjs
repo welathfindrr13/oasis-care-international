@@ -190,7 +190,7 @@ test("Carer Today and My visits use assigned-work cards instead of admin schedul
   assert.doesNotMatch(visitWorkspace, />Visit Header</);
   assert.doesNotMatch(visitWorkspace, />Step 3\. Medication Round</);
   assert.doesNotMatch(visitWorkspace, /Care note and evidence/);
-  assert.match(visitWorkspace, /isAdmin &&\s*visit\?\.client/);
+  assert.doesNotMatch(visitWorkspace, /DUE_MEDS_QUERY|RECORD_ADMINISTRATION|\/emar|\/medication/);
   assert.match(visitWorkspace, /\{isAdmin && \([\s\S]*?Open care-note records/);
 });
 

@@ -19,6 +19,8 @@ import { join } from 'path';
 import { ConfigModule } from '@nestjs/config';
 import { CarerAccessService } from '../src/carer/carer-access.service';
 import { AuthAccessModule } from '../src/auth/auth-access.module';
+import { MedicationLaunchGuard } from '../src/medication/medication-launch.guard';
+import { formatGraphQLError } from '../src/common/filters/graphql-error.filter';
 
 const EMAR_CARER_ID = '88888888-8888-4888-8888-888888888888';
 
@@ -34,6 +36,7 @@ describe('eMAR real DB flow', () => {
     process.env.JWT_SECRET = getTestJwtSecret();
     process.env.AUTH_IDENTITY_PROVIDER = 'cognito';
     process.env.TENANT_MEMBERSHIP_REQUIRED = 'true';
+    process.env.MEDICATION_EMAR_ENABLED = 'false';
 
     const moduleRef = await Test.createTestingModule({
       imports: [
@@ -60,6 +63,7 @@ describe('eMAR real DB flow', () => {
           sortSchema: true,
           playground: false,
           context: ({ req }: any) => ({ req }),
+          formatError: formatGraphQLError,
         }),
         PassportModule.register({ defaultStrategy: 'jwt' }),
         JwtModule.register({
@@ -73,6 +77,7 @@ describe('eMAR real DB flow', () => {
         MedicationService,
         MedicationResolver,
         MedicationRepository,
+        MedicationLaunchGuard,
         PrismaService,
         CarerAccessService,
         // Mock Prometheus counters for testing
@@ -182,6 +187,7 @@ describe('eMAR real DB flow', () => {
   });
 
   it('records medication administration end-to-end', async () => {
+    process.env.MEDICATION_EMAR_ENABLED = 'true';
     const MUTATION = `
       mutation Record($input: RecordAdministrationInput!) {
         recordAdministration(input: $input) {
@@ -198,19 +204,74 @@ describe('eMAR real DB flow', () => {
       }
     };
 
-    const response = await request(app.getHttpServer())
+    try {
+      const response = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('carer'))
+        .send({ query: MUTATION, variables })
+        .expect(200);
+
+      expect(response.body.data.recordAdministration.status).toBe('ADMINISTERED');
+
+      const inDb = await prisma.medicationAdministration.findUnique({
+        where: { id: 'adm-001' }
+      });
+      expect(inDb?.status).toBe('ADMINISTERED');
+      expect(inDb?.administered_by).toBe(EMAR_CARER_ID);
+      expect(inDb?.administered_by).not.toBe(TEST_USERS.carer.sub);
+    } finally {
+      process.env.MEDICATION_EMAR_ENABLED = 'false';
+    }
+  });
+
+  it('authenticates first, then rejects disabled operations without service access or writes', async () => {
+    process.env.MEDICATION_EMAR_ENABLED = 'false';
+    const existing = await prisma.medicationAdministration.findUniqueOrThrow({
+      where: { id: 'adm-001' },
+    });
+    await prisma.medicationAdministration.create({
+      data: {
+        id: 'adm-disabled',
+        visit_id: existing.visit_id,
+        prescription_id: existing.prescription_id,
+        scheduled_time: new Date(),
+        status: MedicationStatus.SCHEDULED,
+      },
+    });
+    const service = app.get(MedicationService);
+    const serviceSpy = jest.spyOn(service, 'recordAdministration');
+    const mutation = `
+      mutation DisabledRecord($input: RecordAdministrationInput!) {
+        recordAdministration(input: $input) { id status }
+      }
+    `;
+    const variables = {
+      input: { administrationId: 'adm-disabled', status: 'MISSED' },
+    };
+
+    const unauthenticated = await request(app.getHttpServer())
+      .post('/graphql')
+      .send({ query: mutation, variables })
+      .expect(200);
+    expect(unauthenticated.body.errors?.[0]?.extensions?.code).toBe(
+      'UNAUTHENTICATED',
+    );
+
+    const disabled = await request(app.getHttpServer())
       .post('/graphql')
       .set('Authorization', getBearerToken('carer'))
-      .send({ query: MUTATION, variables })
+      .send({ query: mutation, variables })
       .expect(200);
-
-    expect(response.body.data.recordAdministration.status).toBe('ADMINISTERED');
+    expect(disabled.body.data?.recordAdministration).toBeNull();
+    expect(disabled.body.errors?.[0]?.extensions?.code).toBe(
+      'FEATURE_NOT_ENABLED',
+    );
+    expect(serviceSpy).not.toHaveBeenCalled();
 
     const inDb = await prisma.medicationAdministration.findUnique({
-      where: { id: 'adm-001' }
+      where: { id: 'adm-disabled' },
     });
-    expect(inDb?.status).toBe('ADMINISTERED');
-    expect(inDb?.administered_by).toBe(EMAR_CARER_ID);
-    expect(inDb?.administered_by).not.toBe(TEST_USERS.carer.sub);
+    expect(inDb?.status).toBe(MedicationStatus.SCHEDULED);
+    expect(inDb?.administered_by).toBeNull();
   });
 });

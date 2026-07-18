@@ -153,6 +153,13 @@ test('api service does not inject a default Clerk audience', () => {
   assert.doesNotMatch(apiBlock, /CLERK_AUDIENCE:[^\n]*oasis-api/);
 });
 
+test('api service hard-pins medication and eMAR off for the current launch', () => {
+  const apiBlock = serviceBlock('api');
+
+  assert.match(apiBlock, /MEDICATION_EMAR_ENABLED:\s*"false"/);
+  assert.doesNotMatch(apiBlock, /MEDICATION_EMAR_ENABLED:\s*\$\{/);
+});
+
 test('platform operator allowlist is server-only and required by the api', () => {
   const apiBlock = serviceBlock('api');
   const webBlock = serviceBlock('web');

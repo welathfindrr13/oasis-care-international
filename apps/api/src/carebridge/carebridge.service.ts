@@ -10,6 +10,11 @@ import {
 } from '@oasis/db';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import {
+  assertMedicationEmarEnabled,
+  containsMedicationEmarContent,
+  isMedicationEmarEnabled,
+} from '../common/features/medication-emar';
 import { sanitizeAuditMetadata } from '../common/audit/audit-metadata.policy';
 import { CarebridgeRepository } from './carebridge.repository';
 import { CarebridgeAccessService } from './access/carebridge-access.service';
@@ -97,6 +102,9 @@ export class CarebridgeService {
 
   async updatePolicy(input: UpdateCarebridgePolicyInput, actorUserId: string, actorRole: string, organizationId: string) {
     this.assertStaffRole(actorRole);
+    if (input.showMedicationSupportDefault === true) {
+      assertMedicationEmarEnabled();
+    }
     const room = await this.repository.findRoomByIdForOrganization(input.careRoomId, organizationId);
     if (!room) {
       throw new BaseHttpException(
@@ -110,7 +118,9 @@ export class CarebridgeService {
       const updated = await this.repository.updatePolicy(input.careRoomId, {
         show_visit_times_default: input.showVisitTimesDefault ?? undefined,
         show_task_summary_default: input.showTaskSummaryDefault ?? undefined,
-        show_medication_support_default: input.showMedicationSupportDefault ?? undefined,
+        show_medication_support_default: isMedicationEmarEnabled()
+          ? input.showMedicationSupportDefault ?? undefined
+          : false,
         require_approval_for_all_content: input.requireApprovalForAllContent ?? undefined,
       }, tx);
 
@@ -156,7 +166,9 @@ export class CarebridgeService {
     this.assertStaffRole(viewer.role);
     await this.getCareRoom(careRoomId, viewer);
     const stories = await this.repository.listVerifiedVisitStoriesByRoomId(careRoomId);
-    return stories.map((story: any) => this.mapStory(story));
+    return stories
+      .filter((story: any) => !this.isExcludedMedicationStory(story))
+      .map((story: any) => this.mapStory(story));
   }
 
   async listFamilyCareRooms(viewer: ViewerContext) {
@@ -195,11 +207,13 @@ export class CarebridgeService {
     const stories = await this.repository.listFamilySafePublishedStoriesByRoomId(
       careRoomId,
     );
-    return stories.map((story: any) => ({
+    return stories
+      .filter((story: any) => !this.isExcludedMedicationStory(story))
+      .map((story: any) => ({
       title: story.family_safe_title,
       body: story.family_safe_body,
       publishedAt: story.published_at,
-    }));
+      }));
   }
 
   async listVerifiedVisitStoryApprovalQueue(viewer: ViewerContext, careRoomId?: string) {
@@ -218,7 +232,9 @@ export class CarebridgeService {
     }
 
     const stories = await this.repository.listVerifiedVisitStoryApprovalQueue(organizationId, careRoomId);
-    return stories.map((story: any) => this.mapStory(story));
+    return stories
+      .filter((story: any) => !this.isExcludedMedicationStory(story))
+      .map((story: any) => this.mapStory(story));
   }
 
   async listConcernInbox(viewer: ViewerContext, status?: ConcernStatus) {
@@ -256,8 +272,12 @@ export class CarebridgeService {
       );
     }
 
-    const completedTasks = visit.tasks.filter((task) => task.is_completed);
-    const pendingTasks = visit.tasks.filter((task) => !task.is_completed);
+    const storyTasks = visit.tasks.filter(
+      (task) => isMedicationEmarEnabled() || !containsMedicationEmarContent(task.task_name),
+    );
+    const completedTasks = storyTasks.filter((task) => task.is_completed);
+    const pendingTasks = storyTasks.filter((task) => !task.is_completed);
+    const safeVisitNotes = containsMedicationEmarContent(visit.notes) ? null : visit.notes;
     const draftTitle = completedTasks.length > 0
       ? `Visit recorded for ${visit.client.full_name}`
       : 'Visit recorded';
@@ -269,7 +289,7 @@ export class CarebridgeService {
       pendingTasks.length > 0
         ? `Follow-up tasks: ${pendingTasks.map((task) => task.task_name).join(', ')}.`
         : null,
-      visit.notes ? `Care update: ${visit.notes}` : null,
+      safeVisitNotes ? `Care update: ${safeVisitNotes}` : null,
     ].filter(Boolean).join(' ');
     const familySafeBody = [
       'The scheduled care visit was completed.',
@@ -283,7 +303,7 @@ export class CarebridgeService {
 
     const sourceRefs = [
       { type: 'Visit', id: visit.id },
-      ...visit.tasks.map((task) => ({ type: 'VisitTask', id: task.id })),
+      ...storyTasks.map((task) => ({ type: 'VisitTask', id: task.id })),
     ];
 
     const story = await this.prisma.$transaction(async (tx) => {
@@ -330,6 +350,9 @@ export class CarebridgeService {
         'Verified visit story could not be found for your organisation.',
         HttpStatus.NOT_FOUND,
       );
+    }
+    if (this.isExcludedMedicationStory(story)) {
+      assertMedicationEmarEnabled();
     }
     if (story.status !== 'DRAFT') {
       throw new BaseHttpException(
@@ -952,7 +975,8 @@ export class CarebridgeService {
       id: policy.id,
       showVisitTimesDefault: policy.show_visit_times_default,
       showTaskSummaryDefault: policy.show_task_summary_default,
-      showMedicationSupportDefault: policy.show_medication_support_default,
+      showMedicationSupportDefault:
+        isMedicationEmarEnabled() && policy.show_medication_support_default,
       requireApprovalForAllContent: policy.require_approval_for_all_content,
       familyCanRaiseConcerns: policy.family_can_raise_concerns,
       familyCanReplyToConcerns: policy.family_can_reply_to_concerns,
@@ -977,6 +1001,30 @@ export class CarebridgeService {
       sourceRefs: story.source_refs,
       publishedAt: story.published_at ?? null,
     };
+  }
+
+  private isExcludedMedicationStory(story: any): boolean {
+    if (isMedicationEmarEnabled()) return false;
+    const refs = Array.isArray(story?.source_refs) ? story.source_refs : [];
+    const hasMedicationReference = refs.some((ref: any) => {
+      const type = String(ref?.type || ref?.sourceType || '')
+        .replace(/[^a-z]/gi, '')
+        .toLowerCase();
+      const category = String(ref?.category || '').trim().toUpperCase();
+      return type === 'medicationadministration' || category === 'MEDICATION';
+    });
+    return (
+      hasMedicationReference ||
+      containsMedicationEmarContent([
+        story?.draft_title,
+        story?.draft_body,
+        story?.approved_title,
+        story?.approved_body,
+        story?.family_safe_title,
+        story?.family_safe_body,
+        story?.rejection_reason,
+      ])
+    );
   }
 
   private mapConcern(concern: any) {

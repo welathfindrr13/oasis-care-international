@@ -137,7 +137,7 @@ export default async function ClientsPage(props: ClientsPageProps) {
             People
           </h1>
           <p className="text-slate-500 mt-1">
-            View each person&apos;s care status, visits, Care Notes, medication support, and family access.
+            View each person&apos;s care status, visits, Care Notes, and family access.
           </p>
         </div>
 

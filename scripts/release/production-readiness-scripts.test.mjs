@@ -286,3 +286,39 @@ test('live release probes require explicit environment instead of built-in live 
     assert.doesNotMatch(source, /SecurePassword123!/);
   }
 });
+
+test('the maintained eMAR-named probe proves launch exclusion without reading or provisioning care data', () => {
+  const source = readFileSync(
+    path.join(repoRoot, 'scripts/release/probes/emar_provisioning_probe.mjs'),
+    'utf8',
+  );
+
+  assert.match(source, /FEATURE_NOT_ENABLED/);
+  assert.match(source, /\/access\/feature-not-enabled/);
+  assert.match(source, /_medication_exclusion_probe\.json/);
+  assert.match(source, /name:\s*''/);
+  assert.match(source, /startDate:\s*'not-a-date'/);
+  assert.match(source, /date:\s*'not-a-date'/);
+  assert.match(source, /frequencyPerDay:\s*0/);
+  assert.doesNotMatch(source, /ClientsForProbe|clientLookup|No client available/);
+  assert.doesNotMatch(source, /pass:\s*createMedicationRes\.status === 200 && !hasErrors/);
+});
+
+test('touched live browser probes use the canonical auth-neutral login helper', () => {
+  const helper = readFileSync(
+    path.join(repoRoot, 'scripts/release/probes/live-probe-login.mjs'),
+    'utf8',
+  );
+  const probes = [
+    'scripts/release/mobile-route-smoke.mjs',
+    'scripts/release/probes/emar_provisioning_probe.mjs',
+  ];
+
+  assert.match(helper, /input\[name="identifier"\]/);
+  assert.match(helper, /selectOption\(localRole\)/);
+  for (const file of probes) {
+    const source = readFileSync(path.join(repoRoot, file), 'utf8');
+    assert.match(source, /loginLiveProbeAccount/);
+    assert.doesNotMatch(source, /amazoncognito|Sign in securely/i);
+  }
+});

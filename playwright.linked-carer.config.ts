@@ -42,6 +42,7 @@ export default defineConfig({
         LOCAL_AUTH_ISSUER: "oasis-local-dev",
         AUTH_IDENTITY_PROVIDER: "clerk",
         TENANT_MEMBERSHIP_REQUIRED: "true",
+        MEDICATION_EMAR_ENABLED: "false",
         API_RATE_LIMIT_MAX: "1000",
         PORT: "4000",
         FRONTEND_URL: "http://localhost:3002",

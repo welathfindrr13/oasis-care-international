@@ -58,6 +58,7 @@ export default defineConfig({
         CLERK_AUDIENCE: audience,
         CLERK_AUTHORIZED_PARTIES: webOrigin,
         TENANT_MEMBERSHIP_REQUIRED: "true",
+        MEDICATION_EMAR_ENABLED: "false",
         API_RATE_LIMIT_MAX: "1000",
         PORT: "4001",
         FRONTEND_URL: webOrigin,

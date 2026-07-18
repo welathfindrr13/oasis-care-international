@@ -10,7 +10,7 @@ const probes = [
   { name: 'strict_post_deploy_matrix', script: path.join(PROBES_DIR, 'strict_post_deploy_matrix.mjs') },
   { name: 'care_log_probe', script: path.join(PROBES_DIR, 'care_log_probe.mjs') },
   { name: 'ai_summary_probe', script: path.join(PROBES_DIR, 'ai_summary_probe.mjs') },
-  { name: 'emar_provisioning_probe', script: path.join(PROBES_DIR, 'emar_provisioning_probe.mjs') },
+  { name: 'medication_exclusion_probe', script: path.join(PROBES_DIR, 'emar_provisioning_probe.mjs') },
 ];
 
 function parseProbeResult(stdout) {

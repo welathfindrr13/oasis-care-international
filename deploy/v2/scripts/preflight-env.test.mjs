@@ -55,6 +55,7 @@ function validEnv(overrides = {}) {
     DEMO_MODE: 'false',
     RUN_MIGRATIONS: 'false',
     AI_SUMMARY_ENABLED: 'false',
+    MEDICATION_EMAR_ENABLED: 'false',
     ...overrides,
   };
 }
@@ -62,6 +63,37 @@ function validEnv(overrides = {}) {
 test('valid production-shaped environment passes', () => {
   const result = validate(validEnv());
   assert.deepEqual(result.errors, []);
+});
+
+test('production-like environments reject medication and eMAR enablement', () => {
+  for (const NODE_ENV of ['production', 'staging']) {
+    const result = validate(
+      validEnv({ NODE_ENV, MEDICATION_EMAR_ENABLED: 'true' }),
+    );
+    assert(
+      result.errors.includes(
+        'MEDICATION_EMAR_ENABLED=true is forbidden for the current production launch',
+      ),
+    );
+  }
+});
+
+test('missing, blank and malformed medication values remain disabled', () => {
+  for (const value of [undefined, '', ' ', 'false', 'TRUE', '1', 'enabled']) {
+    const env = validEnv();
+    if (value === undefined) delete env.MEDICATION_EMAR_ENABLED;
+    else env.MEDICATION_EMAR_ENABLED = value;
+    assert.deepEqual(validate(env).errors, []);
+  }
+});
+
+test('isolated non-production tests may explicitly enable legacy medication coverage', () => {
+  assert.deepEqual(
+    validate(
+      validEnv({ NODE_ENV: 'test', MEDICATION_EMAR_ENABLED: 'true' }),
+    ).errors,
+    [],
+  );
 });
 
 test('shift idempotency signing configuration is dedicated and strongly encoded', () => {

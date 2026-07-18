@@ -6,6 +6,10 @@ describe('CarebridgeFeedService', () => {
   let service: CarebridgeFeedService;
   let prisma: any;
 
+  afterEach(() => {
+    delete process.env.MEDICATION_EMAR_ENABLED;
+  });
+
   beforeEach(async () => {
     prisma = {
       whereNotDeleted: jest.fn((where) => where),
@@ -87,13 +91,33 @@ describe('CarebridgeFeedService', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           draft_body: expect.not.stringContaining('Medication support was recorded'),
+          source_refs: expect.not.arrayContaining([
+            expect.objectContaining({ id: 'task-2' }),
+          ]),
         }),
+      }),
+    );
+    const createdData = prisma.verifiedVisitStory.create.mock.calls[0][0].data;
+    expect(createdData.draft_body).not.toContain('Medication prompt');
+    expect(prisma.visit.findFirst.mock.calls[0][0].include.care_logs.where).toEqual(
+      expect.objectContaining({
+        category: { not: 'MEDICATION' },
+        OR: expect.arrayContaining([
+          { notes: null },
+          {
+            NOT: expect.arrayContaining([
+              { notes: { contains: 'medication', mode: 'insensitive' } },
+              { notes: { contains: 'emar', mode: 'insensitive' } },
+            ]),
+          },
+        ]),
       }),
     );
     expect(story.status).toBe('DRAFT');
   });
 
   it('projects medication support as status-only when policy allows medication visibility', async () => {
+    process.env.MEDICATION_EMAR_ENABLED = 'true';
     prisma.careRoom.findFirst.mockResolvedValue({
       id: 'room-1',
       organization_id: 'org-1',
@@ -200,10 +224,18 @@ describe('CarebridgeFeedService', () => {
   it('lists only published visit stories for the requested care room', async () => {
     prisma.verifiedVisitStory.findMany.mockResolvedValue([
       {
+        id: 'story-medication',
+        care_room_id: 'room-1',
+        status: 'PUBLISHED',
+        source_refs: [{ type: 'Visit', id: 'visit-legacy' }],
+        approved_body: 'Medication was supported during the visit.',
+      },
+      {
         id: 'story-published',
         care_room_id: 'room-1',
         status: 'PUBLISHED',
         approved_title: 'Approved update',
+        approved_body: 'The care visit was completed.',
       },
     ]);
 
@@ -220,5 +252,24 @@ describe('CarebridgeFeedService', () => {
     });
     expect(stories).toHaveLength(1);
     expect(stories[0].id).toBe('story-published');
+  });
+
+  it('blocks publication when legacy visit text contains excluded medication content', async () => {
+    prisma.verifiedVisitStory.findFirst.mockResolvedValue({
+      id: 'story-medication',
+      organization_id: 'org-1',
+      status: 'DRAFT',
+      source_refs: [{ type: 'Visit', id: 'visit-legacy' }],
+      draft_body: 'eMAR support was recorded during the visit.',
+    });
+
+    await expect(
+      service.publishVerifiedVisitStory({
+        storyId: 'story-medication',
+        organizationId: 'org-1',
+        actorUserId: 'staff-1',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'FEATURE_NOT_ENABLED' } });
+    expect(prisma.verifiedVisitStory.update).not.toHaveBeenCalled();
   });
 });

@@ -93,6 +93,7 @@ describe('CarebridgeService', () => {
   };
 
   beforeEach(async () => {
+    delete process.env.MEDICATION_EMAR_ENABLED;
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CarebridgeService,
@@ -239,6 +240,23 @@ describe('CarebridgeService', () => {
         new_values: { careRoomId: 'room-1' },
       }),
     });
+  });
+
+  it('rejects medication sharing before tenant lookup or policy writes while excluded', async () => {
+    await expect(
+      service.updatePolicy(
+        { careRoomId: 'room-1', showMedicationSupportDefault: true },
+        'admin-1',
+        'admin',
+        'org-1',
+      ),
+    ).rejects.toMatchObject({
+      response: { code: ErrorCode.FEATURE_NOT_ENABLED },
+    });
+
+    expect(repository.findRoomByIdForOrganization).not.toHaveBeenCalled();
+    expect(repository.updatePolicy).not.toHaveBeenCalled();
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('lists family-safe care rooms by verified auth subject only', async () => {
@@ -591,10 +609,15 @@ describe('CarebridgeService', () => {
         status: 'DRAFT',
         family_safe_version: 1,
         family_safe_title: 'Care visit update',
-        family_safe_body: 'The scheduled care visit was completed. One care task was recorded as completed. 1 care task needs follow-up.',
+        family_safe_body: 'The scheduled care visit was completed. One care task was recorded as completed. No care tasks need follow-up.',
         source_refs: expect.arrayContaining([{ type: 'Visit', id: 'visit-1' }]),
       }),
       transactionClient,
+    );
+    const createdStory = repository.createVerifiedVisitStory.mock.calls[0][0] as any;
+    expect(createdStory.draft_body).not.toContain('Medication prompt');
+    expect(createdStory.source_refs).not.toContainEqual(
+      expect.objectContaining({ id: 'task-2' }),
     );
     expect(result.id).toBe('story-1');
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
@@ -637,7 +660,7 @@ describe('CarebridgeService', () => {
     ).rejects.toThrow(BaseHttpException);
   });
 
-  it('refuses to publish a legacy story without versioned family-safe content', async () => {
+  it('refuses to publish legacy medication text even when only a generic visit is referenced', async () => {
     repository.findVerifiedVisitStoryById.mockResolvedValue({
       id: 'story-legacy',
       organization_id: 'org-1',
@@ -653,9 +676,37 @@ describe('CarebridgeService', () => {
     await expect(
       service.publishVerifiedVisitStory('story-legacy', 'admin-1', 'org-1'),
     ).rejects.toMatchObject({
-      response: { code: ErrorCode.VALIDATION_FAILED },
+      response: { code: ErrorCode.FEATURE_NOT_ENABLED },
     });
     expect(repository.publishVerifiedVisitStory).not.toHaveBeenCalled();
+  });
+
+  it('filters legacy medication text from the Manager story list', async () => {
+    repository.findRoomByIdForOrganization.mockResolvedValue({
+      id: 'room-1',
+      organization_id: 'org-1',
+      client_id: 'client-1',
+    } as any);
+    repository.listVerifiedVisitStoriesByRoomId.mockResolvedValue([
+      {
+        id: 'story-medication',
+        source_refs: [{ type: 'Visit', id: 'visit-legacy' }],
+        draft_body: 'Medication support was recorded.',
+      },
+      {
+        id: 'story-safe',
+        source_refs: [{ type: 'Visit', id: 'visit-safe' }],
+        draft_body: 'The visit was completed.',
+      },
+    ] as any);
+
+    const result = await service.listVerifiedVisitStories('room-1', {
+      role: 'admin',
+      organizationId: 'org-1',
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('story-safe');
   });
 
   it('refuses to publish family proof when the linked visit is not completed', async () => {
@@ -860,6 +911,12 @@ describe('CarebridgeService', () => {
       memberships: [familyMembership({ authSubject: 'family-subject' })],
     } as any);
     repository.listFamilySafePublishedStoriesByRoomId.mockResolvedValue([
+      {
+        family_safe_title: 'Care visit update',
+        family_safe_body: 'eMAR support was recorded during the visit.',
+        source_refs: [{ type: 'Visit', id: 'visit-legacy' }],
+        published_at: new Date('2026-04-22T10:00:00Z'),
+      },
       {
         family_safe_title: 'Care visit update',
         family_safe_body: 'The visit was completed and two care tasks were recorded.',

@@ -7,6 +7,7 @@ import { PrismaService } from '@oasis/db';
 import { MetricsModule } from '../metrics/metrics.module';
 import { Counter, register } from 'prom-client';
 import { CarerModule } from '../carer/carer.module';
+import { MedicationLaunchGuard } from './medication-launch.guard';
 
 const medicationAdministrationsTotal = new Counter({
   name: 'medication_administrations_total',
@@ -27,6 +28,7 @@ register.registerMetric(medicationOverlapsTotal);
     MedicationService,
     MedicationResolver,
     MedicationRepository,
+    MedicationLaunchGuard,
     PrismaService,
     {
       provide: 'medication_administrations_total',

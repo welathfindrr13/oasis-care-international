@@ -10,6 +10,7 @@ import {
   AccessCapability,
   capabilitiesForAccess,
 } from "./access-capability";
+import { isMedicationEmarEnabled } from "../common/features/medication-emar";
 
 export enum ViewerMembershipState {
   ACTIVE = "ACTIVE",
@@ -74,6 +75,9 @@ export class ViewerAccessSnapshotDto {
   @Field(() => [String])
   capabilities!: AccessCapability[];
 
+  @Field(() => Boolean)
+  medicationEmarEnabled!: boolean;
+
   static from(context: CanonicalAccessContext): ViewerAccessSnapshotDto {
     return {
       authenticated: true,
@@ -84,6 +88,7 @@ export class ViewerAccessSnapshotDto {
       linkedIdentityState: context.linkedIdentityState,
       onboardingState: context.onboardingState,
       capabilities: Array.from(capabilitiesForAccess(context)),
+      medicationEmarEnabled: isMedicationEmarEnabled(),
     };
   }
 }

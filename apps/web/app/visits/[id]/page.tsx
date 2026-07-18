@@ -17,7 +17,6 @@ import {
 } from '../../../lib/time';
 
 type VisitStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
-type MedicationStatus = 'SCHEDULED' | 'ADMINISTERED' | 'MISSED' | 'REFUSED' | 'CANCELLED';
 type TaskOutcome = 'DONE' | 'NOT_DONE' | 'REFUSED' | 'NOT_REQUIRED' | 'CONCERN_RAISED';
 type CareLogCategory =
   | 'TOILETING'
@@ -26,7 +25,6 @@ type CareLogCategory =
   | 'SLEEP'
   | 'MOOD'
   | 'MOBILITY'
-  | 'MEDICATION'
   | 'SKIN'
   | 'PAIN'
   | 'INCIDENT'
@@ -71,24 +69,6 @@ type CareLog = {
   escalated: boolean;
   escalatedTo?: string | null;
   source?: string | null;
-};
-
-type MedicationAdministration = {
-  id: string;
-  scheduledTime: string;
-  administeredTime?: string | null;
-  status: MedicationStatus;
-  notes?: string | null;
-  prescription?: {
-    id: string;
-    specialInstructions?: string | null;
-    medication?: {
-      id: string;
-      name: string;
-      dosage: string;
-      unit: string;
-    } | null;
-  } | null;
 };
 
 const VISIT_QUERY = `
@@ -147,28 +127,6 @@ const CARE_LOGS_QUERY = `
   }
 `;
 
-const DUE_MEDS_QUERY = `
-  query DueMeds($visitId: String!) {
-    listDueMeds(visitId: $visitId) {
-      id
-      scheduledTime
-      administeredTime
-      status
-      notes
-      prescription {
-        id
-        specialInstructions
-        medication {
-          id
-          name
-          dosage
-          unit
-        }
-      }
-    }
-  }
-`;
-
 const START_VISIT_MUTATION = `
   mutation StartVisit($visitId: String!) {
     startVisit(visitId: $visitId) {
@@ -218,17 +176,6 @@ const COMPLETE_VISIT_MUTATION = `
   }
 `;
 
-const RECORD_ADMINISTRATION_MUTATION = `
-  mutation RecordAdministration($input: RecordAdministrationInput!) {
-    recordAdministration(input: $input) {
-      id
-      status
-      notes
-      administeredTime
-    }
-  }
-`;
-
 const CARE_LOG_CATEGORIES: Array<{ value: CareLogCategory; label: string }> = [
   { value: 'TOILETING', label: 'Toileting' },
   { value: 'NUTRITION', label: 'Nutrition' },
@@ -236,7 +183,6 @@ const CARE_LOG_CATEGORIES: Array<{ value: CareLogCategory; label: string }> = [
   { value: 'SLEEP', label: 'Sleep' },
   { value: 'MOOD', label: 'Mood' },
   { value: 'MOBILITY', label: 'Mobility' },
-  { value: 'MEDICATION', label: 'Medication' },
   { value: 'SKIN', label: 'Skin' },
   { value: 'PAIN', label: 'Pain' },
   { value: 'INCIDENT', label: 'Incident' },
@@ -265,36 +211,16 @@ function nowLocalDatetime(): string {
   return formatOrganizationDateTimeInput(new Date());
 }
 
-function statusBadge(status: VisitStatus | MedicationStatus): string {
+function statusBadge(status: VisitStatus): string {
   switch (status) {
     case 'COMPLETED':
-    case 'ADMINISTERED':
       return 'bg-green-100 text-green-800';
     case 'IN_PROGRESS':
       return 'bg-blue-100 text-blue-800';
-    case 'MISSED':
-      return 'bg-red-100 text-red-800';
-    case 'REFUSED':
-      return 'bg-orange-100 text-orange-800';
     case 'CANCELLED':
       return 'bg-slate-200 text-slate-700';
     default:
       return 'bg-amber-100 text-amber-800';
-  }
-}
-
-function describeMedicationAction(status: MedicationStatus): string {
-  switch (status) {
-    case 'ADMINISTERED':
-      return 'Medication administered';
-    case 'MISSED':
-      return 'Medication missed';
-    case 'REFUSED':
-      return 'Medication refused';
-    case 'CANCELLED':
-      return 'Medication cancelled';
-    default:
-      return 'Medication scheduled';
   }
 }
 
@@ -329,11 +255,9 @@ export default function VisitDetailPage() {
     'FRONTLINE_VISIT_EXECUTE',
   );
   const canLogCare = canRunVisitWorkflow;
-  const canRecordMedication = canRunVisitWorkflow;
 
   const [visit, setVisit] = useState<Visit | null>(null);
   const [careLogs, setCareLogs] = useState<CareLog[]>([]);
-  const [medications, setMedications] = useState<MedicationAdministration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -342,7 +266,6 @@ export default function VisitDetailPage() {
   const [startingVisit, setStartingVisit] = useState(false);
   const [recordingTaskId, setRecordingTaskId] = useState<string | null>(null);
   const [submittingCareNote, setSubmittingCareNote] = useState(false);
-  const [recordingMedicationId, setRecordingMedicationId] = useState<string | null>(null);
   const [completingVisit, setCompletingVisit] = useState(false);
 
   const [careNoteCategory, setCareNoteCategory] = useState<CareLogCategory>('OTHER');
@@ -352,7 +275,6 @@ export default function VisitDetailPage() {
   const [careNoteEscalatedTo, setCareNoteEscalatedTo] = useState('');
 
   const [visitCompletionNotes, setVisitCompletionNotes] = useState('');
-  const [medicationNotes, setMedicationNotes] = useState<Record<string, string>>({});
 
   const loadWorkspace = useCallback(async () => {
     if (!visitId) return;
@@ -374,28 +296,20 @@ export default function VisitDetailPage() {
     }
 
     try {
-      const [visitResult, careLogResult, medicationResult] = await Promise.all([
+      const [visitResult, careLogResult] = await Promise.all([
         clientQuery<{ visit: Visit }>(VISIT_QUERY, { id: visitId }, { getBearerToken }),
         clientQuery<{ careLogs: { items: CareLog[] } }>(
           CARE_LOGS_QUERY,
           { visitId, skip: 0, take: 50 },
           { getBearerToken },
         ),
-        clientQuery<{ listDueMeds: MedicationAdministration[] }>(
-          DUE_MEDS_QUERY,
-          { visitId },
-          { getBearerToken },
-        ),
       ]);
 
       setVisit(visitResult.visit);
-      setCareLogs(careLogResult.careLogs?.items || []);
-      setMedications(medicationResult.listDueMeds || []);
-      setMedicationNotes(
-        (medicationResult.listDueMeds || []).reduce<Record<string, string>>((acc, medication) => {
-          acc[medication.id] = medication.notes || '';
-          return acc;
-        }, {}),
+      setCareLogs(
+        (careLogResult.careLogs?.items || []).filter(
+          (log) => log.category !== ('MEDICATION' as CareLogCategory),
+        ),
       );
     } catch (err: any) {
       setError(err?.message || 'Failed to load care visit');
@@ -422,22 +336,10 @@ export default function VisitDetailPage() {
       kind: 'care-log' as const,
     }));
 
-    const medicationItems = medications
-      .filter((medication) => medication.status !== 'SCHEDULED')
-      .map((medication) => ({
-        id: `medication-${medication.id}`,
-        occurredAt: medication.administeredTime || medication.scheduledTime,
-        title: describeMedicationAction(medication.status),
-        detail: medication.prescription?.medication
-          ? `${medication.prescription.medication.name} ${medication.prescription.medication.dosage}${medication.prescription.medication.unit ? ` ${medication.prescription.medication.unit}` : ''}`
-          : medication.notes || 'Medication outcome recorded',
-        kind: 'medication' as const,
-      }));
-
-    return [...careLogItems, ...medicationItems].sort(
+    return careLogItems.sort(
       (left, right) => new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime(),
     );
-  }, [careLogs, medications]);
+  }, [careLogs]);
 
   const hasStartedVisit = visit?.status === 'IN_PROGRESS' || visit?.status === 'COMPLETED';
   const visitIsClosed = visit?.status === 'COMPLETED' || visit?.status === 'CANCELLED';
@@ -545,34 +447,6 @@ export default function VisitDetailPage() {
     }
   }
 
-  async function recordMedicationOutcome(administrationId: string, status: MedicationStatus) {
-    if (!canRecordMedication) return;
-
-    setRecordingMedicationId(administrationId);
-    setError(null);
-    setMessage(null);
-
-    try {
-      await clientQuery(
-        RECORD_ADMINISTRATION_MUTATION,
-        {
-          input: {
-            administrationId,
-            status,
-            notes: medicationNotes[administrationId]?.trim() || undefined,
-          },
-        },
-        { getBearerToken },
-      );
-      setMessage(`Medication marked ${status.toLowerCase()}.`);
-      await loadWorkspace();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to record medication outcome');
-    } finally {
-      setRecordingMedicationId(null);
-    }
-  }
-
   async function completeVisit() {
     if (!visit || !canRunVisitWorkflow || !hasStartedVisit || visitIsClosed) return;
 
@@ -611,11 +485,6 @@ export default function VisitDetailPage() {
           {visit?.client && (
             <Link href={`/clients/${visit.client.id}`} className="text-slate-500 hover:text-slate-700">
               Person details
-            </Link>
-          )}
-          {isAdmin && visit?.client && (
-            <Link href={`/emar?clientId=${visit.client.id}`} className="text-slate-500 hover:text-slate-700">
-              Open medication records
             </Link>
           )}
         </div>
@@ -703,7 +572,7 @@ export default function VisitDetailPage() {
               <Card>
                 <CardHeader>
                   <h2 className="text-xl font-semibold text-slate-900">Step 1. Start visit</h2>
-                  <p className="text-sm text-slate-500">Start when you arrive before recording care and medication support.</p>
+                  <p className="text-sm text-slate-500">Start when you arrive before recording care actions and notes.</p>
                 </CardHeader>
                 <CardContent className="mb-0 space-y-3">
                   {!canRunVisitWorkflow ? (
@@ -794,105 +663,7 @@ export default function VisitDetailPage() {
 
               <Card>
                 <CardHeader>
-                  <h2 className="text-xl font-semibold text-slate-900">Step 3. Medication support</h2>
-                  <p className="text-sm text-slate-500">Record the outcome for medication due during this visit.</p>
-                </CardHeader>
-                <CardContent className="mb-0">
-                  {medications.length === 0 ? (
-                    <p className="text-sm text-slate-500">No medication administrations are currently linked to this visit.</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {medications.map((medication) => (
-                        <div key={medication.id} className="rounded-lg border border-slate-200 p-4">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                              <p className="font-medium text-slate-900">
-                                {medication.prescription?.medication?.name || 'Medication'}
-                              </p>
-                              <p className="mt-1 text-sm text-slate-600">
-                                {[medication.prescription?.medication?.dosage, medication.prescription?.medication?.unit]
-                                  .filter(Boolean)
-                                  .join(' ')}
-                              </p>
-                            </div>
-                            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusBadge(medication.status)}`}>
-                              {medication.status.toLowerCase()}
-                            </span>
-                          </div>
-
-                          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-                            <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-                              <p>Scheduled: {formatDateTime(medication.scheduledTime)}</p>
-                              {medication.administeredTime && (
-                                <p className="mt-1">Recorded: {formatDateTime(medication.administeredTime)}</p>
-                              )}
-                            </div>
-                            <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-                              <p className="font-medium text-slate-900">Instructions</p>
-                              <p className="mt-1">
-                                {medication.prescription?.specialInstructions || 'No specific instructions recorded.'}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="mt-3">
-                            <label className="mb-1 block text-sm text-slate-600">Medication note</label>
-                            <textarea
-                              value={medicationNotes[medication.id] || ''}
-                              onChange={(event) =>
-                                setMedicationNotes((current) => ({
-                                  ...current,
-                                  [medication.id]: event.target.value,
-                                }))
-                              }
-                              rows={2}
-                              className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                              placeholder="Add a medication outcome note"
-                            />
-                          </div>
-
-                          {medication.status === 'SCHEDULED' && canRecordMedication ? (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                onClick={() => recordMedicationOutcome(medication.id, 'ADMINISTERED')}
-                                disabled={recordingMedicationId === medication.id}
-                              >
-                                {recordingMedicationId === medication.id ? 'Saving...' : 'Mark administered'}
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => recordMedicationOutcome(medication.id, 'MISSED')}
-                                disabled={recordingMedicationId === medication.id}
-                              >
-                                Mark missed
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => recordMedicationOutcome(medication.id, 'REFUSED')}
-                                disabled={recordingMedicationId === medication.id}
-                              >
-                                Mark refused
-                              </Button>
-                            </div>
-                          ) : (
-                            <p className="mt-3 text-sm text-slate-500">Outcome recorded for this medication.</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <h2 className="text-xl font-semibold text-slate-900">Step 4. Care notes</h2>
+                  <h2 className="text-xl font-semibold text-slate-900">Step 3. Care notes</h2>
                   <p className="text-sm text-slate-500">Record the care provided and anything the team needs to follow up.</p>
                 </CardHeader>
                 <CardContent className="mb-0">
@@ -999,8 +770,8 @@ export default function VisitDetailPage() {
 
               <Card>
                 <CardHeader>
-                  <h2 className="text-xl font-semibold text-slate-900">Step 5. Finish visit</h2>
-                  <p className="text-sm text-slate-500">Finish once care actions, medication outcomes, and notes are recorded.</p>
+                  <h2 className="text-xl font-semibold text-slate-900">Step 4. Finish visit</h2>
+                  <p className="text-sm text-slate-500">Finish once care actions and notes are recorded.</p>
                 </CardHeader>
                 <CardContent className="mb-0 space-y-4">
                   {visit.status === 'COMPLETED' ? (
@@ -1047,7 +818,7 @@ export default function VisitDetailPage() {
               <Card>
                 <CardHeader>
                   <h2 className="text-xl font-semibold text-slate-900">Activity timeline</h2>
-                  <p className="text-sm text-slate-500">Medication and care note activity linked to this visit.</p>
+                  <p className="text-sm text-slate-500">Care note activity linked to this visit.</p>
                 </CardHeader>
                 <CardContent className="mb-0">
                   {activityItems.length === 0 ? (
@@ -1077,9 +848,6 @@ export default function VisitDetailPage() {
                     <>
                       <Button asChild variant="outline" className="w-full justify-center">
                         <Link href={`/clients/${visit.clientId}/care-logs`}>Open care-note records</Link>
-                      </Button>
-                      <Button asChild variant="outline" className="w-full justify-center">
-                        <Link href={`/emar?clientId=${visit.clientId}`}>Open medication records</Link>
                       </Button>
                     </>
                   )}

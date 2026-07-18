@@ -104,7 +104,8 @@ test("a linked fake carer follows the database role despite an admin token claim
   await expect(page.getByRole("heading", { name: "Assigned Fake Client" })).toBeVisible();
   await expect(page.getByText("Browser Carer", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Visit details" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Step 3. Medication support" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Step 3. Care notes" })).toBeVisible();
+  await expect(page.getByText(/medication|eMAR/i)).toHaveCount(0);
   await expect(
     page.getByText("Confirm assigned visit", { exact: true }),
   ).toBeVisible();
@@ -242,7 +243,7 @@ test("manager, care manager, and office memberships stay outside admin and Carer
   }
 });
 
-test("an administrator sees the real organization in the guided synthetic setup", async ({
+test("an administrator sees the real company journey without internal setup language", async ({
   page,
 }) => {
   await signIn(page, {
@@ -256,23 +257,17 @@ test("an administrator sees the real organization in the guided synthetic setup"
 
   await expect(page).toHaveURL("/admin/setup");
   await expect(
-    page.getByRole("heading", { name: "Prepare your Oasis workspace" }),
+    page.getByRole("heading", { name: "Set up your company" }),
   ).toBeVisible();
   await expect(
     page.getByText("Linked Carer Browser Proof", { exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByText("org-browser-linked-carer", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Billing is not part of this setup.", { exact: false }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Add synthetic person →" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Schedule visit →" }),
-  ).toBeVisible();
+  await expect(page.getByText("org-browser-linked-carer", { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/synthetic|canary|fixture|seed|billing/i)).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Add a person", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Invite a carer", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Schedule a visit", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "View people", exact: true })).toBeVisible();
 });
 
 test("Admin Today prioritizes visit exceptions at mobile and desktop sizes", async ({
@@ -533,6 +528,7 @@ test("the lifecycle UI handles duplicate and expired invitation actions with sta
           "AI_SUMMARY_CONFIGURE",
           "GDPR_MANAGE",
         ],
+        medicationEmarEnabled: false,
       }),
     });
   });

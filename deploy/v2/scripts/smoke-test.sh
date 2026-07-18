@@ -152,6 +152,26 @@ expect_graphql_allowed_for_staff() {
   fi
 }
 
+expect_graphql_feature_disabled() {
+  local label="$1"
+  local query="$2"
+  local cookie="$3"
+  local token="$4"
+
+  if [[ -z "$cookie$token" ]]; then
+    skip "$label requires an authenticated session; launch-exclusion check not run"
+    return
+  fi
+
+  local response
+  response="$(post_graphql "$query" "$cookie" "$token")"
+  if printf '%s' "$response" | grep -q 'FEATURE_NOT_ENABLED'; then
+    pass "$label returned FEATURE_NOT_ENABLED"
+  else
+    fail "$label did not return FEATURE_NOT_ENABLED"
+  fi
+}
+
 log "Deployment V2 smoke test"
 log "Base URL: $BASE_URL"
 log "GraphQL URL: $API_URL"
@@ -184,7 +204,8 @@ esac
 expect_graphql_allowed_for_staff "Staff evidence packs GraphQL probe" "query StaffEvidencePacks { evidencePacks { id } }"
 expect_graphql_denied_for_family_cookie "Family raw visits GraphQL probe" "query FamilyRawVisits { visits { id } }"
 expect_graphql_denied_for_family_cookie "Family raw care notes GraphQL probe" "query FamilyRawCareLogs { careLogs { id } }"
-expect_graphql_denied_for_family_cookie "Family medication administrations GraphQL probe" "query FamilyMedicationAdministrations { medicationAdministrations { id } }"
+expect_graphql_feature_disabled "Staff medication launch-exclusion probe" "query StaffMedicationExcluded { medications(skip: 0, take: 1) { total } }" "$STAFF_COOKIE" "$STAFF_TEST_TOKEN"
+expect_graphql_feature_disabled "Family medication launch-exclusion probe" "query FamilyMedicationExcluded { medications(skip: 0, take: 1) { total } }" "$FAMILY_COOKIE" "$FAMILY_TEST_TOKEN"
 expect_graphql_denied_for_family_cookie "Family care planning GraphQL probe" "query FamilyCarePlanning { assessments { id } carePlans { id } evidencePacks { id } }"
 expect_graphql_denied_for_family_cookie "Family evidence pack export source probe" "query FamilyEvidencePacks { evidencePacks { id sourceRefs { sourceType sourceId } } }"
 expect_graphql_denied_for_family_cookie "Family approval queue probe" "query FamilyApprovalQueue { verifiedVisitStoryApprovalQueue { id status } }"

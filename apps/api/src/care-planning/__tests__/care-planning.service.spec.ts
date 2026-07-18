@@ -1,5 +1,8 @@
 import { BaseHttpException } from '../../common/errors/base-http.exception';
-import { EvidenceSourceTypeGQL } from '../dto/care-planning.dto';
+import {
+  EvidencePackStatusGQL,
+  EvidenceSourceTypeGQL,
+} from '../dto/care-planning.dto';
 import { CarePlanningRepository } from '../care-planning.repository';
 import { CarePlanningService } from '../care-planning.service';
 
@@ -8,6 +11,7 @@ describe('CarePlanningService', () => {
   let repository: jest.Mocked<CarePlanningRepository>;
 
   beforeEach(() => {
+    delete process.env.MEDICATION_EMAR_ENABLED;
     repository = {
       listAssessments: jest.fn(),
       createAssessment: jest.fn(),
@@ -109,6 +113,11 @@ describe('CarePlanningService', () => {
   });
 
   it('records evidence pack export for staff and defaults actor from viewer', async () => {
+    repository.getEvidencePack.mockResolvedValue({
+      id: 'pack-1',
+      source_refs: {},
+      items: [],
+    } as any);
     repository.recordEvidencePackExport.mockResolvedValue({
       id: 'pack-1',
       organization_id: 'org-1',
@@ -134,6 +143,66 @@ describe('CarePlanningService', () => {
     );
 
     expect(repository.recordEvidencePackExport).toHaveBeenCalledWith('org-1', 'pack-1', 'admin-1');
+  });
+
+  it('rejects explicit medication candidates before repository access', async () => {
+    await expect(
+      service.evidenceSourceCandidates(
+        {
+          clientId: 'client-1',
+          periodStart: new Date('2026-05-01T00:00:00.000Z'),
+          periodEnd: new Date('2026-05-07T23:59:59.000Z'),
+          sourceTypes: [EvidenceSourceTypeGQL.MEDICATION_ADMINISTRATION],
+        },
+        { role: 'admin', organizationId: 'org-1', userId: 'admin-1' },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'FEATURE_NOT_ENABLED' },
+    });
+    expect(repository.listEvidenceSourceCandidates).not.toHaveBeenCalled();
+  });
+
+  it('rejects medication-derived evidence packs before creation', async () => {
+    await expect(
+      service.createEvidencePack(
+        {
+          clientId: 'client-1',
+          status: EvidencePackStatusGQL.DRAFT,
+          periodStart: new Date('2026-05-01T00:00:00.000Z'),
+          periodEnd: new Date('2026-05-07T23:59:59.000Z'),
+          items: [
+            {
+              sourceType: EvidenceSourceTypeGQL.MEDICATION_ADMINISTRATION,
+              sourceId: 'med-1',
+              headline: 'Medication outcome',
+            },
+          ],
+        },
+        { role: 'admin', organizationId: 'org-1', userId: 'admin-1' },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'FEATURE_NOT_ENABLED' },
+    });
+    expect(repository.createEvidencePack).not.toHaveBeenCalled();
+  });
+
+  it('refuses a medication-derived historical pack before recording export', async () => {
+    repository.getEvidencePack.mockResolvedValue({
+      id: 'pack-medication',
+      source_refs: { sourceType: 'MEDICATION_ADMINISTRATION', id: 'med-1' },
+      items: [],
+    } as any);
+
+    await expect(
+      service.recordEvidencePackExport('pack-medication', {
+        role: 'admin',
+        organizationId: 'org-1',
+        userId: 'admin-1',
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'FEATURE_NOT_ENABLED' },
+    });
+    expect(repository.recordEvidencePackExport).not.toHaveBeenCalled();
   });
 
   it('lists evidence source candidates for clinical staff', async () => {

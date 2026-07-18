@@ -60,6 +60,7 @@ function accessSnapshot(request) {
       linkedIdentityState: "NOT_REQUIRED",
       onboardingState: "READY",
       capabilities: capabilities.admin,
+      medicationEmarEnabled: false,
     };
   }
   if (tokenRole === "carer") {
@@ -72,6 +73,7 @@ function accessSnapshot(request) {
       linkedIdentityState: "LINKED",
       onboardingState: "READY",
       capabilities: capabilities.carer,
+      medicationEmarEnabled: false,
     };
   }
   if (tokenRole === "user") {
@@ -84,6 +86,7 @@ function accessSnapshot(request) {
       linkedIdentityState: "LINKED",
       onboardingState: "READY",
       capabilities: capabilities.family,
+      medicationEmarEnabled: false,
     };
   }
   return {
@@ -95,6 +98,7 @@ function accessSnapshot(request) {
     linkedIdentityState: "NOT_REQUIRED",
     onboardingState: "NOT_STARTED",
     capabilities: [],
+    medicationEmarEnabled: false,
   };
 }
 
@@ -104,6 +108,12 @@ const operationHandlers = new Map([
     (request) => ({ viewerAccessSnapshot: accessSnapshot(request) }),
   ],
   ["Visits", () => ({ visits: { items: [], total: 0 } })],
+  [
+    "OrganizationSetupDetails",
+    () => ({
+      viewerOrganizationSetupDetails: { name: "Meadow Care Services" },
+    }),
+  ],
   [
     "ShiftAnalytics",
     () => ({
@@ -162,7 +172,6 @@ const operationHandlers = new Map([
     }),
   ],
   ["CareLogs", () => ({ careLogs: { total: 0, items: [] } })],
-  ["DueMeds", () => ({ listDueMeds: [] })],
   ["FamilyCareRooms", () => ({ familyCareRooms: [] })],
   [
     "FamilyVerifiedVisitStories",

@@ -816,7 +816,6 @@ export interface CarebridgePolicy {
   id: string;
   showVisitTimesDefault: boolean;
   showTaskSummaryDefault: boolean;
-  showMedicationSupportDefault: boolean;
   requireApprovalForAllContent: boolean;
   familyCanRaiseConcerns: boolean;
   familyCanReplyToConcerns: boolean;
@@ -975,7 +974,6 @@ export const CAREBRIDGE_ROOMS_QUERY = `
         id
         showVisitTimesDefault
         showTaskSummaryDefault
-        showMedicationSupportDefault
         requireApprovalForAllContent
         familyCanRaiseConcerns
         familyCanReplyToConcerns
@@ -1024,7 +1022,6 @@ export const CAREBRIDGE_ROOM_QUERY = `
         id
         showVisitTimesDefault
         showTaskSummaryDefault
-        showMedicationSupportDefault
         requireApprovalForAllContent
         familyCanRaiseConcerns
         familyCanReplyToConcerns
