@@ -233,7 +233,7 @@ test("Family access is grant-bound, tenant-safe, and revoked immediately with th
     .click();
   await expect(
     managerPage
-      .getByRole("alert")
+      .getByRole("status")
       .filter({ hasText: "Sharing choices saved for Browser Family." }),
   ).toBeVisible();
 
@@ -276,7 +276,7 @@ test("Family access is grant-bound, tenant-safe, and revoked immediately with th
     .click();
   await expect(
     managerPage
-      .getByRole("alert")
+      .getByRole("status")
       .filter({ hasText: "Access revoked for Browser Family." }),
   ).toBeVisible();
   await expect(membershipCard).toContainText("Access ended");
