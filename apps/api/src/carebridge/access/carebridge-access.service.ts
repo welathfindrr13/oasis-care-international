@@ -15,6 +15,12 @@ interface RequireFamilyScopeInput {
   requiredScopes: AccessGrantScope[];
 }
 
+const LAUNCH_FAMILY_SCOPES = new Set<AccessGrantScope>([
+  AccessGrantScope.VIEW_UPDATES,
+  AccessGrantScope.VIEW_TASK_SUMMARY,
+  AccessGrantScope.RAISE_CONCERNS,
+]);
+
 @Injectable()
 export class CarebridgeAccessService {
   constructor(private readonly prisma: PrismaService) {}
@@ -25,12 +31,16 @@ export class CarebridgeAccessService {
     const organizationId = (input.organizationId || '').trim();
     const authSubject = (input.authSubject || '').trim();
     const requiredScopes = [...new Set(input.requiredScopes ?? [])];
+    const hasUpdates = requiredScopes.includes(AccessGrantScope.VIEW_UPDATES);
+    const hasTaskSummary = requiredScopes.includes(AccessGrantScope.VIEW_TASK_SUMMARY);
 
     if (
       !careRoomId ||
       !organizationId ||
       !authSubject ||
-      requiredScopes.length === 0
+      requiredScopes.length === 0 ||
+      requiredScopes.some((scope) => !LAUNCH_FAMILY_SCOPES.has(scope)) ||
+      hasUpdates !== hasTaskSummary
     ) {
       throw this.forbidden();
     }

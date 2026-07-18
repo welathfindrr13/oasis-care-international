@@ -177,6 +177,12 @@ export class FamilyCareRoomDTO {
 
   @Field()
   clientDisplayName!: string;
+
+  @Field()
+  canViewApprovedUpdates!: boolean;
+
+  @Field()
+  canRaiseConcerns!: boolean;
 }
 
 @ObjectType()

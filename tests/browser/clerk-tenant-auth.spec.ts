@@ -5,6 +5,7 @@ const SESSION_KEY = "oasis.synthetic-clerk-session";
 const UNASSIGNED_VISIT_ID = "55555555-5555-4555-8555-666666666666";
 const CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const CARE_ROOM_MEMBERSHIP_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const CLIENT_ID = "client-browser-linked-carer";
 const SENTINEL_CLIENT_ID = "client-browser-sentinel";
 const SENTINEL_CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-bbbbbbbbbbbb";
 
@@ -168,6 +169,7 @@ test("a token carrying an admin claim is reduced to its linked Carer assignment"
 
 test("Family access is grant-bound, tenant-safe, and revoked immediately with the same signed session", async ({
   page,
+  browser,
 }) => {
   const familyToken = await activateSignedProfile(page, "family");
 
@@ -192,23 +194,95 @@ test("Family access is grant-bound, tenant-safe, and revoked immediately with th
   ).toBeVisible();
   await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
 
-  const managerToken = await tokenFor(page.request, "manager");
-  const revokeResponse = await page.request.post("/api/graphql", {
-    headers: { Authorization: `Bearer ${managerToken}` },
+  const managerContext = await browser.newContext({
+    baseURL: "http://localhost:3004",
+  });
+  const managerPage = await managerContext.newPage();
+  const managerToken = await activateSignedProfile(managerPage, "manager");
+
+  await gotoAppRoute(managerPage, `/clients/${CLIENT_ID}/carebridge`);
+  await expect(managerPage).toHaveURL(
+    new RegExp(`/clients/${CLIENT_ID}/carebridge$`),
+  );
+  await expect(
+    managerPage.getByRole("heading", {
+      name: "Family access for Assigned Fake Client",
+    }),
+  ).toBeVisible();
+  await expect(managerPage.getByText("TEST ONLY Sentinel Person")).toHaveCount(
+    0,
+  );
+
+  const membershipCard = managerPage.locator(
+    `#family-membership-${CARE_ROOM_MEMBERSHIP_ID}`,
+  );
+  await expect(membershipCard.getByText("Browser Family")).toBeVisible();
+
+  const approvedUpdates = membershipCard.getByRole("checkbox", {
+    name: /Approved care updates/,
+  });
+  const concerns = membershipCard.getByRole("checkbox", {
+    name: /Send concerns/,
+  });
+  await expect(approvedUpdates).toBeChecked();
+  await expect(concerns).toBeChecked();
+
+  await concerns.uncheck();
+  await membershipCard
+    .getByRole("button", { name: "Save sharing choices" })
+    .click();
+  await expect(
+    managerPage
+      .getByRole("status")
+      .filter({ hasText: "Sharing choices saved for Browser Family." }),
+  ).toBeVisible();
+
+  const authorityResponse = await page.request.post("/api/graphql", {
+    headers: { Authorization: `Bearer ${familyToken}` },
     data: {
-      query: `mutation Revoke($input: FamilyMembershipActionInput!) {
-        revokeFamilyAccess(input: $input) { status accessGrants { scope } }
+      query: `query FamilyAuthority {
+        familyCareRooms {
+          id
+          clientDisplayName
+          canViewApprovedUpdates
+          canRaiseConcerns
+        }
       }`,
-      variables: {
-        input: { careRoomMembershipId: CARE_ROOM_MEMBERSHIP_ID },
-      },
     },
   });
-  expect(revokeResponse.status()).toBe(200);
-  await expect(revokeResponse.json()).resolves.toMatchObject({
-    data: { revokeFamilyAccess: { status: "REVOKED", accessGrants: [] } },
+  expect(authorityResponse.status()).toBe(200);
+  await expect(authorityResponse.json()).resolves.toEqual({
+    data: {
+      familyCareRooms: [
+        {
+          id: CARE_ROOM_ID,
+          clientDisplayName: "Assigned Fake Client",
+          canViewApprovedUpdates: true,
+          canRaiseConcerns: false,
+        },
+      ],
+    },
   });
 
+  await membershipCard.getByRole("button", { name: "Revoke access" }).click();
+  const revokeDialog = managerPage.getByRole("dialog", {
+    name: "Revoke access for Browser Family?",
+  });
+  await expect(revokeDialog).toContainText(
+    "Their access to Assigned Fake Client will stop immediately.",
+  );
+  await revokeDialog
+    .getByRole("button", { name: "Revoke access", exact: true })
+    .click();
+  await expect(
+    managerPage
+      .getByRole("status")
+      .filter({ hasText: "Access revoked for Browser Family." }),
+  ).toBeVisible();
+  await expect(membershipCard).toContainText("Access ended");
+
+  expect(managerToken).toContain(".");
+  await managerContext.close();
   expect(familyToken).toContain(".");
   const deniedResponse = await page.request.get("/api/access-context");
   expect(deniedResponse.status()).toBe(200);

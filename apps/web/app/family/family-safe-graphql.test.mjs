@@ -37,10 +37,15 @@ test('family pages use only the family-safe GraphQL operations', () => {
 });
 
 test('family-safe query selections contain no staff membership or draft fields', () => {
-  const familyQueries = queries.slice(
+  const roomQueries = queries.slice(
     queries.indexOf('export const FAMILY_CAREBRIDGE_ROOMS_QUERY'),
+    queries.indexOf('const FAMILY_MEMBERSHIP_MUTATION_FIELDS'),
+  );
+  const familyContentQueries = queries.slice(
+    queries.indexOf('export const FAMILY_VERIFIED_VISIT_STORIES_QUERY'),
     queries.indexOf('export const PUBLISH_VERIFIED_VISIT_STORY_MUTATION'),
   );
+  const familyQueries = `${roomQueries}\n${familyContentQueries}`;
   assert.match(familyQueries, /clientDisplayName/);
   assert.match(familyQueries, /title\s+body\s+publishedAt/);
   assert.doesNotMatch(
@@ -71,7 +76,8 @@ test('family experience uses plain language and exposes the family-safe concern 
   assert.match(listPage, /latestUpdate/);
   assert.match(roomPage, /Tell us about a concern/);
   assert.match(roomPage, /FamilyConcernForm/);
-  assert.match(concernForm, /FAMILY_CONCERN_CREATE/);
+  assert.match(roomPage, /room\.canRaiseConcerns \?/);
+  assert.doesNotMatch(concernForm, /FAMILY_CONCERN_CREATE|hasAccessCapability/);
   assert.match(concernForm, /RAISE_FAMILY_CONCERN_MUTATION/);
   assert.match(roomPage, /call 999/i);
   assert.doesNotMatch(concernForm, /CAREBRIDGE_CONCERN_INBOX_QUERY|UPDATE_CAREBRIDGE_CONCERN_MUTATION/);

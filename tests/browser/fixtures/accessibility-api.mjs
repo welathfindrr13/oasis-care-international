@@ -9,6 +9,8 @@ const { Kind, parse } = requireFromApiWorkspace("graphql");
 
 const port = Number(process.env.ACCESSIBILITY_FIXTURE_API_PORT || 4014);
 const visitId = "77777777-7777-4777-8777-777777777777";
+const personId = "88888888-8888-4888-8888-888888888888";
+const careRoomId = "99999999-9999-4999-8999-999999999999";
 
 const capabilities = {
   admin: [
@@ -108,6 +110,68 @@ const operationHandlers = new Map([
     (request) => ({ viewerAccessSnapshot: accessSnapshot(request) }),
   ],
   ["Visits", () => ({ visits: { items: [], total: 0 } })],
+  [
+    "Client",
+    () => ({
+      client: {
+        id: personId,
+        fullName: "Jordan Ellis",
+        addressLine1: "12 Test Lane",
+        addressLine2: null,
+        city: "Leeds",
+        postcode: "LS1 1AA",
+      },
+    }),
+  ],
+  [
+    "CareRooms",
+    () => ({
+      careRooms: [
+        {
+          id: careRoomId,
+          status: "ACTIVE",
+          client: { id: personId, fullName: "Jordan Ellis" },
+          memberships: [
+            {
+              id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+              invitationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+              role: "FAMILY_VIEWER",
+              status: "INVITED",
+              accessBasis: "CLIENT_CONSENT",
+              reviewDueAt: null,
+              familyContact: { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", fullName: "Alex Ellis", email: "alex@example.test", relationship: "Daughter" },
+              accessGrants: [],
+              invitationStatus: "PENDING",
+              deliveryStatus: "DELIVERED",
+              cleanupStatus: "COMPLETE",
+              invitationExpiresAt: "2026-07-25T09:00:00.000Z",
+            },
+            {
+              id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+              invitationId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+              role: "FAMILY_VIEWER",
+              status: "ACTIVE",
+              accessBasis: "PROVIDER_AUTHORISED",
+              reviewDueAt: null,
+              familyContact: { id: "ffffffff-ffff-4fff-8fff-ffffffffffff", fullName: "Morgan Ellis", email: "morgan@example.test", relationship: "Son" },
+              accessGrants: [
+                { id: "grant-update", scope: "VIEW_UPDATES", grantedAt: "2026-07-18T09:00:00.000Z", revokedAt: null },
+                { id: "grant-summary", scope: "VIEW_TASK_SUMMARY", grantedAt: "2026-07-18T09:00:00.000Z", revokedAt: null },
+              ],
+              invitationStatus: "ACCEPTED",
+              deliveryStatus: "DELIVERED",
+              cleanupStatus: "COMPLETE",
+              invitationExpiresAt: "2026-07-25T09:00:00.000Z",
+            },
+          ],
+          policy: null,
+          createdAt: "2026-07-18T09:00:00.000Z",
+          updatedAt: "2026-07-18T09:00:00.000Z",
+        },
+      ],
+    }),
+  ],
+  ["VerifiedVisitStories", () => ({ verifiedVisitStories: [] })],
   [
     "OrganizationSetupDetails",
     () => ({

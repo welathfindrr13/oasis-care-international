@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
-import { hasAccessCapability } from '../../lib/auth/capabilities'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { clientQuery } from '../../lib/graphql/client-side'
 import {
   RAISE_FAMILY_CONCERN_MUTATION,
@@ -31,15 +30,11 @@ export function FamilyConcernForm({ careRoomId, personName }: FamilyConcernFormP
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submittedTitle, setSubmittedTitle] = useState<string | null>(null)
+  const errorRef = useRef<HTMLDivElement>(null)
 
-  if (!hasAccessCapability(access.capabilities, 'FAMILY_CONCERN_CREATE')) {
-    return (
-      <p className="text-sm leading-6 text-slate-600">
-        Online concerns are not included in your current access. Please contact the care provider using the details
-        they have given you.
-      </p>
-    )
-  }
+  useEffect(() => {
+    if (error) errorRef.current?.focus()
+  }, [error])
 
   async function submitConcern(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -119,9 +114,10 @@ export function FamilyConcernForm({ careRoomId, personName }: FamilyConcernFormP
         </label>
       </div>
 
-      <label className="block text-sm font-medium text-slate-800">
+      <label className="block text-sm font-medium text-slate-800" htmlFor="family-concern-title">
         Short summary
         <input
+          id="family-concern-title"
           required
           maxLength={200}
           value={title}
@@ -142,7 +138,12 @@ export function FamilyConcernForm({ careRoomId, personName }: FamilyConcernFormP
         />
       </label>
 
-      {error ? <p className="text-sm text-rose-700" role="alert">{error}</p> : null}
+      {error ? (
+        <div ref={errorRef} tabIndex={-1} className="rounded-xl border border-rose-300 bg-rose-50 p-3 outline-none" role="alert">
+          <p className="font-semibold text-rose-800">There is a problem</p>
+          <a className="mt-1 inline-flex text-sm text-rose-700 underline" href="#family-concern-title">{error}</a>
+        </div>
+      ) : null}
 
       <button
         type="submit"

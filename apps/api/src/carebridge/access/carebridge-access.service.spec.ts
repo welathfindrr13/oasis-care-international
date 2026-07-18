@@ -31,9 +31,7 @@ describe('CarebridgeAccessService', () => {
 
   const storyScopes = [
     AccessGrantScope.VIEW_UPDATES,
-    AccessGrantScope.VIEW_VISIT_TIMES,
     AccessGrantScope.VIEW_TASK_SUMMARY,
-    AccessGrantScope.VIEW_MEDICATION_SUPPORT_STATUS,
   ];
 
   beforeEach(async () => {
@@ -56,9 +54,9 @@ describe('CarebridgeAccessService', () => {
     service = module.get(CarebridgeAccessService);
   });
 
-  it('requires the exact active tenant membership and one non-revoked scope', async () => {
+  it('requires the exact active tenant membership and one non-revoked concern scope', async () => {
     prisma.careRoomMembership.findMany.mockResolvedValue([
-      membershipWithScopes([AccessGrantScope.VIEW_UPDATES]),
+      membershipWithScopes([AccessGrantScope.RAISE_CONCERNS]),
     ]);
 
     const membership = await service.requireFamilyScopes({
@@ -66,7 +64,7 @@ describe('CarebridgeAccessService', () => {
       careRoomId: 'room-1',
       organizationId: 'org-1',
       authSubject: 'auth-sub-1',
-      requiredScopes: [AccessGrantScope.VIEW_UPDATES],
+      requiredScopes: [AccessGrantScope.RAISE_CONCERNS],
     });
 
     expect(prisma.careRoomMembership.findMany).toHaveBeenCalledWith({
@@ -110,6 +108,21 @@ describe('CarebridgeAccessService', () => {
     expect(membership.id).toBe('membership-1');
   });
 
+  it.each([
+    [AccessGrantScope.VIEW_UPDATES],
+    [AccessGrantScope.VIEW_TASK_SUMMARY],
+  ])('denies partial approved-update bundle %s before database access', async (scope) => {
+    await expect(service.requireFamilyScopes({
+      membershipId: 'membership-1',
+      careRoomId: 'room-1',
+      organizationId: 'org-1',
+      authSubject: 'auth-sub-1',
+      requiredScopes: [scope],
+    })).rejects.toMatchObject({ status: 403 });
+
+    expect(prisma.careRoomMembership.findMany).not.toHaveBeenCalled();
+  });
+
   it('requires all requested published-story scopes', async () => {
     prisma.careRoomMembership.findMany.mockResolvedValue([
       membershipWithScopes(storyScopes),
@@ -144,9 +157,9 @@ describe('CarebridgeAccessService', () => {
     },
   );
 
-  it('denies when any required scope is missing or revoked', async () => {
+  it('denies when any launch scope is missing or revoked', async () => {
     prisma.careRoomMembership.findMany.mockResolvedValue([
-      membershipWithScopes([AccessGrantScope.SUBMIT_PULSE]),
+      membershipWithScopes([AccessGrantScope.VIEW_UPDATES]),
     ]);
 
     await expect(
@@ -156,14 +169,34 @@ describe('CarebridgeAccessService', () => {
         organizationId: 'org-1',
         authSubject: 'auth-sub-1',
         requiredScopes: [
-          AccessGrantScope.SUBMIT_PULSE,
-          AccessGrantScope.RAISE_CONCERNS,
+          AccessGrantScope.VIEW_UPDATES,
+          AccessGrantScope.VIEW_TASK_SUMMARY,
         ],
       }),
     ).rejects.toMatchObject({
       status: 403,
       response: { code: 'FORBIDDEN_INSUFFICIENT_PERMISSIONS' },
     });
+  });
+
+  it.each([
+    AccessGrantScope.VIEW_VISIT_TIMES,
+    AccessGrantScope.VIEW_MEDICATION_SUPPORT_STATUS,
+    AccessGrantScope.VIEW_WEEKLY_SUMMARIES,
+    AccessGrantScope.REPLY_TO_CONCERNS,
+    AccessGrantScope.SUBMIT_PULSE,
+  ])('denies unused launch scope %s before database access', async (scope) => {
+    await expect(
+      service.requireFamilyScopes({
+        membershipId: 'membership-1',
+        careRoomId: 'room-1',
+        organizationId: 'org-1',
+        authSubject: 'auth-sub-1',
+        requiredScopes: [scope],
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+
+    expect(prisma.careRoomMembership.findMany).not.toHaveBeenCalled();
   });
 
   it('fails closed when identity lookup is ambiguous', async () => {
@@ -177,7 +210,7 @@ describe('CarebridgeAccessService', () => {
         careRoomId: 'room-1',
         organizationId: 'org-1',
         authSubject: 'auth-sub-1',
-        requiredScopes: [AccessGrantScope.VIEW_UPDATES],
+        requiredScopes: storyScopes,
       }),
     ).rejects.toMatchObject({ status: 403 });
   });

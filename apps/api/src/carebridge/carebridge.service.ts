@@ -178,25 +178,24 @@ export class CarebridgeService {
     for (const room of rooms) {
       const membership = this.findFamilyMembership(room.memberships, lookup);
       if (!membership) continue;
-      try {
-        await this.requireFamilyScopes(room.id, membership.id, lookup, [
-          AccessGrantScope.VIEW_UPDATES,
-        ]);
-        authorizedRooms.push(this.mapFamilyCareRoom(room));
-      } catch (error) {
-        // A zero-grant or revoked family room is intentionally indistinguishable
-        // from a room that does not exist for this viewer.
-        if (!this.isFamilyDenial(error)) throw error;
-      }
+      const authority = this.familyLaunchAuthority(membership);
+      if (!authority.canViewApprovedUpdates && !authority.canRaiseConcerns) continue;
+      authorizedRooms.push(this.mapFamilyCareRoom(room, membership));
     }
     return authorizedRooms;
   }
 
   async getFamilyCareRoom(id: string, viewer: ViewerContext) {
-    const access = await this.requireScopedFamilyRoomAccess(id, viewer, [
-      AccessGrantScope.VIEW_UPDATES,
-    ]);
-    return this.mapFamilyCareRoom(access.room);
+    const access = await this.findFamilyRoomAccess(
+      id,
+      this.requireFamilyAccessLookup(viewer),
+    );
+    if (!access) throw this.familyRoomForbidden();
+    const authority = this.familyLaunchAuthority(access.membership);
+    if (!authority.canViewApprovedUpdates && !authority.canRaiseConcerns) {
+      throw this.familyRoomForbidden();
+    }
+    return this.mapFamilyCareRoom(access.room, access.membership);
   }
 
   async listFamilyVerifiedVisitStories(careRoomId: string, viewer: ViewerContext) {
@@ -928,10 +927,26 @@ export class CarebridgeService {
     };
   }
 
-  private mapFamilyCareRoom(room: any) {
+  private familyLaunchAuthority(membership: any) {
+    const activeScopes = new Set(
+      (membership.access_grants ?? [])
+        .filter((grant: any) => !grant.revoked_at)
+        .map((grant: any) => grant.scope),
+    );
+    return {
+      canViewApprovedUpdates:
+        activeScopes.has(AccessGrantScope.VIEW_UPDATES) &&
+        activeScopes.has(AccessGrantScope.VIEW_TASK_SUMMARY),
+      canRaiseConcerns: activeScopes.has(AccessGrantScope.RAISE_CONCERNS),
+    };
+  }
+
+  private mapFamilyCareRoom(room: any, membership: any) {
+    const authority = this.familyLaunchAuthority(membership);
     return {
       id: room.id,
       clientDisplayName: room.client?.full_name || 'Care recipient',
+      ...authority,
     };
   }
 

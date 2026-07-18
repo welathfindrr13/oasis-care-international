@@ -9,6 +9,7 @@ export function ConfirmDialog({
   onCancel,
   onConfirm,
   open,
+  returnFocusId,
   title,
 }: {
   confirmLabel: string;
@@ -16,10 +17,12 @@ export function ConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
   open: boolean;
+  returnFocusId?: string;
   title: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
   const descriptionId = useId();
 
@@ -27,12 +30,29 @@ export function ConfirmDialog({
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (open && !dialog.open) {
+      openerRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
       dialog.showModal();
       cancelRef.current?.focus();
     } else if (!open && dialog.open) {
       dialog.close();
+      const opener = openerRef.current;
+      openerRef.current = null;
+      queueMicrotask(() => {
+        const openerIsEnabled =
+          opener?.isConnected &&
+          !(opener instanceof HTMLButtonElement && opener.disabled);
+        const target = openerIsEnabled
+          ? opener
+          : returnFocusId
+            ? document.getElementById(returnFocusId)
+            : null;
+        target?.focus();
+      });
     }
-  }, [open]);
+  }, [open, returnFocusId]);
 
   return (
     <dialog

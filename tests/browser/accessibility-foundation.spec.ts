@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "playwright/test";
 
 const VISIT_ID = "77777777-7777-4777-8777-777777777777";
+const PERSON_ID = "88888888-8888-4888-8888-888888888888";
 const MAX_SEQUENTIAL_FOCUS_STEPS = 80;
 
 type TestProfile = {
@@ -282,6 +283,188 @@ test("Tenant admin company setup", async ({ page }) => {
   expect(primarySize.height).toBeGreaterThanOrEqual(44);
   expect(primarySize.width).toBeGreaterThanOrEqual(44);
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
+});
+
+test("Tenant admin manages Family access from the selected person", async ({ page }) => {
+  await signIn(page, profiles.tenantAdmin);
+  await page.goto(`/clients/${PERSON_ID}/carebridge`);
+  await expect(page).toHaveURL(new RegExp(`/clients/${PERSON_ID}/carebridge$`));
+  await expect(page.getByRole("heading", { name: "Family access for Jordan Ellis" })).toBeVisible();
+  await expect(page.getByText("Invitations begin with no access.")).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: /Approved care updates/ })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: /Send concerns/ })).toBeVisible();
+
+  await page.getByRole("button", { name: "Send invitation", exact: true }).click();
+  const problem = page.getByRole("alert").filter({ hasText: "There is a problem" });
+  await expect(problem).toBeFocused();
+  await expect(problem.getByRole("link", { name: "Enter the family member’s name." })).toHaveAttribute("href", "#family-fullName");
+  await expect(problem.getByRole("link", { name: "Enter a valid email address." })).toHaveAttribute("href", "#family-email");
+
+  const resend = page.getByRole("button", { name: "Resend invitation" });
+  await resend.focus();
+  await resend.click();
+  await expect(page.getByRole("dialog", { name: "Resend invitation to Alex Ellis?" })).toBeVisible();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(resend).toBeFocused();
+
+  const undersized = await page.locator("button, input:not([type=checkbox]), select, textarea").evaluateAll((controls) =>
+    controls.filter((control) => {
+      const bounds = control.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0 && (bounds.width < 44 || bounds.height < 44);
+    }).map((control) => ({ tag: control.tagName, text: control.textContent })),
+  );
+  expect(undersized).toEqual([]);
+  const checkboxTargets = await page.getByRole("checkbox").evaluateAll((checkboxes) =>
+    checkboxes.map((checkbox) => {
+      const label = checkbox.closest("label");
+      const bounds = label?.getBoundingClientRect();
+      return { width: bounds?.width || 0, height: bounds?.height || 0 };
+    }),
+  );
+  expect(checkboxTargets.every((target) => target.width >= 44 && target.height >= 44)).toBe(true);
+
+  await expectAccessibilityFoundation(page, { repeatedHeader: true });
+  await page.setViewportSize({ width: 320, height: 844 });
+  const reflow = await page.evaluate(() => ({
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+  expect(reflow.documentWidth).toBeLessThanOrEqual(reflow.viewportWidth);
+});
+
+test("Tenant admin receives truthful Family delivery and linked operation errors", async ({ page }) => {
+  await signIn(page, profiles.tenantAdmin);
+  await page.goto(`/clients/${PERSON_ID}/carebridge`);
+
+  await page.route("**/api/graphql", async (route) => {
+    const payload = route.request().postDataJSON() as { query?: string };
+    if (payload.query?.includes("InviteFamilyContact")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            inviteFamilyContact: {
+              id: "12121212-1212-4121-8121-121212121212",
+              invitationId: "34343434-3434-4343-8343-343434343434",
+              role: "FAMILY_VIEWER",
+              status: "INVITED",
+              accessBasis: "PROVIDER_AUTHORISED",
+              reviewDueAt: null,
+              familyContact: {
+                id: "56565656-5656-4565-8565-565656565656",
+                fullName: "Casey Ellis",
+                email: "casey@example.test",
+                relationship: null,
+              },
+              accessGrants: [],
+              invitationStatus: "PENDING",
+              deliveryStatus: "RETRYABLE",
+              cleanupStatus: "COMPLETE",
+              invitationExpiresAt: "2026-07-25T09:00:00.000Z",
+            },
+          },
+        }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.getByLabel("Full name").fill("Casey Ellis");
+  await page.getByLabel("Email address").fill("casey@example.test");
+  await page.getByRole("button", { name: "Send invitation", exact: true }).click();
+
+  const deliveryProblem = page
+    .getByRole("alert")
+    .filter({ hasText: "invitation email was not delivered" });
+  await expect(deliveryProblem).toBeFocused();
+  await expect(page.getByText(/Invitation sent to Casey Ellis/)).toHaveCount(0);
+  const retry = page.getByRole("button", { name: "Retry delivery" });
+  const deliveryLink = deliveryProblem.getByRole("link", {
+    name: /invitation email was not delivered/,
+  });
+  await expect(deliveryLink).toHaveAttribute(
+    "href",
+    "#family-retry-12121212-1212-4121-8121-121212121212",
+  );
+  await deliveryLink.click();
+  await expect(retry).toBeFocused();
+});
+
+test("Tenant admin keeps grant choices and focus through failed and confirmed actions", async ({ page }) => {
+  await signIn(page, profiles.tenantAdmin);
+  await page.goto(`/clients/${PERSON_ID}/carebridge`);
+
+  await page.route("**/api/graphql", async (route) => {
+    const payload = route.request().postDataJSON() as { query?: string };
+    if (payload.query?.includes("UpdateFamilyAccessGrants")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ errors: [{ message: "Fixture grant failure" }] }),
+      });
+      return;
+    }
+    if (payload.query?.includes("RevokeFamilyAccess")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            revokeFamilyAccess: {
+              id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+              invitationId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+              role: "FAMILY_VIEWER",
+              status: "REVOKED",
+              accessBasis: "PROVIDER_AUTHORISED",
+              reviewDueAt: null,
+              familyContact: {
+                id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+                fullName: "Morgan Ellis",
+                email: "morgan@example.test",
+                relationship: "Son",
+              },
+              accessGrants: [],
+              invitationStatus: "ACCEPTED",
+              deliveryStatus: "DELIVERED",
+              cleanupStatus: "COMPLETE",
+              invitationExpiresAt: "2026-07-25T09:00:00.000Z",
+            },
+          },
+        }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  const concerns = page.getByRole("checkbox", { name: /Send concerns/ });
+  await concerns.check();
+  await page.getByRole("button", { name: "Save sharing choices" }).click();
+  const grantProblem = page
+    .getByRole("alert")
+    .filter({ hasText: "sharing choices" });
+  await expect(grantProblem).toBeFocused();
+  await expect(concerns).toBeChecked();
+  const grantLink = grantProblem.getByRole("link", { name: /sharing choices/ });
+  await expect(grantLink).toHaveAttribute(
+    "href",
+    "#family-grants-dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+  );
+  await grantLink.click();
+  await expect(
+    page.locator("#family-grants-dddddddd-dddd-4ddd-8ddd-dddddddddddd"),
+  ).toBeFocused();
+  await expect(concerns).toBeChecked();
+
+  await page.getByRole("button", { name: "Revoke access" }).click();
+  await page
+    .getByRole("dialog", { name: "Revoke access for Morgan Ellis?" })
+    .getByRole("button", { name: "Revoke access" })
+    .click();
+  await expect(page.locator("#family-members-heading")).toBeFocused();
+  await expect(page.getByText("Access revoked for Morgan Ellis.")).toBeVisible();
 });
 
 for (const route of ["/emar", "/medication"]) {
