@@ -508,7 +508,12 @@ export default function VisitDetailPage() {
         {loading && <div className="rounded-lg border border-slate-200 bg-white p-6">Loading care visit...</div>}
 
         {!loading && error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+          <div
+            role="alert"
+            className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          >
+            {error}
+          </div>
         )}
 
         {!loading && message && (
