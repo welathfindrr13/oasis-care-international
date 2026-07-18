@@ -90,6 +90,7 @@ const AUDITED_OPTIONAL_NAMES = new Set([
   'GDPR_ENABLED',
   'METRICS_ENABLED',
   'AI_SUMMARY_ENABLED',
+  'MEDICATION_EMAR_ENABLED',
   'AWS_REGION',
   'BEDROCK_MODEL',
   'COGNITO_ISSUER',
@@ -380,6 +381,16 @@ function validate(values) {
 
   if (isProductionLike && isTruthy(values.DEMO_MODE)) {
     add(errors, 'DEMO_MODE=true is forbidden in production-like env');
+  }
+
+  if (
+    isProductionLike &&
+    String(values.MEDICATION_EMAR_ENABLED || '').trim() === 'true'
+  ) {
+    add(
+      errors,
+      'MEDICATION_EMAR_ENABLED=true is forbidden for the current production launch',
+    );
   }
 
   if (isProductionLike && isTruthy(values.LOCAL_AUTH_ENABLED)) {

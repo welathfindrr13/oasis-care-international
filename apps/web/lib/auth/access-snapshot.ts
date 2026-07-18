@@ -37,6 +37,7 @@ export interface AuthoritativeAccessSnapshot {
   onboardingState: OnboardingState;
   resolution: AccessResolution;
   capabilities: AccessCapability[];
+  medicationEmarEnabled: boolean;
 }
 
 const VIEWER_ACCESS_QUERY = `
@@ -50,6 +51,7 @@ const VIEWER_ACCESS_QUERY = `
       linkedIdentityState
       onboardingState
       capabilities
+      medicationEmarEnabled
     }
   }
 `;
@@ -65,6 +67,7 @@ export function unauthenticatedAccessSnapshot(): AuthoritativeAccessSnapshot {
     onboardingState: "NOT_STARTED",
     resolution: "UNAUTHENTICATED",
     capabilities: [],
+    medicationEmarEnabled: false,
   };
 }
 
@@ -79,6 +82,7 @@ export function unavailableAccessSnapshot(): AuthoritativeAccessSnapshot {
     onboardingState: "BLOCKED",
     resolution: "UNAVAILABLE",
     capabilities: [],
+    medicationEmarEnabled: false,
   };
 }
 
@@ -201,6 +205,7 @@ export function parseAccessSnapshot(
       : null;
   const capabilities = parseAccessCapabilities(candidate.capabilities);
   if (!capabilities) return null;
+  const medicationEmarEnabled = candidate.medicationEmarEnabled === true;
   const organizationId =
     typeof candidate.organizationId === "string" && candidate.organizationId.trim()
       ? candidate.organizationId.trim()
@@ -240,6 +245,7 @@ export function parseAccessSnapshot(
     onboardingState: candidate.onboardingState as OnboardingState,
     resolution: ready ? "READY" : "DENIED",
     capabilities: ready ? capabilities : [],
+    medicationEmarEnabled,
   };
 }
 

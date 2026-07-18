@@ -26,6 +26,7 @@ export type AccessDestination =
   | '/access/disabled'
   | '/access/pending'
   | '/access/setup'
+  | '/access/feature-not-enabled'
   | '/access/unavailable'
 
 export type RouteDecision =
@@ -56,7 +57,8 @@ const FRONTLINE_PATHS = [
 ]
 const FAMILY_PATH = /^\/family(?:\/|$)/
 const SETTINGS_PATH = /^\/settings(?:\/|$)/
-const ACCESS_STATE_PATH = /^\/access\/(?:no-membership|disabled|pending|setup|unavailable)$/
+const ACCESS_STATE_PATH = /^\/access\/(?:no-membership|disabled|pending|setup|feature-not-enabled|unavailable)$/
+const MEDICATION_EMAR_PATH = /^\/(?:medication|emar)(?:\/|$)/
 const AUTHORITATIVE_ROUTE_BYPASS_PATHS = [
   /^\/offline(?:\/|$)/,
   /^\/request-access(?:\/|$)/,
@@ -145,6 +147,12 @@ export function resolveAuthoritativeRoute(
       return { action: 'redirect', destination: '/access/disabled' }
     }
     return { action: 'redirect', destination: '/access/unavailable' }
+  }
+  if (pathname === '/access/feature-not-enabled') {
+    return { action: 'allow' }
+  }
+  if (!snapshot.medicationEmarEnabled && MEDICATION_EMAR_PATH.test(pathname)) {
+    return { action: 'redirect', destination: '/access/feature-not-enabled' }
   }
   return resolveAuthenticatedRoute(
     pathname,

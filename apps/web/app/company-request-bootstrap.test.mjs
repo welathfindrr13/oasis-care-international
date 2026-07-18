@@ -86,14 +86,15 @@ test("platform operators can inspect every request status with bounded paginatio
   assert.match(operatorServerPage, /key=\{`\$\{status\}:\$\{page\.offset\}`\}/);
 });
 
-test("guided setup is honest about synthetic canary data and excludes billing", () => {
-  assert.match(setupPage, /use clearly synthetic details/i);
-  assert.match(setupPage, /workforce/i);
-  assert.match(setupPage, /synthetic visit/i);
-  assert.match(setupPage, /family-safe workspace/i);
-  assert.match(setupPage, /Billing is not part of this setup/);
+test("guided setup presents the real company journey without internal language", () => {
+  assert.match(setupPage, /Set up your company/);
+  assert.match(setupPage, /Add a person/);
+  assert.match(setupPage, /Invite a carer/);
+  assert.match(setupPage, /must accept the invitation before you can assign/);
+  assert.match(setupPage, /Schedule a visit/);
+  assert.match(setupPage, /Set up family updates/);
   assert.match(setupPage, /viewerOrganizationSetupDetails/);
-  assert.match(setupPage, /Internal organization ID/);
+  assert.doesNotMatch(setupPage, /\bid\b|internal|synthetic|canary|fixture|seed|developer|billing/i);
 });
 
 test("Clerk invitations authenticate and activate before entering guided setup", () => {

@@ -1,6 +1,7 @@
 import { Resolver, Query, Mutation, Args, Context } from '@nestjs/graphql';
 import { UseGuards, SetMetadata } from '@nestjs/common';
 import { GqlRolesGuard } from '../auth/gql-roles.guard';
+import { GqlJwtAuthGuard } from '../auth/gql-jwt-auth.guard';
 import { MedicationService } from './medication.service';
 import { CreateMedicationInput } from './dto/create-medication.input';
 import { CreatePrescriptionInput } from './dto/create-prescription.input';
@@ -13,11 +14,12 @@ import { LegacyOperationalSurface } from '../auth/legacy-operational-access';
 import { requireOperationalActor } from '../carer/carer-access.service';
 import { RequireCapabilities } from '../auth/access-capability';
 import type { CanonicalAccessContext } from '../auth/access-context.service';
+import { MedicationLaunchGuard } from './medication-launch.guard';
 
 export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => SetMetadata('roles', roles);
 
 @Resolver()
-@UseGuards(GqlRolesGuard)
+@UseGuards(GqlJwtAuthGuard, MedicationLaunchGuard, GqlRolesGuard)
 @LegacyOperationalSurface()
 export class MedicationResolver {
   constructor(private readonly medicationService: MedicationService) {}

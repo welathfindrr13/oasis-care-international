@@ -22,7 +22,6 @@ interface EvidenceSourcePickerProps {
 const SOURCE_FILTERS: Array<{ value: OperationalEvidenceSourceType; label: string }> = [
   { value: 'VISIT', label: 'Visits' },
   { value: 'CARE_LOG', label: 'Care notes' },
-  { value: 'MEDICATION_ADMINISTRATION', label: 'Medication support' },
   { value: 'CONCERN', label: 'Concern cases' },
 ]
 
@@ -142,7 +141,7 @@ export function EvidenceSourcePicker({
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800">Operational sources</p>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            Add visits, care notes, medication support outcomes, and concern cases already recorded for this person.
+            Add visits, care notes, and concern cases already recorded for this person.
           </p>
         </div>
         <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-emerald-800">

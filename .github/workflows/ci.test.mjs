@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const workflow = fs.readFileSync(new URL('./ci.yml', import.meta.url), 'utf8');
+const apiWorkflow = fs.readFileSync(
+  new URL('./api-ci-cd.yml', import.meta.url),
+  'utf8',
+);
 const packageJson = JSON.parse(
   fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
 );
@@ -25,6 +29,21 @@ const linkedCarerJourney = fs.readFileSync(
 test('CI executes Prisma migrations before the linked-carer browser journey', () => {
   assert.match(workflow, /run: pnpm --filter @oasis\/db exec prisma migrate deploy/);
   assert.match(workflow, /run: pnpm test:browser:linked-carer/);
+});
+
+test('API-only CI generates the current Prisma client before build and test', () => {
+  const generateIndex = apiWorkflow.indexOf(
+    'run: pnpm --filter @oasis/db exec prisma generate',
+  );
+  const buildIndex = apiWorkflow.indexOf(
+    'run: pnpm turbo run build --filter=@oasis/api',
+  );
+  const testIndex = apiWorkflow.indexOf('run: pnpm --filter @oasis/api test');
+  assert.notEqual(generateIndex, -1);
+  assert.notEqual(buildIndex, -1);
+  assert.notEqual(testIndex, -1);
+  assert.ok(generateIndex < buildIndex);
+  assert.ok(generateIndex < testIndex);
 });
 
 test('CI runs the Clerk tenant auth browser proof after migrations and Chromium install', () => {

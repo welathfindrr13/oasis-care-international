@@ -38,6 +38,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma client
+        run: pnpm --filter @oasis/db exec prisma generate
+
       - name: Build API package
         run: pnpm turbo run build --filter=@oasis/api
 

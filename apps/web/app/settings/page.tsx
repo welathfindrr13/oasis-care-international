@@ -135,9 +135,6 @@ function SettingsContent({ userName, userEmail }: { userName: string; userEmail:
                     <Button asChild variant="ghost">
                       <Link href="/family-updates">Open Family Updates</Link>
                     </Button>
-                    <Button asChild variant="ghost">
-                      <Link href="/medication">Open Medication Round</Link>
-                    </Button>
                   </>
                 )}
                 {isCarer && (

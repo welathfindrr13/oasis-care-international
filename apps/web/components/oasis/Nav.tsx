@@ -9,7 +9,6 @@ const navItems = [
   { href: '/today', label: 'Today' },
   { href: '/schedule', label: 'Schedule' },
   { href: '/people', label: 'People' },
-  { href: '/medication', label: 'Medication Round' },
   { href: '/family-updates', label: 'Family Updates' },
 ] as const
 

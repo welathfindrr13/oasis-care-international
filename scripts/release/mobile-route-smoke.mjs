@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { chromium } from 'playwright';
 import { getLiveProbeAccount, getLiveProbeBaseUrl } from './probes/live-probe-env.mjs';
+import { loginLiveProbeAccount } from './probes/live-probe-login.mjs';
 
 const BASE_URL = getLiveProbeBaseUrl();
 const OUT_DIR = path.resolve('output/playwright/e2e-live');
@@ -9,21 +10,8 @@ const TS = Date.now();
 
 const ACCOUNT = getLiveProbeAccount('admin');
 
-const routes = ['/activity', '/visits', '/clients', '/clients/new', '/emar'];
-
-async function login(page) {
-  await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.locator('button:has-text("Sign in securely")').first().click({ timeout: 20000 });
-  await page.waitForURL(/amazoncognito\.com/, { timeout: 60000 });
-
-  await page.locator('input[name="username"], input#username, input[type="email"]').first().fill(ACCOUNT.email);
-  await page.getByRole('button', { name: /next|continue|sign in|log in/i }).first().click({ timeout: 15000 });
-  await page.locator('input[name="password"], input#password, input[type="password"]').first().fill(ACCOUNT.password);
-  await page.getByRole('button', { name: /continue|sign in|log in|login/i }).first().click({ timeout: 15000 });
-  await page.waitForURL((url) => url.toString().startsWith(BASE_URL) && !url.toString().includes('/login'), {
-    timeout: 90000,
-  });
-}
+const routes = ['/activity', '/visits', '/clients', '/clients/new'];
+const excludedMedicationRoutes = ['/emar', '/medication'];
 
 async function main() {
   const report = {
@@ -40,7 +28,11 @@ async function main() {
   const page = await context.newPage();
 
   try {
-    await login(page);
+    await loginLiveProbeAccount(page, {
+      baseUrl: BASE_URL,
+      account: ACCOUNT,
+      localRole: 'admin',
+    });
 
     for (const route of routes) {
       await page.goto(`${BASE_URL}${route}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
@@ -54,6 +46,17 @@ async function main() {
       await page.screenshot({ path: shot, fullPage: true });
 
       report.results.push({ route, pass, currentUrl, screenshot: shot });
+    }
+
+    for (const route of excludedMedicationRoutes) {
+      await page.goto(`${BASE_URL}${route}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+      await page.waitForURL(/\/access\/feature-not-enabled$/, { timeout: 30000 });
+      const currentUrl = page.url();
+      const pass = new URL(currentUrl).pathname === '/access/feature-not-enabled';
+      if (!pass) report.verdict = 'FAIL';
+      const shot = path.join(OUT_DIR, `${TS}_mobile_smoke_${route.slice(1)}_excluded.png`);
+      await page.screenshot({ path: shot, fullPage: true });
+      report.results.push({ route, expected: '/access/feature-not-enabled', pass, currentUrl, screenshot: shot });
     }
   } catch (error) {
     report.verdict = 'FAIL';

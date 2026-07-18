@@ -2,6 +2,10 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '@oasis/db';
 import { BaseHttpException } from '../../common/errors/base-http.exception';
 import { ErrorCode } from '../../common/errors/error-codes';
+import {
+  assertMedicationEmarEnabled,
+  isMedicationEmarEnabled,
+} from '../../common/features/medication-emar';
 import { CreateCareRoomInput } from './dto/create-care-room.input';
 import { UpsertCarebridgePolicyInput } from './dto/upsert-carebridge-policy.input';
 
@@ -93,6 +97,9 @@ export class CareRoomService {
 
   async upsertPolicy(input: UpsertCarebridgePolicyInput, actorUserId: string, organizationId?: string | null) {
     const orgId = this.requireOrganizationId(organizationId);
+    if (input.allowMedicationSupportStatus === true) {
+      assertMedicationEmarEnabled();
+    }
     const existing = await this.prisma.careBridgePolicy.findFirst({
       where: {
         organization_id: orgId,
@@ -105,7 +112,9 @@ export class CareRoomService {
       require_approval_for_all_content: input.requireApprovalForAllContent ?? DEFAULT_POLICY.require_approval_for_all_content,
       family_can_raise_concerns: input.familyCanRaiseConcerns ?? DEFAULT_POLICY.family_can_raise_concerns,
       family_can_reply_to_concerns: input.familyCanReplyToConcerns ?? DEFAULT_POLICY.family_can_reply_to_concerns,
-      show_medication_support_default: input.allowMedicationSupportStatus ?? DEFAULT_POLICY.show_medication_support_default,
+      show_medication_support_default: isMedicationEmarEnabled()
+        ? input.allowMedicationSupportStatus ?? DEFAULT_POLICY.show_medication_support_default
+        : false,
     };
 
     return existing
@@ -125,9 +134,16 @@ export class CareRoomService {
 
   private async attachEffectivePolicy(room: any) {
     const policy = await this.getEffectivePolicy(room.organization_id, room.client_id, room.id);
+    const effectivePolicy = policy
+      ? {
+          ...policy,
+          show_medication_support_default:
+            isMedicationEmarEnabled() && policy.show_medication_support_default,
+        }
+      : null;
     return {
       ...room,
-      effectivePolicy: policy || {
+      effectivePolicy: effectivePolicy || {
         id: 'default',
         require_approval_for_all_content: DEFAULT_POLICY.require_approval_for_all_content,
         family_can_raise_concerns: DEFAULT_POLICY.family_can_raise_concerns,

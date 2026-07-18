@@ -123,6 +123,7 @@ services:
       GDPR_ENABLED: ${GDPR_ENABLED:-false}
       METRICS_ENABLED: ${METRICS_ENABLED:-false}
       AI_SUMMARY_ENABLED: ${AI_SUMMARY_ENABLED:-false}
+      MEDICATION_EMAR_ENABLED: "false"
       APP_VERSION: ${APP_VERSION:-unknown}
       APP_COMMIT_SHA: ${APP_COMMIT_SHA:-unknown}
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-false}

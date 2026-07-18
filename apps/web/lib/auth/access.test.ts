@@ -31,6 +31,7 @@ const ready = (surface: 'ADMIN' | 'STAFF' | 'FAMILY'): AuthoritativeAccessSnapsh
             'FRONTLINE_VISIT_EXECUTE',
           ]
         : ['FAMILY_UPDATES_VIEW', 'FAMILY_CONCERN_CREATE'],
+  medicationEmarEnabled: false,
 })
 
 test('unknown roles never become family or admin access', () => {
@@ -64,6 +65,33 @@ test('canonical snapshot routes admin, carer and family surfaces', () => {
   assert.deepEqual(resolveAuthoritativeRoute('/access', ready('ADMIN')), { action: 'redirect', destination: '/today' })
   assert.deepEqual(resolveAuthoritativeRoute('/management', ready('STAFF')), { action: 'redirect', destination: '/today' })
   assert.deepEqual(resolveAuthoritativeRoute('/today', ready('FAMILY')), { action: 'redirect', destination: '/family' })
+})
+
+test('authentication remains ahead of the medication launch boundary', () => {
+  assert.deepEqual(
+    resolveAuthoritativeRoute('/emar', {
+      ...ready('ADMIN'),
+      authenticated: false,
+      resolution: 'UNAUTHENTICATED',
+    }),
+    { action: 'redirect', destination: '/login' },
+  )
+})
+
+test('canonical snapshot fails closed for direct medication routes', () => {
+  for (const pathname of ['/medication', '/medication/history', '/emar', '/emar/round']) {
+    assert.deepEqual(resolveAuthoritativeRoute(pathname, ready('ADMIN')), {
+      action: 'redirect',
+      destination: '/access/feature-not-enabled',
+    })
+  }
+  assert.deepEqual(
+    resolveAuthoritativeRoute('/emar', {
+      ...ready('ADMIN'),
+      medicationEmarEnabled: true,
+    }),
+    { action: 'allow' },
+  )
 })
 
 test('restricted management snapshots route only to Settings', () => {

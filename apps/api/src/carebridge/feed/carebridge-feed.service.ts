@@ -5,6 +5,11 @@ import {
 } from '@oasis/db';
 import { BaseHttpException } from '../../common/errors/base-http.exception';
 import { ErrorCode } from '../../common/errors/error-codes';
+import {
+  assertMedicationEmarEnabled,
+  containsMedicationEmarContent,
+  isMedicationEmarEnabled,
+} from '../../common/features/medication-emar';
 
 interface SyncVerifiedVisitStoryInput {
   visitId: string;
@@ -43,15 +48,35 @@ export class CarebridgeFeedService {
           where: { deleted_at: null },
         },
         care_logs: {
-          where: { deleted_at: null },
+          where: {
+            deleted_at: null,
+            ...(isMedicationEmarEnabled()
+              ? {}
+              : {
+                  category: { not: 'MEDICATION' },
+                  OR: [
+                    { notes: null },
+                    {
+                      NOT: [
+                        { notes: { contains: 'medication', mode: 'insensitive' } },
+                        { notes: { contains: 'emar', mode: 'insensitive' } },
+                      ],
+                    },
+                  ],
+                }),
+          },
           orderBy: { created_at: 'desc' },
           take: 3,
         },
-        medication_administrations: {
-          where: { deleted_at: null },
-          orderBy: { created_at: 'desc' },
-          take: 3,
-        },
+        ...(isMedicationEmarEnabled()
+          ? {
+              medication_administrations: {
+                where: { deleted_at: null },
+                orderBy: { created_at: 'desc' },
+                take: 3,
+              },
+            }
+          : {}),
       },
     }) as any;
 
@@ -87,9 +112,14 @@ export class CarebridgeFeedService {
       orderBy: [{ care_room_id: 'desc' }, { created_at: 'asc' }],
     });
 
-    const completedTasks = visit.tasks.filter((task: any) => task.is_completed);
-    const pendingTasks = visit.tasks.filter((task: any) => !task.is_completed);
-    const showMedicationStatus = policy?.show_medication_support_default ?? false;
+    const storyTasks = visit.tasks.filter(
+      (task: any) => isMedicationEmarEnabled() || !containsMedicationEmarContent(task.task_name),
+    );
+    const completedTasks = storyTasks.filter((task: any) => task.is_completed);
+    const pendingTasks = storyTasks.filter((task: any) => !task.is_completed);
+    const showMedicationStatus =
+      isMedicationEmarEnabled() &&
+      (policy?.show_medication_support_default ?? false);
 
     const draftTitle =
       completedTasks.length > 0
@@ -107,21 +137,21 @@ export class CarebridgeFeedService {
         ? `Tasks needing follow-up: ${pendingTasks.map((task: any) => task.task_name).join(', ')}.`
         : null,
       visit.care_logs[0]?.notes ? `Update: ${visit.care_logs[0].notes}` : null,
-      showMedicationStatus && visit.medication_administrations.length > 0
+      showMedicationStatus && visit.medication_administrations?.length > 0
         ? 'Medication support was recorded during this visit.'
         : null,
     ].filter(Boolean);
 
     const sourceRefs: SourceRef[] = [
       { type: 'Visit', id: visit.id },
-      ...visit.tasks.map((task: any) => ({ type: 'VisitTask' as const, id: task.id })),
+      ...storyTasks.map((task: any) => ({ type: 'VisitTask' as const, id: task.id })),
       ...visit.care_logs.map((log: any) => ({
         type: 'CareLog' as const,
         id: log.id,
         category: log.category ?? undefined,
       })),
       ...(showMedicationStatus
-        ? visit.medication_administrations.map((medication: any) => ({
+        ? (visit.medication_administrations || []).map((medication: any) => ({
             type: 'MedicationAdministration' as const,
             id: medication.id,
             visibility: 'STATUS_ONLY' as const,
@@ -186,6 +216,10 @@ export class CarebridgeFeedService {
       );
     }
 
+    if (this.isMedicationStory(story)) {
+      assertMedicationEmarEnabled();
+    }
+
     const refs = Array.isArray(story.source_refs) ? story.source_refs : [];
     if (refs.length === 0) {
       throw new BaseHttpException(
@@ -209,7 +243,7 @@ export class CarebridgeFeedService {
   }
 
   async listPublishedStoriesForRoom(careRoomId: string) {
-    return (this.prisma as any).verifiedVisitStory.findMany({
+    const stories = await (this.prisma as any).verifiedVisitStory.findMany({
       where: {
         care_room_id: careRoomId,
         status: CarebridgeContentStatus.PUBLISHED,
@@ -218,6 +252,30 @@ export class CarebridgeFeedService {
         published_at: 'desc',
       },
     });
+    return stories.filter((story: any) => !this.isMedicationStory(story));
+  }
+
+  private isMedicationStory(story: any): boolean {
+    if (isMedicationEmarEnabled()) return false;
+    const refs = Array.isArray(story?.source_refs) ? story.source_refs : [];
+    const hasMedicationReference = refs.some((ref: any) => {
+      const type = String(ref?.type || '').replace(/[^a-z]/gi, '').toLowerCase();
+      return (
+        type === 'medicationadministration' ||
+        String(ref?.category || '').trim().toUpperCase() === 'MEDICATION'
+      );
+    });
+    return (
+      hasMedicationReference ||
+      containsMedicationEmarContent([
+        story?.draft_title,
+        story?.draft_body,
+        story?.approved_title,
+        story?.approved_body,
+        story?.family_safe_title,
+        story?.family_safe_body,
+      ])
+    );
   }
 
   private requireOrganizationId(organizationId?: string | null) {

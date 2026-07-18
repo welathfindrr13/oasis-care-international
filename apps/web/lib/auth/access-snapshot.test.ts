@@ -27,6 +27,7 @@ const adminPayload = {
     "AI_SUMMARY_CONFIGURE",
     "GDPR_MANAGE",
   ],
+  medicationEmarEnabled: false,
 };
 
 test("parses only the safe canonical contract and derives roles from its surface", () => {
@@ -35,6 +36,16 @@ test("parses only the safe canonical contract and derives roles from its surface
   assert.equal(parsed.resolution, "READY");
   assert.deepEqual(rolesFromAccessSnapshot(parsed), ["admin"]);
   assert.deepEqual(parsed.capabilities, adminPayload.capabilities);
+  assert.equal(parsed.medicationEmarEnabled, false);
+  assert.equal(
+    parseAccessSnapshot({ ...adminPayload, medicationEmarEnabled: true })
+      ?.medicationEmarEnabled,
+    true,
+  );
+  for (const malformed of [undefined, null, "true", "false", 1]) {
+    const candidate = { ...adminPayload, medicationEmarEnabled: malformed };
+    assert.equal(parseAccessSnapshot(candidate)?.medicationEmarEnabled, false);
+  }
   assert.equal(
     parseAccessSnapshot({
       ...adminPayload,

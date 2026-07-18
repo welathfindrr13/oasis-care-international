@@ -1,6 +1,10 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { BaseHttpException } from '../common/errors/base-http.exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import {
+  assertMedicationEmarEnabled,
+  isMedicationEmarEnabled,
+} from '../common/features/medication-emar';
 import { CarePlanningRepository } from './care-planning.repository';
 import {
   AssessmentDTO,
@@ -162,7 +166,9 @@ export class CarePlanningService {
     this.assertReadAccess(viewer.role);
 
     const records = await this.withSchemaGuard(() => this.repository.listEvidencePacks(organizationId, clientId, take));
-    return records.map((record) => this.mapEvidencePack(record));
+    return records
+      .filter((record) => !this.containsExcludedMedicationEvidence(record))
+      .map((record) => this.mapEvidencePack(record));
   }
 
   async evidenceSourceCandidates(
@@ -183,7 +189,7 @@ export class CarePlanningService {
       );
     }
 
-    return this.withSchemaGuard(() =>
+    const candidates = await this.withSchemaGuard(() =>
       this.repository.listEvidenceSourceCandidates(organizationId, {
         clientId: input.clientId,
         periodStart,
@@ -192,12 +198,18 @@ export class CarePlanningService {
         take: this.normalizeTake(input.take),
       }),
     );
+    return candidates.filter(
+      (candidate) => !this.containsExcludedMedicationEvidence(candidate),
+    );
   }
 
   async createEvidencePack(input: CreateEvidencePackInput, viewer: CarePlanningViewer): Promise<EvidencePackDTO> {
     const organizationId = this.requireOrganizationId(viewer.organizationId);
     this.assertWriteAccess(viewer.role);
     const actorId = this.requireActorId(viewer.userId);
+    if (this.containsExcludedMedicationEvidence(input)) {
+      assertMedicationEmarEnabled();
+    }
 
     const record = await this.withSchemaGuard(() =>
       this.repository.createEvidencePack(organizationId, {
@@ -216,6 +228,9 @@ export class CarePlanningService {
     if (!record) {
       throw new BaseHttpException(ErrorCode.VALIDATION_FAILED, 'Evidence pack not found', HttpStatus.NOT_FOUND);
     }
+    if (this.containsExcludedMedicationEvidence(record)) {
+      assertMedicationEmarEnabled();
+    }
 
     return this.mapEvidencePack(record);
   }
@@ -223,6 +238,16 @@ export class CarePlanningService {
   async recordEvidencePackExport(id: string, viewer: CarePlanningViewer): Promise<EvidencePackDTO> {
     const organizationId = this.requireOrganizationId(viewer.organizationId);
     this.assertWriteAccess(viewer.role);
+
+    const existing = await this.withSchemaGuard(() =>
+      this.repository.getEvidencePack(organizationId, id),
+    );
+    if (!existing) {
+      throw new BaseHttpException(ErrorCode.VALIDATION_FAILED, 'Evidence pack not found', HttpStatus.NOT_FOUND);
+    }
+    if (this.containsExcludedMedicationEvidence(existing)) {
+      assertMedicationEmarEnabled();
+    }
 
     const record = await this.withSchemaGuard(() =>
       this.repository.recordEvidencePackExport(organizationId, id, viewer.userId ?? undefined),
@@ -321,6 +346,19 @@ export class CarePlanningService {
       ? Array.from(new Set(sourceTypes))
       : Array.from(SUPPORTED_EVIDENCE_CANDIDATE_SOURCE_TYPES);
 
+    if (
+      !isMedicationEmarEnabled() &&
+      requested.includes(EvidenceSourceTypeGQL.MEDICATION_ADMINISTRATION)
+    ) {
+      if (sourceTypes?.length) {
+        assertMedicationEmarEnabled();
+      }
+      return requested.filter(
+        (sourceType) =>
+          sourceType !== EvidenceSourceTypeGQL.MEDICATION_ADMINISTRATION,
+      );
+    }
+
     const unsupported = requested.filter((sourceType) => !SUPPORTED_EVIDENCE_CANDIDATE_SOURCE_TYPES.has(sourceType));
     if (unsupported.length) {
       throw new BaseHttpException(
@@ -331,6 +369,17 @@ export class CarePlanningService {
     }
 
     return requested;
+  }
+
+  private containsExcludedMedicationEvidence(value: unknown): boolean {
+    if (isMedicationEmarEnabled() || value === null || value === undefined) {
+      return false;
+    }
+    try {
+      return /medication|\bemar\b/i.test(JSON.stringify(value));
+    } catch {
+      return true;
+    }
   }
 
   private normalizeTake(take?: number | null): number {

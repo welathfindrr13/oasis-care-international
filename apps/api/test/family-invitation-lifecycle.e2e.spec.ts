@@ -368,12 +368,14 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
       { visitId: visit.id },
     ).expect(200);
     expect(generated.body.errors).toBeUndefined();
-    expect(generated.body.data.generateVerifiedVisitStory.draftBody).toContain('Medication prompt');
-    expect(generated.body.data.generateVerifiedVisitStory.draftBody).toContain('Raw medication note');
+    expect(generated.body.data.generateVerifiedVisitStory.draftBody).toContain('Confidential follow-up');
+    expect(generated.body.data.generateVerifiedVisitStory.draftBody).not.toContain('Medication prompt');
+    expect(generated.body.data.generateVerifiedVisitStory.draftBody).not.toContain('Raw medication note');
+    expect(generated.body.data.generateVerifiedVisitStory.draftBody).not.toContain('Internal medication detail');
     expect(generated.body.data.generateVerifiedVisitStory).toMatchObject({
       familySafeVersion: 1,
       familySafeTitle: 'Care visit update',
-      familySafeBody: 'The scheduled care visit was completed. One care task was recorded as completed. 1 care task needs follow-up.',
+      familySafeBody: 'The scheduled care visit was completed. 0 care tasks were recorded as completed. 1 care task needs follow-up.',
     });
     const generatedStoryId = generated.body.data.generateVerifiedVisitStory.id;
     const published = await gql(
@@ -385,9 +387,10 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     ).expect(200);
     expect(published.body.errors).toBeUndefined();
     expect(published.body.data.publishVerifiedVisitStory.approvedBody).toBe(
-      'The scheduled care visit was completed. One care task was recorded as completed. 1 care task needs follow-up.',
+      'The scheduled care visit was completed. 0 care tasks were recorded as completed. 1 care task needs follow-up.',
     );
     expect(published.body.data.publishVerifiedVisitStory.approvedBody).not.toContain('Medication prompt');
+    expect(published.body.data.publishVerifiedVisitStory.approvedBody).not.toContain('Raw medication note');
     const familyPublishedAt = published.body.data.publishVerifiedVisitStory.publishedAt;
 
     await prisma.verifiedVisitStory.createMany({
@@ -454,7 +457,7 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     expect(familyView.body.data.familyVerifiedVisitStories).toEqual([
       {
         title: 'Care visit update',
-        body: 'The scheduled care visit was completed. One care task was recorded as completed. 1 care task needs follow-up.',
+        body: 'The scheduled care visit was completed. 0 care tasks were recorded as completed. 1 care task needs follow-up.',
         publishedAt: familyPublishedAt,
       },
       {

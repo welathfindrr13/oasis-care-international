@@ -230,6 +230,7 @@ export class CarebridgeRepository {
         family_safe_title: true,
         family_safe_body: true,
         published_at: true,
+        source_refs: true,
       },
     });
   }

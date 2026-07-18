@@ -161,7 +161,7 @@ test("carer profile help exposes only carer-safe operational shortcuts", () => {
   assert.match(adminShortcuts, /href="\/schedule"/);
   assert.match(adminShortcuts, /href="\/people"/);
   assert.match(adminShortcuts, /href="\/family-updates"/);
-  assert.match(adminShortcuts, /href="\/medication"/);
+  assert.doesNotMatch(adminShortcuts, /href="\/(?:medication|emar)"/);
   assert.doesNotMatch(adminShortcuts, /href="\/visits"/);
   assert.match(settings, /\{isCarer && \([\s\S]*?href="\/visits"/);
 });

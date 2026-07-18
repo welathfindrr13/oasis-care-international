@@ -17,7 +17,6 @@ interface FamilyConcernFormProps {
 const categories = [
   { value: 'VISIT_DELIVERY', label: 'A visit or care task' },
   { value: 'COMMUNICATION', label: 'Communication' },
-  { value: 'MEDICATION_SUPPORT', label: 'Medication support' },
   { value: 'WELLBEING_CHANGE', label: 'A change in wellbeing' },
   { value: 'SCHEDULING', label: 'Visit timing or schedule' },
   { value: 'OTHER', label: 'Something else' },

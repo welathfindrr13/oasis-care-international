@@ -48,6 +48,7 @@ export default defineConfig({
       env: {
         ...process.env,
         ACCESSIBILITY_FIXTURE_API_PORT: String(apiPort),
+        MEDICATION_EMAR_ENABLED: "false",
       },
     },
     {

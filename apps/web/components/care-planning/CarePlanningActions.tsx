@@ -451,7 +451,7 @@ export function CarePlanningActions({ clientId, assessments, carePlans, onComple
             </div>
           </fieldset>
           <p className="mt-2 text-xs text-slate-500">
-            Visits, care notes, medication exceptions, and concerns will be added in the source picker once those list
+            Visits, care notes, and concerns will be added in the source picker once those list
             queries are wired.
           </p>
           <label className="mt-3 block text-sm font-medium text-slate-700">Period start</label>

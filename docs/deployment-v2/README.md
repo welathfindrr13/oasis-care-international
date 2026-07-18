@@ -134,7 +134,9 @@ The deployment is not healthy until CareBridge checks prove:
 - family users cannot access raw visits, care notes, medication records, care-planning internals, evidence packs, staff/admin/reporting data;
 - staff review/approval surfaces do not leak into family navigation;
 - published family updates remain approved projections, not raw operational records;
-- medication visibility remains status-only by default: no names, no doses, no advice;
+- medication and eMAR remain disabled for this launch; Deployment V2 pins
+  `MEDICATION_EMAR_ENABLED=false`, and authenticated GraphQL attempts fail with
+  `FEATURE_NOT_ENABLED` before medication service or repository access;
 - concern cases remain scoped to the correct Care Room/contact;
 - evidence exports remain staff-only unless a family-safe export is deliberately built later.
 

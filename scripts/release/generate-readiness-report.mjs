@@ -61,22 +61,22 @@ async function main() {
   const latestStrict = await findLatestBySuffix(files, '_strict_post_deploy_matrix.json');
   const latestCare = await findLatestBySuffix(files, '_care_log_probe.json');
   const latestAi = await findLatestBySuffix(files, '_ai_summary_probe.json');
-  const latestEmar = await findLatestBySuffix(files, '_emar_provisioning_probe.json');
+  const latestMedicationExclusion = await findLatestBySuffix(files, '_medication_exclusion_probe.json');
   const latestSuite = await findLatestBySuffix(files, '_reliability_suite.json');
 
   const strictData = latestStrict ? await loadJson(latestStrict) : null;
   const careData = latestCare ? await loadJson(latestCare) : null;
   const aiData = latestAi ? await loadJson(latestAi) : null;
-  const emarData = latestEmar ? await loadJson(latestEmar) : null;
+  const medicationExclusionData = latestMedicationExclusion ? await loadJson(latestMedicationExclusion) : null;
   const suiteData = latestSuite ? await loadJson(latestSuite) : null;
 
   const strictPass = isValidProbeArtifact(strictData) && strictData?.verdict === 'PASS';
   const carePass = isValidProbeArtifact(careData) && careData?.verdict === 'PASS';
   const aiPass = isValidProbeArtifact(aiData) && aiData?.verdict === 'PASS';
-  const emarPass = isValidProbeArtifact(emarData) && emarData?.verdict === 'PASS';
+  const medicationExclusionPass = isValidProbeArtifact(medicationExclusionData) && medicationExclusionData?.verdict === 'PASS';
   const suitePass = suiteData?.verdict === 'PASS';
 
-  const finalPass = strictPass && carePass && aiPass && emarPass && suitePass;
+  const finalPass = strictPass && carePass && aiPass && medicationExclusionPass && suitePass;
   const generatedAt = new Date().toISOString();
   const outPath = path.join(DEST_DIR, `${Date.now()}_production_readiness.md`);
 
@@ -92,7 +92,7 @@ async function main() {
     `- Care log probe: ${statusIcon(carePass)} (${latestCare || 'missing'})`,
     `- AI summary probe: ${statusIcon(aiPass)} (${latestAi || 'missing'})`,
     aiData ? `  - checks: ${aiData.passedChecks ?? 0}/${aiData.totalChecks ?? 0}` : '',
-    `- eMAR provisioning probe: ${statusIcon(emarPass)} (${latestEmar || 'missing'})`,
+    `- Medication/eMAR exclusion probe: ${statusIcon(medicationExclusionPass)} (${latestMedicationExclusion || 'missing'})`,
     `- Reliability suite: ${statusIcon(suitePass)} (${latestSuite || 'missing'})`,
     '',
     '## Gate Decision',

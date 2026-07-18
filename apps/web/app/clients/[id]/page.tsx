@@ -163,7 +163,6 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
     { label: 'Assessments', href: '/care-planning' },
     { label: 'Visits', href: `/schedule?clientId=${client.id}` },
     { label: 'Care Notes', href: `/clients/${client.id}/care-logs` },
-    { label: 'Medication', href: `/medication?clientId=${client.id}` },
     { label: 'Risks', href: '/care-planning' },
     { label: 'Family Updates', href: `/clients/${client.id}/carebridge` },
     { label: 'Documents', href: '/evidence' },
@@ -384,9 +383,6 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
                   <div className="space-y-2">
                     <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
                       <Link href={`/clients/${client.id}/carebridge`}>Family Updates room</Link>
-                    </Button>
-                    <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
-                      <Link href={`/medication?clientId=${client.id}`}>View Medication Round</Link>
                     </Button>
                     <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
                       <Link href={`/clients/${client.id}/summary`}>AI Health Summary</Link>

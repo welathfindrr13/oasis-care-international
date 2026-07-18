@@ -188,7 +188,7 @@ test("Family access is grant-bound, tenant-safe, and revoked immediately with th
   ).toBeVisible();
   await gotoAppRoute(page, `/family/care-rooms/${SENTINEL_CARE_ROOM_ID}`);
   await expect(
-    page.getByRole("heading", { name: "Updates temporarily unavailable" }),
+    page.getByRole("heading", { name: "Updates unavailable", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
 

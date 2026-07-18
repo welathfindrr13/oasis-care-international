@@ -1,11 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Header } from "../../../components/oasis/Header";
+import { Button } from "../../../components/ui/Button";
 import { query } from "../../../lib/graphql/client";
 
 const ORGANIZATION_SETUP_DETAILS = `
   query OrganizationSetupDetails {
     viewerOrganizationSetupDetails {
-      id
       name
     }
   }
@@ -13,102 +14,91 @@ const ORGANIZATION_SETUP_DETAILS = `
 
 export const dynamic = "force-dynamic";
 
+export const metadata: Metadata = {
+  title: "Set up your company | Oasis Care",
+};
+
 const steps = [
   {
-    title: "Review organization and account details",
-    description:
-      "Confirm your authenticated administrator profile and current organization access.",
-    href: "/settings",
-    action: "Review settings",
-  },
-  {
-    title: "Add one synthetic person",
-    description:
-      "For the production canary, use clearly synthetic details. Do not enter real care-recipient data.",
+    title: "Add a person",
+    description: "Create the first person profile so you can plan their care.",
     href: "/people/new",
-    action: "Add synthetic person",
+    action: "Add a person",
   },
   {
-    title: "Set up the workforce",
+    title: "Invite a carer",
     description:
-      "Create and link the minimum synthetic carer profile needed for the canary.",
+      "Invite a carer to join your company. They must accept the invitation before you can assign them to a visit.",
     href: "/admin/carers",
-    action: "Open carer directory",
+    action: "Invite a carer",
   },
   {
-    title: "Schedule a synthetic visit",
+    title: "Schedule a visit",
     description:
-      "Create the first canary visit only after the synthetic person and carer are ready.",
+      "Choose a person, date and time, then assign a carer who has accepted their invitation.",
     href: "/schedule/new",
-    action: "Schedule visit",
+    action: "Schedule a visit",
   },
   {
-    title: "Review the family-safe workspace",
+    title: "Set up family updates",
     description:
-      "See where approved updates and concerns will be managed without exposing raw care records.",
-    href: "/family-updates",
-    action: "Review family updates",
+      "Open a person profile when you are ready to manage safe Family access and approved updates.",
+    href: "/people",
+    action: "View people",
   },
-];
+] as const;
 
 export default async function AdminSetupPage() {
   const { viewerOrganizationSetupDetails: organization } = await query<{
-    viewerOrganizationSetupDetails: { id: string; name: string };
+    viewerOrganizationSetupDetails: { name: string };
   }>(ORGANIZATION_SETUP_DETAILS);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-oasis-canvas">
       <Header />
-      <main className="mx-auto max-w-4xl px-6 py-10">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-800">
-          Guided setup
-        </p>
-        <h1 className="font-heading text-4xl font-black tracking-tight">
-          Prepare your Oasis workspace
+      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+        <p className="text-sm font-semibold text-oasis-teal-dark">Company setup</p>
+        <h1 className="mt-2 font-heading text-3xl font-bold tracking-tight text-oasis-ink sm:text-4xl">
+          Set up your company
         </h1>
-        <p className="mb-8 text-slate-600">
-          Complete this checklist with synthetic data during the production
-          canary. Billing is not part of this setup.
+        <p className="mt-3 text-lg leading-7 text-oasis-muted">
+          {organization.name}
         </p>
-        <ol className="space-y-4">
+        <p className="mt-5 max-w-2xl leading-7 text-oasis-muted">
+          Follow these steps to prepare your company for its first visit. You
+          can return to this page at any time.
+        </p>
+
+        <Button asChild size="lg" className="mt-8 w-full sm:w-auto">
+          <Link href="/people/new">Add a person</Link>
+        </Button>
+
+        <ol className="mt-10 border-t border-oasis-border">
           {steps.map((step, index) => (
             <li
               key={step.title}
-              className="flex gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+              className="grid grid-cols-[2.75rem_1fr] gap-3 border-b border-oasis-border py-6 sm:grid-cols-[3rem_1fr_auto] sm:items-start sm:gap-5"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-100 font-black text-teal-900">
+              <span
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-oasis-teal-soft font-bold text-oasis-teal-dark"
+                aria-hidden="true"
+              >
                 {index + 1}
               </span>
               <div>
-                <h2 className="font-heading text-xl font-black text-slate-950">
+                <h2 className="font-heading text-xl font-bold text-oasis-ink">
                   {step.title}
                 </h2>
-                <p className="text-sm leading-6 text-slate-600">
+                <p className="mt-2 max-w-xl leading-6 text-oasis-muted">
                   {step.description}
                 </p>
-                {index === 0 && (
-                  <dl className="mb-3 rounded-2xl bg-slate-50 p-4 text-sm">
-                    <div>
-                      <dt className="font-bold text-slate-700">Organization</dt>
-                      <dd className="text-slate-950">{organization.name}</dd>
-                    </div>
-                    <div className="mt-2">
-                      <dt className="font-bold text-slate-700">
-                        Internal organization ID
-                      </dt>
-                      <dd className="font-mono text-xs text-slate-600">
-                        {organization.id}
-                      </dd>
-                    </div>
-                  </dl>
-                )}
-                <Link
-                  href={step.href}
-                  className="text-sm font-bold text-teal-800"
-                >
-                  {step.action} →
-                </Link>
               </div>
+              <Link
+                href={step.href}
+                className="col-start-2 flex min-h-11 items-center font-semibold text-oasis-teal-dark sm:col-start-3"
+              >
+                {step.action}
+              </Link>
             </li>
           ))}
         </ol>

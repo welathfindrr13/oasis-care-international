@@ -182,7 +182,7 @@ function EvidencePackList({ evidencePacks }: { evidencePacks: EvidencePackRecord
     return (
       <EmptyState
         title="No evidence packs yet"
-        body="Inspection-ready evidence packs will collect assessment, plan, visit, concern, and medication evidence without claiming guaranteed compliance."
+        body="Inspection-ready evidence packs collect assessment, plan, visit, and concern evidence without claiming guaranteed compliance."
       />
     )
   }

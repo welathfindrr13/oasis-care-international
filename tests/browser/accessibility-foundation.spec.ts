@@ -266,6 +266,36 @@ test("Tenant admin Today", async ({ page }) => {
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
 });
 
+test("Tenant admin company setup", async ({ page }) => {
+  await signIn(page, profiles.tenantAdmin);
+  await page.goto("/admin/setup");
+  await expect(page).toHaveURL(/\/admin\/setup$/);
+  await expect(page.getByRole("heading", { name: "Set up your company" })).toBeVisible();
+  await expect(page.getByText("Meadow Care Services", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Add a person", exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/must accept the invitation before you can assign/)).toBeVisible();
+  await expect(page.getByText(/synthetic|canary|fixture|seed|internal organization ID/i)).toHaveCount(0);
+  const primarySize = await page.getByRole("link", { name: "Add a person", exact: true }).first().evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return { width: bounds.width, height: bounds.height };
+  });
+  expect(primarySize.height).toBeGreaterThanOrEqual(44);
+  expect(primarySize.width).toBeGreaterThanOrEqual(44);
+  await expectAccessibilityFoundation(page, { repeatedHeader: true });
+});
+
+for (const route of ["/emar", "/medication"]) {
+  test(`Tenant admin ${route} is safely excluded`, async ({ page }) => {
+    await signIn(page, profiles.tenantAdmin);
+    await page.goto(route);
+    await expect(page).toHaveURL(/\/access\/feature-not-enabled$/);
+    await expect(
+      page.getByRole("heading", { name: "Medication and eMAR are not available" }),
+    ).toBeVisible();
+    await expectAccessibilityFoundation(page);
+  });
+}
+
 test("Carer Today", async ({ page }) => {
   await signIn(page, profiles.carer);
   await page.goto("/today");
