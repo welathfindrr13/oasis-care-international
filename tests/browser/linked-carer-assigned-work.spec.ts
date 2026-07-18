@@ -685,11 +685,11 @@ test("tenant and family room guessing stays isolated", async ({ page }) => {
     role: "user",
   });
   await page.goto(`/family/care-rooms/${SENTINEL_CARE_ROOM_ID}`);
-  await expect(page.getByRole("heading", { name: "Updates temporarily unavailable" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Updates unavailable", exact: true })).toBeVisible();
   await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
 
   await page.goto("/family/care-rooms/aaaaaaaa-aaaa-4aaa-8aaa-cccccccccccc");
-  await expect(page.getByRole("heading", { name: "Updates temporarily unavailable" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Updates unavailable", exact: true })).toBeVisible();
   await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
 });
 
