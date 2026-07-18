@@ -11,6 +11,7 @@ const port = Number(process.env.ACCESSIBILITY_FIXTURE_API_PORT || 4014);
 const visitId = "77777777-7777-4777-8777-777777777777";
 const personId = "88888888-8888-4888-8888-888888888888";
 const careRoomId = "99999999-9999-4999-8999-999999999999";
+const companyRequestId = "10101010-1010-4010-8010-101010101010";
 
 const capabilities = {
   admin: [
@@ -29,11 +30,7 @@ const capabilities = {
     "FRONTLINE_ASSIGNED_VISITS_VIEW",
     "FRONTLINE_VISIT_EXECUTE",
   ],
-  family: [
-    "PROFILE_HELP_VIEW",
-    "FAMILY_UPDATES_VIEW",
-    "FAMILY_CONCERN_CREATE",
-  ],
+  family: ["PROFILE_HELP_VIEW", "FAMILY_UPDATES_VIEW", "FAMILY_CONCERN_CREATE"],
 };
 
 function readBearerPayload(request) {
@@ -43,7 +40,9 @@ function readBearerPayload(request) {
   const encodedPayload = token.split(".")[1];
   if (!encodedPayload) return {};
   try {
-    return JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
+    return JSON.parse(
+      Buffer.from(encodedPayload, "base64url").toString("utf8"),
+    );
   } catch {
     return {};
   }
@@ -139,7 +138,12 @@ const operationHandlers = new Map([
               status: "INVITED",
               accessBasis: "CLIENT_CONSENT",
               reviewDueAt: null,
-              familyContact: { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", fullName: "Alex Ellis", email: "alex@example.test", relationship: "Daughter" },
+              familyContact: {
+                id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+                fullName: "Alex Ellis",
+                email: "alex@example.test",
+                relationship: "Daughter",
+              },
               accessGrants: [],
               invitationStatus: "PENDING",
               deliveryStatus: "DELIVERED",
@@ -153,10 +157,25 @@ const operationHandlers = new Map([
               status: "ACTIVE",
               accessBasis: "PROVIDER_AUTHORISED",
               reviewDueAt: null,
-              familyContact: { id: "ffffffff-ffff-4fff-8fff-ffffffffffff", fullName: "Morgan Ellis", email: "morgan@example.test", relationship: "Son" },
+              familyContact: {
+                id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+                fullName: "Morgan Ellis",
+                email: "morgan@example.test",
+                relationship: "Son",
+              },
               accessGrants: [
-                { id: "grant-update", scope: "VIEW_UPDATES", grantedAt: "2026-07-18T09:00:00.000Z", revokedAt: null },
-                { id: "grant-summary", scope: "VIEW_TASK_SUMMARY", grantedAt: "2026-07-18T09:00:00.000Z", revokedAt: null },
+                {
+                  id: "grant-update",
+                  scope: "VIEW_UPDATES",
+                  grantedAt: "2026-07-18T09:00:00.000Z",
+                  revokedAt: null,
+                },
+                {
+                  id: "grant-summary",
+                  scope: "VIEW_TASK_SUMMARY",
+                  grantedAt: "2026-07-18T09:00:00.000Z",
+                  revokedAt: null,
+                },
               ],
               invitationStatus: "ACCEPTED",
               deliveryStatus: "DELIVERED",
@@ -177,6 +196,48 @@ const operationHandlers = new Map([
     () => ({
       viewerOrganizationSetupDetails: { name: "Meadow Care Services" },
     }),
+  ],
+  [
+    "CompanyRequests",
+    (_request, payload) => {
+      const status = payload.variables?.status;
+      const isDisabled = status === "DISABLED";
+      const isApproved = status === "APPROVED";
+      const items =
+        isDisabled || isApproved
+          ? [
+              {
+                id: companyRequestId,
+                companyName: "Meadow Care Services",
+                contactName: "Avery Morgan",
+                businessEmail: "avery@example.test",
+                operationalNote: null,
+                status,
+                organizationId: "org-accessibility-fixture",
+                provisioningStatus: "ACTIVATED",
+                provisioningAttemptCount: 1,
+                provisioningErrorCode: null,
+                bootstrapManagerEmail: "manager@example.test",
+                bootstrapManagerAccessStatus: isDisabled ? "REVOKED" : "ACTIVE",
+                bootstrapManagerCleanupStatus: isDisabled
+                  ? "NEEDS_ATTENTION"
+                  : "NOT_REQUIRED",
+                bootstrapManagerCleanupErrorCode: isDisabled
+                  ? "CLERK_MEMBERSHIP_BINDING_MISMATCH"
+                  : null,
+                requestedAt: "2026-07-18T09:00:00.000Z",
+              },
+            ]
+          : [];
+      return {
+        companyAccessRequests: {
+          items,
+          total: items.length,
+          offset: 0,
+          limit: 50,
+        },
+      };
+    },
   ],
   [
     "ShiftAnalytics",
@@ -237,15 +298,16 @@ const operationHandlers = new Map([
   ],
   ["CareLogs", () => ({ careLogs: { total: 0, items: [] } })],
   ["FamilyCareRooms", () => ({ familyCareRooms: [] })],
-  [
-    "FamilyVerifiedVisitStories",
-    () => ({ familyVerifiedVisitStories: [] }),
-  ],
+  ["FamilyVerifiedVisitStories", () => ({ familyVerifiedVisitStories: [] })],
   ["CarebridgeConcernInbox", () => ({ carebridgeConcernInbox: [] })],
 ]);
 
 export function parseAllowedOperation(payload) {
-  if (!payload || typeof payload !== "object" || typeof payload.query !== "string") {
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    typeof payload.query !== "string"
+  ) {
     throw new Error("GraphQL request must include a query string");
   }
 
@@ -281,7 +343,7 @@ export function parseAllowedOperation(payload) {
 
 export function graphqlData(payload, request) {
   const operationName = parseAllowedOperation(payload);
-  return operationHandlers.get(operationName)(request);
+  return operationHandlers.get(operationName)(request, payload);
 }
 
 function sendJson(response, status, body) {
@@ -335,7 +397,10 @@ const server = http.createServer((request, response) => {
   });
 });
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   server.listen(port, "127.0.0.1", () => {
     process.stdout.write(`Accessibility fixture API listening on ${port}\n`);
   });

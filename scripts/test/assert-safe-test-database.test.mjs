@@ -116,6 +116,14 @@ test("Clerk conversion detaches and recreates invitation references around ident
     organizationMembershipInvitation: {
       deleteMany: async () => calls.push("delete invitations"),
       updateMany: async () => calls.push("update remaining invitations"),
+      create: async (input) => {
+        calls.push("create bootstrap invitation");
+        assert.equal(input.data.identity_provider, "clerk");
+        assert.equal(
+          input.data.bound_auth_subject,
+          "user_clerk_manager_browser",
+        );
+      },
       createMany: async (input) => {
         calls.push("recreate invitations");
         assert.deepEqual(
@@ -171,6 +179,10 @@ test("Clerk conversion detaches and recreates invitation references around ident
   );
   assert.ok(
     calls.lastIndexOf("update membership identity") <
+      calls.indexOf("create bootstrap invitation"),
+  );
+  assert.ok(
+    calls.indexOf("create bootstrap invitation") <
       calls.indexOf("recreate invitations"),
   );
   assert.ok(calls.indexOf("recreate invitations") < calls.indexOf("rebind"));

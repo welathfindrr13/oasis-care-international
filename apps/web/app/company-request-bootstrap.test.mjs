@@ -86,6 +86,28 @@ test("platform operators can inspect every request status with bounded paginatio
   assert.match(operatorServerPage, /key=\{`\$\{status\}:\$\{page\.offset\}`\}/);
 });
 
+test("Platform Owners revoke the exact first Manager with accessible recovery states", () => {
+  assert.match(operatorServerPage, /bootstrapManagerEmail/);
+  assert.match(operatorServerPage, /bootstrapManagerAccessStatus/);
+  assert.match(operatorServerPage, /bootstrapManagerCleanupStatus/);
+  assert.match(operatorPage, /revokeBootstrapManagerAccess/);
+  assert.match(operatorPage, /Revoke first Manager/);
+  assert.match(operatorPage, /Revoke access for/);
+  assert.match(operatorPage, /company and care records will remain/i);
+  assert.match(operatorPage, /No replacement Manager will be created/);
+  assert.match(operatorPage, /appoint one separately/);
+  assert.match(operatorPage, /Retry Clerk cleanup/);
+  assert.match(operatorPage, /Oasis access remains revoked/);
+  assert.match(operatorPage, /returnFocusId="company-requests-heading"/);
+  assert.match(operatorPage, /<Alert live tone="success"/);
+  assert.match(operatorPage, /role="alert"/);
+  assert.match(operatorPage, /href=\{`#\$\{error\.targetId\}`\}/);
+  assert.doesNotMatch(
+    operatorPage,
+    /createReplacementManager|appointReplacementManager/,
+  );
+});
+
 test("guided setup presents the real company journey without internal language", () => {
   assert.match(setupPage, /Set up your company/);
   assert.match(setupPage, /Add a person/);
@@ -94,7 +116,10 @@ test("guided setup presents the real company journey without internal language",
   assert.match(setupPage, /Schedule a visit/);
   assert.match(setupPage, /Set up family updates/);
   assert.match(setupPage, /viewerOrganizationSetupDetails/);
-  assert.doesNotMatch(setupPage, /\bid\b|internal|synthetic|canary|fixture|seed|developer|billing/i);
+  assert.doesNotMatch(
+    setupPage,
+    /\bid\b|internal|synthetic|canary|fixture|seed|developer|billing/i,
+  );
 });
 
 test("Clerk invitations authenticate and activate before entering guided setup", () => {

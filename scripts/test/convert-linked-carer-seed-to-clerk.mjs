@@ -4,6 +4,10 @@ import { assertSafeTestDatabaseSeed } from "./assert-safe-test-database.mjs";
 
 const externalOrganizationId = "org_clerk_browser_primary";
 const organizationId = "org-browser-linked-carer";
+const bootstrapRequestId = "f0f0f0f0-f0f0-40f0-80f0-f0f0f0f0f0f0";
+const bootstrapInvitationId = "f1f1f1f1-f1f1-41f1-81f1-f1f1f1f1f1f1";
+const bootstrapMembershipId = "77777777-7777-4777-8777-777777777777";
+const bootstrapSubject = "user_clerk_manager_browser";
 
 const memberships = [
   ["44444444-4444-4444-8444-444444444444", "user_clerk_carer_browser"],
@@ -81,6 +85,24 @@ export async function convertLinkedCarerSeedToClerk(prisma) {
     await tx.organizationMembershipInvitation.updateMany({
       where: { organization_id: organizationId },
       data: { identity_provider: "clerk" },
+    });
+    await tx.organizationMembershipInvitation.create({
+      data: {
+        id: bootstrapInvitationId,
+        organization_id: organizationId,
+        source_request_id: bootstrapRequestId,
+        activated_membership_id: bootstrapMembershipId,
+        identity_provider: "clerk",
+        intended_email: "admin@local.dev",
+        normalized_email: "admin@local.dev",
+        intended_role: "admin",
+        status: "ACCEPTED",
+        external_invitation_id: "orginv_browser_bootstrap_manager",
+        created_by_subject: "user_platform_operator_browser",
+        bound_auth_subject: bootstrapSubject,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        accepted_at: new Date(),
+      },
     });
     await tx.organizationMembershipInvitation.createMany({
       data: invitations.map((invitation) => ({

@@ -58,6 +58,19 @@ export enum PlatformProvisioningStatus {
   NEEDS_ATTENTION = "NEEDS_ATTENTION",
 }
 
+export enum PlatformBootstrapManagerAccessStatus {
+  ACTIVE = "ACTIVE",
+  REVOKED = "REVOKED",
+  UNAVAILABLE = "UNAVAILABLE",
+}
+
+export enum PlatformBootstrapManagerCleanupStatus {
+  NOT_REQUIRED = "NOT_REQUIRED",
+  PENDING = "PENDING",
+  COMPLETE = "COMPLETE",
+  NEEDS_ATTENTION = "NEEDS_ATTENTION",
+}
+
 export enum PlatformCompanyAccessRejectionCode {
   NOT_ELIGIBLE = "NOT_ELIGIBLE",
   DUPLICATE = "DUPLICATE",
@@ -70,6 +83,12 @@ registerEnumType(PlatformCompanyAccessRequestStatus, {
 });
 registerEnumType(PlatformProvisioningStatus, {
   name: "PlatformProvisioningStatus",
+});
+registerEnumType(PlatformBootstrapManagerAccessStatus, {
+  name: "PlatformBootstrapManagerAccessStatus",
+});
+registerEnumType(PlatformBootstrapManagerCleanupStatus, {
+  name: "PlatformBootstrapManagerCleanupStatus",
 });
 registerEnumType(PlatformCompanyAccessRejectionCode, {
   name: "PlatformCompanyAccessRejectionCode",
@@ -106,6 +125,18 @@ export class PlatformCompanyAccessRequestDTO {
 
   @Field({ nullable: true })
   provisioningErrorCode?: string;
+
+  @Field({ nullable: true })
+  bootstrapManagerEmail?: string;
+
+  @Field(() => PlatformBootstrapManagerAccessStatus)
+  bootstrapManagerAccessStatus!: PlatformBootstrapManagerAccessStatus;
+
+  @Field(() => PlatformBootstrapManagerCleanupStatus)
+  bootstrapManagerCleanupStatus!: PlatformBootstrapManagerCleanupStatus;
+
+  @Field({ nullable: true })
+  bootstrapManagerCleanupErrorCode?: string;
 
   @Field(() => Date)
   requestedAt!: Date;

@@ -57,6 +57,8 @@ export default defineConfig({
         CLERK_JWKS_URL: `${issuer}/.well-known/jwks.json`,
         CLERK_AUDIENCE: audience,
         CLERK_AUTHORIZED_PARTIES: webOrigin,
+        PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID: "org_platform_ops_browser",
+        PLATFORM_OPERATOR_CLERK_SUBJECTS: "user_platform_operator_browser",
         TENANT_MEMBERSHIP_REQUIRED: "true",
         MEDICATION_EMAR_ENABLED: "false",
         API_RATE_LIMIT_MAX: "1000",

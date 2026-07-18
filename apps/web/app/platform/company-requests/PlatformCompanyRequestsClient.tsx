@@ -2,7 +2,10 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Alert } from "../../../components/ui/Alert";
+import { Button } from "../../../components/ui/Button";
+import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { clientQuery } from "../../../lib/graphql/client-side";
 
 export type PlatformRequest = {
@@ -16,7 +19,20 @@ export type PlatformRequest = {
   provisioningStatus?: string;
   provisioningAttemptCount?: number;
   provisioningErrorCode?: string;
+  bootstrapManagerEmail?: string;
+  bootstrapManagerAccessStatus: "ACTIVE" | "REVOKED" | "UNAVAILABLE";
+  bootstrapManagerCleanupStatus:
+    | "NOT_REQUIRED"
+    | "PENDING"
+    | "COMPLETE"
+    | "NEEDS_ATTENTION";
+  bootstrapManagerCleanupErrorCode?: string;
   requestedAt: string;
+};
+
+type OperationError = {
+  message: string;
+  targetId: string;
 };
 
 const REQUEST_FIELDS = `
@@ -30,6 +46,10 @@ const REQUEST_FIELDS = `
   provisioningStatus
   provisioningAttemptCount
   provisioningErrorCode
+  bootstrapManagerEmail
+  bootstrapManagerAccessStatus
+  bootstrapManagerCleanupStatus
+  bootstrapManagerCleanupErrorCode
   requestedAt
 `;
 
@@ -42,19 +62,33 @@ export function PlatformCompanyRequestsClient({
   const router = useRouter();
   const [items, setItems] = useState(initialItems);
   const [workingId, setWorkingId] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<OperationError | null>(null);
+  const [notice, setNotice] = useState("");
+  const [confirmRevocation, setConfirmRevocation] =
+    useState<PlatformRequest | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setItems(initialItems);
   }, [initialItems]);
 
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
+
   async function run(
     id: string,
     mutation: string,
     variables: Record<string, unknown>,
+    options: {
+      errorMessage?: string;
+      errorTargetId?: string;
+      successMessage?: (updated: PlatformRequest) => string;
+    } = {},
   ) {
     setWorkingId(id);
-    setError("");
+    setError(null);
+    setNotice("");
     try {
       const data = await clientQuery<Record<string, PlatformRequest>>(
         mutation,
@@ -68,27 +102,68 @@ export function PlatformCompanyRequestsClient({
       setItems((current) =>
         current.map((item) => (item.id === id ? updated : item)),
       );
+      if (options.successMessage) {
+        setNotice(options.successMessage(updated));
+      }
       router.refresh();
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "The platform action failed.",
-      );
+    } catch {
+      setError({
+        message:
+          options.errorMessage ||
+          "The platform action could not be completed. Check the latest state and try again.",
+        targetId: options.errorTargetId || "company-requests-heading",
+      });
     } finally {
       setWorkingId("");
     }
   }
 
+  function runBootstrapManagerAction(
+    item: PlatformRequest,
+    action: "revoke" | "retry",
+  ) {
+    setConfirmRevocation(null);
+    void run(
+      item.id,
+      `mutation RevokeBootstrapManager($id: String!) { revokeBootstrapManagerAccess(id: $id) { ${REQUEST_FIELDS} } }`,
+      { id: item.id },
+      {
+        errorMessage:
+          action === "retry"
+            ? "We could not retry Clerk cleanup. Oasis access remains revoked. Check the latest state and try again."
+            : "We could not revoke this first Manager safely. No replacement Manager was created. Check the latest state and try again.",
+        errorTargetId: `bootstrap-manager-${item.id}`,
+        successMessage: (updated) =>
+          action === "retry"
+            ? updated.bootstrapManagerCleanupStatus === "COMPLETE"
+              ? `Clerk cleanup completed for ${updated.companyName}.`
+              : `Oasis access remains revoked for ${updated.companyName}. Clerk cleanup still needs attention.`
+            : updated.bootstrapManagerCleanupStatus === "COMPLETE"
+              ? `First Manager access revoked for ${updated.companyName}. Clerk cleanup completed.`
+              : `First Manager access revoked for ${updated.companyName}. Clerk cleanup still needs attention.`,
+      },
+    );
+  }
+
   return (
     <div className="space-y-5">
       {error && (
-        <p
-          className="rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-800"
+        <div
+          ref={errorRef}
+          tabIndex={-1}
+          className="rounded-md border-2 border-oasis-danger bg-oasis-danger-soft p-4 text-sm text-oasis-danger outline-none"
           role="alert"
         >
-          {error}
-        </p>
+          <p className="font-semibold">There is a problem</p>
+          <a className="mt-2 block underline" href={`#${error.targetId}`}>
+            {error.message}
+          </a>
+        </div>
+      )}
+      {notice && (
+        <Alert live tone="success" title="Company access updated">
+          {notice}
+        </Alert>
       )}
       {items.length === 0 && (
         <div className="rounded-3xl border border-slate-200 bg-white p-8 text-slate-600">
@@ -141,6 +216,102 @@ export function PlatformCompanyRequestsClient({
               </p>
             </div>
           )}
+
+          {item.bootstrapManagerEmail &&
+            item.bootstrapManagerAccessStatus !== "UNAVAILABLE" && (
+              <section
+                id={`bootstrap-manager-${item.id}`}
+                tabIndex={-1}
+                aria-labelledby={`bootstrap-manager-heading-${item.id}`}
+                className="mt-5 rounded-md border border-oasis-border bg-oasis-canvas p-4 outline-none"
+              >
+                <h3
+                  id={`bootstrap-manager-heading-${item.id}`}
+                  className="font-heading text-lg font-semibold text-oasis-ink"
+                >
+                  First Manager access
+                </h3>
+                <p className="mt-2 break-all text-sm text-oasis-muted">
+                  {item.bootstrapManagerEmail}
+                </p>
+
+                {item.bootstrapManagerAccessStatus === "ACTIVE" ? (
+                  <>
+                    <p className="mt-3 text-sm leading-6 text-oasis-ink">
+                      Access is active. Revoking it stops this Manager&apos;s
+                      Oasis authority immediately. The company and care records
+                      will remain.
+                    </p>
+                    <Button
+                      id={`bootstrap-revoke-${item.id}`}
+                      className="mt-4"
+                      variant="danger"
+                      disabled={workingId === item.id}
+                      onClick={() => setConfirmRevocation(item)}
+                    >
+                      {workingId === item.id
+                        ? "Revoking…"
+                        : "Revoke first Manager"}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {item.bootstrapManagerCleanupStatus === "COMPLETE" ? (
+                      <Alert
+                        className="mt-3"
+                        tone="success"
+                        title="Access revoked"
+                      >
+                        Oasis access is revoked and Clerk cleanup is complete.
+                      </Alert>
+                    ) : item.bootstrapManagerCleanupStatus ===
+                      "NEEDS_ATTENTION" ? (
+                      <Alert
+                        className="mt-3"
+                        tone="attention"
+                        title="Cleanup needs attention"
+                      >
+                        <p>
+                          Oasis access is revoked. Clerk cleanup still needs
+                          attention and cannot restore application authority.
+                        </p>
+                        {item.bootstrapManagerCleanupErrorCode ? (
+                          <p className="mt-2 break-all font-mono text-xs">
+                            Safe code: {item.bootstrapManagerCleanupErrorCode}
+                          </p>
+                        ) : null}
+                      </Alert>
+                    ) : (
+                      <Alert
+                        className="mt-3"
+                        tone="attention"
+                        title="Cleanup in progress"
+                      >
+                        Oasis access is revoked while Clerk cleanup is being
+                        completed.
+                      </Alert>
+                    )}
+                    <p className="mt-3 text-sm leading-6 text-oasis-muted">
+                      No replacement Manager was created. A Platform Owner must
+                      appoint one separately.
+                    </p>
+                    {item.bootstrapManagerCleanupStatus ===
+                    "NEEDS_ATTENTION" ? (
+                      <Button
+                        className="mt-4"
+                        variant="secondary"
+                        disabled={workingId === item.id}
+                        onClick={() => runBootstrapManagerAction(item, "retry")}
+                      >
+                        {workingId === item.id
+                          ? "Retrying Clerk cleanup…"
+                          : "Retry Clerk cleanup"}
+                      </Button>
+                    ) : null}
+                  </>
+                )}
+              </section>
+            )}
 
           <div className="mt-5 flex flex-wrap gap-3">
             {item.status === "PENDING_APPROVAL" && (
@@ -201,6 +372,27 @@ export function PlatformCompanyRequestsClient({
           </div>
         </article>
       ))}
+      <ConfirmDialog
+        open={Boolean(confirmRevocation)}
+        title={
+          confirmRevocation?.bootstrapManagerEmail
+            ? `Revoke access for ${confirmRevocation.bootstrapManagerEmail}?`
+            : "Revoke first Manager access?"
+        }
+        description={
+          confirmRevocation
+            ? `This stops the first Manager's access to ${confirmRevocation.companyName} immediately. The company and care records will remain. No replacement Manager will be created. A Platform Owner must appoint one separately.`
+            : ""
+        }
+        confirmLabel="Revoke first Manager"
+        returnFocusId="company-requests-heading"
+        onCancel={() => setConfirmRevocation(null)}
+        onConfirm={() => {
+          if (confirmRevocation) {
+            runBootstrapManagerAction(confirmRevocation, "revoke");
+          }
+        }}
+      />
     </div>
   );
 }

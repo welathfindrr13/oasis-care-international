@@ -46,6 +46,7 @@ const SENTINEL_VISIT_ID = "55555555-5555-4555-8555-888888888888";
 const PENDING_INVITATION_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const EXPIRED_INVITATION_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const REVOKED_INVITATION_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+const BOOTSTRAP_REQUEST_ID = "f0f0f0f0-f0f0-40f0-80f0-f0f0f0f0f0f0";
 
 function localSubject(role, email) {
   return `local-${crypto
@@ -123,7 +124,13 @@ try {
   await prisma.organizationMembershipInvitation.deleteMany({
     where: { organization_id: { in: ORGANIZATION_IDS } },
   });
+  await prisma.companyAccessRequest.deleteMany({
+    where: { organization_id: { in: ORGANIZATION_IDS } },
+  });
   await prisma.organizationMembership.deleteMany({
+    where: { organization_id: { in: ORGANIZATION_IDS } },
+  });
+  await prisma.organizationProviderBinding.deleteMany({
     where: { organization_id: { in: ORGANIZATION_IDS } },
   });
   await prisma.carer.deleteMany({
@@ -141,6 +148,28 @@ try {
       { id: ORGANIZATION_ID, name: "Linked Carer Browser Proof" },
       { id: SENTINEL_ORGANIZATION_ID, name: "Sentinel Browser Tenant" },
     ],
+  });
+  await prisma.companyAccessRequest.create({
+    data: {
+      id: BOOTSTRAP_REQUEST_ID,
+      company_name: "Linked Carer Browser Proof",
+      contact_name: "Browser Manager",
+      business_email: "admin@local.dev",
+      normalized_business_email: "admin@local.dev",
+      status: "APPROVED",
+      organization_id: ORGANIZATION_ID,
+      reviewed_at: new Date(),
+      reviewed_by_subject: "user_platform_operator_browser",
+      approved_at: new Date(),
+    },
+  });
+  await prisma.organizationProviderBinding.create({
+    data: {
+      organization_id: ORGANIZATION_ID,
+      identity_provider: "clerk",
+      external_organization_id: "org_clerk_browser_cleanup_mismatch",
+      external_slug: "linked-carer-browser-proof",
+    },
   });
   await prisma.carer.create({
     data: {
