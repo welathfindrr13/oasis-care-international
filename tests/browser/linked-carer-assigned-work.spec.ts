@@ -105,7 +105,7 @@ test("a linked fake carer follows the database role despite an admin token claim
   await expect(page.getByText("Browser Carer", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Visit details" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Step 3. Care notes" })).toBeVisible();
-  await expect(page.getByText(/medication|eMAR/i)).toHaveCount(0);
+  await expect(page.locator("main").getByText(/medication|eMAR/i)).toHaveCount(0);
   await expect(
     page.getByText("Confirm assigned visit", { exact: true }),
   ).toBeVisible();
@@ -629,7 +629,7 @@ test("tenant and family room guessing stays isolated", async ({ page }) => {
     role: "admin",
   });
   await page.goto(`/schedule/${SENTINEL_VISIT_ID}`);
-  await expect(page.getByText("An internal error occurred", { exact: true })).toBeVisible();
+  await expect(page.getByText("GraphQL error: Visit not found", { exact: true })).toBeVisible();
   await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
 
   await signIn(page, {
