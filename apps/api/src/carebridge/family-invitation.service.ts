@@ -27,12 +27,8 @@ const FAMILY_INVITATION_UNAVAILABLE = 'Family invitation is temporarily unavaila
 const FAMILY_ACCESS_UNAVAILABLE = 'Family access is unavailable';
 const SUPPORTED_FAMILY_SCOPES = new Set<AccessGrantScope>([
   AccessGrantScope.VIEW_UPDATES,
-  AccessGrantScope.VIEW_VISIT_TIMES,
   AccessGrantScope.VIEW_TASK_SUMMARY,
-  AccessGrantScope.VIEW_WEEKLY_SUMMARIES,
   AccessGrantScope.RAISE_CONCERNS,
-  AccessGrantScope.REPLY_TO_CONCERNS,
-  AccessGrantScope.SUBMIT_PULSE,
 ]);
 
 export type VerifiedFamilyAdminPrincipal = {
@@ -434,7 +430,12 @@ export class FamilyInvitationService {
   ) {
     const actor = this.requirePrincipal(principal);
     const scopes = [...new Set(input.scopes || [])];
-    if (scopes.some((scope) => !SUPPORTED_FAMILY_SCOPES.has(scope))) {
+    const hasUpdates = scopes.includes(AccessGrantScope.VIEW_UPDATES);
+    const hasTaskSummary = scopes.includes(AccessGrantScope.VIEW_TASK_SUMMARY);
+    if (
+      scopes.some((scope) => !SUPPORTED_FAMILY_SCOPES.has(scope)) ||
+      hasUpdates !== hasTaskSummary
+    ) {
       throw new BadRequestException('One or more family access grants are not available');
     }
 

@@ -871,6 +871,20 @@ export interface VerifiedVisitStoryApprovalQueueQueryResponse {
 export interface FamilyCarebridgeRoom {
   id: string;
   clientDisplayName: string;
+  canViewApprovedUpdates: boolean;
+  canRaiseConcerns: boolean;
+}
+
+export interface CreateCareRoomMutationResponse {
+  createCareRoom: CarebridgeRoom;
+}
+
+export interface FamilyMembershipMutationResponse {
+  inviteFamilyContact?: CarebridgeMembership;
+  updateFamilyAccessGrants?: CarebridgeMembership;
+  retryFamilyInvitationDelivery?: CarebridgeMembership;
+  revokeFamilyInvitation?: CarebridgeMembership;
+  revokeFamilyAccess?: CarebridgeMembership;
 }
 
 export interface FamilyVerifiedVisitStory {
@@ -1080,6 +1094,8 @@ export const FAMILY_CAREBRIDGE_ROOMS_QUERY = `
     familyCareRooms {
       id
       clientDisplayName
+      canViewApprovedUpdates
+      canRaiseConcerns
     }
   }
 `;
@@ -1089,7 +1105,77 @@ export const FAMILY_CAREBRIDGE_ROOM_QUERY = `
     familyCareRoom(id: $id) {
       id
       clientDisplayName
+      canViewApprovedUpdates
+      canRaiseConcerns
     }
+  }
+`;
+
+const FAMILY_MEMBERSHIP_MUTATION_FIELDS = `
+  id
+  invitationId
+  role
+  status
+  accessBasis
+  reviewDueAt
+  familyContact {
+    id
+    fullName
+    email
+    relationship
+  }
+  accessGrants {
+    id
+    scope
+    grantedAt
+    revokedAt
+  }
+  invitationStatus
+  deliveryStatus
+  cleanupStatus
+  invitationExpiresAt
+`;
+
+export const CREATE_CARE_ROOM_MUTATION = `
+  mutation CreateCareRoom($input: CreateCareRoomInput!) {
+    createCareRoom(input: $input) {
+      id
+      status
+      client { id fullName }
+      memberships { ${FAMILY_MEMBERSHIP_MUTATION_FIELDS} }
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const INVITE_FAMILY_CONTACT_MUTATION = `
+  mutation InviteFamilyContact($input: InviteFamilyContactInput!) {
+    inviteFamilyContact(input: $input) { ${FAMILY_MEMBERSHIP_MUTATION_FIELDS} }
+  }
+`;
+
+export const UPDATE_FAMILY_ACCESS_GRANTS_MUTATION = `
+  mutation UpdateFamilyAccessGrants($input: UpdateFamilyAccessGrantsInput!) {
+    updateFamilyAccessGrants(input: $input) { ${FAMILY_MEMBERSHIP_MUTATION_FIELDS} }
+  }
+`;
+
+export const RETRY_FAMILY_INVITATION_DELIVERY_MUTATION = `
+  mutation RetryFamilyInvitationDelivery($input: FamilyInvitationActionInput!) {
+    retryFamilyInvitationDelivery(input: $input) { ${FAMILY_MEMBERSHIP_MUTATION_FIELDS} }
+  }
+`;
+
+export const REVOKE_FAMILY_INVITATION_MUTATION = `
+  mutation RevokeFamilyInvitation($input: FamilyInvitationActionInput!) {
+    revokeFamilyInvitation(input: $input) { ${FAMILY_MEMBERSHIP_MUTATION_FIELDS} }
+  }
+`;
+
+export const REVOKE_FAMILY_ACCESS_MUTATION = `
+  mutation RevokeFamilyAccess($input: FamilyMembershipActionInput!) {
+    revokeFamilyAccess(input: $input) { ${FAMILY_MEMBERSHIP_MUTATION_FIELDS} }
   }
 `;
 

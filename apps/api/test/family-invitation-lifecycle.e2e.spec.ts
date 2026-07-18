@@ -290,7 +290,10 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
         },
       },
     ).expect(200);
-    expect(partialGrant.body.errors).toBeUndefined();
+    expect(partialGrant.body.errors).toHaveLength(1);
+    expect(await prisma.accessGrant.count({
+      where: { care_room_membership_id: careRoomMembershipId },
+    })).toBe(0);
     const partialStoryAccess = await gql(
       bearer(familySubject),
       `query Stories($id: String!) {
@@ -322,6 +325,76 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
       ]),
     );
     expect(granted.body.data.updateFamilyAccessGrants.accessGrants).toHaveLength(2);
+
+    const concernOnly = await gql(
+      bearer(adminSubject),
+      `mutation Grant($input: UpdateFamilyAccessGrantsInput!) {
+        updateFamilyAccessGrants(input: $input) { accessGrants { scope } }
+      }`,
+      { input: { careRoomMembershipId, scopes: ['RAISE_CONCERNS'] } },
+    ).expect(200);
+    expect(concernOnly.body.errors).toBeUndefined();
+    const concernOnlyRooms = await gql(
+      bearer(familySubject),
+      `{ familyCareRooms { id clientDisplayName canViewApprovedUpdates canRaiseConcerns } }`,
+    ).expect(200);
+    expect(concernOnlyRooms.body.errors).toBeUndefined();
+    expect(concernOnlyRooms.body.data.familyCareRooms).toEqual([{
+      id: roomId,
+      clientDisplayName: 'Synthetic Mary',
+      canViewApprovedUpdates: false,
+      canRaiseConcerns: true,
+    }]);
+    const concernOnlyStories = await gql(
+      bearer(familySubject),
+      `query Stories($id: String!) {
+        familyVerifiedVisitStories(careRoomId: $id) { title }
+      }`,
+      { id: roomId },
+    ).expect(200);
+    expect(concernOnlyStories.body.errors).toHaveLength(1);
+    const raisedConcern = await gql(
+      bearer(familySubject),
+      `mutation Concern($input: RaiseConcernInput!) {
+        raiseFamilyCarebridgeConcern(input: $input) { title status }
+      }`,
+      { input: {
+        careRoomId: roomId,
+        title: 'Please call about today',
+        severity: 'MEDIUM',
+        category: 'COMMUNICATION',
+      } },
+    ).expect(200);
+    expect(raisedConcern.body.errors).toBeUndefined();
+    expect(raisedConcern.body.data.raiseFamilyCarebridgeConcern).toMatchObject({
+      title: 'Please call about today',
+    });
+
+    await gql(
+      bearer(adminSubject),
+      `mutation Grant($input: UpdateFamilyAccessGrantsInput!) {
+        updateFamilyAccessGrants(input: $input) { accessGrants { scope } }
+      }`,
+      { input: {
+        careRoomMembershipId,
+        scopes: ['VIEW_UPDATES', 'VIEW_TASK_SUMMARY'],
+      } },
+    ).expect(200);
+    const concernCount = await prisma.concern.count();
+    const deniedConcern = await gql(
+      bearer(familySubject),
+      `mutation Concern($input: RaiseConcernInput!) {
+        raiseFamilyCarebridgeConcern(input: $input) { title status }
+      }`,
+      { input: {
+        careRoomId: roomId,
+        title: 'This must not be written',
+        severity: 'LOW',
+        category: 'OTHER',
+      } },
+    ).expect(200);
+    expect(deniedConcern.body.errors).toHaveLength(1);
+    expect(await prisma.concern.count()).toBe(concernCount);
 
     const carer = await prisma.carer.create({
       data: {
@@ -444,7 +517,7 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     const familyView = await gql(
       bearer(familySubject),
       `query Family($id: String!) {
-        familyCareRoom(id: $id) { id clientDisplayName }
+        familyCareRoom(id: $id) { id clientDisplayName canViewApprovedUpdates canRaiseConcerns }
         familyVerifiedVisitStories(careRoomId: $id) { title body publishedAt }
       }`,
       { id: roomId },
@@ -453,6 +526,8 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     expect(familyView.body.data.familyCareRoom).toEqual({
       id: roomId,
       clientDisplayName: 'Synthetic Mary',
+      canViewApprovedUpdates: true,
+      canRaiseConcerns: false,
     });
     expect(familyView.body.data.familyVerifiedVisitStories).toEqual([
       {
@@ -569,7 +644,7 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
         `mutation Grant($input: UpdateFamilyAccessGrantsInput!) {
           updateFamilyAccessGrants(input: $input) { status accessGrants { scope } }
         }`,
-        { input: { careRoomMembershipId, scopes: ['VIEW_UPDATES'] } },
+        { input: { careRoomMembershipId, scopes: ['VIEW_UPDATES', 'VIEW_TASK_SUMMARY'] } },
       ).expect(200),
       gql(
         bearer(adminSubject),
@@ -601,7 +676,7 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     expect(afterRevocation.body.data).toBeNull();
   });
 
-  it('blocks duplicate, wrong-room, and medication-support invitation/grant paths', async () => {
+  it('blocks duplicate, wrong-room, partial, medication, and unused grant paths', async () => {
     const inviteMutation = `mutation Invite($input: InviteFamilyContactInput!) {
       inviteFamilyContact(input: $input) { id invitationId }
     }`;
@@ -696,19 +771,27 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     expect(wrongRoom.body.errors).toHaveLength(1);
     expect(await prisma.familyContact.count({ where: { email: 'sentinel-family@example.test' } })).toBe(0);
 
-    const medicationGrant = await gql(
-      bearer(adminSubject),
-      `mutation Grant($input: UpdateFamilyAccessGrantsInput!) {
-        updateFamilyAccessGrants(input: $input) { id }
-      }`,
-      {
-        input: {
+    for (const scopes of [
+      ['VIEW_UPDATES'],
+      ['VIEW_TASK_SUMMARY'],
+      ['VIEW_MEDICATION_SUPPORT_STATUS'],
+      ['VIEW_VISIT_TIMES'],
+      ['VIEW_WEEKLY_SUMMARIES'],
+      ['REPLY_TO_CONCERNS'],
+      ['SUBMIT_PULSE'],
+    ]) {
+      const deniedGrant = await gql(
+        bearer(adminSubject),
+        `mutation Grant($input: UpdateFamilyAccessGrantsInput!) {
+          updateFamilyAccessGrants(input: $input) { id }
+        }`,
+        { input: {
           careRoomMembershipId: first.body.data.inviteFamilyContact.id,
-          scopes: ['VIEW_MEDICATION_SUPPORT_STATUS'],
-        },
-      },
-    ).expect(200);
-    expect(medicationGrant.body.errors).toHaveLength(1);
+          scopes,
+        } },
+      ).expect(200);
+      expect(deniedGrant.body.errors).toHaveLength(1);
+    }
     expect(await prisma.accessGrant.count()).toBe(0);
   });
 
@@ -899,17 +982,22 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
       {
         input: {
           careRoomMembershipId: added.body.data.inviteFamilyContact.id,
-          scopes: ['VIEW_UPDATES'],
+          scopes: ['VIEW_UPDATES', 'VIEW_TASK_SUMMARY'],
         },
       },
     ).expect(200);
     const rooms = await gql(
       bearer(familySubject),
-      `{ familyCareRooms { id clientDisplayName } }`,
+      `{ familyCareRooms { id clientDisplayName canViewApprovedUpdates canRaiseConcerns } }`,
     ).expect(200);
     expect(rooms.body.errors).toBeUndefined();
     expect(rooms.body.data.familyCareRooms).toEqual([
-      { id: secondRoom.id, clientDisplayName: 'Synthetic George' },
+      {
+        id: secondRoom.id,
+        clientDisplayName: 'Synthetic George',
+        canViewApprovedUpdates: true,
+        canRaiseConcerns: false,
+      },
     ]);
   });
 
@@ -1126,7 +1214,7 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     const reissued = await gql(
       bearer(adminSubject),
       `mutation Invite($input: InviteFamilyContactInput!) {
-        inviteFamilyContact(input: $input) { id invitationId status deliveryStatus }
+        inviteFamilyContact(input: $input) { id invitationId status deliveryStatus accessGrants { scope } }
       }`,
       {
         input: {
@@ -1143,6 +1231,7 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
       id: invited.body.data.inviteFamilyContact.id,
       status: 'INVITED',
       deliveryStatus: 'DELIVERED',
+      accessGrants: [],
     });
     expect(reissued.body.data.inviteFamilyContact.invitationId).not.toBe(
       invitationId,
@@ -1157,6 +1246,120 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
         where: { family_contact: { email: 'retry-family@example.test' } },
       }),
     ).toBe(1);
+
+    verifyClerk.listAcceptedInvitationsForUser.mockResolvedValue([{
+      id: `external_${invitationId}`,
+      organizationId: externalOrganizationId,
+      emailAddress: 'retry-family@example.test',
+      role: 'org:member',
+      publicMetadata: { oasis_invitation_id: invitationId },
+      privateMetadata: { oasis_invitation_id: invitationId },
+    }]);
+    verifyClerk.getOrganizationMembership.mockResolvedValue({
+      id: 'orgmem_old_revoked_invitation',
+      organizationId: externalOrganizationId,
+      userId: familySubject,
+      role: 'org:member',
+    });
+    const oldActivation = await gql(
+      bearer(familySubject, false),
+      `mutation Activate($input: InvitationActivationInputDTO!) {
+        activateViewerOrganizationInvitation(input: $input) { status nextPath }
+      }`,
+      { input: { invitationId } },
+    ).expect(200);
+    expect(oldActivation.body.errors).toHaveLength(1);
+  });
+
+  it('allows exactly one safe winner when invitation acceptance races cancellation and reissue', async () => {
+    const input = {
+      careRoomId: roomId,
+      fullName: 'Race Relative',
+      email: 'race-family@example.test',
+      role: 'FAMILY_VIEWER',
+      accessBasis: 'CLIENT_CONSENT',
+    };
+    const invited = await gql(
+      bearer(adminSubject),
+      `mutation Invite($input: InviteFamilyContactInput!) {
+        inviteFamilyContact(input: $input) { id invitationId accessGrants { scope } }
+      }`,
+      { input },
+    ).expect(200);
+    expect(invited.body.errors).toBeUndefined();
+    expect(invited.body.data.inviteFamilyContact.accessGrants).toEqual([]);
+    const invitationId = invited.body.data.inviteFamilyContact.invitationId;
+
+    verifyClerk.listAcceptedInvitationsForUser.mockResolvedValue([{
+      id: `external_${invitationId}`,
+      organizationId: externalOrganizationId,
+      emailAddress: input.email,
+      role: 'org:member',
+      publicMetadata: { oasis_invitation_id: invitationId },
+      privateMetadata: { oasis_invitation_id: invitationId },
+    }]);
+    verifyClerk.getOrganizationMembership.mockResolvedValue({
+      id: 'orgmem_family_race',
+      organizationId: externalOrganizationId,
+      userId: familySubject,
+      role: 'org:member',
+    });
+
+    const [activation, cancellation] = await Promise.all([
+      gql(
+        bearer(familySubject, false),
+        `mutation Activate($input: InvitationActivationInputDTO!) {
+          activateViewerOrganizationInvitation(input: $input) { status nextPath }
+        }`,
+        { input: { invitationId } },
+      ).expect(200),
+      gql(
+        bearer(adminSubject),
+        `mutation Revoke($input: FamilyInvitationActionInput!) {
+          revokeFamilyInvitation(input: $input) { status invitationStatus cleanupStatus }
+        }`,
+        { input: { invitationId } },
+      ).expect(200),
+    ]);
+
+    expect([activation, cancellation].filter((result) => !result.body.errors)).toHaveLength(1);
+    const terminal = await prisma.organizationMembershipInvitation.findUniqueOrThrow({
+      where: { id: invitationId },
+      include: {
+        care_room_memberships: {
+          include: { access_grants: { where: { revoked_at: null } } },
+        },
+      },
+    });
+    expect(terminal.status).toMatch(/^(ACCEPTED|REVOKED)$/);
+    expect(terminal.care_room_memberships).toHaveLength(1);
+    expect(terminal.care_room_memberships[0].access_grants).toEqual([]);
+
+    const reissue = await gql(
+      bearer(adminSubject),
+      `mutation Invite($input: InviteFamilyContactInput!) {
+        inviteFamilyContact(input: $input) { id invitationId status accessGrants { scope } }
+      }`,
+      { input },
+    ).expect(200);
+    if (terminal.status === 'REVOKED') {
+      expect(reissue.body.errors).toBeUndefined();
+      expect(reissue.body.data.inviteFamilyContact).toMatchObject({
+        id: invited.body.data.inviteFamilyContact.id,
+        status: 'INVITED',
+        accessGrants: [],
+      });
+      expect(reissue.body.data.inviteFamilyContact.invitationId).not.toBe(invitationId);
+    } else {
+      expect(reissue.body.errors).toHaveLength(1);
+      expect(await prisma.organizationMembershipInvitation.count({
+        where: { normalized_email: input.email },
+      })).toBe(1);
+    }
+    expect(await prisma.familyContact.count({ where: { email: input.email } })).toBe(1);
+    expect(await prisma.careRoomMembership.count({
+      where: { family_contact: { email: input.email } },
+    })).toBe(1);
   });
 
   it('retries committed, expired-lease, and manual-review deliveries', async () => {

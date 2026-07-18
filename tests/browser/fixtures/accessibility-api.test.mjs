@@ -19,6 +19,19 @@ test("returns fixture data only for an exact allowlisted parsed operation name",
     }),
     "FamilyCareRooms",
   );
+  assert.deepEqual(
+    graphqlData({ query: "query Client($id: String!) { client(id: $id) { id fullName } }" }, request),
+    {
+      client: {
+        id: "88888888-8888-4888-8888-888888888888",
+        fullName: "Jordan Ellis",
+        addressLine1: "12 Test Lane",
+        addressLine2: null,
+        city: "Leeds",
+        postcode: "LS1 1AA",
+      },
+    },
+  );
 });
 
 test("does not allow operation-name substrings or query text inside string values", () => {

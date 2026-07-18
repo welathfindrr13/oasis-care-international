@@ -20,6 +20,7 @@ export function ConfirmDialog({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
   const descriptionId = useId();
 
@@ -27,10 +28,19 @@ export function ConfirmDialog({
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (open && !dialog.open) {
+      openerRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
       dialog.showModal();
       cancelRef.current?.focus();
     } else if (!open && dialog.open) {
       dialog.close();
+      const opener = openerRef.current;
+      openerRef.current = null;
+      queueMicrotask(() => {
+        if (opener?.isConnected) opener.focus();
+      });
     }
   }, [open]);
 

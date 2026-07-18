@@ -15,7 +15,11 @@ describe('CarebridgeService', () => {
   let repository: jest.Mocked<CarebridgeRepository>;
   let accessService: jest.Mocked<CarebridgeAccessService>;
 
-  const familyMembership = (identity: { authSubject?: string; email?: string }) => ({
+  const familyMembership = (identity: {
+    authSubject?: string;
+    email?: string;
+    scopes?: AccessGrantScope[];
+  }) => ({
     id: 'membership-1',
     status: 'ACTIVE',
     role: 'FAMILY',
@@ -29,7 +33,10 @@ describe('CarebridgeService', () => {
       relationship: 'Daughter',
       disabled_at: null,
     },
-    access_grants: [],
+    access_grants: (identity.scopes ?? [
+      AccessGrantScope.VIEW_UPDATES,
+      AccessGrantScope.VIEW_TASK_SUMMARY,
+    ]).map((scope) => ({ scope, revoked_at: null })),
     organization_membership_invitation: {
       organization_id: 'org-1',
       intended_role: 'family',
@@ -288,7 +295,12 @@ describe('CarebridgeService', () => {
       authSubject: 'clerk-family-subject',
     });
     expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({ id: 'room-1', clientDisplayName: 'Mary Smith' });
+    expect(result[0]).toEqual({
+      id: 'room-1',
+      clientDisplayName: 'Mary Smith',
+      canViewApprovedUpdates: true,
+      canRaiseConcerns: false,
+    });
   });
 
   it('treats client-scoped external viewers as family access rather than staff access', async () => {
@@ -418,6 +430,7 @@ describe('CarebridgeService', () => {
             },
             access_grants: [
               { id: 'grant-authorized', scope: 'VIEW_UPDATES', granted_at: new Date(), revoked_at: null },
+              { id: 'grant-summary', scope: 'VIEW_TASK_SUMMARY', granted_at: new Date(), revoked_at: null },
             ],
             organization_membership_invitation: {
               organization_id: 'org-1',
@@ -507,7 +520,12 @@ describe('CarebridgeService', () => {
       authSubject: 'family-subject',
     });
 
-    expect(result[0]).toEqual({ id: 'room-1', clientDisplayName: 'Mary Smith' });
+    expect(result[0]).toEqual({
+      id: 'room-1',
+      clientDisplayName: 'Mary Smith',
+      canViewApprovedUpdates: true,
+      canRaiseConcerns: false,
+    });
     expect(result[0]).not.toHaveProperty('memberships');
     expect(result[0]).not.toHaveProperty('policy');
   });
@@ -540,7 +558,7 @@ describe('CarebridgeService', () => {
     expect(result.id).toBe('room-1');
   });
 
-  it('requires update scope for family room detail', async () => {
+  it('returns server-derived update authority for family room detail', async () => {
     repository.findRoomByIdForFamilyAccess.mockResolvedValue({
       id: 'room-1',
       organization_id: 'org-1',
@@ -548,20 +566,44 @@ describe('CarebridgeService', () => {
       memberships: [familyMembership({ authSubject: 'family-subject' })],
     } as any);
 
-    await service.getFamilyCareRoom('room-1', {
+    const result = await service.getFamilyCareRoom('room-1', {
       role: 'user',
       organizationId: 'org-1',
       authSubject: 'family-subject',
     });
 
-    expect(accessService.requireFamilyScopes).toHaveBeenCalledWith(
-      expect.objectContaining({
-        membershipId: 'membership-1',
-        careRoomId: 'room-1',
-        organizationId: 'org-1',
-        requiredScopes: [AccessGrantScope.VIEW_UPDATES],
-      }),
-    );
+    expect(result).toEqual({
+      id: 'room-1',
+      clientDisplayName: 'Care recipient',
+      canViewApprovedUpdates: true,
+      canRaiseConcerns: false,
+    });
+    expect(accessService.requireFamilyScopes).not.toHaveBeenCalled();
+  });
+
+  it('discovers concern-only family access without exposing approved updates', async () => {
+    repository.listRoomsForFamilyAccess.mockResolvedValue([
+      {
+        id: 'room-1',
+        organization_id: 'org-1',
+        client: { id: 'client-1', full_name: 'Mary Smith' },
+        memberships: [familyMembership({
+          authSubject: 'family-subject',
+          scopes: [AccessGrantScope.RAISE_CONCERNS],
+        })],
+      },
+    ] as any);
+
+    await expect(service.listFamilyCareRooms({
+      role: 'user',
+      organizationId: 'org-1',
+      authSubject: 'family-subject',
+    })).resolves.toEqual([{
+      id: 'room-1',
+      clientDisplayName: 'Mary Smith',
+      canViewApprovedUpdates: false,
+      canRaiseConcerns: true,
+    }]);
   });
 
   it('denies an email-only family identity before repository access', async () => {

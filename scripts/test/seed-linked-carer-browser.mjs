@@ -440,7 +440,6 @@ try {
       access_grants: {
         create: [
           { scope: "VIEW_UPDATES" },
-          { scope: "VIEW_VISIT_TIMES" },
           { scope: "VIEW_TASK_SUMMARY" },
           { scope: "RAISE_CONCERNS" },
         ],
