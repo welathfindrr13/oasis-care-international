@@ -1,4 +1,5 @@
 import { GraphQLError, GraphQLFormattedError } from 'graphql';
+import { unwrapResolverError } from '@apollo/server/errors';
 import { BaseHttpException } from '../errors/base-http.exception';
 import { ErrorCode } from '../errors/error-codes';
 import { Masker } from '../utils/masker';
@@ -36,6 +37,22 @@ export function formatGraphQLError(
   // Handle BaseHttpException wrapped in GraphQLError
   if (originalError instanceof BaseHttpException) {
     const response = originalError.getResponse() as any;
+    const maskedMessage = Masker.mask(response.message);
+
+    return new GraphQLError(maskedMessage, {
+      extensions: {
+        code: response.code,
+        originalError: undefined,
+      },
+    });
+  }
+
+  // Apollo passes the formatted error first and the original resolver/guard
+  // error second. Guard failures can otherwise arrive here already labelled
+  // INTERNAL_SERVER_ERROR, which would erase a stable application code.
+  const unwrappedRawError = unwrapResolverError(rawError);
+  if (unwrappedRawError instanceof BaseHttpException) {
+    const response = unwrappedRawError.getResponse() as any;
     const maskedMessage = Masker.mask(response.message);
 
     return new GraphQLError(maskedMessage, {

@@ -1,4 +1,5 @@
 import { GraphQLError } from 'graphql';
+import { BaseHttpException } from '../errors/base-http.exception';
 import { ErrorCode } from '../errors/error-codes';
 import { formatGraphQLError } from './graphql-error.filter';
 import { GRAPHQL_OPERATION_REJECTED } from '../../security/graphql-operation-guards';
@@ -41,6 +42,32 @@ describe('formatGraphQLError', () => {
 
     expect(formatted.message).toBe('Forbidden for p***@example.test');
     expect(formatted.extensions.code).toBe('FORBIDDEN');
+  });
+
+  it('preserves a BaseHttpException thrown from an Apollo resolver guard', () => {
+    const exception = new BaseHttpException(
+      ErrorCode.FEATURE_NOT_ENABLED,
+      'Medication and eMAR are not available for this launch.',
+      403,
+    );
+    const rawError = new GraphQLError('Forbidden resource', {
+      path: ['recordAdministration'],
+      originalError: exception,
+    });
+    const formatted = formatGraphQLError(
+      new GraphQLError('Forbidden resource', {
+        extensions: { code: 'INTERNAL_SERVER_ERROR' },
+      }),
+      rawError,
+    );
+
+    expect(formatted.message).toBe(
+      'Medication and eMAR are not available for this launch.',
+    );
+    expect(formatted.extensions).toEqual({
+      code: ErrorCode.FEATURE_NOT_ENABLED,
+      originalError: undefined,
+    });
   });
 
   it('maps native parser token-limit errors to a stable redacted response', () => {
