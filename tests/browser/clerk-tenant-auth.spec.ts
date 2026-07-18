@@ -334,7 +334,9 @@ test("a Platform Owner revokes the exact first Manager before cleanup and the sa
   const company = operatorPage
     .getByRole("article")
     .filter({ hasText: "Linked Carer Browser Proof" });
-  await expect(company.getByText("admin@local.dev")).toBeVisible();
+  await expect(
+    company.getByText("admin@local.dev", { exact: true }),
+  ).toBeVisible();
   const revokeButton = company.getByRole("button", {
     name: "Revoke first Manager",
   });
