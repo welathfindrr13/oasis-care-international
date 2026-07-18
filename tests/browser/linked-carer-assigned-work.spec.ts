@@ -254,10 +254,12 @@ test("a linked fake carer follows the database role despite an admin token claim
     page.getByText("Care note recorded.", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText(
-      "Browser journey care note recorded by the assigned Carer.",
-      { exact: true },
-    ),
+    page
+      .getByRole("heading", { name: "Recent care notes" })
+      .locator("..")
+      .getByText("Browser journey care note recorded by the assigned Carer.", {
+        exact: true,
+      }),
   ).toBeVisible();
 
   await page
@@ -280,10 +282,12 @@ test("a linked fake carer follows the database role despite an admin token claim
     page.getByRole("heading", { name: "Admin visit oversight" }),
   ).toBeVisible();
   await expect(
-    page.getByText(
-      "Browser journey care note recorded by the assigned Carer.",
-      { exact: true },
-    ),
+    page
+      .getByRole("heading", { name: "Recent care notes" })
+      .locator("..")
+      .getByText("Browser journey care note recorded by the assigned Carer.", {
+        exact: true,
+      }),
   ).toBeVisible();
   await expect(page.getByText(/Recorded note:/)).toContainText(
     "Browser journey completed with planned care delivered.",
