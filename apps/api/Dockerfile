@@ -67,7 +67,7 @@ COPY --from=build /app/libs/db/src/generated ./libs/db/dist/generated
 
 # Fail the image build if a compiled workspace dependency cannot resolve under
 # the production Node.js runtime.
-RUN node -e "require('@oasis/time')"
+RUN node -e "require('@oasis/auth'); require('@oasis/db'); require('@oasis/time')"
 
 COPY apps/api/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh

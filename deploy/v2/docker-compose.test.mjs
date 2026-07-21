@@ -14,6 +14,13 @@ const legacyApiProductionEnv = fs.readFileSync(
 );
 const webDockerfile = fs.readFileSync(new URL('../../apps/web/Dockerfile', import.meta.url), 'utf8');
 const apiDockerfile = fs.readFileSync(new URL('../../apps/api/Dockerfile', import.meta.url), 'utf8');
+const apiProductionImageWorkflow = fs.readFileSync(
+  new URL('../../.github/workflows/api-production-image-runtime.yml', import.meta.url),
+  'utf8',
+);
+const apiPackage = JSON.parse(
+  fs.readFileSync(new URL('../../apps/api/package.json', import.meta.url), 'utf8'),
+);
 const verifyLocalScript = fs.readFileSync(new URL('./scripts/verify-local.sh', import.meta.url), 'utf8');
 const stagingDockerDeployScript = fs.readFileSync(
   new URL('../../infrastructure/scripts/docker-deploy.sh', import.meta.url),
@@ -128,12 +135,28 @@ test('web and api services expose only safe live revision metadata to health end
 });
 
 test('api production image packages every compiled Oasis workspace dependency', () => {
+  assert.equal(apiPackage.dependencies['@oasis/auth'], 'workspace:*');
+  assert.equal(apiPackage.dependencies['@oasis/db'], 'workspace:*');
+  assert.equal(apiPackage.dependencies['@oasis/time'], 'workspace:*');
   assert.match(apiDockerfile, /COPY libs\/time\/package\.json \.\/libs\/time\//);
   assert.match(apiDockerfile, /RUN cd libs\/time && pnpm build/);
   assert.match(apiDockerfile, /sed -i[^\n]*libs\/time\/package\.json/);
   assert.match(apiDockerfile, /ln -s \/app\/libs\/time node_modules\/@oasis\/time/);
   assert.match(apiDockerfile, /COPY --from=build \/app\/libs\/time\/dist \.\/libs\/time\/dist/);
-  assert.match(apiDockerfile, /RUN node -e "require\('@oasis\/time'\)"/);
+  assert.match(
+    apiDockerfile,
+    /RUN node -e "require\('@oasis\/auth'\); require\('@oasis\/db'\); require\('@oasis\/time'\)"/,
+  );
+});
+
+test('api production image verification runs when the Docker build context changes', () => {
+  for (const buildInput of ['.dockerignore', 'tsconfig.json']) {
+    const escapedBuildInput = buildInput.replace('.', '\\.');
+    assert.match(
+      apiProductionImageWorkflow,
+      new RegExp(`paths:\\n(?:\\s+- .+\\n)*\\s+- '${escapedBuildInput}'`),
+    );
+  }
 });
 
 test('web production image packages the compiled time workspace dependency', () => {
