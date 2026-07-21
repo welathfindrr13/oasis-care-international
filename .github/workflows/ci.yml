@@ -203,6 +203,7 @@ jobs:
         node --test .github/workflows/ci.test.mjs
         node --test apps/web/next.config.test.js
         node --test .github/workflows/deploy-vps.test.mjs
+        node --test .github/workflows/forward-deploy-vps.test.mjs
         node --test .github/workflows/staging-tenant-migration-rehearsal.test.mjs
         node --test .github/workflows/production-tenant-migration-gate.test.mjs
         node --test .github/workflows/production-backup-restore-proof.test.mjs
