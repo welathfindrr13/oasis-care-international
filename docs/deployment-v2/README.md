@@ -215,6 +215,55 @@ as `LEGACY_UNKNOWN`, database readiness to remain healthy, and state to become `
 The permanent reservation and any completion marker remain. Forward recovery after rollback requires a
 new design and explicit approval; the exception cannot be reused.
 
+## Forward Deployment From Durable Legacy Rollback
+
+`Forward Deploy VPS` is a separate, single-use recovery lane for one reviewed application target:
+`18aacd8458a3f96a38bf470d9a4c837ad563fa5c`. Adding this workflow does not authorize or execute
+production deployment. It must be reviewed and merged first; a later operator action must use the
+then-current reviewed workflow revision and a fresh attempt identifier.
+
+The approval value is bound to both SHAs, the attempt, and the starting state:
+
+```text
+APPROVE_FORWARD_DEPLOY_<target_sha>_WITH_<workflow_sha>_ATTEMPT_<attempt_id>_FROM_LEGACY_ROLLED_BACK
+```
+
+The workflow requires `target_sha` to be the fixed application target, while `workflow_sha` must equal
+the dispatch revision and current `origin/main`. This two-SHA model permits the separately reviewed
+workflow to deploy the already reviewed application commit without pretending that the application
+target contains the later workflow.
+
+Forward state is stored separately under Git common metadata at
+`oasis-deploy/forward-deployment-v1`. The first valid preparation creates the lane's only permanent
+attempt reservation. Preparation is allowed only when the existing legacy helper reads
+`LEGACY_ROLLED_BACK`, its reservation/manifest/completion presence and contents match the recorded
+start digest, all three preserved rollback aliases still resolve to their recorded image IDs, and the
+currently running API, web, and Caddy containers use those exact IDs. The legacy state machine and its
+files are read but never transitioned, reset, rewritten, or removed.
+
+The forward transitions are:
+
+```text
+ABSENT -> PREPARED -> MUTATION_STARTED -> COMPLETE
+                         |
+                         +-> RECOVERABLE_FAILURE
+```
+
+`MUTATION_STARTED` is durable before checkout. Every checkout, target preflight, build, container
+replacement, health, revision, or preserved-state failure after that point records a fixed failure
+class and stops in `RECOVERABLE_FAILURE`; the workflow never rolls back automatically. Partial state,
+locks, unsafe permissions, symlinks, replay, a second attempt, stale main, changed legacy state, and
+uncertain writes all fail closed.
+
+The mutation builds only API and web. Caddy uses the preserved rollback alias through a temporary
+Compose override layered over the repository production model, so its volumes, ports, dependencies,
+entrypoint, command, capabilities, and user remain production-parity without retagging the rollback
+image. Only API, web, and Caddy are recreated with `--no-deps --no-build --pull never`.
+`RUN_MIGRATIONS=false` and `MEDICATION_EMAR_ENABLED=false` are checked and supplied explicitly; the
+lane contains no PostgreSQL operation. Completion is durable only after `/health`, `/ready`, and
+`/api/health` all prove the exact target SHA and database readiness, the legacy digest is unchanged,
+and all rollback aliases still match their preserved image IDs.
+
 ### External execution blockers
 
 These controls cannot be solved or truthfully proven by repository code:

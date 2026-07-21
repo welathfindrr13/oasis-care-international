@@ -177,3 +177,10 @@ test('Deployment V2 CI runs production backup restore proof workflow guard', () 
     /node --test \.github\/workflows\/production-backup-restore-proof\.test\.mjs/,
   );
 });
+
+test('Deployment V2 CI runs the forward-deployment state and workflow guard', () => {
+  assert.match(
+    workflow,
+    /node --test \.github\/workflows\/forward-deploy-vps\.test\.mjs/,
+  );
+});

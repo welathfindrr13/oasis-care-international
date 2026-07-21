@@ -1,0 +1,449 @@
+name: Forward Deploy VPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact reviewed lowercase 40-character application SHA to deploy.
+        required: true
+        type: string
+      workflow_sha:
+        description: Exact reviewed lowercase 40-character workflow SHA at current origin main.
+        required: true
+        type: string
+      attempt_id:
+        description: Fresh lowercase 32-character hexadecimal forward-deployment attempt identifier.
+        required: true
+        type: string
+      production_code_approval:
+        description: Exact SHA, workflow, attempt, and starting-state approval token.
+        required: true
+        type: string
+
+concurrency:
+  group: production-vps-mutation
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  forward-deploy:
+    name: Forward deploy from durable legacy rollback
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+    env:
+      EXPECTED_TARGET_SHA: 18aacd8458a3f96a38bf470d9a4c837ad563fa5c
+      OASIS_PRODUCTION_APP_URL: ${{ vars.OASIS_PRODUCTION_APP_URL }}
+      OASIS_PRODUCTION_VPS_HOST: ${{ secrets.OASIS_PRODUCTION_VPS_HOST }}
+      OASIS_PRODUCTION_VPS_USER: ${{ secrets.OASIS_PRODUCTION_VPS_USER }}
+      OASIS_PRODUCTION_VPS_SSH_KEY: ${{ secrets.OASIS_PRODUCTION_VPS_SSH_KEY }}
+      OASIS_PRODUCTION_VPS_KNOWN_HOSTS: ${{ secrets.OASIS_PRODUCTION_VPS_KNOWN_HOSTS }}
+      TARGET_SHA: ${{ inputs.target_sha }}
+      WORKFLOW_SHA: ${{ inputs.workflow_sha }}
+      ATTEMPT_ID: ${{ inputs.attempt_id }}
+      PRODUCTION_CODE_APPROVAL: ${{ inputs.production_code_approval }}
+    steps:
+      - name: Checkout reviewed workflow revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Validate target, workflow, attempt, approval, and transport
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          fail_inputs() {
+            printf 'FORWARD_INPUTS_INVALID\n' >&2
+            exit 1
+          }
+
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || fail_inputs
+          [ "$TARGET_SHA" = "$EXPECTED_TARGET_SHA" ] || fail_inputs
+          [[ "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] || fail_inputs
+          [[ "$ATTEMPT_ID" =~ ^[0-9a-f]{32}$ ]] || fail_inputs
+          [ "$GITHUB_REF" = "refs/heads/main" ] || fail_inputs
+          [ "$GITHUB_SHA" = "$WORKFLOW_SHA" ] || fail_inputs
+          required_approval="APPROVE_FORWARD_DEPLOY_${TARGET_SHA}_WITH_${WORKFLOW_SHA}_ATTEMPT_${ATTEMPT_ID}_FROM_LEGACY_ROLLED_BACK"
+          [ "$PRODUCTION_CODE_APPROVAL" = "$required_approval" ] || fail_inputs
+          [ -n "$OASIS_PRODUCTION_VPS_HOST" ] || fail_inputs
+          [ -n "$OASIS_PRODUCTION_VPS_USER" ] || fail_inputs
+          [ -n "$OASIS_PRODUCTION_VPS_SSH_KEY" ] || fail_inputs
+          [ -n "$OASIS_PRODUCTION_VPS_KNOWN_HOSTS" ] || fail_inputs
+          [ -n "$OASIS_PRODUCTION_APP_URL" ] || fail_inputs
+          [[ "$OASIS_PRODUCTION_VPS_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$ ]] || fail_inputs
+          [[ "$OASIS_PRODUCTION_VPS_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]{0,31}$ ]] || fail_inputs
+          [ "$GITHUB_REPOSITORY" = "welathfindrr13/oasis-care-international" ] || fail_inputs
+
+          if ! OASIS_PRODUCTION_APP_URL="$OASIS_PRODUCTION_APP_URL" node --input-type=module <<'NODE' >/dev/null 2>&1
+          import { normalizeBaseUrl } from './.github/workflows/revision-proof.mjs';
+          normalizeBaseUrl(process.env.OASIS_PRODUCTION_APP_URL);
+          NODE
+          then
+            fail_inputs
+          fi
+          printf 'FORWARD_INPUTS_VALID\n'
+
+      - name: Prove target and reviewed workflow against current origin main
+        shell: bash
+        run: |
+          set -euo pipefail
+          diagnostic_file="$(mktemp)"
+          chmod 600 "$diagnostic_file"
+          trap 'rm -f "$diagnostic_file"' EXIT
+
+          if ! git fetch --no-tags origin main >"$diagnostic_file" 2>&1; then
+            printf 'FORWARD_TARGET_PROOF_FAILED\n' >&2
+            exit 1
+          fi
+          origin_main="$(git rev-parse origin/main 2>/dev/null)" || {
+            printf 'FORWARD_TARGET_PROOF_FAILED\n' >&2
+            exit 1
+          }
+          [ "$origin_main" = "$WORKFLOW_SHA" ] || {
+            printf 'FORWARD_TARGET_PROOF_FAILED\n' >&2
+            exit 1
+          }
+          git cat-file -e "${TARGET_SHA}^{commit}" 2>/dev/null || {
+            printf 'FORWARD_TARGET_PROOF_FAILED\n' >&2
+            exit 1
+          }
+          git merge-base --is-ancestor "$TARGET_SHA" "$WORKFLOW_SHA" >"$diagnostic_file" 2>&1 || {
+            printf 'FORWARD_TARGET_PROOF_FAILED\n' >&2
+            exit 1
+          }
+          [ -z "$(git status --porcelain --untracked-files=all)" ] || {
+            printf 'FORWARD_TARGET_PROOF_FAILED\n' >&2
+            exit 1
+          }
+          printf 'FORWARD_TARGET_PROOF_VALID\n'
+
+      - name: Prove expected legacy revision before transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          OASIS_PRODUCTION_APP_URL="$OASIS_PRODUCTION_APP_URL" TARGET_SHA="$TARGET_SHA" \
+            node .github/workflows/revision-proof.mjs rollback_legacy
+
+      - name: Configure production transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          key_file=~/.ssh/oasis_production_vps
+          printf '%s\n' "$OASIS_PRODUCTION_VPS_SSH_KEY" > "$key_file"
+          chmod 600 "$key_file"
+          printf '%s\n' "$OASIS_PRODUCTION_VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          [ -s ~/.ssh/known_hosts ] || {
+            printf 'PRODUCTION_TRANSPORT_FAILED\n' >&2
+            exit 1
+          }
+          printf 'PRODUCTION_TRANSPORT_READY\n'
+
+      - name: Stage reviewed forward helpers
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker_capture="$(mktemp)"
+          helper_dir_capture="$(mktemp)"
+          chmod 600 "$marker_capture" "$helper_dir_capture"
+          trap 'rm -f "$marker_capture" "$helper_dir_capture"' EXIT
+
+          set +e
+          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" \
+            'target_class="$(tr -d "\r\n" < /etc/oasis/production-deploy-target-class 2>/dev/null)"; [ "$target_class" = production ] && printf "DEPLOY_TARGET_PRODUCTION\n"' \
+            >"$marker_capture" 2>/dev/null
+          marker_status=$?
+          set -e
+          if [ "$marker_status" -ne 0 ] || [ "$(tr -d '\r\n' < "$marker_capture")" != "DEPLOY_TARGET_PRODUCTION" ]; then
+            printf 'DEPLOY_TARGET_PROOF_FAILED\n' >&2
+            exit 1
+          fi
+          printf 'DEPLOY_TARGET_PRODUCTION\n'
+
+          if ! ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" \
+            'umask 077; mktemp -d /tmp/oasis-forward-deploy.XXXXXXXX' \
+            >"$helper_dir_capture" 2>/dev/null; then
+            printf 'FORWARD_HELPER_TRANSFER_FAILED\n' >&2
+            exit 1
+          fi
+          remote_helper_dir="$(tr -d '\r\n' < "$helper_dir_capture")"
+          [[ "$remote_helper_dir" =~ ^/tmp/oasis-forward-deploy\.[A-Za-z0-9]{8}$ ]] || {
+            printf 'FORWARD_HELPER_TRANSFER_FAILED\n' >&2
+            exit 1
+          }
+          printf 'REMOTE_HELPER_DIR=%s\n' "$remote_helper_dir" >> "$GITHUB_ENV"
+
+          for helper in \
+            deploy/v2/scripts/forward-deploy-state.mjs \
+            deploy/v2/scripts/legacy-bootstrap-state.mjs \
+            deploy/v2/scripts/preflight-env.mjs \
+            .github/workflows/revision-proof.mjs
+          do
+            if ! scp -q -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+              "$helper" \
+              "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST:$remote_helper_dir/$(basename "$helper")" \
+              >/dev/null 2>&1; then
+              printf 'FORWARD_HELPER_TRANSFER_FAILED\n' >&2
+              exit 1
+            fi
+          done
+          printf 'FORWARD_HELPERS_STAGED\n'
+
+      - name: Run approved forward deployment with allowlisted output only
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_output="$(mktemp)"
+          chmod 600 "$remote_output"
+          trap 'rm -f "$remote_output"' EXIT
+
+          set +e
+          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" \
+            "TARGET_SHA='$TARGET_SHA' WORKFLOW_SHA='$WORKFLOW_SHA' ATTEMPT_ID='$ATTEMPT_ID' APP_URL='$OASIS_PRODUCTION_APP_URL' REPOSITORY='$GITHUB_REPOSITORY' HELPER_DIR='$REMOTE_HELPER_DIR' bash -se" \
+            >"$remote_output" 2>&1 <<'REMOTE'
+          set -euo pipefail
+          umask 077
+
+          fail_remote() {
+            printf '%s\n' "$1"
+            exit 1
+          }
+
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || fail_remote FORWARD_INPUTS_INVALID
+          [ "$TARGET_SHA" = "18aacd8458a3f96a38bf470d9a4c837ad563fa5c" ] || fail_remote FORWARD_INPUTS_INVALID
+          [[ "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] || fail_remote FORWARD_INPUTS_INVALID
+          [[ "$ATTEMPT_ID" =~ ^[0-9a-f]{32}$ ]] || fail_remote FORWARD_INPUTS_INVALID
+          [ "$REPOSITORY" = "welathfindrr13/oasis-care-international" ] || fail_remote FORWARD_INPUTS_INVALID
+          [[ "$HELPER_DIR" =~ ^/tmp/oasis-forward-deploy\.[A-Za-z0-9]{8}$ ]] || fail_remote FORWARD_INPUTS_INVALID
+          [ -d "$HELPER_DIR" ] || fail_remote FORWARD_INPUTS_INVALID
+
+          forward_helper="$HELPER_DIR/forward-deploy-state.mjs"
+          legacy_helper="$HELPER_DIR/legacy-bootstrap-state.mjs"
+          revision_helper="$HELPER_DIR/revision-proof.mjs"
+          preflight_helper="$HELPER_DIR/preflight-env.mjs"
+          binding_export="$HELPER_DIR/legacy-binding"
+          caddy_override="$HELPER_DIR/caddy-override.yml"
+          diagnostic_file="$(mktemp)"
+          chmod 600 "$diagnostic_file"
+          failure_armed=0
+
+          cleanup_remote() {
+            rm -f "$diagnostic_file" "$binding_export" "$caddy_override" "$forward_helper" "$legacy_helper" "$revision_helper" "$preflight_helper" >/dev/null 2>&1 || true
+            rmdir "$HELPER_DIR" >/dev/null 2>&1 || true
+          }
+
+          handle_remote_exit() {
+            local exit_status="$?"
+            trap - EXIT HUP INT TERM
+            if [ "$failure_armed" -eq 1 ]; then
+              if FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
+                NEXT_STATE=RECOVERABLE_FAILURE FAILURE_CLASS=UNEXPECTED_FAILURE \
+                node "$forward_helper" transition >/dev/null 2>&1; then
+                printf 'FORWARD_STATE_RECOVERABLE_FAILURE\n'
+              else
+                printf 'FORWARD_STATE_IO_UNCERTAIN\n'
+              fi
+              printf 'FORWARD_RECOVERY_REQUIRED\n'
+            fi
+            cleanup_remote
+            exit "$exit_status"
+          }
+
+          trap 'handle_remote_exit' EXIT
+          trap 'exit 1' HUP INT TERM
+
+          target_class="$(tr -d '\r\n' < /etc/oasis/production-deploy-target-class 2>/dev/null)" || fail_remote DEPLOY_TARGET_UNKNOWN
+          [ "$target_class" = "production" ] || fail_remote DEPLOY_TARGET_NOT_PRODUCTION
+          printf 'DEPLOY_TARGET_PRODUCTION\n'
+
+          cd /opt/oasis-care || fail_remote REPOSITORY_STATE_UNSAFE
+          [ -d .git ] || fail_remote REPOSITORY_STATE_UNSAFE
+          [ -z "$(git status --porcelain --untracked-files=all 2>/dev/null)" ] || fail_remote REPOSITORY_STATE_UNSAFE
+          origin_url="$(git remote get-url origin 2>/dev/null)" || fail_remote REPOSITORY_STATE_UNSAFE
+          case "$origin_url" in
+            "https://github.com/${REPOSITORY}.git"|"git@github.com:${REPOSITORY}.git") ;;
+            *) fail_remote REPOSITORY_STATE_UNSAFE ;;
+          esac
+
+          remote_main_line="$(git ls-remote --exit-code origin refs/heads/main 2>/dev/null)" || fail_remote FORWARD_TARGET_PROOF_FAILED
+          remote_main="${remote_main_line%%[[:space:]]*}"
+          [ "$remote_main" = "$WORKFLOW_SHA" ] || fail_remote FORWARD_TARGET_PROOF_FAILED
+
+          git_common_raw="$(git rev-parse --git-common-dir 2>/dev/null)" || fail_remote REPOSITORY_STATE_UNSAFE
+          git_common="$(cd "$git_common_raw" 2>/dev/null && pwd -P)" || fail_remote REPOSITORY_STATE_UNSAFE
+          legacy_state_dir="$git_common/oasis-deploy/legacy-bootstrap-v1/state"
+          forward_state_root="$git_common/oasis-deploy/forward-deployment-v1"
+          exec 9>"$git_common/oasis-deploy/production-vps-mutation.lock"
+          flock -n 9 || fail_remote PRODUCTION_MUTATION_LOCKED
+          locked_target_class="$(tr -d '\r\n' < /etc/oasis/production-deploy-target-class 2>/dev/null)" || fail_remote DEPLOY_TARGET_UNKNOWN
+          [ "$locked_target_class" = "production" ] || fail_remote DEPLOY_TARGET_NOT_PRODUCTION
+          printf 'FORWARD_MUTATION_LOCK_ACQUIRED\n'
+
+          LEGACY_STATE_DIR="$legacy_state_dir" LEGACY_STATE_HELPER="$legacy_helper" \
+            FORWARD_BINDING_EXPORT="$binding_export" node "$forward_helper" inspect-legacy || exit 1
+          declare -A legacy_values
+          while IFS='=' read -r key value; do
+            case "$key" in
+              LEGACY_STATE_DIGEST|LEGACY_TARGET_SHA|LEGACY_ATTEMPT_ID|API_IMAGE_ID|API_IMAGE_ALIAS|WEB_IMAGE_ID|WEB_IMAGE_ALIAS|CADDY_IMAGE_ID|CADDY_IMAGE_ALIAS)
+                [ -z "${legacy_values[$key]+x}" ] || fail_remote FORWARD_LEGACY_STATE_UNSAFE
+                legacy_values["$key"]="$value"
+                ;;
+              *) fail_remote FORWARD_LEGACY_STATE_UNSAFE ;;
+            esac
+          done < "$binding_export"
+          [ "${#legacy_values[@]}" -eq 9 ] || fail_remote FORWARD_LEGACY_STATE_UNSAFE
+          [[ "${legacy_values[LEGACY_STATE_DIGEST]}" =~ ^[0-9a-f]{64}$ ]] || fail_remote FORWARD_LEGACY_STATE_UNSAFE
+
+          compose=(docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml)
+          declare -A running_images
+          verify_rollback_aliases() {
+            local service alias_key image_key alias_id
+            for service in API WEB CADDY; do
+              alias_key="${service}_IMAGE_ALIAS"
+              image_key="${service}_IMAGE_ID"
+              alias_id="$(docker image inspect --format '{{.Id}}' "${legacy_values[$alias_key]}" 2>/dev/null)" || return 1
+              [ "$alias_id" = "${legacy_values[$image_key]}" ] || return 1
+            done
+          }
+          verify_rollback_aliases || fail_remote FORWARD_ROLLBACK_IMAGES_UNSAFE
+
+          for service in api web caddy; do
+            container_id="$("${compose[@]}" ps -q "$service" 2>/dev/null)" || fail_remote FORWARD_RUNNING_IMAGES_UNSAFE
+            [[ "$container_id" =~ ^[0-9a-f]{64}$ ]] || fail_remote FORWARD_RUNNING_IMAGES_UNSAFE
+            health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null)" || fail_remote FORWARD_RUNNING_IMAGES_UNSAFE
+            [ "$health_status" = "healthy" ] || fail_remote FORWARD_RUNNING_IMAGES_UNSAFE
+            running_image="$(docker inspect --format '{{.Image}}' "$container_id" 2>/dev/null)" || fail_remote FORWARD_RUNNING_IMAGES_UNSAFE
+            image_key="${service^^}_IMAGE_ID"
+            [ "$running_image" = "${legacy_values[$image_key]}" ] || fail_remote FORWARD_RUNNING_IMAGES_UNSAFE
+            running_images["$service"]="$running_image"
+          done
+          postgres_container="$("${compose[@]}" ps -q postgres 2>/dev/null)" || fail_remote FORWARD_RUNNING_IMAGES_UNSAFE
+          [[ "$postgres_container" =~ ^[0-9a-f]{64}$ ]] || fail_remote FORWARD_RUNNING_IMAGES_UNSAFE
+          postgres_health="$(docker inspect --format '{{.State.Health.Status}}' "$postgres_container" 2>/dev/null)" || fail_remote FORWARD_RUNNING_IMAGES_UNSAFE
+          [ "$postgres_health" = "healthy" ] || fail_remote FORWARD_RUNNING_IMAGES_UNSAFE
+
+          if ! node "$preflight_helper" deploy/v2/.env >"$diagnostic_file" 2>&1; then
+            fail_remote FORWARD_PREFLIGHT_FAILED
+          fi
+          RUNNING_API_IMAGE_ID="${running_images[api]}" \
+            RUNNING_WEB_IMAGE_ID="${running_images[web]}" \
+            RUNNING_CADDY_IMAGE_ID="${running_images[caddy]}" \
+            FORWARD_STATE_ROOT="$forward_state_root" TARGET_SHA="$TARGET_SHA" WORKFLOW_SHA="$WORKFLOW_SHA" ATTEMPT_ID="$ATTEMPT_ID" \
+            ORIGIN_MAIN_SHA="$WORKFLOW_SHA" REPOSITORY="$REPOSITORY" \
+            LEGACY_STATE_DIR="$legacy_state_dir" LEGACY_STATE_HELPER="$legacy_helper" \
+            EXPECTED_LEGACY_STATE_DIGEST="${legacy_values[LEGACY_STATE_DIGEST]}" \
+            node "$forward_helper" prepare || exit 1
+          verify_rollback_aliases || fail_remote FORWARD_ROLLBACK_IMAGES_UNSAFE
+
+          record_recoverable_failure() {
+            local failure_class="$1"
+            if FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
+              NEXT_STATE=RECOVERABLE_FAILURE FAILURE_CLASS="$failure_class" \
+              node "$forward_helper" transition >/dev/null 2>&1; then
+              failure_armed=0
+              printf 'FORWARD_STATE_RECOVERABLE_FAILURE\n'
+            else
+              failure_armed=0
+              printf 'FORWARD_STATE_IO_UNCERTAIN\n'
+            fi
+            printf 'FORWARD_RECOVERY_REQUIRED\n'
+            exit 1
+          }
+
+          failure_armed=1
+          FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" NEXT_STATE=MUTATION_STARTED \
+            node "$forward_helper" transition || exit 1
+          if ! git fetch --no-tags origin main >"$diagnostic_file" 2>&1; then
+            record_recoverable_failure CHECKOUT_FAILED
+          fi
+          fetched_main="$(git rev-parse origin/main 2>/dev/null)" || record_recoverable_failure CHECKOUT_FAILED
+          [ "$fetched_main" = "$WORKFLOW_SHA" ] || record_recoverable_failure CHECKOUT_FAILED
+          git cat-file -e "${TARGET_SHA}^{commit}" 2>/dev/null || record_recoverable_failure CHECKOUT_FAILED
+          git merge-base --is-ancestor "$TARGET_SHA" "$WORKFLOW_SHA" >"$diagnostic_file" 2>&1 || record_recoverable_failure CHECKOUT_FAILED
+          if ! git checkout --detach "$TARGET_SHA" >"$diagnostic_file" 2>&1; then
+            record_recoverable_failure CHECKOUT_FAILED
+          fi
+          if ! node deploy/v2/scripts/preflight-env.mjs deploy/v2/.env >"$diagnostic_file" 2>&1; then
+            record_recoverable_failure PREFLIGHT_FAILED
+          fi
+          read_env_value() {
+            awk -F= -v n="$1" '$0 !~ /^[[:space:]]*#/ && $1 == n {v=substr($0,index($0,"=")+1)} END {gsub(/^[[:space:]]+|[[:space:]]+$/,"",v); print v}' deploy/v2/.env 2>/dev/null
+          }
+          [ "$(read_env_value RUN_MIGRATIONS)" = "false" ] || record_recoverable_failure PREFLIGHT_FAILED
+          printf 'services:\n  caddy:\n    image: %s\n' "${legacy_values[CADDY_IMAGE_ALIAS]}" > "$caddy_override" || record_recoverable_failure PREFLIGHT_FAILED
+          chmod 600 "$caddy_override" || record_recoverable_failure PREFLIGHT_FAILED
+          compose=(docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml -f "$caddy_override")
+          verify_rollback_aliases || record_recoverable_failure LEGACY_STATE_CHANGED
+          if ! RUN_MIGRATIONS=false MEDICATION_EMAR_ENABLED=false APP_COMMIT_SHA="$TARGET_SHA" APP_VERSION="${TARGET_SHA:0:12}" \
+            "${compose[@]}" build web api >"$diagnostic_file" 2>&1; then
+            record_recoverable_failure BUILD_FAILED
+          fi
+          verify_rollback_aliases || record_recoverable_failure LEGACY_STATE_CHANGED
+
+          if ! RUN_MIGRATIONS=false MEDICATION_EMAR_ENABLED=false APP_COMMIT_SHA="$TARGET_SHA" APP_VERSION="${TARGET_SHA:0:12}" \
+            "${compose[@]}" up -d --no-deps --no-build --pull never --wait --wait-timeout 180 api web caddy \
+            >"$diagnostic_file" 2>&1; then
+            record_recoverable_failure RUNTIME_REPLACEMENT_FAILED
+          fi
+          for service in api web caddy; do
+            container_id="$("${compose[@]}" ps -q "$service" 2>/dev/null)" || record_recoverable_failure CONTAINER_HEALTH_FAILED
+            health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null)" || record_recoverable_failure CONTAINER_HEALTH_FAILED
+            [ "$health_status" = "healthy" ] || record_recoverable_failure CONTAINER_HEALTH_FAILED
+            if [ "$service" = "caddy" ]; then
+              running_image="$(docker inspect --format '{{.Image}}' "$container_id" 2>/dev/null)" || record_recoverable_failure CONTAINER_HEALTH_FAILED
+              [ "$running_image" = "${legacy_values[CADDY_IMAGE_ID]}" ] || record_recoverable_failure LEGACY_STATE_CHANGED
+            fi
+          done
+          verify_rollback_aliases || record_recoverable_failure LEGACY_STATE_CHANGED
+          if ! OASIS_PRODUCTION_APP_URL="$APP_URL" TARGET_SHA="$TARGET_SHA" \
+            node "$revision_helper" target_exact; then
+            record_recoverable_failure REVISION_PROOF_FAILED
+          fi
+          if ! FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
+            LEGACY_STATE_DIR="$legacy_state_dir" LEGACY_STATE_HELPER="$legacy_helper" \
+            node "$forward_helper" verify-legacy; then
+            record_recoverable_failure LEGACY_STATE_CHANGED
+          fi
+          verify_rollback_aliases || record_recoverable_failure LEGACY_STATE_CHANGED
+          if ! FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" NEXT_STATE=COMPLETE \
+            node "$forward_helper" transition; then
+            failure_armed=0
+            printf 'FORWARD_STATE_IO_UNCERTAIN\n'
+            printf 'FORWARD_RECOVERY_REQUIRED\n'
+            exit 1
+          fi
+          failure_armed=0
+          printf 'FORWARD_DEPLOY_COMPLETE\n'
+          REMOTE
+          remote_status=$?
+          set -e
+
+          unsafe_output=0
+          while IFS= read -r line || [ -n "$line" ]; do
+            case "$line" in
+              FORWARD_INPUTS_INVALID|FORWARD_TARGET_PROOF_FAILED|DEPLOY_TARGET_PRODUCTION|DEPLOY_TARGET_UNKNOWN|DEPLOY_TARGET_NOT_PRODUCTION|REPOSITORY_STATE_UNSAFE|PRODUCTION_MUTATION_LOCKED|FORWARD_MUTATION_LOCK_ACQUIRED|FORWARD_LEGACY_START_VALID|FORWARD_LEGACY_STATE_UNSAFE|FORWARD_RUNNING_IMAGES_UNSAFE|FORWARD_ROLLBACK_IMAGES_UNSAFE|FORWARD_PREFLIGHT_FAILED|FORWARD_STATE_PREPARED|FORWARD_STATE_MUTATION_STARTED|FORWARD_STATE_RECOVERABLE_FAILURE|FORWARD_STATE_COMPLETE|FORWARD_STATE_ALREADY_CONSUMED|FORWARD_STATE_LOCKED|FORWARD_STATE_INVALID|FORWARD_STATE_IO_UNCERTAIN|FORWARD_RECOVERY_REQUIRED|FORWARD_LEGACY_STATE_UNCHANGED|REVISION_AWARE_EXACT|REVISION_UNSAFE|FORWARD_DEPLOY_COMPLETE)
+                printf '%s\n' "$line"
+                ;;
+              *)
+                unsafe_output=1
+                ;;
+            esac
+          done < "$remote_output"
+
+          if [ "$unsafe_output" -ne 0 ]; then
+            printf 'REMOTE_OUTPUT_UNSAFE\n' >&2
+            exit 1
+          fi
+          if [ "$remote_status" -ne 0 ]; then
+            printf 'FORWARD_REMOTE_OPERATION_FAILED\n' >&2
+            exit 1
+          fi
