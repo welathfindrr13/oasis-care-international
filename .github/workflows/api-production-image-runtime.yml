@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - '.dockerignore'
       - '.github/workflows/api-production-image-runtime.yml'
       - 'apps/api/**'
       - 'libs/auth/**'

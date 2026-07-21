@@ -14,6 +14,10 @@ const legacyApiProductionEnv = fs.readFileSync(
 );
 const webDockerfile = fs.readFileSync(new URL('../../apps/web/Dockerfile', import.meta.url), 'utf8');
 const apiDockerfile = fs.readFileSync(new URL('../../apps/api/Dockerfile', import.meta.url), 'utf8');
+const apiProductionImageWorkflow = fs.readFileSync(
+  new URL('../../.github/workflows/api-production-image-runtime.yml', import.meta.url),
+  'utf8',
+);
 const apiPackage = JSON.parse(
   fs.readFileSync(new URL('../../apps/api/package.json', import.meta.url), 'utf8'),
 );
@@ -142,6 +146,13 @@ test('api production image packages every compiled Oasis workspace dependency', 
   assert.match(
     apiDockerfile,
     /RUN node -e "require\('@oasis\/auth'\); require\('@oasis\/db'\); require\('@oasis\/time'\)"/,
+  );
+});
+
+test('api production image verification runs when the Docker build context changes', () => {
+  assert.match(
+    apiProductionImageWorkflow,
+    /paths:\n(?:\s+- .+\n)*\s+- '\.dockerignore'/,
   );
 });
 
