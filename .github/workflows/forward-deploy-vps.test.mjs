@@ -25,6 +25,10 @@ import {
   REVISION_UNSAFE,
   verifyRevision,
 } from './revision-proof.mjs';
+import {
+  parseEnvFile,
+  validate as validateEnvironment,
+} from '../../deploy/v2/scripts/preflight-env.mjs';
 
 const workflow = fs.readFileSync(new URL('./forward-deploy-vps.yml', import.meta.url), 'utf8');
 const forwardHelper = fs.readFileSync(
@@ -387,6 +391,23 @@ test('success, controlled failure, unexpected exit, and TERM all clean staged he
       status: 1,
       output: 'FORWARD_STATE_RECOVERABLE_FAILURE\nFORWARD_RECOVERY_REQUIRED\n',
     },
+    {
+      name: 'mutation-transition-term',
+      armed: 1,
+      action: 'node "$forward_helper" transition',
+      nodeSource: `
+        node_calls=0
+        node() {
+          node_calls=$((node_calls + 1))
+          if [ "$node_calls" -eq 1 ]; then
+            kill -TERM $$
+          fi
+          return 0
+        }
+      `,
+      status: 1,
+      output: 'FORWARD_STATE_RECOVERABLE_FAILURE\nFORWARD_RECOVERY_REQUIRED\n',
+    },
   ];
 
   for (const testCase of cases) {
@@ -414,7 +435,7 @@ test('success, controlled failure, unexpected exit, and TERM all clean staged he
       preflight_helper="$HELPER_DIR/preflight-env.mjs"
       forward_state_root=/synthetic
       ATTEMPT_ID=${forwardAttemptId}
-      node() { return 0; }
+      ${testCase.nodeSource ?? 'node() { return 0; }'}
       failure_armed=${testCase.armed}
       ${cleanupSource}
       ${exitSource}
@@ -432,6 +453,34 @@ test('success, controlled failure, unexpected exit, and TERM all clean staged he
     assert.equal(result.stderr, '', testCase.name);
     assert.equal(fs.existsSync(helperDir), false, `${testCase.name} must remove helper directory`);
   }
+});
+
+test('omitted and quoted false medication flags remain disabled without consuming the attempt', (t) => {
+  for (const line of [
+    '',
+    'MEDICATION_EMAR_ENABLED=false',
+    'MEDICATION_EMAR_ENABLED="false"',
+    "MEDICATION_EMAR_ENABLED='false'",
+  ]) {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'oasis-forward-medication-env-'));
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+    const envFile = path.join(directory, '.env');
+    fs.writeFileSync(envFile, `NODE_ENV=production\n${line}\n`, { mode: 0o600 });
+    const medicationErrors = validateEnvironment(parseEnvFile(envFile)).errors.filter((error) =>
+      error.includes('MEDICATION_EMAR_ENABLED'),
+    );
+    assert.deepEqual(medicationErrors, [], line || 'omitted');
+  }
+
+  const preMutationPreflight = workflow.indexOf('node "$preflight_helper" deploy/v2/.env');
+  const prepare = workflow.indexOf('node "$forward_helper" prepare', preMutationPreflight);
+  const armed = workflow.indexOf('failure_armed=1', prepare);
+  assert(preMutationPreflight < prepare && prepare < armed);
+  assert.doesNotMatch(workflow, /read_env_value MEDICATION_EMAR_ENABLED/);
+  assert.match(
+    workflow,
+    /RUN_MIGRATIONS=false MEDICATION_EMAR_ENABLED=false APP_COMMIT_SHA="\$TARGET_SHA"/g,
+  );
 });
 
 test('exact completion proof requires API, readiness, and web to report the target SHA', async () => {
@@ -507,7 +556,7 @@ test('workflow preserves legacy state and aliases before checkout, build, runtim
 test('workflow forces excluded medication, no migrations, service-only replacement, and sanitized output', () => {
   assert.match(workflow, /RUN_MIGRATIONS=false MEDICATION_EMAR_ENABLED=false APP_COMMIT_SHA="\$TARGET_SHA"/g);
   assert.match(workflow, /read_env_value RUN_MIGRATIONS/);
-  assert.match(workflow, /read_env_value MEDICATION_EMAR_ENABLED/);
+  assert.doesNotMatch(workflow, /read_env_value MEDICATION_EMAR_ENABLED/);
   assert.match(workflow, /build web api/);
   assert.match(workflow, /up -d --no-deps --no-build --pull never --wait --wait-timeout 180 api web caddy/);
   assert.doesNotMatch(workflow, /RUN_MIGRATIONS=true|MEDICATION_EMAR_ENABLED=true/i);
@@ -526,12 +575,13 @@ test('failure handler records recoverable failure and contains no automatic roll
   assert.doesNotMatch(failureHandler, /compose| up |rollback|LEGACY_ROLLED_BACK/);
   assert.match(workflow, /FAILURE_CLASS=UNEXPECTED_FAILURE/);
   assert.match(workflow, /cleanup_remote/);
-  const mutation = workflow.indexOf('NEXT_STATE=MUTATION_STARTED');
-  const armed = workflow.indexOf('failure_armed=1', mutation);
+  const prepare = workflow.indexOf('node "$forward_helper" prepare');
+  const armed = workflow.indexOf('failure_armed=1', prepare);
+  const mutation = workflow.indexOf('NEXT_STATE=MUTATION_STARTED', armed);
   const exitTrap = workflow.indexOf("trap 'handle_remote_exit' EXIT");
   const complete = workflow.indexOf('NEXT_STATE=COMPLETE', exitTrap);
   const disarmed = workflow.indexOf('failure_armed=0', complete);
-  assert(exitTrap < mutation && mutation < armed && armed < complete && complete < disarmed);
+  assert(exitTrap < armed && armed < mutation && mutation < complete && complete < disarmed);
   assert.match(docs, /Forward Deployment From Durable Legacy Rollback/);
   assert.match(docs, /does not authorize or execute\s+production deployment/);
 });

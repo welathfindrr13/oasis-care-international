@@ -359,9 +359,9 @@ jobs:
             exit 1
           }
 
+          failure_armed=1
           FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" NEXT_STATE=MUTATION_STARTED \
             node "$forward_helper" transition || exit 1
-          failure_armed=1
           if ! git fetch --no-tags origin main >"$diagnostic_file" 2>&1; then
             record_recoverable_failure CHECKOUT_FAILED
           fi
@@ -379,7 +379,6 @@ jobs:
             awk -F= -v n="$1" '$0 !~ /^[[:space:]]*#/ && $1 == n {v=substr($0,index($0,"=")+1)} END {gsub(/^[[:space:]]+|[[:space:]]+$/,"",v); print v}' deploy/v2/.env 2>/dev/null
           }
           [ "$(read_env_value RUN_MIGRATIONS)" = "false" ] || record_recoverable_failure PREFLIGHT_FAILED
-          [ "$(read_env_value MEDICATION_EMAR_ENABLED)" = "false" ] || record_recoverable_failure PREFLIGHT_FAILED
           printf 'services:\n  caddy:\n    image: %s\n' "${legacy_values[CADDY_IMAGE_ALIAS]}" > "$caddy_override" || record_recoverable_failure PREFLIGHT_FAILED
           chmod 600 "$caddy_override" || record_recoverable_failure PREFLIGHT_FAILED
           compose=(docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml -f "$caddy_override")
