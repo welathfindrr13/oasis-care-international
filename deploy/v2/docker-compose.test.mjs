@@ -150,10 +150,13 @@ test('api production image packages every compiled Oasis workspace dependency', 
 });
 
 test('api production image verification runs when the Docker build context changes', () => {
-  assert.match(
-    apiProductionImageWorkflow,
-    /paths:\n(?:\s+- .+\n)*\s+- '\.dockerignore'/,
-  );
+  for (const buildInput of ['.dockerignore', 'tsconfig.json']) {
+    const escapedBuildInput = buildInput.replace('.', '\\.');
+    assert.match(
+      apiProductionImageWorkflow,
+      new RegExp(`paths:\\n(?:\\s+- .+\\n)*\\s+- '${escapedBuildInput}'`),
+    );
+  }
 });
 
 test('web production image packages the compiled time workspace dependency', () => {
