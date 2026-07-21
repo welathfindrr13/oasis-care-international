@@ -13,6 +13,8 @@
     "test:e2e": "cross-env NODE_ENV=test jest --config ./test/jest-e2e.json --runInBand"
   },
   "dependencies": {
+    "@oasis/auth": "workspace:*",
+    "@oasis/db": "workspace:*",
     "@oasis/time": "workspace:*",
     "@apollo/server": "5.5.1",
     "@as-integrations/express5": "1.1.2",

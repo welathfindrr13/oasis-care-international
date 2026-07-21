@@ -115,6 +115,12 @@ importers:
       '@nestjs/platform-express':
         specifier: 11.1.28
         version: 11.1.28(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.14.0)(reflect-metadata@0.2.1)(rxjs@7.8.1))(@nestjs/core@11.1.28)
+      '@oasis/auth':
+        specifier: workspace:*
+        version: link:../../libs/auth
+      '@oasis/db':
+        specifier: workspace:*
+        version: link:../../libs/db
       '@oasis/time':
         specifier: workspace:*
         version: link:../../libs/time
