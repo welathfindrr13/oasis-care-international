@@ -665,11 +665,27 @@ test('the CLI emits only the fixed completion category while using inherited mut
     return;
   }
   const fixture = await createFixture(t);
+  const toolsDir = path.join(fixture.root, 'cli-tools');
+  fs.mkdirSync(toolsDir, { mode: 0o700 });
+  const fakeDocker = path.join(toolsDir, 'docker');
+  fs.writeFileSync(fakeDocker, [
+    '#!/usr/bin/env bash',
+    'set -euo pipefail',
+    'alias="${5:-}"',
+    'case "$alias" in',
+    `  oasis-legacy-bootstrap-api:${legacyAttemptId}) printf '%s\\n' '${imageIds.api}' ;;`,
+    `  oasis-legacy-bootstrap-web:${legacyAttemptId}) printf '%s\\n' '${imageIds.web}' ;;`,
+    `  oasis-legacy-bootstrap-caddy:${legacyAttemptId}) printf '%s\\n' '${imageIds.caddy}' ;;`,
+    '  *) exit 1 ;;',
+    'esac',
+    '',
+  ].join('\n'), { mode: 0o700 });
   const stdio = ['ignore', 'pipe', 'pipe', 'ignore', 'ignore', 'ignore', 'ignore', 'ignore', 'ignore', fixture.lockFd];
   const result = spawnSync(process.execPath, [archiveHelperPath], {
     encoding: 'utf8',
     env: {
       ...process.env,
+      PATH: `${toolsDir}:${process.env.PATH}`,
       GIT_COMMON_DIR: fixture.gitCommon,
       ATTEMPT_ID: ARCHIVABLE_ATTEMPT_ID,
       TARGET_SHA: ARCHIVABLE_TARGET_SHA,
