@@ -941,13 +941,107 @@ test('workflow forces excluded medication, no migrations, service-only replaceme
 
 test('effective deploy identity is enforced before helper staging, state preparation, and mutation', () => {
   assert.match(workflow, /OASIS_PRODUCTION_VPS_USER" = "deploy"/);
-  assert.match(workflow, /effective_user="\$\(id -un 2>\/dev\/null\)"; \[ "\$effective_user" = deploy \]/);
+  assert.match(workflow, /effective_user="\$\(id -un 2>\/dev\/null\)"\s+\[ "\$effective_user" = deploy \] \|\| exit 1/);
   assert.match(workflow, /\[ "\$\(id -un 2>\/dev\/null\)" = "deploy" \] \|\| fail_remote FORWARD_REMOTE_IDENTITY_INVALID/);
+  const probe = workflow.indexOf("<<'FORWARD_REMOTE_TARGET_PROBE'");
+  const helperDirectory = workflow.indexOf('mktemp -d /var/tmp/oasis-forward-deploy.', probe);
+  const helperTransfer = workflow.indexOf('scp -q', helperDirectory);
   const remoteIdentity = workflow.indexOf('fail_remote FORWARD_REMOTE_IDENTITY_INVALID');
   const prepare = workflow.indexOf('node "$forward_helper" prepare');
   const mutation = workflow.indexOf('NEXT_STATE=MUTATION_STARTED', prepare);
+  assert(probe !== -1 && probe < helperDirectory && helperDirectory < helperTransfer);
   assert(remoteIdentity < prepare && prepare < mutation);
   assert.doesNotMatch(workflow, /\[ "\$\(id -un[^\n]*" = "root"/);
+});
+
+test('remote target probe executes in Bash and gates helper creation and transfer', (t) => {
+  const match = workflow.match(/<<'FORWARD_REMOTE_TARGET_PROBE'\n([\s\S]*?)\n {10}FORWARD_REMOTE_TARGET_PROBE/);
+  assert.ok(match, 'remote target probe heredoc must remain extractable');
+  const productionProbe = match[1].replace(/^ {10}/gm, '');
+  const markerAssignment = 'target_class_file=/etc/oasis/production-deploy-target-class';
+  assert.equal(productionProbe.split(markerAssignment).length - 1, 1);
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oasis-forward-target-probe-'));
+  const toolsDir = path.join(root, 'tools');
+  const marker = path.join(root, 'production-deploy-target-class');
+  const helperDirectory = path.join(root, 'remote-helper-directory');
+  const transferMarker = path.join(root, 'helper-transfer');
+  fs.mkdirSync(toolsDir, { mode: 0o700 });
+  fs.writeFileSync(
+    path.join(toolsDir, 'id'),
+    '#!/usr/bin/env bash\nset -euo pipefail\nprintf \'%s\\n\' "$TEST_EFFECTIVE_USER"\n',
+    { mode: 0o700 },
+  );
+  t.after(() => {
+    if (fs.existsSync(marker)) fs.chmodSync(marker, 0o600);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  const executableProbe = productionProbe.replace(
+    markerAssignment,
+    'target_class_file="$TEST_TARGET_CLASS_FILE"',
+  );
+  const stageHarness = `
+    set -euo pipefail
+    marker_capture="$(mktemp)"
+    trap 'rm -f "$marker_capture"' EXIT
+    set +e
+    bash -se >"$marker_capture" 2>/dev/null <<'FORWARD_REMOTE_TARGET_PROBE'
+${executableProbe}
+FORWARD_REMOTE_TARGET_PROBE
+    marker_status=$?
+    set -e
+    if [ "$marker_status" -ne 0 ] || [ "$(cat "$marker_capture")" != $'FORWARD_REMOTE_IDENTITY_VALID\\nDEPLOY_TARGET_PRODUCTION' ]; then
+      printf 'DEPLOY_TARGET_PROOF_FAILED\\n' >&2
+      exit 1
+    fi
+    cat "$marker_capture"
+    mkdir "$TEST_HELPER_DIRECTORY"
+    : > "$TEST_TRANSFER_MARKER"
+  `;
+
+  const runProbe = ({ effectiveUser = 'deploy', markerContents, markerMode = 0o600 } = {}) => {
+    fs.rmSync(marker, { force: true });
+    fs.rmSync(helperDirectory, { recursive: true, force: true });
+    fs.rmSync(transferMarker, { force: true });
+    if (markerContents !== undefined) {
+      fs.writeFileSync(marker, markerContents, { mode: markerMode });
+      fs.chmodSync(marker, markerMode);
+    }
+    const result = spawnSync('bash', ['-c', stageHarness], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${toolsDir}:${process.env.PATH}`,
+        TEST_EFFECTIVE_USER: effectiveUser,
+        TEST_TARGET_CLASS_FILE: marker,
+        TEST_HELPER_DIRECTORY: helperDirectory,
+        TEST_TRANSFER_MARKER: transferMarker,
+      },
+    });
+    if (fs.existsSync(marker)) fs.chmodSync(marker, 0o600);
+    return result;
+  };
+
+  const success = runProbe({ markerContents: 'production\n' });
+  assert.equal(success.status, 0, success.stderr);
+  assert.equal(success.stdout, 'FORWARD_REMOTE_IDENTITY_VALID\nDEPLOY_TARGET_PRODUCTION\n');
+  assert.equal(fs.existsSync(helperDirectory), true);
+  assert.equal(fs.existsSync(transferMarker), true);
+
+  for (const failure of [
+    { name: 'wrong user', effectiveUser: 'root', markerContents: 'production\n' },
+    { name: 'missing proof' },
+    { name: 'unreadable proof', markerContents: 'production\n', markerMode: 0o000 },
+    { name: 'incorrect proof', markerContents: 'staging\n' },
+  ]) {
+    const result = runProbe(failure);
+    assert.notEqual(result.status, 0, failure.name);
+    assert.equal(result.stdout, '', failure.name);
+    assert.equal(result.stderr, 'DEPLOY_TARGET_PROOF_FAILED\n', failure.name);
+    assert.equal(fs.existsSync(helperDirectory), false, `${failure.name}: helper directory`);
+    assert.equal(fs.existsSync(transferMarker), false, `${failure.name}: helper transfer`);
+  }
 });
 
 test('the executable timing invariant bounds every post-mutation phase and reserves recovery margin', () => {

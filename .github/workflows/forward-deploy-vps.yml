@@ -207,8 +207,18 @@ jobs:
           set +e
           ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
             "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" \
-            'effective_user="$(id -un 2>/dev/null)"; [ "$effective_user" = deploy ] || exit 1; printf "FORWARD_REMOTE_IDENTITY_VALID\n"; target_class="$(tr -d "\r\n" < /etc/oasis/production-deploy-target-class 2>/dev/null)"; [ "$target_class" = production ] && printf "DEPLOY_TARGET_PRODUCTION\n"' \
-            >"$marker_capture" 2>/dev/null
+            bash -se \
+            >"$marker_capture" 2>/dev/null <<'FORWARD_REMOTE_TARGET_PROBE'
+          set -euo pipefail
+          effective_user="$(id -un 2>/dev/null)"
+          [ "$effective_user" = deploy ] || exit 1
+          target_class_file=/etc/oasis/production-deploy-target-class
+          [ -f "$target_class_file" ] && [ ! -L "$target_class_file" ] && [ -r "$target_class_file" ] || exit 1
+          target_class="$(tr -d '\r\n' < "$target_class_file")"
+          [ "$target_class" = production ] || exit 1
+          printf 'FORWARD_REMOTE_IDENTITY_VALID\n'
+          printf 'DEPLOY_TARGET_PRODUCTION\n'
+          FORWARD_REMOTE_TARGET_PROBE
           marker_status=$?
           set -e
           if [ "$marker_status" -ne 0 ] || [ "$(cat "$marker_capture")" != $'FORWARD_REMOTE_IDENTITY_VALID\nDEPLOY_TARGET_PRODUCTION' ]; then
