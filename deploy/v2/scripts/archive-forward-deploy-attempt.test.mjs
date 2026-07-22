@@ -268,6 +268,7 @@ async function createExecutableWrapperFixture(t, { helperVariant = 'valid' } = {
   asDeploy(['git', '-C', systemRepository, 'init', '-q']);
   asDeploy(['git', '-C', systemRepository, 'config', 'user.name', 'Oasis CI']);
   asDeploy(['git', '-C', systemRepository, 'config', 'user.email', 'ci@oasis.invalid']);
+  sudoChecked(['chmod', '0755', systemGitCommon]);
   asDeploy(['git', '-C', systemRepository, 'add', '.']);
   asDeploy(['git', '-C', systemRepository, 'commit', '-q', '-m', 'stale helper fixture']);
   const staleSha = asDeploy(['git', '-C', systemRepository, 'rev-parse', 'HEAD']).stdout.trim();
