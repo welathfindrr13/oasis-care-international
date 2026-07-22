@@ -146,7 +146,7 @@ export async function verifyRevision({ mode, baseUrl, targetSha, fetchImpl = fet
     if (mode !== 'bootstrap_legacy' && mode !== 'target_exact' && mode !== 'rollback_legacy') {
       return REVISION_UNSAFE;
     }
-    if (mode === 'target_exact' && !isCanonicalSha(targetSha)) {
+    if ((mode === 'target_exact' || mode === 'rollback_legacy') && !isCanonicalSha(targetSha)) {
       return REVISION_UNSAFE;
     }
 
@@ -168,10 +168,21 @@ export async function verifyRevision({ mode, baseUrl, targetSha, fetchImpl = fet
         : REVISION_UNSAFE;
     }
 
-    return pair.classification === LEGACY_UNKNOWN &&
+    if (
+      pair.classification === LEGACY_UNKNOWN &&
       readyPayloadMatches(readyPayload, LEGACY_UNKNOWN)
-      ? LEGACY_UNKNOWN
-      : REVISION_UNSAFE;
+    ) {
+      return LEGACY_UNKNOWN;
+    }
+    if (
+      mode === 'rollback_legacy' &&
+      pair.classification === REVISION_AWARE_EXACT &&
+      pair.sha === targetSha &&
+      readyPayloadMatches(readyPayload, targetSha)
+    ) {
+      return REVISION_AWARE_EXACT;
+    }
+    return REVISION_UNSAFE;
   } catch {
     return REVISION_UNSAFE;
   }
@@ -187,7 +198,8 @@ async function main() {
   process.stdout.write(`${result}\n`);
   process.exitCode =
     (mode === 'target_exact' && result === REVISION_AWARE_EXACT) ||
-    ((mode === 'bootstrap_legacy' || mode === 'rollback_legacy') && result === LEGACY_UNKNOWN)
+    (mode === 'bootstrap_legacy' && result === LEGACY_UNKNOWN) ||
+    (mode === 'rollback_legacy' && (result === LEGACY_UNKNOWN || result === REVISION_AWARE_EXACT))
       ? 0
       : 1;
 }

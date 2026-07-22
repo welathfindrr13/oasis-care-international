@@ -14,6 +14,7 @@ import {
   EXPECTED_LEGACY_STATE,
   FORWARD_STATES,
   FORWARD_TARGET_SHA,
+  recordFailureEvidence,
   prepareForwardState,
   readForwardState,
   readLegacyBinding,
@@ -359,64 +360,117 @@ test('post-mutation failures are explicit, terminal, and never become completion
   );
 });
 
+test('sanitized failure evidence is immutable, fixed-category, and bound to the initiating failure', async (t) => {
+  const fixture = makeFixture(t);
+  await prepareForward(fixture);
+  transitionForwardState({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    nextState: FORWARD_STATES.MUTATION_STARTED,
+  });
+  transitionForwardState({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    nextState: FORWARD_STATES.RECOVERABLE_FAILURE,
+    failureClass: 'RUNTIME_REPLACEMENT_FAILED',
+  });
+  const evidence = recordFailureEvidence({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    failureClass: 'RUNTIME_REPLACEMENT_FAILED',
+    phase: 'RUNTIME_REPLACEMENT',
+    serviceStates: {
+      api: 'RUNNING_UNHEALTHY',
+      web: 'MISSING',
+      caddy: 'RUNNING_HEALTHY',
+    },
+    logCategories: {
+      api: 'READINESS_FAILURE',
+      web: 'READINESS_FAILURE',
+      caddy: 'NO_MATCH',
+    },
+  });
+  assert.equal(evidence.failureClass, 'RUNTIME_REPLACEMENT_FAILED');
+  assert.equal(evidence.serviceStates.api, 'RUNNING_UNHEALTHY');
+  assert.equal(evidence.serviceStates.web, 'MISSING');
+  const state = readForwardState({ rootDir: fixture.forwardRoot, attemptId: forwardAttemptId });
+  assert.deepEqual(state.failureEvidence, evidence);
+  assert.equal(state.failureClass, 'RUNTIME_REPLACEMENT_FAILED');
+  assert.throws(() => recordFailureEvidence({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    failureClass: 'BUILD_FAILED',
+    phase: 'BUILD',
+    serviceStates: { api: 'OTHER', web: 'OTHER', caddy: 'OTHER' },
+    logCategories: { api: 'NO_MATCH', web: 'NO_MATCH', caddy: 'NO_MATCH' },
+  }), isForwardError);
+  const evidencePath = path.join(
+    fixture.forwardRoot,
+    'attempts',
+    forwardAttemptId,
+    'failure-evidence.json',
+  );
+  assert.equal(fs.statSync(evidencePath).mode & 0o777, 0o600);
+  assert.doesNotMatch(fs.readFileSync(evidencePath, 'utf8'), /password|secret|token/i);
+});
+
 test('success, controlled failure, unexpected exit, and TERM all clean staged helpers', (t) => {
   function extractFunction(name) {
-    const match = workflow.match(new RegExp(`${name}\\(\\) \\{([\\s\\S]*?)\\n\\s*\\}`));
+    const match = workflow.match(new RegExp(`^ {10}${name}\\(\\) \\{([\\s\\S]*?)^ {10}\\}$`, 'm'));
     assert.ok(match, `${name} must remain extractable`);
     return `${name}() {${match[1].replace(/^ {10}/gm, '')}\n}`;
   }
   const cleanupSource = extractFunction('cleanup_remote');
   const exitSource = extractFunction('handle_remote_exit');
   const controlledSource = extractFunction('record_recoverable_failure');
+  const recoverySource = extractFunction('recover_from_failure');
   const cases = [
-    { name: 'success', armed: 0, action: 'exit 0', status: 0, output: '' },
+    { name: 'success', armed: 0, action: 'exit 0', status: 0, output: '', evidence: null },
     {
       name: 'controlled',
       armed: 1,
-      action: 'record_recoverable_failure BUILD_FAILED',
+      action: 'record_recoverable_failure BUILD_FAILED BUILD',
       status: 1,
-      output: 'FORWARD_STATE_RECOVERABLE_FAILURE\nFORWARD_RECOVERY_REQUIRED\n',
+      output: 'FORWARD_STATE_RECOVERABLE_FAILURE\nFORWARD_FAILURE_EVIDENCE_RECORDED\nFORWARD_ROLLBACK_COMPLETE\nFORWARD_RECOVERY_REQUIRED\n',
+      evidence: 'BUILD_FAILED:BUILD',
     },
     {
       name: 'unexpected',
       armed: 1,
       action: 'false',
       status: 1,
-      output: 'FORWARD_STATE_RECOVERABLE_FAILURE\nFORWARD_RECOVERY_REQUIRED\n',
+      output: 'FORWARD_STATE_RECOVERABLE_FAILURE\nFORWARD_FAILURE_EVIDENCE_RECORDED\nFORWARD_ROLLBACK_COMPLETE\nFORWARD_RECOVERY_REQUIRED\n',
+      evidence: 'UNEXPECTED_FAILURE:UNEXPECTED_EXIT',
     },
     {
       name: 'term',
       armed: 1,
       action: 'kill -TERM $$',
       status: 1,
-      output: 'FORWARD_STATE_RECOVERABLE_FAILURE\nFORWARD_RECOVERY_REQUIRED\n',
+      output: 'FORWARD_STATE_RECOVERABLE_FAILURE\nFORWARD_FAILURE_EVIDENCE_RECORDED\nFORWARD_ROLLBACK_COMPLETE\nFORWARD_RECOVERY_REQUIRED\n',
+      evidence: 'UNEXPECTED_FAILURE:UNEXPECTED_EXIT',
     },
     {
-      name: 'mutation-transition-term',
+      name: 'rollback-failure',
       armed: 1,
-      action: 'node "$forward_helper" transition',
-      nodeSource: `
-        node_calls=0
-        node() {
-          node_calls=$((node_calls + 1))
-          if [ "$node_calls" -eq 1 ]; then
-            kill -TERM $$
-          fi
-          return 0
-        }
-      `,
+      action: 'record_recoverable_failure CONTAINER_HEALTH_FAILED CONTAINER_HEALTH',
       status: 1,
-      output: 'FORWARD_STATE_RECOVERABLE_FAILURE\nFORWARD_RECOVERY_REQUIRED\n',
+      rollbackFailure: true,
+      output: 'FORWARD_STATE_RECOVERABLE_FAILURE\nFORWARD_FAILURE_EVIDENCE_RECORDED\nFORWARD_ROLLBACK_FAILED\nFORWARD_RECOVERY_REQUIRED\n',
+      evidence: 'CONTAINER_HEALTH_FAILED:CONTAINER_HEALTH',
     },
   ];
 
   for (const testCase of cases) {
     const helperDir = fs.mkdtempSync(path.join(os.tmpdir(), `oasis-forward-cleanup-${testCase.name}-`));
     t.after(() => fs.rmSync(helperDir, { recursive: true, force: true }));
+    const evidencePath = path.join(os.tmpdir(), `oasis-forward-evidence-${testCase.name}-${process.pid}`);
+    t.after(() => fs.rmSync(evidencePath, { force: true }));
     const names = [
       'diagnostic',
       'legacy-binding',
       'caddy-override.yml',
+      'rollback-override.yml',
       'forward-deploy-state.mjs',
       'legacy-bootstrap-state.mjs',
       'revision-proof.mjs',
@@ -429,15 +483,32 @@ test('success, controlled failure, unexpected exit, and TERM all clean staged he
       diagnostic_file="$HELPER_DIR/diagnostic"
       binding_export="$HELPER_DIR/legacy-binding"
       caddy_override="$HELPER_DIR/caddy-override.yml"
+      rollback_override="$HELPER_DIR/rollback-override.yml"
       forward_helper="$HELPER_DIR/forward-deploy-state.mjs"
       legacy_helper="$HELPER_DIR/legacy-bootstrap-state.mjs"
       revision_helper="$HELPER_DIR/revision-proof.mjs"
       preflight_helper="$HELPER_DIR/preflight-env.mjs"
       forward_state_root=/synthetic
       ATTEMPT_ID=${forwardAttemptId}
-      ${testCase.nodeSource ?? 'node() { return 0; }'}
+      node() { return 0; }
+      capture_sanitized_diagnostics() {
+        api_state_category=RUNNING_UNHEALTHY
+        web_state_category=MISSING
+        caddy_state_category=RUNNING_HEALTHY
+        api_log_category=READINESS_FAILURE
+        web_log_category=READINESS_FAILURE
+        caddy_log_category=NO_MATCH
+      }
+      persist_failure_evidence() {
+        printf '%s:%s' "$1" "$2" > "$TEST_EVIDENCE"
+        printf 'FORWARD_FAILURE_EVIDENCE_RECORDED\n'
+      }
+      rollback_legacy_runtime() {
+        ${testCase.rollbackFailure ? 'return 1' : "printf 'FORWARD_ROLLBACK_COMPLETE\\n'"}
+      }
       failure_armed=${testCase.armed}
       ${cleanupSource}
+      ${recoverySource}
       ${exitSource}
       ${controlledSource}
       trap 'handle_remote_exit' EXIT
@@ -446,12 +517,17 @@ test('success, controlled failure, unexpected exit, and TERM all clean staged he
     `;
     const result = spawnSync('bash', ['-c', script], {
       encoding: 'utf8',
-      env: { ...process.env, TEST_HELPER_DIR: helperDir },
+      env: { ...process.env, TEST_HELPER_DIR: helperDir, TEST_EVIDENCE: evidencePath },
     });
     assert.equal(result.status, testCase.status, testCase.name);
     assert.equal(result.stdout, testCase.output, testCase.name);
     assert.equal(result.stderr, '', testCase.name);
     assert.equal(fs.existsSync(helperDir), false, `${testCase.name} must remove helper directory`);
+    assert.equal(
+      fs.existsSync(evidencePath) ? fs.readFileSync(evidencePath, 'utf8') : null,
+      testCase.evidence,
+      `${testCase.name} must preserve the initiating category`,
+    );
   }
 });
 
@@ -530,6 +606,7 @@ test('workflow is a new one-shot lane bound to the exact application and reviewe
 
 test('workflow preserves legacy state and aliases before checkout, build, runtime replacement, and completion', () => {
   const inspect = workflow.indexOf('node "$forward_helper" inspect-legacy');
+  const authenticatedLegacyProof = workflow.indexOf('node "$revision_helper" rollback_legacy', inspect);
   const running = workflow.indexOf('running_image=', inspect);
   const prepare = workflow.indexOf('node "$forward_helper" prepare', running);
   const mutation = workflow.indexOf('NEXT_STATE=MUTATION_STARTED', prepare);
@@ -539,9 +616,10 @@ test('workflow preserves legacy state and aliases before checkout, build, runtim
   const exactProof = workflow.indexOf('node "$revision_helper" target_exact', up);
   const legacyProof = workflow.indexOf('node "$forward_helper" verify-legacy', exactProof);
   const complete = workflow.indexOf('NEXT_STATE=COMPLETE', legacyProof);
-  for (const index of [inspect, running, prepare, mutation, checkout, build, up, exactProof, legacyProof, complete]) {
+  for (const index of [inspect, authenticatedLegacyProof, running, prepare, mutation, checkout, build, up, exactProof, legacyProof, complete]) {
     assert.notEqual(index, -1);
   }
+  assert(inspect < authenticatedLegacyProof && authenticatedLegacyProof < prepare);
   assert(inspect < running && running < prepare && prepare < mutation && mutation < checkout);
   assert(checkout < build && build < up && up < exactProof && exactProof < legacyProof && legacyProof < complete);
   assert.match(workflow, /verify_rollback_aliases/g);
@@ -567,23 +645,234 @@ test('workflow forces excluded medication, no migrations, service-only replaceme
   assert.doesNotMatch(workflow, /set -x|printenv|toJson|tee\s|cat\s+deploy\/v2\/\.env|curl\s+-[^\n]*[vViI]/);
 });
 
-test('failure handler records recoverable failure and contains no automatic rollback', () => {
-  const failureHandler = workflow.match(/record_recoverable_failure\(\) \{([\s\S]*?)\n\s*\}/)?.[1];
-  assert.ok(failureHandler);
-  assert.match(failureHandler, /NEXT_STATE=RECOVERABLE_FAILURE/);
-  assert.match(failureHandler, /FORWARD_RECOVERY_REQUIRED/);
-  assert.doesNotMatch(failureHandler, /compose| up |rollback|LEGACY_ROLLED_BACK/);
-  assert.match(workflow, /FAILURE_CLASS=UNEXPECTED_FAILURE/);
-  assert.match(workflow, /cleanup_remote/);
+test('effective deploy identity is enforced before helper staging, state preparation, and mutation', () => {
+  assert.match(workflow, /OASIS_PRODUCTION_VPS_USER" = "deploy"/);
+  assert.match(workflow, /effective_user="\$\(id -un 2>\/dev\/null\)"; \[ "\$effective_user" = deploy \]/);
+  assert.match(workflow, /\[ "\$\(id -un 2>\/dev\/null\)" = "deploy" \] \|\| fail_remote FORWARD_REMOTE_IDENTITY_INVALID/);
+  const remoteIdentity = workflow.indexOf('fail_remote FORWARD_REMOTE_IDENTITY_INVALID');
   const prepare = workflow.indexOf('node "$forward_helper" prepare');
-  const armed = workflow.indexOf('failure_armed=1', prepare);
-  const mutation = workflow.indexOf('NEXT_STATE=MUTATION_STARTED', armed);
-  const exitTrap = workflow.indexOf("trap 'handle_remote_exit' EXIT");
-  const complete = workflow.indexOf('NEXT_STATE=COMPLETE', exitTrap);
-  const disarmed = workflow.indexOf('failure_armed=0', complete);
-  assert(exitTrap < armed && armed < mutation && mutation < complete && complete < disarmed);
+  const mutation = workflow.indexOf('NEXT_STATE=MUTATION_STARTED', prepare);
+  assert(remoteIdentity < prepare && prepare < mutation);
+  assert.doesNotMatch(workflow, /\[ "\$\(id -un[^\n]*" = "root"/);
+});
+
+test('build, replacement, transport, and rollback budgets are independent and reserve job recovery time', () => {
+  const jobMinutes = Number(workflow.match(/timeout-minutes: (\d+)/)?.[1]);
+  const buildSeconds = Number(workflow.match(/BUILD_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
+  const diagnosticSeconds = Number(workflow.match(/DIAGNOSTIC_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
+  const replacementSeconds = Number(workflow.match(/REPLACEMENT_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
+  const rollbackSeconds = Number(workflow.match(/ROLLBACK_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
+  const transportSeconds = Number(workflow.match(/TRANSPORT_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
+  assert.equal(jobMinutes, 45);
+  assert.equal(diagnosticSeconds, 10);
+  assert(buildSeconds + replacementSeconds + rollbackSeconds < transportSeconds);
+  assert(transportSeconds + 600 <= jobMinutes * 60);
+  assert.match(workflow, /timeout --foreground --signal=TERM --kill-after=15s "\$\{BUILD_TIMEOUT_SECONDS\}s"/);
+  assert.match(workflow, /timeout --foreground --signal=TERM --kill-after=15s "\$\{REPLACEMENT_TIMEOUT_SECONDS\}s"/);
+  assert.match(workflow, /timeout --foreground --signal=TERM --kill-after=15s "\$\{ROLLBACK_TIMEOUT_SECONDS\}s"/);
+  assert.match(workflow, /timeout --foreground --signal=TERM --kill-after=15s "\$\{TRANSPORT_TIMEOUT_SECONDS\}s"/);
+  assert.match(workflow, /ServerAliveInterval=15/);
+  assert.match(workflow, /ServerAliveCountMax=3/);
+  assert.match(workflow, /124\|137\|143[\s\S]*FORWARD_TRANSPORT_TIMEOUT/);
+});
+
+test('API-unhealthy and web-blocked replacement evidence is classified without emitting raw logs', (t) => {
+  function extractFunction(name) {
+    const match = workflow.match(new RegExp(`^ {10}${name}\\(\\) \\{([\\s\\S]*?)^ {10}\\}$`, 'm'));
+    assert.ok(match, `${name} must remain extractable`);
+    return `${name}() {${match[1].replace(/^ {10}/gm, '')}\n}`;
+  }
+  const stateSource = extractFunction('service_state_category');
+  const logSource = extractFunction('service_log_category');
+  const diagnostic = path.join(os.tmpdir(), `oasis-forward-diagnostic-${process.pid}`);
+  t.after(() => fs.rmSync(diagnostic, { force: true }));
+  fs.writeFileSync(
+    diagnostic,
+    'dependency failed to start: container oasis-care-v2-api-1 is unhealthy SENSITIVE_SENTINEL',
+    { mode: 0o600 },
+  );
+  const script = `
+    set -euo pipefail
+    diagnostic_file="$TEST_DIAGNOSTIC"
+    api_id=${'a'.repeat(64)}
+    fake_compose() {
+      service="\${!#}"
+      if [ "$service" = api ]; then printf '%s\\n' "$api_id"; fi
+    }
+    docker() {
+      if [ "$1" = inspect ]; then printf 'running|starting|0|false\\n'; return; fi
+      if [ "$1" = logs ]; then return 0; fi
+      return 1
+    }
+    timeout() { shift; "$@"; }
+    DIAGNOSTIC_TIMEOUT_SECONDS=10
+    compose=(fake_compose)
+    ${stateSource}
+    ${logSource}
+    printf 'API=%s\\n' "$(service_state_category api)"
+    printf 'WEB=%s\\n' "$(service_state_category web)"
+    printf 'API_LOG=%s\\n' "$(service_log_category api)"
+    printf 'WEB_LOG=%s\\n' "$(service_log_category web)"
+  `;
+  const result = spawnSync('bash', ['-c', script], {
+    encoding: 'utf8',
+    env: { ...process.env, TEST_DIAGNOSTIC: diagnostic },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    result.stdout,
+    'API=RUNNING_UNHEALTHY\nWEB=MISSING\nAPI_LOG=READINESS_FAILURE\nWEB_LOG=READINESS_FAILURE\n',
+  );
+  assert.doesNotMatch(result.stdout + result.stderr, /SENSITIVE_SENTINEL/);
+});
+
+test('automatic rollback uses only immutable aliases and verifies private and public legacy health', () => {
+  const rollback = workflow.match(/^ {10}rollback_legacy_runtime\(\) \{([\s\S]*?)^ {10}\}$/m)?.[1];
+  const recovery = workflow.match(/^ {10}recover_from_failure\(\) \{([\s\S]*?)^ {10}\}$/m)?.[1];
+  assert.ok(rollback);
+  assert.ok(recovery);
+  assert.match(rollback, /API_IMAGE_ALIAS/);
+  assert.match(rollback, /WEB_IMAGE_ALIAS/);
+  assert.match(rollback, /CADDY_IMAGE_ALIAS/);
+  assert.match(rollback, /up -d --no-deps --no-build --pull never --wait --wait-timeout 180 api web caddy/);
+  assert.match(rollback, /ps -q postgres/);
+  assert.match(rollback, /TARGET_SHA="\$\{legacy_values\[LEGACY_TARGET_SHA\]\}"[\s\S]*rollback_legacy/);
+  assert.match(rollback, /node "\$forward_helper" verify-legacy/);
+  assert.match(rollback, /verify_rollback_aliases/g);
+  assert.match(rollback, /RUN_MIGRATIONS=false/);
+  assert.doesNotMatch(rollback, /(?:compose\[@\]|docker compose)[^\n]*\sbuild\s|git (?:fetch|pull|checkout)|docker (?:pull|image tag|image rm|rmi)|RUN_MIGRATIONS=true|prisma\s+migrate|migrate\s+deploy|pg_dump|pg_restore|exec /i);
+  assert.match(recovery, /NEXT_STATE=RECOVERABLE_FAILURE FAILURE_CLASS="\$failure_class"/);
+  assert.match(recovery, /persist_failure_evidence/);
+  assert.match(recovery, /rollback_legacy_runtime/);
+  assert.match(recovery, /FORWARD_ROLLBACK_FAILED/);
+  assert.match(recovery, /FORWARD_RECOVERY_REQUIRED/);
+  assert.match(workflow, /FAILURE_CLASS=UNEXPECTED_FAILURE|recover_from_failure UNEXPECTED_FAILURE UNEXPECTED_EXIT/);
   assert.match(docs, /Forward Deployment From Durable Legacy Rollback/);
   assert.match(docs, /does not authorize or execute\s+production deployment/);
+});
+
+test('rollback completes only when restored aliases and every health proof pass', (t) => {
+  if (process.platform === 'darwin') {
+    t.skip('the production workflow requires Bash 4 associative arrays; exercised on GitHub Linux CI');
+    return;
+  }
+  const match = workflow.match(/^ {10}rollback_legacy_runtime\(\) \{([\s\S]*?)^ {10}\}$/m);
+  assert.ok(match);
+  const rollbackSource = `rollback_legacy_runtime() {${match[1].replace(/^ {10}/gm, '')}\n}`;
+  const toolsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oasis-forward-rollback-tools-'));
+  t.after(() => fs.rmSync(toolsDir, { recursive: true, force: true }));
+  const commandLog = path.join(toolsDir, 'commands');
+  const dockerScript = `#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = compose ]; then
+  shift
+  while [ "$1" != up ] && [ "$1" != ps ]; do shift; done
+  operation="$1"
+  shift
+  if [ "$operation" = up ]; then
+    printf '%s\\n' "$*" >> "$COMMAND_LOG"
+    exit 0
+  fi
+  [ "$1" = -q ]
+  case "$2" in
+    api) printf '%s\\n' '${'1'.repeat(64)}' ;;
+    web) printf '%s\\n' '${'2'.repeat(64)}' ;;
+    caddy) printf '%s\\n' '${'3'.repeat(64)}' ;;
+    postgres) printf '%s\\n' '${'4'.repeat(64)}' ;;
+    *) exit 1 ;;
+  esac
+  exit 0
+fi
+if [ "$1" = inspect ]; then
+  format="$3"
+  container="$4"
+  if [[ "$format" == *'.Image'* ]]; then
+    case "$container" in
+      ${'1'.repeat(64)}) printf '%s\\n' "sha256:${'a'.repeat(64)}" ;;
+      ${'2'.repeat(64)}) printf '%s\\n' "sha256:${'b'.repeat(64)}" ;;
+      ${'3'.repeat(64)}) printf '%s\\n' "sha256:${'c'.repeat(64)}" ;;
+      *) exit 1 ;;
+    esac
+  elif [ "\${FAIL_API_HEALTH:-0}" = 1 ] && [ "$container" = '${'1'.repeat(64)}' ]; then
+    printf 'unhealthy\\n'
+  else
+    printf 'healthy\\n'
+  fi
+  exit 0
+fi
+exit 1
+`;
+  const timeoutScript = `#!/usr/bin/env bash
+set -euo pipefail
+while [[ "$1" == --* ]]; do shift; done
+shift
+exec "$@"
+`;
+  const nodeScript = `#!/usr/bin/env bash
+set -euo pipefail
+printf 'node:%s\\n' "$1" >> "$COMMAND_LOG"
+case "$1" in
+  *revision*) printf 'REVISION_AWARE_EXACT\\n' ;;
+  *) printf 'FORWARD_LEGACY_STATE_UNCHANGED\\n' ;;
+esac
+`;
+  fs.writeFileSync(path.join(toolsDir, 'docker'), dockerScript, { mode: 0o755 });
+  fs.writeFileSync(path.join(toolsDir, 'timeout'), timeoutScript, { mode: 0o755 });
+  fs.writeFileSync(path.join(toolsDir, 'node'), nodeScript, { mode: 0o755 });
+  const shell = `
+    set -euo pipefail
+    declare -A legacy_values=(
+      ["LEGACY_TARGET_SHA"]=${'7'.repeat(40)}
+      ["API_IMAGE_ALIAS"]=oasis-legacy-bootstrap-api:${legacyAttemptId}
+      ["WEB_IMAGE_ALIAS"]=oasis-legacy-bootstrap-web:${legacyAttemptId}
+      ["CADDY_IMAGE_ALIAS"]=oasis-legacy-bootstrap-caddy:${legacyAttemptId}
+      ["API_IMAGE_ID"]=sha256:${'a'.repeat(64)}
+      ["WEB_IMAGE_ID"]=sha256:${'b'.repeat(64)}
+      ["CADDY_IMAGE_ID"]=sha256:${'c'.repeat(64)}
+    )
+    verify_rollback_aliases() { return 0; }
+    rollback_override="$TEST_ROOT/rollback.yml"
+    diagnostic_file="$TEST_ROOT/diagnostic"
+    ROLLBACK_TIMEOUT_SECONDS=300
+    DIAGNOSTIC_TIMEOUT_SECONDS=10
+    APP_URL=https://example.invalid
+    forward_state_root=/synthetic/forward
+    ATTEMPT_ID=${forwardAttemptId}
+    legacy_state_dir=/synthetic/legacy
+    revision_helper=/synthetic/revision-proof.mjs
+    forward_helper=/synthetic/forward-deploy-state.mjs
+    ${rollbackSource}
+    rollback_legacy_runtime
+  `;
+  const success = spawnSync('bash', ['-c', shell], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      PATH: `${toolsDir}:${process.env.PATH}`,
+      TEST_ROOT: toolsDir,
+      COMMAND_LOG: commandLog,
+    },
+  });
+  assert.equal(success.status, 0, success.stderr);
+  assert.match(success.stdout, /FORWARD_ROLLBACK_COMPLETE/);
+  const commands = fs.readFileSync(commandLog, 'utf8');
+  assert.match(commands, /--no-build --pull never/);
+  assert.match(commands, /node:\/synthetic\/revision-proof\.mjs/);
+  assert.match(commands, /node:\/synthetic\/forward-deploy-state\.mjs/);
+  assert.doesNotMatch(commands, /(?:^|\s)build(?:\s|$)|(?:^|\s)pull(?! never)|migrat|exec/i);
+
+  const unhealthy = spawnSync('bash', ['-c', shell], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      PATH: `${toolsDir}:${process.env.PATH}`,
+      TEST_ROOT: toolsDir,
+      COMMAND_LOG: commandLog,
+      FAIL_API_HEALTH: '1',
+    },
+  });
+  assert.notEqual(unhealthy.status, 0);
+  assert.doesNotMatch(unhealthy.stdout, /FORWARD_ROLLBACK_COMPLETE/);
 });
 
 test('the reviewed remote shell is syntactically valid', () => {

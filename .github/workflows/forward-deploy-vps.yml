@@ -31,11 +31,16 @@ jobs:
   forward-deploy:
     name: Forward deploy from durable legacy rollback
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     environment:
       name: production
     env:
       EXPECTED_TARGET_SHA: 18aacd8458a3f96a38bf470d9a4c837ad563fa5c
+      BUILD_TIMEOUT_SECONDS: "900"
+      DIAGNOSTIC_TIMEOUT_SECONDS: "10"
+      REPLACEMENT_TIMEOUT_SECONDS: "300"
+      ROLLBACK_TIMEOUT_SECONDS: "300"
+      TRANSPORT_TIMEOUT_SECONDS: "1800"
       OASIS_PRODUCTION_APP_URL: ${{ vars.OASIS_PRODUCTION_APP_URL }}
       OASIS_PRODUCTION_VPS_HOST: ${{ secrets.OASIS_PRODUCTION_VPS_HOST }}
       OASIS_PRODUCTION_VPS_USER: ${{ secrets.OASIS_PRODUCTION_VPS_USER }}
@@ -72,6 +77,7 @@ jobs:
           [ "$PRODUCTION_CODE_APPROVAL" = "$required_approval" ] || fail_inputs
           [ -n "$OASIS_PRODUCTION_VPS_HOST" ] || fail_inputs
           [ -n "$OASIS_PRODUCTION_VPS_USER" ] || fail_inputs
+          [ "$OASIS_PRODUCTION_VPS_USER" = "deploy" ] || fail_inputs
           [ -n "$OASIS_PRODUCTION_VPS_SSH_KEY" ] || fail_inputs
           [ -n "$OASIS_PRODUCTION_VPS_KNOWN_HOSTS" ] || fail_inputs
           [ -n "$OASIS_PRODUCTION_APP_URL" ] || fail_inputs
@@ -122,13 +128,6 @@ jobs:
           }
           printf 'FORWARD_TARGET_PROOF_VALID\n'
 
-      - name: Prove expected legacy revision before transport
-        shell: bash
-        run: |
-          set -euo pipefail
-          OASIS_PRODUCTION_APP_URL="$OASIS_PRODUCTION_APP_URL" TARGET_SHA="$TARGET_SHA" \
-            node .github/workflows/revision-proof.mjs rollback_legacy
-
       - name: Configure production transport
         shell: bash
         run: |
@@ -155,19 +154,20 @@ jobs:
           trap 'rm -f "$marker_capture" "$helper_dir_capture"' EXIT
 
           set +e
-          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
             "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" \
-            'target_class="$(tr -d "\r\n" < /etc/oasis/production-deploy-target-class 2>/dev/null)"; [ "$target_class" = production ] && printf "DEPLOY_TARGET_PRODUCTION\n"' \
+            'effective_user="$(id -un 2>/dev/null)"; [ "$effective_user" = deploy ] || exit 1; printf "FORWARD_REMOTE_IDENTITY_VALID\n"; target_class="$(tr -d "\r\n" < /etc/oasis/production-deploy-target-class 2>/dev/null)"; [ "$target_class" = production ] && printf "DEPLOY_TARGET_PRODUCTION\n"' \
             >"$marker_capture" 2>/dev/null
           marker_status=$?
           set -e
-          if [ "$marker_status" -ne 0 ] || [ "$(tr -d '\r\n' < "$marker_capture")" != "DEPLOY_TARGET_PRODUCTION" ]; then
+          if [ "$marker_status" -ne 0 ] || [ "$(cat "$marker_capture")" != $'FORWARD_REMOTE_IDENTITY_VALID\nDEPLOY_TARGET_PRODUCTION' ]; then
             printf 'DEPLOY_TARGET_PROOF_FAILED\n' >&2
             exit 1
           fi
+          printf 'FORWARD_REMOTE_IDENTITY_VALID\n'
           printf 'DEPLOY_TARGET_PRODUCTION\n'
 
-          if ! ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+          if ! ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
             "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" \
             'umask 077; mktemp -d /tmp/oasis-forward-deploy.XXXXXXXX' \
             >"$helper_dir_capture" 2>/dev/null; then
@@ -206,9 +206,10 @@ jobs:
           trap 'rm -f "$remote_output"' EXIT
 
           set +e
-          ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+          timeout --foreground --signal=TERM --kill-after=15s "${TRANSPORT_TIMEOUT_SECONDS}s" \
+            ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
             "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" \
-            "TARGET_SHA='$TARGET_SHA' WORKFLOW_SHA='$WORKFLOW_SHA' ATTEMPT_ID='$ATTEMPT_ID' APP_URL='$OASIS_PRODUCTION_APP_URL' REPOSITORY='$GITHUB_REPOSITORY' HELPER_DIR='$REMOTE_HELPER_DIR' bash -se" \
+            "TARGET_SHA='$TARGET_SHA' WORKFLOW_SHA='$WORKFLOW_SHA' ATTEMPT_ID='$ATTEMPT_ID' APP_URL='$OASIS_PRODUCTION_APP_URL' REPOSITORY='$GITHUB_REPOSITORY' HELPER_DIR='$REMOTE_HELPER_DIR' BUILD_TIMEOUT_SECONDS='$BUILD_TIMEOUT_SECONDS' DIAGNOSTIC_TIMEOUT_SECONDS='$DIAGNOSTIC_TIMEOUT_SECONDS' REPLACEMENT_TIMEOUT_SECONDS='$REPLACEMENT_TIMEOUT_SECONDS' ROLLBACK_TIMEOUT_SECONDS='$ROLLBACK_TIMEOUT_SECONDS' bash -se" \
             >"$remote_output" 2>&1 <<'REMOTE'
           set -euo pipefail
           umask 077
@@ -225,6 +226,12 @@ jobs:
           [ "$REPOSITORY" = "welathfindrr13/oasis-care-international" ] || fail_remote FORWARD_INPUTS_INVALID
           [[ "$HELPER_DIR" =~ ^/tmp/oasis-forward-deploy\.[A-Za-z0-9]{8}$ ]] || fail_remote FORWARD_INPUTS_INVALID
           [ -d "$HELPER_DIR" ] || fail_remote FORWARD_INPUTS_INVALID
+          [ "$BUILD_TIMEOUT_SECONDS" = "900" ] || fail_remote FORWARD_INPUTS_INVALID
+          [ "$DIAGNOSTIC_TIMEOUT_SECONDS" = "10" ] || fail_remote FORWARD_INPUTS_INVALID
+          [ "$REPLACEMENT_TIMEOUT_SECONDS" = "300" ] || fail_remote FORWARD_INPUTS_INVALID
+          [ "$ROLLBACK_TIMEOUT_SECONDS" = "300" ] || fail_remote FORWARD_INPUTS_INVALID
+          [ "$(id -un 2>/dev/null)" = "deploy" ] || fail_remote FORWARD_REMOTE_IDENTITY_INVALID
+          printf 'FORWARD_REMOTE_IDENTITY_VALID\n'
 
           forward_helper="$HELPER_DIR/forward-deploy-state.mjs"
           legacy_helper="$HELPER_DIR/legacy-bootstrap-state.mjs"
@@ -232,12 +239,13 @@ jobs:
           preflight_helper="$HELPER_DIR/preflight-env.mjs"
           binding_export="$HELPER_DIR/legacy-binding"
           caddy_override="$HELPER_DIR/caddy-override.yml"
+          rollback_override="$HELPER_DIR/rollback-override.yml"
           diagnostic_file="$(mktemp)"
           chmod 600 "$diagnostic_file"
           failure_armed=0
 
           cleanup_remote() {
-            rm -f "$diagnostic_file" "$binding_export" "$caddy_override" "$forward_helper" "$legacy_helper" "$revision_helper" "$preflight_helper" >/dev/null 2>&1 || true
+            rm -f "$diagnostic_file" "$binding_export" "$caddy_override" "$rollback_override" "$forward_helper" "$legacy_helper" "$revision_helper" "$preflight_helper" >/dev/null 2>&1 || true
             rmdir "$HELPER_DIR" >/dev/null 2>&1 || true
           }
 
@@ -245,14 +253,9 @@ jobs:
             local exit_status="$?"
             trap - EXIT HUP INT TERM
             if [ "$failure_armed" -eq 1 ]; then
-              if FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
-                NEXT_STATE=RECOVERABLE_FAILURE FAILURE_CLASS=UNEXPECTED_FAILURE \
-                node "$forward_helper" transition >/dev/null 2>&1; then
-                printf 'FORWARD_STATE_RECOVERABLE_FAILURE\n'
-              else
-                printf 'FORWARD_STATE_IO_UNCERTAIN\n'
-              fi
-              printf 'FORWARD_RECOVERY_REQUIRED\n'
+              set +e
+              recover_from_failure UNEXPECTED_FAILURE UNEXPECTED_EXIT
+              set -e
             fi
             cleanup_remote
             exit "$exit_status"
@@ -302,6 +305,12 @@ jobs:
           done < "$binding_export"
           [ "${#legacy_values[@]}" -eq 9 ] || fail_remote FORWARD_LEGACY_STATE_UNSAFE
           [[ "${legacy_values[LEGACY_STATE_DIGEST]}" =~ ^[0-9a-f]{64}$ ]] || fail_remote FORWARD_LEGACY_STATE_UNSAFE
+          [[ "${legacy_values[LEGACY_TARGET_SHA]}" =~ ^[0-9a-f]{40}$ ]] || fail_remote FORWARD_LEGACY_STATE_UNSAFE
+
+          if ! OASIS_PRODUCTION_APP_URL="$APP_URL" TARGET_SHA="${legacy_values[LEGACY_TARGET_SHA]}" \
+            node "$revision_helper" rollback_legacy; then
+            fail_remote FORWARD_LEGACY_REVISION_UNSAFE
+          fi
 
           compose=(docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml)
           declare -A running_images
@@ -310,10 +319,155 @@ jobs:
             for service in API WEB CADDY; do
               alias_key="${service}_IMAGE_ALIAS"
               image_key="${service}_IMAGE_ID"
-              alias_id="$(docker image inspect --format '{{.Id}}' "${legacy_values[$alias_key]}" 2>/dev/null)" || return 1
+              alias_id="$(timeout "${DIAGNOSTIC_TIMEOUT_SECONDS}s" docker image inspect --format '{{.Id}}' "${legacy_values[$alias_key]}" 2>/dev/null)" || return 1
               [ "$alias_id" = "${legacy_values[$image_key]}" ] || return 1
             done
           }
+
+          service_state_category() {
+            local service="$1" container_id details status health exit_code oom_killed
+            container_id="$(timeout "${DIAGNOSTIC_TIMEOUT_SECONDS}s" "${compose[@]}" ps -q "$service" 2>/dev/null)" || {
+              printf 'MISSING\n'
+              return
+            }
+            if [[ ! "$container_id" =~ ^[0-9a-f]{64}$ ]]; then
+              printf 'MISSING\n'
+              return
+            fi
+            details="$(timeout "${DIAGNOSTIC_TIMEOUT_SECONDS}s" docker inspect --format '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}|{{.State.ExitCode}}|{{.State.OOMKilled}}' "$container_id" 2>/dev/null)" || {
+              printf 'OTHER\n'
+              return
+            }
+            IFS='|' read -r status health exit_code oom_killed <<< "$details"
+            if [ "$oom_killed" = "true" ]; then
+              printf 'OOM_KILLED\n'
+            elif [ "$status" = "running" ] && [ "$health" = "healthy" ]; then
+              printf 'RUNNING_HEALTHY\n'
+            elif [ "$status" = "running" ]; then
+              printf 'RUNNING_UNHEALTHY\n'
+            elif [ "$status" = "exited" ] && [ "$exit_code" = "0" ]; then
+              printf 'EXITED_ZERO\n'
+            elif [ "$status" = "exited" ]; then
+              printf 'EXITED_NONZERO\n'
+            else
+              printf 'OTHER\n'
+            fi
+          }
+
+          service_log_category() {
+            local service="$1" container_id log_material category
+            container_id="$(timeout "${DIAGNOSTIC_TIMEOUT_SECONDS}s" "${compose[@]}" ps -q "$service" 2>/dev/null || true)"
+            if [[ "$container_id" =~ ^[0-9a-f]{64}$ ]]; then
+              log_material="$(timeout "${DIAGNOSTIC_TIMEOUT_SECONDS}s" docker logs --tail 200 "$container_id" 2>&1 || true)"
+            else
+              log_material=''
+            fi
+            if grep -Eiq 'MODULE_NOT_FOUND|Cannot find module|module resolution' "$diagnostic_file" 2>/dev/null || \
+              grep -Eiq 'MODULE_NOT_FOUND|Cannot find module|module resolution' <<< "$log_material"; then
+              category='MODULE_RESOLUTION_FAILURE'
+            elif grep -Eiq 'ECONNREFUSED|database.*(failed|error|unavailable)|postgres.*(failed|error|unavailable)' "$diagnostic_file" 2>/dev/null || \
+              grep -Eiq 'ECONNREFUSED|database.*(failed|error|unavailable)|postgres.*(failed|error|unavailable)' <<< "$log_material"; then
+              category='DATABASE_CONNECTION_FAILURE'
+            elif grep -Eiq 'configuration|environment variable|invalid config|validation failed' "$diagnostic_file" 2>/dev/null || \
+              grep -Eiq 'configuration|environment variable|invalid config|validation failed' <<< "$log_material"; then
+              category='CONFIGURATION_FAILURE'
+            elif grep -Eiq '/ready|health(check)?|unhealthy|dependency failed to start' "$diagnostic_file" 2>/dev/null || \
+              grep -Eiq '/ready|health(check)?|unhealthy|dependency failed to start' <<< "$log_material"; then
+              category='READINESS_FAILURE'
+            elif [ -s "$diagnostic_file" ] || [ -n "$log_material" ]; then
+              category='NO_MATCH'
+            else
+              category='UNAVAILABLE'
+            fi
+            unset log_material
+            printf '%s\n' "$category"
+          }
+
+          capture_sanitized_diagnostics() {
+            api_state_category="$(service_state_category api)"
+            web_state_category="$(service_state_category web)"
+            caddy_state_category="$(service_state_category caddy)"
+            api_log_category="$(service_log_category api)"
+            web_log_category="$(service_log_category web)"
+            caddy_log_category="$(service_log_category caddy)"
+          }
+
+          persist_failure_evidence() {
+            local failure_class="$1" failure_phase="$2"
+            FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
+              FAILURE_CLASS="$failure_class" FAILURE_PHASE="$failure_phase" \
+              API_STATE_CATEGORY="$api_state_category" WEB_STATE_CATEGORY="$web_state_category" CADDY_STATE_CATEGORY="$caddy_state_category" \
+              API_LOG_CATEGORY="$api_log_category" WEB_LOG_CATEGORY="$web_log_category" CADDY_LOG_CATEGORY="$caddy_log_category" \
+              node "$forward_helper" record-evidence >"$diagnostic_file" 2>&1 || return 1
+            printf 'FORWARD_FAILURE_EVIDENCE_RECORDED\n' || true
+            return 0
+          }
+
+          rollback_legacy_runtime() {
+            local service container_id health_status running_image image_key postgres_container postgres_health
+            verify_rollback_aliases || return 1
+            printf 'services:\n  api:\n    image: %s\n  web:\n    image: %s\n  caddy:\n    image: %s\n' \
+              "${legacy_values[API_IMAGE_ALIAS]}" "${legacy_values[WEB_IMAGE_ALIAS]}" "${legacy_values[CADDY_IMAGE_ALIAS]}" \
+              > "$rollback_override" || return 1
+            chmod 600 "$rollback_override" || return 1
+            rollback_compose=(docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml -f "$rollback_override")
+            if ! timeout --foreground --signal=TERM --kill-after=15s "${ROLLBACK_TIMEOUT_SECONDS}s" \
+              env RUN_MIGRATIONS=false MEDICATION_EMAR_ENABLED=false \
+              APP_COMMIT_SHA="${legacy_values[LEGACY_TARGET_SHA]}" APP_VERSION="${legacy_values[LEGACY_TARGET_SHA]:0:12}" \
+              "${rollback_compose[@]}" up -d --no-deps --no-build --pull never --wait --wait-timeout 180 api web caddy \
+              >"$diagnostic_file" 2>&1; then
+              return 1
+            fi
+            for service in api web caddy; do
+              container_id="$(timeout "${DIAGNOSTIC_TIMEOUT_SECONDS}s" "${rollback_compose[@]}" ps -q "$service" 2>/dev/null)" || return 1
+              [[ "$container_id" =~ ^[0-9a-f]{64}$ ]] || return 1
+              health_status="$(timeout "${DIAGNOSTIC_TIMEOUT_SECONDS}s" docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null)" || return 1
+              [ "$health_status" = "healthy" ] || return 1
+              running_image="$(timeout "${DIAGNOSTIC_TIMEOUT_SECONDS}s" docker inspect --format '{{.Image}}' "$container_id" 2>/dev/null)" || return 1
+              image_key="${service^^}_IMAGE_ID"
+              [ "$running_image" = "${legacy_values[$image_key]}" ] || return 1
+            done
+            postgres_container="$(timeout "${DIAGNOSTIC_TIMEOUT_SECONDS}s" "${rollback_compose[@]}" ps -q postgres 2>/dev/null)" || return 1
+            [[ "$postgres_container" =~ ^[0-9a-f]{64}$ ]] || return 1
+            postgres_health="$(timeout "${DIAGNOSTIC_TIMEOUT_SECONDS}s" docker inspect --format '{{.State.Health.Status}}' "$postgres_container" 2>/dev/null)" || return 1
+            [ "$postgres_health" = "healthy" ] || return 1
+            verify_rollback_aliases || return 1
+            OASIS_PRODUCTION_APP_URL="$APP_URL" TARGET_SHA="${legacy_values[LEGACY_TARGET_SHA]}" \
+              node "$revision_helper" rollback_legacy >"$diagnostic_file" 2>&1 || return 1
+            FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
+              LEGACY_STATE_DIR="$legacy_state_dir" LEGACY_STATE_HELPER="$legacy_helper" \
+              node "$forward_helper" verify-legacy >"$diagnostic_file" 2>&1 || return 1
+            verify_rollback_aliases || return 1
+            printf 'FORWARD_ROLLBACK_COMPLETE\n' || true
+            return 0
+          }
+
+          recover_from_failure() {
+            local failure_class="$1" failure_phase="$2" state_recorded=0
+            trap - HUP INT TERM
+            failure_armed=0
+            capture_sanitized_diagnostics
+            if FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
+              NEXT_STATE=RECOVERABLE_FAILURE FAILURE_CLASS="$failure_class" \
+              node "$forward_helper" transition >/dev/null 2>&1; then
+              state_recorded=1
+              printf 'FORWARD_STATE_RECOVERABLE_FAILURE\n'
+              if ! persist_failure_evidence "$failure_class" "$failure_phase"; then
+                printf 'FORWARD_STATE_IO_UNCERTAIN\n'
+              fi
+            else
+              printf 'FORWARD_STATE_IO_UNCERTAIN\n'
+            fi
+            if rollback_legacy_runtime; then
+              :
+            else
+              printf 'FORWARD_ROLLBACK_FAILED\n'
+            fi
+            [ "$state_recorded" -eq 1 ] || printf 'FORWARD_RECOVERY_STATE_UNCERTAIN\n'
+            printf 'FORWARD_RECOVERY_REQUIRED\n'
+            return 1
+          }
+
           verify_rollback_aliases || fail_remote FORWARD_ROLLBACK_IMAGES_UNSAFE
 
           for service in api web caddy; do
@@ -345,17 +499,8 @@ jobs:
           verify_rollback_aliases || fail_remote FORWARD_ROLLBACK_IMAGES_UNSAFE
 
           record_recoverable_failure() {
-            local failure_class="$1"
-            if FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
-              NEXT_STATE=RECOVERABLE_FAILURE FAILURE_CLASS="$failure_class" \
-              node "$forward_helper" transition >/dev/null 2>&1; then
-              failure_armed=0
-              printf 'FORWARD_STATE_RECOVERABLE_FAILURE\n'
-            else
-              failure_armed=0
-              printf 'FORWARD_STATE_IO_UNCERTAIN\n'
-            fi
-            printf 'FORWARD_RECOVERY_REQUIRED\n'
+            local failure_class="$1" failure_phase="$2"
+            recover_from_failure "$failure_class" "$failure_phase" || true
             exit 1
           }
 
@@ -363,57 +508,59 @@ jobs:
           FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" NEXT_STATE=MUTATION_STARTED \
             node "$forward_helper" transition || exit 1
           if ! git fetch --no-tags origin main >"$diagnostic_file" 2>&1; then
-            record_recoverable_failure CHECKOUT_FAILED
+            record_recoverable_failure CHECKOUT_FAILED CHECKOUT
           fi
-          fetched_main="$(git rev-parse origin/main 2>/dev/null)" || record_recoverable_failure CHECKOUT_FAILED
-          [ "$fetched_main" = "$WORKFLOW_SHA" ] || record_recoverable_failure CHECKOUT_FAILED
-          git cat-file -e "${TARGET_SHA}^{commit}" 2>/dev/null || record_recoverable_failure CHECKOUT_FAILED
-          git merge-base --is-ancestor "$TARGET_SHA" "$WORKFLOW_SHA" >"$diagnostic_file" 2>&1 || record_recoverable_failure CHECKOUT_FAILED
+          fetched_main="$(git rev-parse origin/main 2>/dev/null)" || record_recoverable_failure CHECKOUT_FAILED CHECKOUT
+          [ "$fetched_main" = "$WORKFLOW_SHA" ] || record_recoverable_failure CHECKOUT_FAILED CHECKOUT
+          git cat-file -e "${TARGET_SHA}^{commit}" 2>/dev/null || record_recoverable_failure CHECKOUT_FAILED CHECKOUT
+          git merge-base --is-ancestor "$TARGET_SHA" "$WORKFLOW_SHA" >"$diagnostic_file" 2>&1 || record_recoverable_failure CHECKOUT_FAILED CHECKOUT
           if ! git checkout --detach "$TARGET_SHA" >"$diagnostic_file" 2>&1; then
-            record_recoverable_failure CHECKOUT_FAILED
+            record_recoverable_failure CHECKOUT_FAILED CHECKOUT
           fi
           if ! node deploy/v2/scripts/preflight-env.mjs deploy/v2/.env >"$diagnostic_file" 2>&1; then
-            record_recoverable_failure PREFLIGHT_FAILED
+            record_recoverable_failure PREFLIGHT_FAILED PREFLIGHT
           fi
           read_env_value() {
             awk -F= -v n="$1" '$0 !~ /^[[:space:]]*#/ && $1 == n {v=substr($0,index($0,"=")+1)} END {gsub(/^[[:space:]]+|[[:space:]]+$/,"",v); print v}' deploy/v2/.env 2>/dev/null
           }
-          [ "$(read_env_value RUN_MIGRATIONS)" = "false" ] || record_recoverable_failure PREFLIGHT_FAILED
-          printf 'services:\n  caddy:\n    image: %s\n' "${legacy_values[CADDY_IMAGE_ALIAS]}" > "$caddy_override" || record_recoverable_failure PREFLIGHT_FAILED
-          chmod 600 "$caddy_override" || record_recoverable_failure PREFLIGHT_FAILED
+          [ "$(read_env_value RUN_MIGRATIONS)" = "false" ] || record_recoverable_failure PREFLIGHT_FAILED PREFLIGHT
+          printf 'services:\n  caddy:\n    image: %s\n' "${legacy_values[CADDY_IMAGE_ALIAS]}" > "$caddy_override" || record_recoverable_failure PREFLIGHT_FAILED PREFLIGHT
+          chmod 600 "$caddy_override" || record_recoverable_failure PREFLIGHT_FAILED PREFLIGHT
           compose=(docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml -f "$caddy_override")
-          verify_rollback_aliases || record_recoverable_failure LEGACY_STATE_CHANGED
-          if ! RUN_MIGRATIONS=false MEDICATION_EMAR_ENABLED=false APP_COMMIT_SHA="$TARGET_SHA" APP_VERSION="${TARGET_SHA:0:12}" \
+          verify_rollback_aliases || record_recoverable_failure LEGACY_STATE_CHANGED LEGACY_STATE
+          if ! timeout --foreground --signal=TERM --kill-after=15s "${BUILD_TIMEOUT_SECONDS}s" \
+            env RUN_MIGRATIONS=false MEDICATION_EMAR_ENABLED=false APP_COMMIT_SHA="$TARGET_SHA" APP_VERSION="${TARGET_SHA:0:12}" \
             "${compose[@]}" build web api >"$diagnostic_file" 2>&1; then
-            record_recoverable_failure BUILD_FAILED
+            record_recoverable_failure BUILD_FAILED BUILD
           fi
-          verify_rollback_aliases || record_recoverable_failure LEGACY_STATE_CHANGED
+          verify_rollback_aliases || record_recoverable_failure LEGACY_STATE_CHANGED LEGACY_STATE
 
-          if ! RUN_MIGRATIONS=false MEDICATION_EMAR_ENABLED=false APP_COMMIT_SHA="$TARGET_SHA" APP_VERSION="${TARGET_SHA:0:12}" \
+          if ! timeout --foreground --signal=TERM --kill-after=15s "${REPLACEMENT_TIMEOUT_SECONDS}s" \
+            env RUN_MIGRATIONS=false MEDICATION_EMAR_ENABLED=false APP_COMMIT_SHA="$TARGET_SHA" APP_VERSION="${TARGET_SHA:0:12}" \
             "${compose[@]}" up -d --no-deps --no-build --pull never --wait --wait-timeout 180 api web caddy \
             >"$diagnostic_file" 2>&1; then
-            record_recoverable_failure RUNTIME_REPLACEMENT_FAILED
+            record_recoverable_failure RUNTIME_REPLACEMENT_FAILED RUNTIME_REPLACEMENT
           fi
           for service in api web caddy; do
-            container_id="$("${compose[@]}" ps -q "$service" 2>/dev/null)" || record_recoverable_failure CONTAINER_HEALTH_FAILED
-            health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null)" || record_recoverable_failure CONTAINER_HEALTH_FAILED
-            [ "$health_status" = "healthy" ] || record_recoverable_failure CONTAINER_HEALTH_FAILED
+            container_id="$("${compose[@]}" ps -q "$service" 2>/dev/null)" || record_recoverable_failure CONTAINER_HEALTH_FAILED CONTAINER_HEALTH
+            health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null)" || record_recoverable_failure CONTAINER_HEALTH_FAILED CONTAINER_HEALTH
+            [ "$health_status" = "healthy" ] || record_recoverable_failure CONTAINER_HEALTH_FAILED CONTAINER_HEALTH
             if [ "$service" = "caddy" ]; then
-              running_image="$(docker inspect --format '{{.Image}}' "$container_id" 2>/dev/null)" || record_recoverable_failure CONTAINER_HEALTH_FAILED
-              [ "$running_image" = "${legacy_values[CADDY_IMAGE_ID]}" ] || record_recoverable_failure LEGACY_STATE_CHANGED
+              running_image="$(docker inspect --format '{{.Image}}' "$container_id" 2>/dev/null)" || record_recoverable_failure CONTAINER_HEALTH_FAILED CONTAINER_HEALTH
+              [ "$running_image" = "${legacy_values[CADDY_IMAGE_ID]}" ] || record_recoverable_failure LEGACY_STATE_CHANGED LEGACY_STATE
             fi
           done
-          verify_rollback_aliases || record_recoverable_failure LEGACY_STATE_CHANGED
+          verify_rollback_aliases || record_recoverable_failure LEGACY_STATE_CHANGED LEGACY_STATE
           if ! OASIS_PRODUCTION_APP_URL="$APP_URL" TARGET_SHA="$TARGET_SHA" \
             node "$revision_helper" target_exact; then
-            record_recoverable_failure REVISION_PROOF_FAILED
+            record_recoverable_failure REVISION_PROOF_FAILED REVISION_PROOF
           fi
           if ! FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
             LEGACY_STATE_DIR="$legacy_state_dir" LEGACY_STATE_HELPER="$legacy_helper" \
             node "$forward_helper" verify-legacy; then
-            record_recoverable_failure LEGACY_STATE_CHANGED
+            record_recoverable_failure LEGACY_STATE_CHANGED LEGACY_STATE
           fi
-          verify_rollback_aliases || record_recoverable_failure LEGACY_STATE_CHANGED
+          verify_rollback_aliases || record_recoverable_failure LEGACY_STATE_CHANGED LEGACY_STATE
           if ! FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" NEXT_STATE=COMPLETE \
             node "$forward_helper" transition; then
             failure_armed=0
@@ -430,7 +577,7 @@ jobs:
           unsafe_output=0
           while IFS= read -r line || [ -n "$line" ]; do
             case "$line" in
-              FORWARD_INPUTS_INVALID|FORWARD_TARGET_PROOF_FAILED|DEPLOY_TARGET_PRODUCTION|DEPLOY_TARGET_UNKNOWN|DEPLOY_TARGET_NOT_PRODUCTION|REPOSITORY_STATE_UNSAFE|PRODUCTION_MUTATION_LOCKED|FORWARD_MUTATION_LOCK_ACQUIRED|FORWARD_LEGACY_START_VALID|FORWARD_LEGACY_STATE_UNSAFE|FORWARD_RUNNING_IMAGES_UNSAFE|FORWARD_ROLLBACK_IMAGES_UNSAFE|FORWARD_PREFLIGHT_FAILED|FORWARD_STATE_PREPARED|FORWARD_STATE_MUTATION_STARTED|FORWARD_STATE_RECOVERABLE_FAILURE|FORWARD_STATE_COMPLETE|FORWARD_STATE_ALREADY_CONSUMED|FORWARD_STATE_LOCKED|FORWARD_STATE_INVALID|FORWARD_STATE_IO_UNCERTAIN|FORWARD_RECOVERY_REQUIRED|FORWARD_LEGACY_STATE_UNCHANGED|REVISION_AWARE_EXACT|REVISION_UNSAFE|FORWARD_DEPLOY_COMPLETE)
+              FORWARD_INPUTS_INVALID|FORWARD_TARGET_PROOF_FAILED|FORWARD_REMOTE_IDENTITY_VALID|FORWARD_REMOTE_IDENTITY_INVALID|DEPLOY_TARGET_PRODUCTION|DEPLOY_TARGET_UNKNOWN|DEPLOY_TARGET_NOT_PRODUCTION|REPOSITORY_STATE_UNSAFE|PRODUCTION_MUTATION_LOCKED|FORWARD_MUTATION_LOCK_ACQUIRED|FORWARD_LEGACY_START_VALID|FORWARD_LEGACY_STATE_UNSAFE|FORWARD_LEGACY_REVISION_UNSAFE|FORWARD_RUNNING_IMAGES_UNSAFE|FORWARD_ROLLBACK_IMAGES_UNSAFE|FORWARD_PREFLIGHT_FAILED|FORWARD_STATE_PREPARED|FORWARD_STATE_MUTATION_STARTED|FORWARD_STATE_RECOVERABLE_FAILURE|FORWARD_STATE_COMPLETE|FORWARD_STATE_ALREADY_CONSUMED|FORWARD_STATE_LOCKED|FORWARD_STATE_INVALID|FORWARD_STATE_IO_UNCERTAIN|FORWARD_FAILURE_EVIDENCE_RECORDED|FORWARD_ROLLBACK_COMPLETE|FORWARD_ROLLBACK_FAILED|FORWARD_RECOVERY_STATE_UNCERTAIN|FORWARD_RECOVERY_REQUIRED|FORWARD_LEGACY_STATE_UNCHANGED|LEGACY_UNKNOWN|REVISION_AWARE_EXACT|REVISION_UNSAFE|FORWARD_DEPLOY_COMPLETE)
                 printf '%s\n' "$line"
                 ;;
               *)
@@ -439,6 +586,11 @@ jobs:
             esac
           done < "$remote_output"
 
+          case "$remote_status" in
+            124|137|143)
+              printf 'FORWARD_TRANSPORT_TIMEOUT\n' >&2
+              ;;
+          esac
           if [ "$unsafe_output" -ne 0 ]; then
             printf 'REMOTE_OUTPUT_UNSAFE\n' >&2
             exit 1

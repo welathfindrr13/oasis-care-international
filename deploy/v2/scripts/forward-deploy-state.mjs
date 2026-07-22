@@ -25,10 +25,44 @@ export const FAILURE_CLASSES = Object.freeze([
   'UNEXPECTED_FAILURE',
 ]);
 
+export const FAILURE_PHASES = Object.freeze([
+  'CHECKOUT',
+  'PREFLIGHT',
+  'BUILD',
+  'RUNTIME_REPLACEMENT',
+  'CONTAINER_HEALTH',
+  'REVISION_PROOF',
+  'LEGACY_STATE',
+  'UNEXPECTED_EXIT',
+]);
+
+export const SERVICE_STATE_CATEGORIES = Object.freeze([
+  'MISSING',
+  'RUNNING_HEALTHY',
+  'RUNNING_UNHEALTHY',
+  'EXITED_ZERO',
+  'EXITED_NONZERO',
+  'OOM_KILLED',
+  'OTHER',
+]);
+
+export const LOG_CATEGORIES = Object.freeze([
+  'MODULE_RESOLUTION_FAILURE',
+  'DATABASE_CONNECTION_FAILURE',
+  'CONFIGURATION_FAILURE',
+  'READINESS_FAILURE',
+  'NO_MATCH',
+  'UNAVAILABLE',
+]);
+
 const FAILURE_CLASS_SET = new Set(FAILURE_CLASSES);
+const FAILURE_PHASE_SET = new Set(FAILURE_PHASES);
+const SERVICE_STATE_CATEGORY_SET = new Set(SERVICE_STATE_CATEGORIES);
+const LOG_CATEGORY_SET = new Set(LOG_CATEGORIES);
 const MANIFEST_KIND = 'oasis-forward-deploy';
 const MANIFEST_VERSION = 1;
 const MAX_MANIFEST_BYTES = 32 * 1024;
+const MAX_FAILURE_EVIDENCE_BYTES = 4 * 1024;
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const ATTEMPT_ID_PATTERN = /^[0-9a-f]{32}$/;
 const IMAGE_ID_PATTERN = /^sha256:[0-9a-f]{64}$/;
@@ -134,8 +168,31 @@ function pathsFor(rootDir, attemptId) {
     manifest: path.join(attempt, 'manifest.json'),
     mutation: path.join(attempt, 'mutation-started'),
     failure: path.join(attempt, 'recoverable-failure'),
+    failureEvidence: path.join(attempt, 'failure-evidence.json'),
     completion: path.join(attempt, 'completion'),
   };
+}
+
+function validateFailureEvidence(evidence, expectedFailureClass) {
+  exactKeys(evidence, ['failureClass', 'phase', 'serviceStates', 'logCategories']);
+  if (
+    evidence.failureClass !== expectedFailureClass ||
+    !FAILURE_CLASS_SET.has(evidence.failureClass) ||
+    !FAILURE_PHASE_SET.has(evidence.phase)
+  ) {
+    fail();
+  }
+  exactKeys(evidence.serviceStates, SERVICES);
+  exactKeys(evidence.logCategories, SERVICES);
+  for (const service of SERVICES) {
+    if (
+      !SERVICE_STATE_CATEGORY_SET.has(evidence.serviceStates[service]) ||
+      !LOG_CATEGORY_SET.has(evidence.logCategories[service])
+    ) {
+      fail();
+    }
+  }
+  return evidence;
 }
 
 function acquireDirectoryLock(lockPath, parent) {
@@ -398,6 +455,7 @@ function readForwardStateInternal(paths, { lockHeld = false } = {}) {
     'manifest.json',
     'mutation-started',
     'recoverable-failure',
+    'failure-evidence.json',
     'completion',
     ...(lockHeld ? ['transition.lock'] : []),
   ]);
@@ -411,8 +469,13 @@ function readForwardStateInternal(paths, { lockHeld = false } = {}) {
 
   const mutationExists = fs.existsSync(paths.mutation);
   const failureExists = fs.existsSync(paths.failure);
+  const failureEvidenceExists = fs.existsSync(paths.failureEvidence);
   const completionExists = fs.existsSync(paths.completion);
-  if ((failureExists && completionExists) || ((failureExists || completionExists) && !mutationExists)) {
+  if (
+    (failureExists && completionExists) ||
+    ((failureExists || completionExists) && !mutationExists) ||
+    (failureEvidenceExists && !failureExists)
+  ) {
     fail();
   }
   if (mutationExists) readMarker(paths.mutation, MUTATION_CONTENT);
@@ -421,6 +484,16 @@ function readForwardStateInternal(paths, { lockHeld = false } = {}) {
     assertPrivateMode(assertNotSymlink(paths.failure, 'file'), 0o600);
     failureClass = fs.readFileSync(paths.failure, 'utf8').trim();
     if (!FAILURE_CLASS_SET.has(failureClass)) fail();
+  }
+  let failureEvidence = null;
+  if (failureEvidenceExists) {
+    const evidenceStat = assertNotSymlink(paths.failureEvidence, 'file');
+    assertPrivateMode(evidenceStat, 0o600);
+    if (evidenceStat.size <= 0 || evidenceStat.size > MAX_FAILURE_EVIDENCE_BYTES) fail();
+    failureEvidence = validateFailureEvidence(
+      JSON.parse(fs.readFileSync(paths.failureEvidence, 'utf8')),
+      failureClass,
+    );
   }
   if (completionExists) readMarker(paths.completion, COMPLETION_CONTENT);
 
@@ -431,7 +504,7 @@ function readForwardStateInternal(paths, { lockHeld = false } = {}) {
       : mutationExists
         ? FORWARD_STATES.MUTATION_STARTED
         : FORWARD_STATES.PREPARED;
-  return { manifest, state, failureClass };
+  return { manifest, state, failureClass, failureEvidence };
 }
 
 export function readForwardState({ rootDir, attemptId }) {
@@ -463,6 +536,51 @@ export function transitionForwardState({ rootDir, attemptId, nextState, failureC
     releaseDirectoryLock(paths.transitionLock, paths.attempt);
     releaseTransition = false;
     return readForwardState({ rootDir, attemptId });
+  } catch (error) {
+    if (releaseTransition && fs.existsSync(paths.transitionLock)) {
+      try {
+        releaseDirectoryLock(paths.transitionLock, paths.attempt);
+      } catch {
+        throw new ForwardStateError('FORWARD_STATE_IO_UNCERTAIN');
+      }
+    }
+    if (error instanceof ForwardStateError) throw error;
+    throw new ForwardStateError('FORWARD_STATE_IO_UNCERTAIN');
+  }
+}
+
+export function recordFailureEvidence({
+  rootDir,
+  attemptId,
+  failureClass,
+  phase,
+  serviceStates,
+  logCategories,
+}) {
+  const paths = pathsFor(rootDir, attemptId);
+  const evidence = validateFailureEvidence({
+    failureClass,
+    phase,
+    serviceStates,
+    logCategories,
+  }, failureClass);
+  readForwardStateInternal(paths);
+  acquireDirectoryLock(paths.transitionLock, paths.attempt);
+  let releaseTransition = true;
+  try {
+    const current = readForwardStateInternal(paths, { lockHeld: true });
+    if (
+      current.state !== FORWARD_STATES.RECOVERABLE_FAILURE ||
+      current.failureClass !== failureClass ||
+      current.failureEvidence !== null ||
+      fs.existsSync(paths.failureEvidence)
+    ) {
+      fail();
+    }
+    atomicWrite(paths.failureEvidence, `${JSON.stringify(evidence)}\n`);
+    releaseDirectoryLock(paths.transitionLock, paths.attempt);
+    releaseTransition = false;
+    return readForwardState({ rootDir, attemptId }).failureEvidence;
   } catch (error) {
     if (releaseTransition && fs.existsSync(paths.transitionLock)) {
       try {
@@ -525,6 +643,19 @@ function environmentRunningImages() {
   };
 }
 
+function environmentFailureEvidence() {
+  return {
+    failureClass: process.env.FAILURE_CLASS,
+    phase: process.env.FAILURE_PHASE,
+    serviceStates: Object.fromEntries(
+      SERVICES.map((service) => [service, process.env[`${service.toUpperCase()}_STATE_CATEGORY`]]),
+    ),
+    logCategories: Object.fromEntries(
+      SERVICES.map((service) => [service, process.env[`${service.toUpperCase()}_LOG_CATEGORY`]]),
+    ),
+  };
+}
+
 function stateOutput(state) {
   return `FORWARD_STATE_${state}`;
 }
@@ -565,6 +696,15 @@ async function main() {
         failureClass: process.env.FAILURE_CLASS,
       });
       process.stdout.write(`${stateOutput(result.state)}\n`);
+      return;
+    }
+    if (command === 'record-evidence') {
+      recordFailureEvidence({
+        rootDir: process.env.FORWARD_STATE_ROOT,
+        attemptId: process.env.ATTEMPT_ID,
+        ...environmentFailureEvidence(),
+      });
+      process.stdout.write('FORWARD_FAILURE_EVIDENCE_RECORDED\n');
       return;
     }
     if (command === 'verify-legacy') {
