@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   STATES as LEGACY_STATES,
@@ -14,6 +14,7 @@ import {
   EXPECTED_LEGACY_STATE,
   FORWARD_STATES,
   FORWARD_TARGET_SHA,
+  adjudicateForwardStateUnderMutationLock,
   recordFailureEvidence,
   prepareForwardState,
   readForwardState,
@@ -40,6 +41,13 @@ const docs = fs.readFileSync(new URL('../../docs/deployment-v2/README.md', impor
 const legacyHelperPath = fileURLToPath(
   new URL('../../deploy/v2/scripts/legacy-bootstrap-state.mjs', import.meta.url),
 );
+const recoveryHelperPath = fileURLToPath(
+  new URL('../../deploy/v2/scripts/forward-deploy-recovery.sh', import.meta.url),
+);
+const forwardHelperPath = fileURLToPath(
+  new URL('../../deploy/v2/scripts/forward-deploy-state.mjs', import.meta.url),
+);
+const revisionHelperPath = fileURLToPath(new URL('./revision-proof.mjs', import.meta.url));
 const workflowSha = 'f'.repeat(40);
 const forwardAttemptId = 'e'.repeat(32);
 const legacyAttemptId = 'd'.repeat(32);
@@ -139,6 +147,203 @@ function jsonResponse(payload) {
     status: 200,
     headers: { 'content-type': 'application/json' },
   });
+}
+
+function waitForPath(target, timeoutMs = 5000) {
+  const started = Date.now();
+  return new Promise((resolve, reject) => {
+    const poll = () => {
+      if (fs.existsSync(target)) return resolve();
+      if (Date.now() - started >= timeoutMs) return reject(new Error(`timed out waiting for ${target}`));
+      setTimeout(poll, 20);
+    };
+    poll();
+  });
+}
+
+function waitForChild(child, timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve({ code: child.exitCode, signal: child.signalCode });
+      return;
+    }
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      reject(new Error('child process timed out'));
+    }, timeoutMs);
+    child.once('error', (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once('close', (code, signal) => {
+      clearTimeout(timer);
+      resolve({ code, signal });
+    });
+  });
+}
+
+async function makeExecutableRecoveryFixture(t, { state = FORWARD_STATES.MUTATION_STARTED } = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oasis-forward-recovery-exec-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const repositoryRoot = path.join(root, 'repository');
+  const gitCommon = path.join(repositoryRoot, '.git');
+  const oasisDeploy = path.join(gitCommon, 'oasis-deploy');
+  const legacyStateDir = path.join(oasisDeploy, 'legacy-bootstrap-v1', 'state');
+  const forwardRoot = path.join(oasisDeploy, 'forward-deployment-v1');
+  fs.mkdirSync(oasisDeploy, { recursive: true, mode: 0o700 });
+  fs.chmodSync(gitCommon, 0o700);
+  fs.chmodSync(oasisDeploy, 0o700);
+  prepareLegacyState({
+    stateDir: legacyStateDir,
+    targetSha: '7'.repeat(40),
+    attemptId: legacyAttemptId,
+    imageIds,
+  });
+  transitionLegacyState({ stateDir: legacyStateDir, targetSha: '7'.repeat(40), nextState: LEGACY_STATES.MUTATION_STARTED });
+  transitionLegacyState({ stateDir: legacyStateDir, targetSha: '7'.repeat(40), nextState: LEGACY_STATES.ROLLBACK_REQUIRED });
+  transitionLegacyState({ stateDir: legacyStateDir, targetSha: '7'.repeat(40), nextState: LEGACY_STATES.LEGACY_ROLLED_BACK });
+  const binding = await readLegacyBinding({ legacyStateDir, legacyStateHelper: legacyHelperPath });
+  await prepareForwardState({
+    rootDir: forwardRoot,
+    targetSha: FORWARD_TARGET_SHA,
+    workflowSha,
+    originMainSha: workflowSha,
+    repository: 'welathfindrr13/oasis-care-international',
+    attemptId: forwardAttemptId,
+    legacyStateDir,
+    legacyStateHelper: legacyHelperPath,
+    expectedLegacyDigest: binding.digest,
+    runningImageIds: imageIds,
+  });
+  if (state !== FORWARD_STATES.PREPARED) {
+    transitionForwardState({ rootDir: forwardRoot, attemptId: forwardAttemptId, nextState: FORWARD_STATES.MUTATION_STARTED });
+  }
+  if (state === FORWARD_STATES.COMPLETE) {
+    transitionForwardState({ rootDir: forwardRoot, attemptId: forwardAttemptId, nextState: FORWARD_STATES.COMPLETE });
+  } else if (state === FORWARD_STATES.RECOVERABLE_FAILURE) {
+    transitionForwardState({
+      rootDir: forwardRoot,
+      attemptId: forwardAttemptId,
+      nextState: FORWARD_STATES.RECOVERABLE_FAILURE,
+      failureClass: 'RUNTIME_REPLACEMENT_FAILED',
+    });
+  }
+
+  const helperDir = fs.mkdtempSync('/tmp/oasis-forward-recovery-test.');
+  t.after(() => fs.rmSync(helperDir, { recursive: true, force: true }));
+  for (const [source, name, mode] of [
+    [forwardHelperPath, 'forward-deploy-state.mjs', 0o600],
+    [legacyHelperPath, 'legacy-bootstrap-state.mjs', 0o600],
+    [revisionHelperPath, 'revision-proof.mjs', 0o600],
+  ]) {
+    fs.copyFileSync(source, path.join(helperDir, name));
+    fs.chmodSync(path.join(helperDir, name), mode);
+  }
+
+  const toolsDir = path.join(root, 'tools');
+  fs.mkdirSync(toolsDir, { mode: 0o700 });
+  const commandLog = path.join(root, 'commands');
+  const runtimeMode = path.join(root, 'runtime-mode');
+  fs.writeFileSync(runtimeMode, 'target\n', { mode: 0o600 });
+  const fakeGit = `#!/usr/bin/env bash
+set -euo pipefail
+[ "$1" = rev-parse ] && [ "$2" = --git-common-dir ]
+printf '%s\n' "$TEST_GIT_COMMON"
+`;
+  const fakeNode = `#!/usr/bin/env bash
+set -euo pipefail
+script="$1"
+shift
+case "$(basename "$script")" in
+  revision-proof.mjs)
+    if [ "\${1:-}" = target_exact ] && [ "\${TARGET_PROOF:-success}" != success ]; then
+      exit 1
+    fi
+    exit 0
+    ;;
+  *) exec "$REAL_NODE" "$script" "$@" ;;
+esac
+`;
+  const fakeTimeout = `#!/usr/bin/env bash
+set -euo pipefail
+while [[ "$1" == --* ]]; do shift; done
+shift
+exec "$@"
+`;
+  const fakeDocker = `#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = image ] && [ "$2" = inspect ]; then
+  alias="\${5:-}"
+  case "$alias" in
+    oasis-legacy-bootstrap-api:*) printf '%s\n' '${imageIds.api}' ;;
+    oasis-legacy-bootstrap-web:*) printf '%s\n' '${imageIds.web}' ;;
+    oasis-legacy-bootstrap-caddy:*) printf '%s\n' '${imageIds.caddy}' ;;
+    *) exit 1 ;;
+  esac
+  exit 0
+fi
+if [ "$1" = compose ]; then
+  shift
+  while [ "$1" != up ] && [ "$1" != ps ]; do shift; done
+  operation="$1"
+  shift
+  if [ "$operation" = up ]; then
+    printf '%s\n' "$*" >> "$COMMAND_LOG"
+    grep 'image:' "$HELPER_DIR/recovery-rollback-override.yml" >> "$COMMAND_LOG"
+    printf 'legacy\n' > "$RUNTIME_MODE"
+    exit 0
+  fi
+  [ "$1" = -q ]
+  case "$2" in
+    api) printf '%s\n' '${'1'.repeat(64)}' ;;
+    web) printf '%s\n' '${'2'.repeat(64)}' ;;
+    caddy) printf '%s\n' '${'3'.repeat(64)}' ;;
+    postgres) printf '%s\n' '${'4'.repeat(64)}' ;;
+    *) exit 1 ;;
+  esac
+  exit 0
+fi
+if [ "$1" = inspect ]; then
+  format="$3"
+  container="$4"
+  if [[ "$format" == *'.Image'* ]]; then
+    mode="$(tr -d '\\r\\n' < "$RUNTIME_MODE")"
+    case "$container" in
+      ${'1'.repeat(64)}) [ "$mode" = legacy ] && printf '%s\n' '${imageIds.api}' || printf '%s\n' 'sha256:${'9'.repeat(64)}' ;;
+      ${'2'.repeat(64)}) [ "$mode" = legacy ] && printf '%s\n' '${imageIds.web}' || printf '%s\n' 'sha256:${'8'.repeat(64)}' ;;
+      ${'3'.repeat(64)}) printf '%s\n' '${imageIds.caddy}' ;;
+      *) exit 1 ;;
+    esac
+  elif [[ "$format" == *'.State.Status'* ]]; then
+    printf 'running|healthy|0|false\n'
+  else
+    printf 'healthy\n'
+  fi
+  exit 0
+fi
+exit 1
+`;
+  for (const [name, contents] of [['git', fakeGit], ['node', fakeNode], ['timeout', fakeTimeout], ['docker', fakeDocker]]) {
+    fs.writeFileSync(path.join(toolsDir, name), contents, { mode: 0o755 });
+  }
+  const env = {
+    ...process.env,
+    PATH: `${toolsDir}:${process.env.PATH}`,
+    REAL_NODE: process.execPath,
+    TEST_GIT_COMMON: gitCommon,
+    COMMAND_LOG: commandLog,
+    RUNTIME_MODE: runtimeMode,
+    TARGET_SHA: FORWARD_TARGET_SHA,
+    ATTEMPT_ID: forwardAttemptId,
+    APP_URL: 'https://example.invalid',
+    HELPER_DIR: helperDir,
+    DIAGNOSTIC_TIMEOUT_SECONDS: '10',
+    ROLLBACK_TIMEOUT_SECONDS: '300',
+    RECOVERY_LOCK_WAIT_SECONDS: '5',
+    OASIS_FORWARD_RECOVERY_TEST_MODE: '1',
+    OASIS_FORWARD_REPOSITORY_ROOT: repositoryRoot,
+  };
+  return { root, repositoryRoot, gitCommon, legacyStateDir, forwardRoot, helperDir, commandLog, runtimeMode, env };
 }
 
 test('valid durable legacy rollback prepares a separate immutable forward attempt', async (t) => {
@@ -360,6 +565,59 @@ test('post-mutation failures are explicit, terminal, and never become completion
   );
 });
 
+test('completion adjudication fails closed before the marker and authenticates a marker written before an uncertain return', async (t) => {
+  const beforeMarker = makeFixture(t);
+  await prepareForward(beforeMarker);
+  transitionForwardState({
+    rootDir: beforeMarker.forwardRoot,
+    attemptId: forwardAttemptId,
+    nextState: FORWARD_STATES.MUTATION_STARTED,
+  });
+  const beforeResult = adjudicateForwardStateUnderMutationLock({
+    rootDir: beforeMarker.forwardRoot,
+    attemptId: forwardAttemptId,
+  });
+  assert.equal(beforeResult.state, FORWARD_STATES.MUTATION_STARTED);
+  const uncertain = transitionForwardState({
+    rootDir: beforeMarker.forwardRoot,
+    attemptId: forwardAttemptId,
+    nextState: FORWARD_STATES.COMPLETION_UNCERTAIN,
+    failureClass: 'COMPLETION_STATE_UNCERTAIN',
+  });
+  assert.equal(uncertain.state, FORWARD_STATES.COMPLETION_UNCERTAIN);
+  assert.throws(() => transitionForwardState({
+    rootDir: beforeMarker.forwardRoot,
+    attemptId: forwardAttemptId,
+    nextState: FORWARD_STATES.COMPLETE,
+  }), isForwardError);
+
+  const afterMarker = makeFixture(t);
+  await prepareForward(afterMarker);
+  transitionForwardState({
+    rootDir: afterMarker.forwardRoot,
+    attemptId: forwardAttemptId,
+    nextState: FORWARD_STATES.MUTATION_STARTED,
+  });
+  transitionForwardState({
+    rootDir: afterMarker.forwardRoot,
+    attemptId: forwardAttemptId,
+    nextState: FORWARD_STATES.COMPLETE,
+  });
+  const transitionLock = path.join(
+    afterMarker.forwardRoot,
+    'attempts',
+    forwardAttemptId,
+    'transition.lock',
+  );
+  fs.mkdirSync(transitionLock, { mode: 0o700 });
+  const afterResult = adjudicateForwardStateUnderMutationLock({
+    rootDir: afterMarker.forwardRoot,
+    attemptId: forwardAttemptId,
+  });
+  assert.equal(afterResult.state, FORWARD_STATES.COMPLETE);
+  assert.equal(fs.existsSync(transitionLock), false);
+});
+
 test('sanitized failure evidence is immutable, fixed-category, and bound to the initiating failure', async (t) => {
   const fixture = makeFixture(t);
   await prepareForward(fixture);
@@ -414,7 +672,7 @@ test('sanitized failure evidence is immutable, fixed-category, and bound to the 
   assert.doesNotMatch(fs.readFileSync(evidencePath, 'utf8'), /password|secret|token/i);
 });
 
-test('success, controlled failure, unexpected exit, and TERM all clean staged helpers', (t) => {
+test('success, controlled failure, unexpected exit, and TERM remove raw diagnostics but preserve recovery helpers', (t) => {
   function extractFunction(name) {
     const match = workflow.match(new RegExp(`^ {10}${name}\\(\\) \\{([\\s\\S]*?)^ {10}\\}$`, 'm'));
     assert.ok(match, `${name} must remain extractable`);
@@ -472,6 +730,7 @@ test('success, controlled failure, unexpected exit, and TERM all clean staged he
       'caddy-override.yml',
       'rollback-override.yml',
       'forward-deploy-state.mjs',
+      'forward-deploy-recovery.sh',
       'legacy-bootstrap-state.mjs',
       'revision-proof.mjs',
       'preflight-env.mjs',
@@ -522,7 +781,12 @@ test('success, controlled failure, unexpected exit, and TERM all clean staged he
     assert.equal(result.status, testCase.status, testCase.name);
     assert.equal(result.stdout, testCase.output, testCase.name);
     assert.equal(result.stderr, '', testCase.name);
-    assert.equal(fs.existsSync(helperDir), false, `${testCase.name} must remove helper directory`);
+    for (const name of ['diagnostic', 'legacy-binding', 'caddy-override.yml', 'rollback-override.yml']) {
+      assert.equal(fs.existsSync(path.join(helperDir, name)), false, `${testCase.name} must remove ${name}`);
+    }
+    for (const name of ['forward-deploy-state.mjs', 'forward-deploy-recovery.sh', 'legacy-bootstrap-state.mjs', 'revision-proof.mjs']) {
+      assert.equal(fs.existsSync(path.join(helperDir, name)), true, `${testCase.name} must preserve ${name}`);
+    }
     assert.equal(
       fs.existsSync(evidencePath) ? fs.readFileSync(evidencePath, 'utf8') : null,
       testCase.evidence,
@@ -663,14 +927,18 @@ test('build, replacement, transport, and rollback budgets are independent and re
   const replacementSeconds = Number(workflow.match(/REPLACEMENT_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
   const rollbackSeconds = Number(workflow.match(/ROLLBACK_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
   const transportSeconds = Number(workflow.match(/TRANSPORT_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
+  const transportKillGraceSeconds = Number(workflow.match(/TRANSPORT_KILL_GRACE_SECONDS: "(\d+)"/)?.[1]);
+  const reconnectSeconds = Number(workflow.match(/RECOVERY_RECONNECT_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
   assert.equal(jobMinutes, 45);
   assert.equal(diagnosticSeconds, 10);
-  assert(buildSeconds + replacementSeconds + rollbackSeconds < transportSeconds);
-  assert(transportSeconds + 600 <= jobMinutes * 60);
+  assert(buildSeconds + replacementSeconds <= transportSeconds);
+  assert(transportKillGraceSeconds > rollbackSeconds);
+  assert(transportSeconds + transportKillGraceSeconds + reconnectSeconds + 300 <= jobMinutes * 60);
   assert.match(workflow, /timeout --foreground --signal=TERM --kill-after=15s "\$\{BUILD_TIMEOUT_SECONDS\}s"/);
   assert.match(workflow, /timeout --foreground --signal=TERM --kill-after=15s "\$\{REPLACEMENT_TIMEOUT_SECONDS\}s"/);
   assert.match(workflow, /timeout --foreground --signal=TERM --kill-after=15s "\$\{ROLLBACK_TIMEOUT_SECONDS\}s"/);
-  assert.match(workflow, /timeout --foreground --signal=TERM --kill-after=15s "\$\{TRANSPORT_TIMEOUT_SECONDS\}s"/);
+  assert.match(workflow, /timeout --foreground --signal=TERM --kill-after="\$\{TRANSPORT_KILL_GRACE_SECONDS\}s" "\$\{TRANSPORT_TIMEOUT_SECONDS\}s"/);
+  assert.match(workflow, /RECOVERY_RECONNECT_TIMEOUT_SECONDS/);
   assert.match(workflow, /ServerAliveInterval=15/);
   assert.match(workflow, /ServerAliveCountMax=3/);
   assert.match(workflow, /124\|137\|143[\s\S]*FORWARD_TRANSPORT_TIMEOUT/);
@@ -741,7 +1009,8 @@ test('automatic rollback uses only immutable aliases and verifies private and pu
   assert.match(rollback, /verify_rollback_aliases/g);
   assert.match(rollback, /RUN_MIGRATIONS=false/);
   assert.doesNotMatch(rollback, /(?:compose\[@\]|docker compose)[^\n]*\sbuild\s|git (?:fetch|pull|checkout)|docker (?:pull|image tag|image rm|rmi)|RUN_MIGRATIONS=true|prisma\s+migrate|migrate\s+deploy|pg_dump|pg_restore|exec /i);
-  assert.match(recovery, /NEXT_STATE=RECOVERABLE_FAILURE FAILURE_CLASS="\$failure_class"/);
+  assert.match(recovery, /next_state=RECOVERABLE_FAILURE/);
+  assert.match(recovery, /NEXT_STATE="\$next_state" FAILURE_CLASS="\$failure_class"/);
   assert.match(recovery, /persist_failure_evidence/);
   assert.match(recovery, /rollback_legacy_runtime/);
   assert.match(recovery, /FORWARD_ROLLBACK_FAILED/);
@@ -874,6 +1143,121 @@ esac
   });
   assert.notEqual(unhealthy.status, 0);
   assert.doesNotMatch(unhealthy.stdout, /FORWARD_ROLLBACK_COMPLETE/);
+});
+
+test('detached recovery resumes after transport and supervisor termination and removes every uncommitted target runtime', async (t) => {
+  if (process.platform === 'darwin') {
+    t.skip('the production recovery supervisor requires Linux flock and Bash 4; exercised on GitHub Linux CI');
+    return;
+  }
+  const fixture = await makeExecutableRecoveryFixture(t);
+  const mutationLock = path.join(fixture.gitCommon, 'oasis-deploy', 'production-vps-mutation.lock');
+  const holderReady = path.join(fixture.root, 'holder-ready');
+  const holder = spawn('bash', ['-c', 'exec 9>"$MUTATION_LOCK"; flock 9; touch "$HOLDER_READY"; sleep 60'], {
+    env: { ...fixture.env, MUTATION_LOCK: mutationLock, HOLDER_READY: holderReady },
+    stdio: 'ignore',
+  });
+  await waitForPath(holderReady);
+
+  const firstSupervisor = spawn('bash', [recoveryHelperPath], { env: fixture.env, stdio: 'ignore' });
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  assert.equal(fs.existsSync(path.join(fixture.helperDir, 'recovery-result')), false);
+  firstSupervisor.kill('SIGTERM');
+  await waitForChild(firstSupervisor);
+  assert.equal(fs.existsSync(path.join(fixture.helperDir, 'recovery-result')), false);
+
+  const resumedSupervisor = spawn('bash', [recoveryHelperPath], { env: fixture.env, stdio: ['ignore', 'pipe', 'pipe'] });
+  let resumedStdout = '';
+  let resumedStderr = '';
+  resumedSupervisor.stdout.on('data', (chunk) => { resumedStdout += chunk; });
+  resumedSupervisor.stderr.on('data', (chunk) => { resumedStderr += chunk; });
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  holder.kill('SIGTERM');
+  await waitForChild(holder);
+  const resumed = await waitForChild(resumedSupervisor);
+  assert.equal(resumed.code, 1);
+  assert.equal(resumedStdout, '');
+  assert.equal(resumedStderr, '');
+  const result = fs.readFileSync(path.join(fixture.helperDir, 'recovery-result'), 'utf8').trim();
+  assert.equal(result, 'FORWARD_RECOVERY_LEGACY_VERIFIED');
+  assert.equal(fs.readFileSync(fixture.runtimeMode, 'utf8').trim(), 'legacy');
+  const state = readForwardState({ rootDir: fixture.forwardRoot, attemptId: forwardAttemptId });
+  assert.equal(state.state, FORWARD_STATES.RECOVERABLE_FAILURE);
+  assert.equal(state.failureClass, 'TRANSPORT_RECOVERY_REQUIRED');
+  assert.equal(state.failureEvidence?.phase, 'TRANSPORT');
+  const commands = fs.readFileSync(fixture.commandLog, 'utf8');
+  assert.match(commands, /--no-build --pull never/);
+  assert.match(commands, new RegExp(`oasis-legacy-bootstrap-api:${legacyAttemptId}`));
+  assert.match(commands, new RegExp(`oasis-legacy-bootstrap-web:${legacyAttemptId}`));
+  assert.match(commands, new RegExp(`oasis-legacy-bootstrap-caddy:${legacyAttemptId}`));
+  assert.doesNotMatch(commands, /(?:^|\s)build(?:\s|$)|(?:^|\s)pull(?! never)|git|fetch|migrat|exec|image tag|image rm|rmi/i);
+  for (const name of ['recovery-diagnostic', 'recovery-legacy-binding', 'recovery-rollback-override.yml']) {
+    assert.equal(fs.existsSync(path.join(fixture.helperDir, name)), false, `${name} must be deleted`);
+  }
+});
+
+test('recovery authenticates completion written before an uncertain return and does not roll it back', async (t) => {
+  if (process.platform === 'darwin') {
+    t.skip('the production recovery supervisor requires Linux flock and Bash 4; exercised on GitHub Linux CI');
+    return;
+  }
+  const fixture = await makeExecutableRecoveryFixture(t, { state: FORWARD_STATES.COMPLETE });
+  const transitionLock = path.join(fixture.forwardRoot, 'attempts', forwardAttemptId, 'transition.lock');
+  fs.mkdirSync(transitionLock, { mode: 0o700 });
+  const result = spawnSync('bash', [recoveryHelperPath], { env: { ...fixture.env, TARGET_PROOF: 'success' }, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.equal(result.stderr, '');
+  assert.equal(
+    fs.readFileSync(path.join(fixture.helperDir, 'recovery-result'), 'utf8').trim(),
+    'FORWARD_RECOVERY_COMPLETE_VERIFIED',
+  );
+  assert.equal(readForwardState({ rootDir: fixture.forwardRoot, attemptId: forwardAttemptId }).state, FORWARD_STATES.COMPLETE);
+  assert.equal(fs.existsSync(transitionLock), false);
+  assert.equal(fs.readFileSync(fixture.runtimeMode, 'utf8').trim(), 'target');
+  assert.equal(fs.existsSync(fixture.commandLog), false, 'authenticated completion must not invoke rollback');
+});
+
+test('resumed recovery preserves an initiating failure class and fills only missing sanitized evidence', async (t) => {
+  if (process.platform === 'darwin') {
+    t.skip('the production recovery supervisor requires Linux flock and Bash 4; exercised on GitHub Linux CI');
+    return;
+  }
+  const fixture = await makeExecutableRecoveryFixture(t, { state: FORWARD_STATES.RECOVERABLE_FAILURE });
+  const result = spawnSync('bash', [recoveryHelperPath], { env: fixture.env, encoding: 'utf8' });
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.equal(result.stderr, '');
+  const state = readForwardState({ rootDir: fixture.forwardRoot, attemptId: forwardAttemptId });
+  assert.equal(state.state, FORWARD_STATES.RECOVERABLE_FAILURE);
+  assert.equal(state.failureClass, 'RUNTIME_REPLACEMENT_FAILED');
+  assert.equal(state.failureEvidence?.failureClass, 'RUNTIME_REPLACEMENT_FAILED');
+  assert.equal(state.failureEvidence?.phase, 'RUNTIME_REPLACEMENT');
+  assert.equal(fs.readFileSync(fixture.runtimeMode, 'utf8').trim(), 'legacy');
+});
+
+test('failed completion proof records uncertainty and restores legacy instead of leaving target containers active', async (t) => {
+  if (process.platform === 'darwin') {
+    t.skip('the production recovery supervisor requires Linux flock and Bash 4; exercised on GitHub Linux CI');
+    return;
+  }
+  const fixture = await makeExecutableRecoveryFixture(t, { state: FORWARD_STATES.COMPLETE });
+  const result = spawnSync('bash', [recoveryHelperPath], { env: { ...fixture.env, TARGET_PROOF: 'fail' }, encoding: 'utf8' });
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.equal(result.stderr, '');
+  assert.equal(
+    fs.readFileSync(path.join(fixture.helperDir, 'recovery-result'), 'utf8').trim(),
+    'FORWARD_RECOVERY_LEGACY_VERIFIED',
+  );
+  const state = readForwardState({ rootDir: fixture.forwardRoot, attemptId: forwardAttemptId });
+  assert.equal(state.state, FORWARD_STATES.COMPLETION_UNCERTAIN);
+  assert.equal(state.failureClass, 'COMPLETION_STATE_UNCERTAIN');
+  assert.equal(state.failureEvidence?.phase, 'COMPLETION');
+  assert.equal(fs.readFileSync(fixture.runtimeMode, 'utf8').trim(), 'legacy');
+  const commands = fs.readFileSync(fixture.commandLog, 'utf8');
+  assert.match(commands, /--no-build --pull never/);
+  assert.doesNotMatch(commands, /(?:^|\s)build(?:\s|$)|(?:^|\s)pull(?! never)|git|fetch|migrat|exec|image tag|image rm|rmi/i);
 });
 
 test('the reviewed remote shell is syntactically valid', () => {

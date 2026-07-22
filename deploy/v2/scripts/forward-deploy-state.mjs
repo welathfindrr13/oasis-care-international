@@ -7,6 +7,7 @@ export const FORWARD_STATES = Object.freeze({
   PREPARED: 'PREPARED',
   MUTATION_STARTED: 'MUTATION_STARTED',
   RECOVERABLE_FAILURE: 'RECOVERABLE_FAILURE',
+  COMPLETION_UNCERTAIN: 'COMPLETION_UNCERTAIN',
   COMPLETE: 'COMPLETE',
 });
 
@@ -22,6 +23,8 @@ export const FAILURE_CLASSES = Object.freeze([
   'CONTAINER_HEALTH_FAILED',
   'REVISION_PROOF_FAILED',
   'LEGACY_STATE_CHANGED',
+  'TRANSPORT_RECOVERY_REQUIRED',
+  'COMPLETION_STATE_UNCERTAIN',
   'UNEXPECTED_FAILURE',
 ]);
 
@@ -33,6 +36,8 @@ export const FAILURE_PHASES = Object.freeze([
   'CONTAINER_HEALTH',
   'REVISION_PROOF',
   'LEGACY_STATE',
+  'TRANSPORT',
+  'COMPLETION',
   'UNEXPECTED_EXIT',
 ]);
 
@@ -168,6 +173,7 @@ function pathsFor(rootDir, attemptId) {
     manifest: path.join(attempt, 'manifest.json'),
     mutation: path.join(attempt, 'mutation-started'),
     failure: path.join(attempt, 'recoverable-failure'),
+    completionUncertain: path.join(attempt, 'completion-uncertain'),
     failureEvidence: path.join(attempt, 'failure-evidence.json'),
     completion: path.join(attempt, 'completion'),
   };
@@ -455,6 +461,7 @@ function readForwardStateInternal(paths, { lockHeld = false } = {}) {
     'manifest.json',
     'mutation-started',
     'recoverable-failure',
+    'completion-uncertain',
     'failure-evidence.json',
     'completion',
     ...(lockHeld ? ['transition.lock'] : []),
@@ -469,12 +476,15 @@ function readForwardStateInternal(paths, { lockHeld = false } = {}) {
 
   const mutationExists = fs.existsSync(paths.mutation);
   const failureExists = fs.existsSync(paths.failure);
+  const completionUncertainExists = fs.existsSync(paths.completionUncertain);
   const failureEvidenceExists = fs.existsSync(paths.failureEvidence);
   const completionExists = fs.existsSync(paths.completion);
   if (
     (failureExists && completionExists) ||
+    (failureExists && completionUncertainExists) ||
     ((failureExists || completionExists) && !mutationExists) ||
-    (failureEvidenceExists && !failureExists)
+    (completionUncertainExists && !mutationExists) ||
+    (failureEvidenceExists && !failureExists && !completionUncertainExists)
   ) {
     fail();
   }
@@ -484,6 +494,12 @@ function readForwardStateInternal(paths, { lockHeld = false } = {}) {
     assertPrivateMode(assertNotSymlink(paths.failure, 'file'), 0o600);
     failureClass = fs.readFileSync(paths.failure, 'utf8').trim();
     if (!FAILURE_CLASS_SET.has(failureClass)) fail();
+  }
+  if (completionUncertainExists) {
+    assertPrivateMode(assertNotSymlink(paths.completionUncertain, 'file'), 0o600);
+    const uncertainClass = fs.readFileSync(paths.completionUncertain, 'utf8').trim();
+    if (uncertainClass !== 'COMPLETION_STATE_UNCERTAIN') fail();
+    failureClass = uncertainClass;
   }
   let failureEvidence = null;
   if (failureEvidenceExists) {
@@ -497,8 +513,10 @@ function readForwardStateInternal(paths, { lockHeld = false } = {}) {
   }
   if (completionExists) readMarker(paths.completion, COMPLETION_CONTENT);
 
-  const state = completionExists
-    ? FORWARD_STATES.COMPLETE
+  const state = completionUncertainExists
+    ? FORWARD_STATES.COMPLETION_UNCERTAIN
+    : completionExists
+      ? FORWARD_STATES.COMPLETE
     : failureExists
       ? FORWARD_STATES.RECOVERABLE_FAILURE
       : mutationExists
@@ -530,6 +548,14 @@ export function transitionForwardState({ rootDir, attemptId, nextState, failureC
     } else if (nextState === FORWARD_STATES.COMPLETE) {
       if (current.state !== FORWARD_STATES.MUTATION_STARTED || failureClass != null) fail();
       atomicWrite(paths.completion, COMPLETION_CONTENT);
+    } else if (nextState === FORWARD_STATES.COMPLETION_UNCERTAIN) {
+      if (
+        (current.state !== FORWARD_STATES.MUTATION_STARTED && current.state !== FORWARD_STATES.COMPLETE) ||
+        failureClass !== 'COMPLETION_STATE_UNCERTAIN'
+      ) {
+        fail();
+      }
+      atomicWrite(paths.completionUncertain, `${failureClass}\n`);
     } else {
       fail();
     }
@@ -547,6 +573,19 @@ export function transitionForwardState({ rootDir, attemptId, nextState, failureC
     if (error instanceof ForwardStateError) throw error;
     throw new ForwardStateError('FORWARD_STATE_IO_UNCERTAIN');
   }
+}
+
+export function adjudicateForwardStateUnderMutationLock({ rootDir, attemptId }) {
+  const paths = pathsFor(rootDir, attemptId);
+  if (!fs.existsSync(paths.transitionLock)) {
+    return readForwardStateInternal(paths);
+  }
+  const lockStat = assertNotSymlink(paths.transitionLock, 'directory');
+  assertPrivateMode(lockStat, 0o700);
+  if (fs.readdirSync(paths.transitionLock).length !== 0) fail();
+  readForwardStateInternal(paths, { lockHeld: true });
+  releaseDirectoryLock(paths.transitionLock, paths.attempt);
+  return readForwardStateInternal(paths);
 }
 
 export function recordFailureEvidence({
@@ -570,7 +609,8 @@ export function recordFailureEvidence({
   try {
     const current = readForwardStateInternal(paths, { lockHeld: true });
     if (
-      current.state !== FORWARD_STATES.RECOVERABLE_FAILURE ||
+      (current.state !== FORWARD_STATES.RECOVERABLE_FAILURE &&
+        current.state !== FORWARD_STATES.COMPLETION_UNCERTAIN) ||
       current.failureClass !== failureClass ||
       current.failureEvidence !== null ||
       fs.existsSync(paths.failureEvidence)
@@ -696,6 +736,38 @@ async function main() {
         failureClass: process.env.FAILURE_CLASS,
       });
       process.stdout.write(`${stateOutput(result.state)}\n`);
+      return;
+    }
+    if (command === 'inspect') {
+      const result = readForwardState({
+        rootDir: process.env.FORWARD_STATE_ROOT,
+        attemptId: process.env.ATTEMPT_ID,
+      });
+      process.stdout.write(`${stateOutput(result.state)}\n`);
+      return;
+    }
+    if (command === 'adjudicate-completion') {
+      const result = adjudicateForwardStateUnderMutationLock({
+        rootDir: process.env.FORWARD_STATE_ROOT,
+        attemptId: process.env.ATTEMPT_ID,
+      });
+      process.stdout.write(`${stateOutput(result.state)}\n`);
+      return;
+    }
+    if (command === 'inspect-failure') {
+      const result = readForwardState({
+        rootDir: process.env.FORWARD_STATE_ROOT,
+        attemptId: process.env.ATTEMPT_ID,
+      });
+      if (
+        (result.state !== FORWARD_STATES.RECOVERABLE_FAILURE &&
+          result.state !== FORWARD_STATES.COMPLETION_UNCERTAIN) ||
+        !FAILURE_CLASS_SET.has(result.failureClass)
+      ) {
+        fail();
+      }
+      process.stdout.write(`FORWARD_FAILURE_CLASS_${result.failureClass}\n`);
+      process.stdout.write(`FORWARD_FAILURE_EVIDENCE_${result.failureEvidence === null ? 'ABSENT' : 'PRESENT'}\n`);
       return;
     }
     if (command === 'record-evidence') {
