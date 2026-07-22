@@ -287,6 +287,68 @@ test('network verifier proves exact target and legacy rollback without exposing 
     }),
   });
   assert.equal(legacy, LEGACY_UNKNOWN);
+
+  const exactLegacy = await verifyRevision({
+    mode: 'rollback_legacy',
+    baseUrl: 'https://example.invalid',
+    targetSha,
+    fetchImpl: fetchFor({
+      api: jsonResponse(exactHealth(targetSha)),
+      web: jsonResponse(exactHealth(targetSha)),
+      ready: jsonResponse(readyHealth(targetSha)),
+    }),
+  });
+  assert.equal(exactLegacy, REVISION_AWARE_EXACT);
+});
+
+test('manifest-bound rollback rejects wrong, mixed, missing, and arbitrary exact revisions', async () => {
+  const wrongSha = 'b'.repeat(40);
+  const cases = [
+    {
+      api: exactHealth(wrongSha),
+      web: exactHealth(wrongSha),
+      ready: readyHealth(wrongSha),
+    },
+    {
+      api: exactHealth(targetSha),
+      web: exactHealth(wrongSha),
+      ready: readyHealth(targetSha),
+    },
+    {
+      api: exactHealth(targetSha),
+      web: exactHealth(targetSha),
+      ready: readyHealth(wrongSha),
+    },
+    {
+      api: { status: 'ok' },
+      web: exactHealth(targetSha),
+      ready: readyHealth(targetSha),
+    },
+  ];
+  for (const payloads of cases) {
+    const result = await verifyRevision({
+      mode: 'rollback_legacy',
+      baseUrl: 'https://example.invalid',
+      targetSha,
+      fetchImpl: fetchFor({
+        api: jsonResponse(payloads.api),
+        web: jsonResponse(payloads.web),
+        ready: jsonResponse(payloads.ready),
+      }),
+    });
+    assert.equal(result, REVISION_UNSAFE);
+  }
+  const invalidBinding = await verifyRevision({
+    mode: 'rollback_legacy',
+    baseUrl: 'https://example.invalid',
+    targetSha: 'arbitrary',
+    fetchImpl: fetchFor({
+      api: jsonResponse(legacyHealth()),
+      web: jsonResponse(legacyHealth()),
+      ready: jsonResponse(readyHealth('unknown')),
+    }),
+  });
+  assert.equal(invalidBinding, REVISION_UNSAFE);
 });
 
 test('network verifier fails closed for redirects, invalid content, oversized bodies, and hostile errors', async () => {
