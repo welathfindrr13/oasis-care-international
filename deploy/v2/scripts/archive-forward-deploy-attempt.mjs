@@ -195,6 +195,47 @@ function validateRunningImages(runningImageIds, state) {
   }
 }
 
+function resolveDockerAlias(alias) {
+  const result = spawnSync(
+    'timeout',
+    [
+      '--signal=TERM',
+      '--kill-after=2s',
+      '10s',
+      'docker',
+      'image',
+      'inspect',
+      '--format',
+      '{{.Id}}',
+      alias,
+    ],
+    {
+      encoding: 'utf8',
+      maxBuffer: 1024,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    },
+  );
+  const output = typeof result.stdout === 'string' ? result.stdout.trim() : '';
+  if (result.status !== 0 || !IMAGE_ID_PATTERN.test(output) || output.includes('\n')) {
+    fail('FORWARD_ARCHIVE_ALIAS_UNSAFE');
+  }
+  return output;
+}
+
+function verifyRollbackAliases(state, aliasResolver) {
+  for (const service of REQUIRED_SERVICES) {
+    const rollbackImage = state.manifest.rollbackImages[service];
+    let resolved;
+    try {
+      resolved = aliasResolver(rollbackImage.alias);
+    } catch (error) {
+      if (error instanceof ForwardArchiveError) throw error;
+      fail('FORWARD_ARCHIVE_ALIAS_UNSAFE');
+    }
+    if (resolved !== rollbackImage.id) fail('FORWARD_ARCHIVE_ALIAS_UNSAFE');
+  }
+}
+
 function archivePaths(gitCommonDir, attemptId) {
   const gitCommon = safeAbsoluteDirectory(gitCommonDir);
   const deployStateRoot = path.join(gitCommon, 'oasis-deploy');
@@ -231,6 +272,7 @@ export async function archiveFailedForwardAttempt({
   runningImageIds,
   mutationLockFd = 9,
   lockVerifier = acquireMutationLock,
+  aliasResolver = resolveDockerAlias,
   afterRename = () => {},
 }) {
   if (
@@ -251,7 +293,7 @@ export async function archiveFailedForwardAttempt({
   if (fs.existsSync(paths.destinationRoot)) {
     if (fs.existsSync(paths.sourceRoot)) fail('FORWARD_ARCHIVE_HISTORY_UNSAFE');
     const archivedDigest = stateTreeDigest(paths.destinationRoot);
-    await validateArchivedState({
+    const archivedState = await validateArchivedState({
       rootDir: paths.destinationRoot,
       attemptId,
       legacyStateDir,
@@ -259,6 +301,7 @@ export async function archiveFailedForwardAttempt({
       runningImageIds,
       expectedDigest: archivedDigest,
     });
+    verifyRollbackAliases(archivedState, aliasResolver);
     fail('FORWARD_ARCHIVE_ALREADY_ROTATED');
   }
   if (!fs.existsSync(paths.sourceRoot)) {
@@ -274,6 +317,7 @@ export async function archiveFailedForwardAttempt({
     legacyStateDir,
     legacyStateHelper,
   });
+  verifyRollbackAliases(sourceState, aliasResolver);
 
   if (fs.existsSync(paths.historyRoot)) {
     assertOwnedPath(paths.historyRoot, 'directory', 0o700);
@@ -297,6 +341,7 @@ export async function archiveFailedForwardAttempt({
     if (fs.existsSync(paths.sourceRoot) || !fs.existsSync(paths.destinationRoot)) {
       fail('FORWARD_ARCHIVE_IO_UNCERTAIN');
     }
+    verifyRollbackAliases(sourceState, aliasResolver);
     const archivedState = await validateArchivedState({
       rootDir: paths.destinationRoot,
       attemptId,

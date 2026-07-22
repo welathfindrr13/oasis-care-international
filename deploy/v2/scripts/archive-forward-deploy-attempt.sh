@@ -45,11 +45,49 @@ archive_helper="$helper_dir/archive-forward-deploy-attempt.mjs"
 forward_helper="$helper_dir/forward-deploy-state.mjs"
 legacy_helper="$helper_dir/legacy-bootstrap-state.mjs"
 revision_helper="$helper_dir/revision-proof.mjs"
+archive_wrapper="$helper_dir/archive-forward-deploy-attempt.sh"
 
-for helper in "$archive_helper" "$forward_helper" "$legacy_helper" "$revision_helper"; do
-  [ -f "$helper" ] && [ ! -L "$helper" ] || fail FORWARD_ARCHIVE_HELPER_UNSAFE
-  [ "$(stat -c '%U:%G:%a' "$helper" 2>/dev/null)" = deploy:deploy:600 ] || fail FORWARD_ARCHIVE_HELPER_UNSAFE
+declare -A helper_repository_paths=(
+  ["$archive_wrapper"]="deploy/v2/scripts/archive-forward-deploy-attempt.sh"
+  ["$archive_helper"]="deploy/v2/scripts/archive-forward-deploy-attempt.mjs"
+  ["$forward_helper"]="deploy/v2/scripts/forward-deploy-state.mjs"
+  ["$legacy_helper"]="deploy/v2/scripts/legacy-bootstrap-state.mjs"
+  ["$revision_helper"]=".github/workflows/revision-proof.mjs"
+)
+declare -A helper_modes=(
+  ["$archive_wrapper"]="deploy:deploy:700"
+  ["$archive_helper"]="deploy:deploy:600"
+  ["$forward_helper"]="deploy:deploy:600"
+  ["$legacy_helper"]="deploy:deploy:600"
+  ["$revision_helper"]="deploy:deploy:600"
+)
+
+shopt -s dotglob nullglob
+helper_entries=("$helper_dir"/*)
+shopt -u dotglob nullglob
+[ "${#helper_entries[@]}" -eq "${#helper_repository_paths[@]}" ] || fail FORWARD_ARCHIVE_HELPER_UNSAFE
+for helper in "${helper_entries[@]}"; do
+  [ -n "${helper_repository_paths[$helper]+present}" ] || fail FORWARD_ARCHIVE_HELPER_UNSAFE
 done
+
+for helper in "${!helper_repository_paths[@]}"; do
+  [ -f "$helper" ] && [ ! -L "$helper" ] || fail FORWARD_ARCHIVE_HELPER_UNSAFE
+  [ "$(stat -c '%U:%G:%a' "$helper" 2>/dev/null)" = "${helper_modes[$helper]}" ] || fail FORWARD_ARCHIVE_HELPER_UNSAFE
+done
+[ "$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/$(basename "${BASH_SOURCE[0]}")" = "$archive_wrapper" ] || fail FORWARD_ARCHIVE_HELPER_UNSAFE
+
+verify_helper_bundle() {
+  local helper repository_path expected_object actual_object object_type
+  for helper in "${!helper_repository_paths[@]}"; do
+    repository_path="${helper_repository_paths[$helper]}"
+    expected_object="$(git rev-parse --verify "$ROTATION_TOOL_SHA:$repository_path" 2>/dev/null)" || fail FORWARD_ARCHIVE_HELPER_UNSAFE
+    [[ "$expected_object" =~ ^[0-9a-f]{40,64}$ ]] || fail FORWARD_ARCHIVE_HELPER_UNSAFE
+    object_type="$(git cat-file -t "$expected_object" 2>/dev/null)" || fail FORWARD_ARCHIVE_HELPER_UNSAFE
+    [ "$object_type" = blob ] || fail FORWARD_ARCHIVE_HELPER_UNSAFE
+    actual_object="$(git hash-object --no-filters "$helper" 2>/dev/null)" || fail FORWARD_ARCHIVE_HELPER_UNSAFE
+    [ "$actual_object" = "$expected_object" ] || fail FORWARD_ARCHIVE_HELPER_UNSAFE
+  done
+}
 
 exec 9<>"$mutation_lock"
 flock -n 9 || fail FORWARD_ARCHIVE_MUTATION_LOCKED
@@ -63,6 +101,7 @@ remote_main_line="$(timeout --signal=TERM --kill-after=2s 20s git ls-remote --ex
 remote_main="${remote_main_line%%[[:space:]]*}"
 unset remote_main_line
 [ "$remote_main" = "$ROTATION_TOOL_SHA" ] || fail FORWARD_ARCHIVE_TARGET_UNSAFE
+verify_helper_bundle
 printf 'FORWARD_ARCHIVE_LOCKED_PREFLIGHT_VALID\n'
 
 compose=(docker compose --env-file deploy/v2/.env -f deploy/v2/docker-compose.yml)
@@ -88,6 +127,8 @@ if ! timeout --foreground --signal=TERM --kill-after=2s 30s \
   fail FORWARD_ARCHIVE_REVISION_UNSAFE
 fi
 printf 'FORWARD_ARCHIVE_LEGACY_RUNTIME_VERIFIED\n'
+verify_helper_bundle
+printf 'FORWARD_ARCHIVE_HELPERS_AUTHENTIC\n'
 
 GIT_COMMON_DIR="$git_common" \
 ATTEMPT_ID="$EXPECTED_ATTEMPT_ID" \

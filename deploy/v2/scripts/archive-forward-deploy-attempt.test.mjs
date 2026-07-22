@@ -35,12 +35,19 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const archiveHelperPath = path.join(here, 'archive-forward-deploy-attempt.mjs');
 const legacyHelperPath = path.join(here, 'legacy-bootstrap-state.mjs');
 const wrapperPath = path.join(here, 'archive-forward-deploy-attempt.sh');
+const forwardHelperPath = path.join(here, 'forward-deploy-state.mjs');
+const revisionHelperPath = path.resolve(here, '../../../.github/workflows/revision-proof.mjs');
 const legacyAttemptId = '79e13dc0591adc1f69b6b7552d6de64a';
 const nextAttemptId = '0123456789abcdef0123456789abcdef';
 const imageIds = Object.freeze({
   api: `sha256:${'1'.repeat(64)}`,
   web: `sha256:${'2'.repeat(64)}`,
   caddy: `sha256:${'3'.repeat(64)}`,
+});
+const legacyAliasImageIds = Object.freeze({
+  [`oasis-legacy-bootstrap-api:${legacyAttemptId}`]: imageIds.api,
+  [`oasis-legacy-bootstrap-web:${legacyAttemptId}`]: imageIds.web,
+  [`oasis-legacy-bootstrap-caddy:${legacyAttemptId}`]: imageIds.caddy,
 });
 
 function snapshotTree(root) {
@@ -160,6 +167,7 @@ async function createFixture(t, { state = FORWARD_STATES.RECOVERABLE_FAILURE, wi
     runningImageIds: imageIds,
     mutationLockFd: lockFd,
     lockVerifier: () => {},
+    aliasResolver: (alias) => legacyAliasImageIds[alias],
     ...overrides,
   });
 
@@ -176,6 +184,252 @@ async function createFixture(t, { state = FORWARD_STATES.RECOVERABLE_FAILURE, wi
     lockFd,
     legacyBinding,
     archive,
+  };
+}
+
+function runChecked(command, args, options = {}) {
+  const result = spawnSync(command, args, { encoding: 'utf8', ...options });
+  assert.equal(
+    result.status,
+    0,
+    `${command} ${args.join(' ')} failed: ${result.stderr || result.stdout || result.error?.message || 'unknown error'}`,
+  );
+  return result;
+}
+
+function sudoChecked(args, options = {}) {
+  return runChecked('sudo', ['-n', ...args], options);
+}
+
+function installSystemFile(source, destination, mode, owner = 'deploy', group = 'deploy') {
+  sudoChecked(['install', '-o', owner, '-g', group, '-m', mode, source, destination]);
+}
+
+function writeTemporaryFile(root, name, contents) {
+  const target = path.join(root, name);
+  fs.writeFileSync(target, contents, { mode: 0o600 });
+  return target;
+}
+
+function asDeploy(args, options = {}) {
+  return sudoChecked(['-u', 'deploy', ...args], options);
+}
+
+async function createExecutableWrapperFixture(t, { helperVariant = 'valid' } = {}) {
+  const stateFixture = await createFixture(t);
+  const suffix = crypto.randomBytes(4).toString('hex');
+  const systemRepository = '/opt/oasis-care';
+  const systemGitCommon = path.join(systemRepository, '.git');
+  const systemDeployRoot = path.join(systemGitCommon, 'oasis-deploy');
+  const systemForwardRoot = path.join(systemDeployRoot, 'forward-deployment-v1');
+  const systemHistoryRoot = path.join(systemDeployRoot, 'forward-deployment-history-v1');
+  const helperDir = `/var/tmp/oasis-forward-archive.${suffix}`;
+  const toolsDir = `/var/tmp/oasis-forward-archive-tools.${suffix}`;
+  const marker = '/etc/oasis/production-deploy-target-class';
+
+  if (spawnSync('id', ['-u', 'deploy'], { stdio: 'ignore' }).status !== 0) {
+    sudoChecked(['useradd', '--system', '--create-home', '--shell', '/bin/bash', 'deploy']);
+  }
+
+  sudoChecked(['rm', '-rf', systemRepository, helperDir, toolsDir]);
+  sudoChecked(['rm', '-f', marker]);
+  t.after(() => {
+    sudoChecked(['rm', '-rf', systemRepository, helperDir, toolsDir]);
+    sudoChecked(['rm', '-f', marker]);
+  });
+
+  for (const directory of [
+    systemRepository,
+    path.join(systemRepository, 'deploy/v2/scripts'),
+    path.join(systemRepository, '.github/workflows'),
+  ]) {
+    sudoChecked(['install', '-d', '-o', 'deploy', '-g', 'deploy', '-m', '0755', directory]);
+  }
+  sudoChecked(['install', '-d', '-o', 'root', '-g', 'root', '-m', '0755', '/etc/oasis']);
+
+  const staleRevision = writeTemporaryFile(
+    stateFixture.root,
+    'stale-revision-proof.mjs',
+    `${fs.readFileSync(revisionHelperPath, 'utf8')}\n// stale fixture revision\n`,
+  );
+  const syntheticEnv = writeTemporaryFile(stateFixture.root, 'synthetic.env', 'SYNTHETIC=true\n');
+  const syntheticCompose = writeTemporaryFile(stateFixture.root, 'docker-compose.yml', 'services: {}\n');
+  const productionMarker = writeTemporaryFile(stateFixture.root, 'production-marker', 'production\n');
+
+  installSystemFile(wrapperPath, path.join(systemRepository, 'deploy/v2/scripts/archive-forward-deploy-attempt.sh'), '0755');
+  installSystemFile(archiveHelperPath, path.join(systemRepository, 'deploy/v2/scripts/archive-forward-deploy-attempt.mjs'), '0755');
+  installSystemFile(forwardHelperPath, path.join(systemRepository, 'deploy/v2/scripts/forward-deploy-state.mjs'), '0644');
+  installSystemFile(legacyHelperPath, path.join(systemRepository, 'deploy/v2/scripts/legacy-bootstrap-state.mjs'), '0644');
+  installSystemFile(staleRevision, path.join(systemRepository, '.github/workflows/revision-proof.mjs'), '0644');
+  installSystemFile(syntheticEnv, path.join(systemRepository, 'deploy/v2/.env'), '0600');
+  installSystemFile(syntheticCompose, path.join(systemRepository, 'deploy/v2/docker-compose.yml'), '0644');
+  installSystemFile(productionMarker, marker, '0644', 'root', 'root');
+
+  asDeploy(['git', '-C', systemRepository, 'init', '-q']);
+  asDeploy(['git', '-C', systemRepository, 'config', 'user.name', 'Oasis CI']);
+  asDeploy(['git', '-C', systemRepository, 'config', 'user.email', 'ci@oasis.invalid']);
+  asDeploy(['git', '-C', systemRepository, 'add', '.']);
+  asDeploy(['git', '-C', systemRepository, 'commit', '-q', '-m', 'stale helper fixture']);
+  const staleSha = asDeploy(['git', '-C', systemRepository, 'rev-parse', 'HEAD']).stdout.trim();
+
+  installSystemFile(revisionHelperPath, path.join(systemRepository, '.github/workflows/revision-proof.mjs'), '0644');
+  asDeploy(['git', '-C', systemRepository, 'add', '.github/workflows/revision-proof.mjs']);
+  asDeploy(['git', '-C', systemRepository, 'commit', '-q', '-m', 'reviewed helper fixture']);
+  const rotationToolSha = asDeploy(['git', '-C', systemRepository, 'rev-parse', 'HEAD']).stdout.trim();
+  asDeploy([
+    'git',
+    '-C',
+    systemRepository,
+    'remote',
+    'add',
+    'origin',
+    'https://github.com/welathfindrr13/oasis-care-international.git',
+  ]);
+
+  sudoChecked(['cp', '-a', stateFixture.deployStateRoot, systemGitCommon]);
+  sudoChecked(['chown', '-R', 'deploy:deploy', systemDeployRoot]);
+
+  sudoChecked(['install', '-d', '-o', 'deploy', '-g', 'deploy', '-m', '0700', helperDir]);
+  sudoChecked(['install', '-d', '-o', 'deploy', '-g', 'deploy', '-m', '0700', toolsDir]);
+  const stagedFiles = [
+    [wrapperPath, path.join(helperDir, 'archive-forward-deploy-attempt.sh'), '0700'],
+    [archiveHelperPath, path.join(helperDir, 'archive-forward-deploy-attempt.mjs'), '0600'],
+    [forwardHelperPath, path.join(helperDir, 'forward-deploy-state.mjs'), '0600'],
+    [legacyHelperPath, path.join(helperDir, 'legacy-bootstrap-state.mjs'), '0600'],
+    [revisionHelperPath, path.join(helperDir, 'revision-proof.mjs'), '0600'],
+  ];
+  for (const [source, destination, mode] of stagedFiles) {
+    installSystemFile(source, destination, mode);
+  }
+
+  if (helperVariant === 'stale') {
+    const staleBlob = asDeploy([
+      'git',
+      '-C',
+      systemRepository,
+      'show',
+      `${staleSha}:.github/workflows/revision-proof.mjs`,
+    ]).stdout;
+    const staleStaged = writeTemporaryFile(stateFixture.root, 'stale-staged-revision.mjs', staleBlob);
+    installSystemFile(staleStaged, path.join(helperDir, 'revision-proof.mjs'), '0600');
+  } else if (helperVariant === 'mixed') {
+    installSystemFile(legacyHelperPath, path.join(helperDir, 'forward-deploy-state.mjs'), '0600');
+  } else if (helperVariant === 'modified') {
+    const modifiedWrapper = writeTemporaryFile(
+      stateFixture.root,
+      'modified-archive-wrapper.sh',
+      `${fs.readFileSync(wrapperPath, 'utf8')}\n# modified fixture wrapper\n`,
+    );
+    installSystemFile(modifiedWrapper, path.join(helperDir, 'archive-forward-deploy-attempt.sh'), '0700');
+  }
+
+  const dockerLog = path.join(toolsDir, 'docker-commands');
+  const emptyLog = writeTemporaryFile(stateFixture.root, 'docker-commands', '');
+  installSystemFile(emptyLog, dockerLog, '0600');
+  const fakeGit = writeTemporaryFile(stateFixture.root, 'git', [
+    '#!/usr/bin/env bash',
+    'set -euo pipefail',
+    'if [ "${1:-}" = ls-remote ]; then',
+    '  printf "%s\\trefs/heads/main\\n" "$TEST_ROTATION_SHA"',
+    '  exit 0',
+    'fi',
+    'exec "$REAL_GIT" "$@"',
+    '',
+  ].join('\n'));
+  const fakeNode = writeTemporaryFile(stateFixture.root, 'node', [
+    '#!/usr/bin/env bash',
+    'set -euo pipefail',
+    'if [ "$(basename "${1:-}")" = revision-proof.mjs ]; then',
+    '  exit 0',
+    'fi',
+    'exec "$REAL_NODE" "$@"',
+    '',
+  ].join('\n'));
+  const fakeDocker = writeTemporaryFile(stateFixture.root, 'docker', [
+    '#!/usr/bin/env bash',
+    'set -euo pipefail',
+    'printf "%s\\n" "$*" >> "$TEST_DOCKER_LOG"',
+    'if [ "${1:-}" = image ] && [ "${2:-}" = inspect ]; then',
+    '  alias="${5:-}"',
+    '  if [ "${TEST_ALIAS_BEHAVIOR:-valid}" = missing ] && [[ "$alias" == oasis-legacy-bootstrap-api:* ]]; then exit 1; fi',
+    `  if [ "\${TEST_ALIAS_BEHAVIOR:-valid}" = retagged ] && [[ "$alias" == oasis-legacy-bootstrap-api:* ]]; then printf '%s\\n' 'sha256:${'9'.repeat(64)}'; exit 0; fi`,
+    '  case "$alias" in',
+    `    oasis-legacy-bootstrap-api:${legacyAttemptId}) printf '%s\\n' '${imageIds.api}' ;;`,
+    `    oasis-legacy-bootstrap-web:${legacyAttemptId}) printf '%s\\n' '${imageIds.web}' ;;`,
+    `    oasis-legacy-bootstrap-caddy:${legacyAttemptId}) printf '%s\\n' '${imageIds.caddy}' ;;`,
+    '    *) exit 1 ;;',
+    '  esac',
+    '  exit 0',
+    'fi',
+    'if [ "${1:-}" = compose ]; then',
+    '  service="${@: -1}"',
+    '  case "$service" in',
+    `    api) printf '%s\\n' '${'a'.repeat(64)}' ;;`,
+    `    web) printf '%s\\n' '${'b'.repeat(64)}' ;;`,
+    `    caddy) printf '%s\\n' '${'c'.repeat(64)}' ;;`,
+    `    postgres) printf '%s\\n' '${'d'.repeat(64)}' ;;`,
+    '    *) exit 1 ;;',
+    '  esac',
+    '  exit 0',
+    'fi',
+    'if [ "${1:-}" = inspect ]; then',
+    '  format="${3:-}"',
+    '  container="${4:-}"',
+    '  if [[ "$format" == *".Image"* ]]; then',
+    '    case "$container" in',
+    `      ${'a'.repeat(64)}) printf '%s\\n' '${imageIds.api}' ;;`,
+    `      ${'b'.repeat(64)}) printf '%s\\n' '${imageIds.web}' ;;`,
+    `      ${'c'.repeat(64)}) printf '%s\\n' '${imageIds.caddy}' ;;`,
+    '      *) exit 1 ;;',
+    '    esac',
+    '  else',
+    '    printf "healthy\\n"',
+    '  fi',
+    '  exit 0',
+    'fi',
+    'exit 1',
+    '',
+  ].join('\n'));
+  for (const [source, name] of [[fakeGit, 'git'], [fakeNode, 'node'], [fakeDocker, 'docker']]) {
+    installSystemFile(source, path.join(toolsDir, name), '0700');
+  }
+
+  const runWrapper = (aliasBehavior = 'valid') => spawnSync(
+    'sudo',
+    [
+      '-n',
+      '-u',
+      'deploy',
+      'env',
+      `PATH=${toolsDir}:/usr/bin:/bin`,
+      'HOME=/home/deploy',
+      `REAL_GIT=${spawnSync('command', ['-v', 'git'], { shell: true, encoding: 'utf8' }).stdout.trim() || '/usr/bin/git'}`,
+      `REAL_NODE=${process.execPath}`,
+      `ROTATION_TOOL_SHA=${rotationToolSha}`,
+      `TEST_ROTATION_SHA=${rotationToolSha}`,
+      `TEST_ALIAS_BEHAVIOR=${aliasBehavior}`,
+      `TEST_DOCKER_LOG=${dockerLog}`,
+      'bash',
+      path.join(helperDir, 'archive-forward-deploy-attempt.sh'),
+    ],
+    { encoding: 'utf8' },
+  );
+
+  const existsAsDeploy = (target) => spawnSync(
+    'sudo',
+    ['-n', '-u', 'deploy', 'test', '-e', target],
+    { stdio: 'ignore' },
+  ).status === 0;
+  const readAsDeploy = (target) => asDeploy(['cat', target]).stdout;
+
+  return {
+    helperDir,
+    dockerLog,
+    systemForwardRoot,
+    systemHistoryRoot,
+    runWrapper,
+    existsAsDeploy,
+    readAsDeploy,
   };
 }
 
@@ -315,6 +569,42 @@ test('rejects a runtime image mismatch, an unsafe owner mode and a different loc
   });
 });
 
+test('missing or retagged immutable aliases fail before the archive rename', async (t) => {
+  for (const [name, resolver] of [
+    ['missing', (alias) => alias.includes('-api:') ? undefined : legacyAliasImageIds[alias]],
+    ['retagged', (alias) => alias.includes('-api:') ? `sha256:${'9'.repeat(64)}` : legacyAliasImageIds[alias]],
+  ]) {
+    await t.test(name, async (subtest) => {
+      const fixture = await createFixture(subtest);
+      await assert.rejects(
+        fixture.archive({ aliasResolver: resolver }),
+        (error) => error.code === 'FORWARD_ARCHIVE_ALIAS_UNSAFE',
+      );
+      assert.equal(fs.existsSync(fixture.forwardRoot), true);
+      assert.equal(fs.existsSync(fixture.historyRoot), false);
+    });
+  }
+});
+
+test('a post-rename alias mismatch restores and reauthenticates the canonical state', async (t) => {
+  const fixture = await createFixture(t);
+  const before = snapshotTree(fixture.forwardRoot);
+  let resolutions = 0;
+
+  await assert.rejects(
+    fixture.archive({
+      aliasResolver: (alias) => {
+        resolutions += 1;
+        if (resolutions > 3 && alias.includes('-api:')) return `sha256:${'9'.repeat(64)}`;
+        return legacyAliasImageIds[alias];
+      },
+    }),
+    (error) => error.code === 'FORWARD_ARCHIVE_VERIFICATION_FAILED_RESTORED',
+  );
+  assert.deepEqual(snapshotTree(fixture.forwardRoot), before);
+  assert.equal(fs.existsSync(fixture.archivedRoot), false);
+});
+
 test('rejects unexpected or colliding history and never overwrites it', async (t) => {
   const fixture = await createFixture(t);
   fs.mkdirSync(fixture.historyRoot, { mode: 0o700 });
@@ -442,6 +732,56 @@ test('the CLI cannot archive while another Linux process holds the production mu
   assert.equal(result.stderr, '');
   assert.equal(fs.existsSync(fixture.forwardRoot), true);
   assert.equal(fs.existsSync(fixture.historyRoot), false);
+});
+
+test('the executable production wrapper authenticates helpers and immutable aliases before archival', async (t) => {
+  if (process.platform !== 'linux' || process.env.CI !== 'true') {
+    t.skip('the root-owned production path fixture runs only on disposable GitHub Linux CI');
+    return;
+  }
+
+  for (const aliasBehavior of ['missing', 'retagged']) {
+    await t.test(`${aliasBehavior} alias`, async (subtest) => {
+      const fixture = await createExecutableWrapperFixture(subtest);
+      const result = fixture.runWrapper(aliasBehavior);
+      assert.equal(result.status, 1, result.stderr);
+      assert.match(result.stdout, /FORWARD_ARCHIVE_ALIAS_UNSAFE\n$/);
+      assert.equal(fixture.existsAsDeploy(fixture.systemForwardRoot), true);
+      assert.equal(fixture.existsAsDeploy(fixture.systemHistoryRoot), false);
+    });
+  }
+
+  for (const helperVariant of ['stale', 'mixed', 'modified']) {
+    await t.test(`${helperVariant} helper`, async (subtest) => {
+      const fixture = await createExecutableWrapperFixture(subtest, { helperVariant });
+      const result = fixture.runWrapper();
+      assert.equal(result.status, 1, result.stderr);
+      assert.match(result.stdout, /FORWARD_ARCHIVE_HELPER_UNSAFE\n$/);
+      assert.equal(fixture.existsAsDeploy(fixture.systemForwardRoot), true);
+      assert.equal(fixture.existsAsDeploy(fixture.systemHistoryRoot), false);
+      assert.equal(fixture.readAsDeploy(fixture.dockerLog), '');
+    });
+  }
+
+  await t.test('authentic helper bundle and aliases', async (subtest) => {
+    const fixture = await createExecutableWrapperFixture(subtest);
+    const result = fixture.runWrapper();
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /FORWARD_ARCHIVE_HELPERS_AUTHENTIC\n/);
+    assert.match(result.stdout, /FORWARD_ARCHIVE_COMPLETE\n$/);
+    assert.equal(fixture.existsAsDeploy(fixture.systemForwardRoot), false);
+    assert.equal(fixture.existsAsDeploy(fixture.systemHistoryRoot), true);
+
+    const dockerCommands = fixture.readAsDeploy(fixture.dockerLog);
+    for (const service of ['api', 'web', 'caddy']) {
+      const alias = `oasis-legacy-bootstrap-${service}:${legacyAttemptId}`;
+      assert.equal((dockerCommands.match(new RegExp(alias, 'g')) ?? []).length, 2);
+    }
+    assert.doesNotMatch(
+      dockerCommands,
+      /(?:^|\s)(?:up|build|pull|tag|rmi|rm)(?:\s|$)|migrat/i,
+    );
+  });
 });
 
 test('the production wrapper is identity- and lock-bound and contains no deployment, migration or deletion command', () => {
