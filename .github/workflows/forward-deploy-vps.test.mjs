@@ -1325,6 +1325,11 @@ esac
     diagnostic_file="$TEST_ROOT/diagnostic"
     ROLLBACK_TIMEOUT_SECONDS=300
     DIAGNOSTIC_TIMEOUT_SECONDS=10
+    REVISION_PROOF_TIMEOUT_SECONDS=30
+    STATE_OPERATION_TIMEOUT_SECONDS=15
+    SHORT_KILL_GRACE_SECONDS=2
+    PHASE_KILL_GRACE_SECONDS=15
+    safe_status() { printf '%s\\n' "$1"; }
     APP_URL=https://example.invalid
     forward_state_root=/synthetic/forward
     ATTEMPT_ID=${forwardAttemptId}
