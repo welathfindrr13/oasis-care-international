@@ -314,7 +314,7 @@ if [ "$1" = inspect ]; then
       ${'3'.repeat(64)}) printf '%s\n' '${imageIds.caddy}' ;;
       *) exit 1 ;;
     esac
-  elif [[ "$format" == *'.State.Status'* ]]; then
+  elif [[ "$format" == *'.State.ExitCode'* ]]; then
     printf 'running|healthy|0|false\n'
   else
     printf 'healthy\n'
