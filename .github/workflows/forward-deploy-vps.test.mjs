@@ -839,6 +839,7 @@ esac
     forward_state_root=/synthetic/forward
     ATTEMPT_ID=${forwardAttemptId}
     legacy_state_dir=/synthetic/legacy
+    legacy_helper=/synthetic/legacy-bootstrap-state.mjs
     revision_helper=/synthetic/revision-proof.mjs
     forward_helper=/synthetic/forward-deploy-state.mjs
     ${rollbackSource}
