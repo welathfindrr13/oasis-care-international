@@ -235,6 +235,7 @@ async function makeExecutableRecoveryFixture(t, { state = FORWARD_STATES.MUTATIO
     [forwardHelperPath, 'forward-deploy-state.mjs', 0o600],
     [legacyHelperPath, 'legacy-bootstrap-state.mjs', 0o600],
     [revisionHelperPath, 'revision-proof.mjs', 0o600],
+    [recoveryHelperPath, 'forward-deploy-recovery.sh', 0o700],
   ]) {
     fs.copyFileSync(source, path.join(helperDir, name));
     fs.chmodSync(path.join(helperDir, name), mode);
@@ -338,12 +339,27 @@ exit 1
     APP_URL: 'https://example.invalid',
     HELPER_DIR: helperDir,
     DIAGNOSTIC_TIMEOUT_SECONDS: '10',
+    REVISION_PROOF_TIMEOUT_SECONDS: '30',
+    STATE_OPERATION_TIMEOUT_SECONDS: '15',
     ROLLBACK_TIMEOUT_SECONDS: '300',
+    SHORT_KILL_GRACE_SECONDS: '2',
+    PHASE_KILL_GRACE_SECONDS: '15',
     RECOVERY_LOCK_WAIT_SECONDS: '5',
     OASIS_FORWARD_RECOVERY_TEST_MODE: '1',
     OASIS_FORWARD_REPOSITORY_ROOT: repositoryRoot,
   };
-  return { root, repositoryRoot, gitCommon, legacyStateDir, forwardRoot, helperDir, commandLog, runtimeMode, env };
+  return {
+    root,
+    repositoryRoot,
+    gitCommon,
+    legacyStateDir,
+    forwardRoot,
+    helperDir,
+    stagedRecoveryHelper: path.join(helperDir, 'forward-deploy-recovery.sh'),
+    commandLog,
+    runtimeMode,
+    env,
+  };
 }
 
 test('valid durable legacy rollback prepares a separate immutable forward attempt', async (t) => {
@@ -679,6 +695,7 @@ test('success, controlled failure, unexpected exit, and TERM remove raw diagnost
     return `${name}() {${match[1].replace(/^ {10}/gm, '')}\n}`;
   }
   const cleanupSource = extractFunction('cleanup_remote');
+  const safeStatusSource = extractFunction('safe_status');
   const exitSource = extractFunction('handle_remote_exit');
   const controlledSource = extractFunction('record_recoverable_failure');
   const recoverySource = extractFunction('recover_from_failure');
@@ -749,6 +766,18 @@ test('success, controlled failure, unexpected exit, and TERM remove raw diagnost
       preflight_helper="$HELPER_DIR/preflight-env.mjs"
       forward_state_root=/synthetic
       ATTEMPT_ID=${forwardAttemptId}
+      STATE_OPERATION_TIMEOUT_SECONDS=15
+      DIAGNOSTIC_TIMEOUT_SECONDS=10
+      SHORT_KILL_GRACE_SECONDS=2
+      timeout() {
+        while [[ "$1" == --* ]]; do shift; done
+        shift
+        if [ "$1" = env ]; then
+          shift
+          while [[ "$1" == *=* ]]; do export "$1"; shift; done
+        fi
+        "$@"
+      }
       node() { return 0; }
       capture_sanitized_diagnostics() {
         api_state_category=RUNNING_UNHEALTHY
@@ -767,6 +796,7 @@ test('success, controlled failure, unexpected exit, and TERM remove raw diagnost
       }
       failure_armed=${testCase.armed}
       ${cleanupSource}
+      ${safeStatusSource}
       ${recoverySource}
       ${exitSource}
       ${controlledSource}
@@ -874,7 +904,7 @@ test('workflow preserves legacy state and aliases before checkout, build, runtim
   const running = workflow.indexOf('running_image=', inspect);
   const prepare = workflow.indexOf('node "$forward_helper" prepare', running);
   const mutation = workflow.indexOf('NEXT_STATE=MUTATION_STARTED', prepare);
-  const checkout = workflow.indexOf('git checkout --detach "$TARGET_SHA"', mutation);
+  const checkout = workflow.indexOf('git checkout --detach "$2"', mutation);
   const build = workflow.indexOf('"${compose[@]}" build web api', checkout);
   const up = workflow.indexOf('up -d --no-deps --no-build --pull never', build);
   const exactProof = workflow.indexOf('node "$revision_helper" target_exact', up);
@@ -887,7 +917,7 @@ test('workflow preserves legacy state and aliases before checkout, build, runtim
   assert(inspect < running && running < prepare && prepare < mutation && mutation < checkout);
   assert(checkout < build && build < up && up < exactProof && exactProof < legacyProof && legacyProof < complete);
   assert.match(workflow, /verify_rollback_aliases/g);
-  assert.match(workflow, /image: %s.*CADDY_IMAGE_ALIAS/);
+  assert.match(workflow, /caddy_override[\s\S]*legacy_values\[CADDY_IMAGE_ALIAS\]/);
   assert.match(workflow, /running_image" = "\$\{legacy_values\[CADDY_IMAGE_ID\]\}"/);
   assert.doesNotMatch(workflow, /docker image (?:tag|rm|prune)|docker rmi/);
   assert.doesNotMatch(workflow, /node "\$legacy_helper" (?:prepare|transition|export)/);
@@ -897,7 +927,7 @@ test('workflow preserves legacy state and aliases before checkout, build, runtim
 
 test('workflow forces excluded medication, no migrations, service-only replacement, and sanitized output', () => {
   assert.match(workflow, /RUN_MIGRATIONS=false MEDICATION_EMAR_ENABLED=false APP_COMMIT_SHA="\$TARGET_SHA"/g);
-  assert.match(workflow, /read_env_value RUN_MIGRATIONS/);
+  assert.match(workflow, /run_migrations=.*awk[\s\S]*RUN_MIGRATIONS/);
   assert.doesNotMatch(workflow, /read_env_value MEDICATION_EMAR_ENABLED/);
   assert.match(workflow, /build web api/);
   assert.match(workflow, /up -d --no-deps --no-build --pull never --wait --wait-timeout 180 api web caddy/);
@@ -920,28 +950,217 @@ test('effective deploy identity is enforced before helper staging, state prepara
   assert.doesNotMatch(workflow, /\[ "\$\(id -un[^\n]*" = "root"/);
 });
 
-test('build, replacement, transport, and rollback budgets are independent and reserve job recovery time', () => {
+test('the executable timing invariant bounds every post-mutation phase and reserves recovery margin', () => {
   const jobMinutes = Number(workflow.match(/timeout-minutes: (\d+)/)?.[1]);
+  const stateSeconds = Number(workflow.match(/STATE_OPERATION_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
+  const fetchSeconds = Number(workflow.match(/FETCH_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
+  const checkoutSeconds = Number(workflow.match(/CHECKOUT_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
+  const preflightSeconds = Number(workflow.match(/PREFLIGHT_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
   const buildSeconds = Number(workflow.match(/BUILD_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
   const diagnosticSeconds = Number(workflow.match(/DIAGNOSTIC_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
   const replacementSeconds = Number(workflow.match(/REPLACEMENT_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
   const rollbackSeconds = Number(workflow.match(/ROLLBACK_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
+  const shortGrace = Number(workflow.match(/SHORT_KILL_GRACE_SECONDS: "(\d+)"/)?.[1]);
+  const phaseGrace = Number(workflow.match(/PHASE_KILL_GRACE_SECONDS: "(\d+)"/)?.[1]);
+  const verificationSeconds = Number(workflow.match(/TARGET_VERIFICATION_BUDGET_SECONDS: "(\d+)"/)?.[1]);
+  const completionSeconds = Number(workflow.match(/COMPLETION_BUDGET_SECONDS: "(\d+)"/)?.[1]);
+  const failureSeconds = Number(workflow.match(/FAILURE_DIAGNOSTIC_BUDGET_SECONDS: "(\d+)"/)?.[1]);
+  const aliasGuardSeconds = Number(workflow.match(/LEGACY_ALIAS_GUARD_BUDGET_SECONDS: "(\d+)"/)?.[1]);
+  const inlineRollbackSeconds = Number(workflow.match(/INLINE_ROLLBACK_BUDGET_SECONDS: "(\d+)"/)?.[1]);
+  const cleanupSeconds = Number(workflow.match(/CLEANUP_BUDGET_SECONDS: "(\d+)"/)?.[1]);
+  const postMutationSeconds = Number(workflow.match(/POST_MUTATION_MAX_SECONDS: "(\d+)"/)?.[1]);
+  const recoveryWaitSeconds = Number(workflow.match(/RECOVERY_LOCK_WAIT_SECONDS: "(\d+)"/)?.[1]);
+  const recoveryMarginSeconds = Number(workflow.match(/RECOVERY_LOCK_SAFETY_MARGIN_SECONDS: "(\d+)"/)?.[1]);
   const transportSeconds = Number(workflow.match(/TRANSPORT_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
   const transportKillGraceSeconds = Number(workflow.match(/TRANSPORT_KILL_GRACE_SECONDS: "(\d+)"/)?.[1]);
   const reconnectSeconds = Number(workflow.match(/RECOVERY_RECONNECT_TIMEOUT_SECONDS: "(\d+)"/)?.[1]);
   assert.equal(jobMinutes, 45);
   assert.equal(diagnosticSeconds, 10);
-  assert(buildSeconds + replacementSeconds <= transportSeconds);
-  assert(transportKillGraceSeconds > rollbackSeconds);
-  assert(transportSeconds + transportKillGraceSeconds + reconnectSeconds + 300 <= jobMinutes * 60);
-  assert.match(workflow, /timeout --foreground --signal=TERM --kill-after=15s "\$\{BUILD_TIMEOUT_SECONDS\}s"/);
-  assert.match(workflow, /timeout --foreground --signal=TERM --kill-after=15s "\$\{REPLACEMENT_TIMEOUT_SECONDS\}s"/);
-  assert.match(workflow, /timeout --foreground --signal=TERM --kill-after=15s "\$\{ROLLBACK_TIMEOUT_SECONDS\}s"/);
+  const computed = stateSeconds + shortGrace
+    + fetchSeconds + shortGrace
+    + checkoutSeconds + shortGrace
+    + preflightSeconds + shortGrace
+    + buildSeconds + phaseGrace
+    + aliasGuardSeconds
+    + replacementSeconds + phaseGrace
+    + verificationSeconds + completionSeconds + failureSeconds + inlineRollbackSeconds + cleanupSeconds;
+  assert.equal(computed, postMutationSeconds);
+  assert.equal(recoveryWaitSeconds, postMutationSeconds + recoveryMarginSeconds);
+  assert.equal(recoveryMarginSeconds, 50);
+  assert(recoveryWaitSeconds > postMutationSeconds);
+  assert(transportKillGraceSeconds > inlineRollbackSeconds);
+  assert.equal(rollbackSeconds, 300);
+  assert(transportSeconds + transportKillGraceSeconds + reconnectSeconds + 135 <= jobMinutes * 60);
+  assert.match(workflow, /computed_post_mutation_max=/);
+  assert.match(workflow, /POST_MUTATION_MAX_SECONDS \+ RECOVERY_LOCK_SAFETY_MARGIN_SECONDS/);
+  assert.match(workflow, /timeout --foreground --signal=TERM --kill-after="\$\{PHASE_KILL_GRACE_SECONDS\}s" "\$\{BUILD_TIMEOUT_SECONDS\}s"/);
+  assert.match(workflow, /timeout --foreground --signal=TERM --kill-after="\$\{PHASE_KILL_GRACE_SECONDS\}s" "\$\{REPLACEMENT_TIMEOUT_SECONDS\}s"/);
+  assert.match(workflow, /timeout --foreground --signal=TERM --kill-after="\$\{PHASE_KILL_GRACE_SECONDS\}s" "\$\{ROLLBACK_TIMEOUT_SECONDS\}s"/);
   assert.match(workflow, /timeout --foreground --signal=TERM --kill-after="\$\{TRANSPORT_KILL_GRACE_SECONDS\}s" "\$\{TRANSPORT_TIMEOUT_SECONDS\}s"/);
   assert.match(workflow, /RECOVERY_RECONNECT_TIMEOUT_SECONDS/);
   assert.match(workflow, /ServerAliveInterval=15/);
   assert.match(workflow, /ServerAliveCountMax=3/);
   assert.match(workflow, /124\|137\|143[\s\S]*FORWARD_TRANSPORT_TIMEOUT/);
+});
+
+test('post-mutation git fetch is bounded and a real timeout is reduced to a fixed category', (t) => {
+  if (process.platform === 'darwin') {
+    t.skip('GNU timeout semantics are exercised on GitHub Linux CI');
+    return;
+  }
+  const extractFunction = (name) => {
+    const match = workflow.match(new RegExp(`^ {10}${name}\\(\\) \\{([\\s\\S]*?)^ {10}\\}$`, 'm'));
+    assert.ok(match, `${name} must remain extractable`);
+    return `${name}() {${match[1].replace(/^ {10}/gm, '')}\n}`;
+  };
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oasis-forward-fetch-timeout-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const fakeGit = path.join(root, 'git');
+  const commandLog = path.join(root, 'command');
+  fs.writeFileSync(fakeGit, `#!/usr/bin/env bash\nprintf '%s\\n' "$*" > "$COMMAND_LOG"\nsleep 30\n`, { mode: 0o755 });
+  const script = `
+    set -euo pipefail
+    diagnostic_file="$TEST_ROOT/diagnostic"
+    FETCH_TIMEOUT_SECONDS=1
+    SHORT_KILL_GRACE_SECONDS=1
+    ${extractFunction('safe_status')}
+    ${extractFunction('bounded_git_fetch')}
+    ${extractFunction('classify_fetch_status')}
+    set +e
+    bounded_git_fetch
+    status=$?
+    set -e
+    classify_fetch_status "$status"
+    printf 'STATUS=%s\\n' "$status"
+  `;
+  const started = Date.now();
+  const result = spawnSync('bash', ['-c', script], {
+    encoding: 'utf8',
+    env: { ...process.env, PATH: `${root}:${process.env.PATH}`, TEST_ROOT: root, COMMAND_LOG: commandLog },
+    timeout: 5000,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /^FORWARD_FETCH_TIMEOUT\nSTATUS=124\n$/);
+  assert(Date.now() - started < 5000);
+  assert.equal(fs.readFileSync(commandLog, 'utf8').trim(), 'fetch --no-tags origin main');
+});
+
+test('runner cleanup deletes helpers only for conclusively verified terminal results', () => {
+  const match = workflow.match(/^ {10}recovery_result_is_conclusively_safe\(\) \{([\s\S]*?)^ {10}\}$/m);
+  assert.ok(match);
+  const source = `recovery_result_is_conclusively_safe() {${match[1].replace(/^ {10}/gm, '')}\n}`;
+  const cases = [
+    ['FORWARD_RECOVERY_COMPLETE_VERIFIED', 0],
+    ['FORWARD_RECOVERY_LEGACY_VERIFIED', 0],
+    ['FORWARD_RECOVERY_NO_MUTATION', 0],
+    ['FORWARD_RECOVERY_LEGACY_VERIFIED_STATE_UNCERTAIN', 1],
+    ['FORWARD_RECOVERY_ROLLBACK_FAILED', 1],
+    ['FORWARD_RECOVERY_STATE_UNCERTAIN', 1],
+    ['FORWARD_RECOVERY_SUPERVISOR_FAILED', 1],
+    ['FORWARD_RECOVERY_RECONNECT_FAILED', 1],
+  ];
+  for (const [category, expected] of cases) {
+    const result = spawnSync('bash', ['-c', `set +e\n${source}\nrecovery_result_is_conclusively_safe "$1"`, 'bash', category]);
+    assert.equal(result.status, expected, category);
+  }
+  assert.doesNotMatch(workflow, /FORWARD_RECOVERY_LOCK_TIMEOUT/);
+  assert.match(workflow, /FORWARD_RECOVERY_HELPERS_PRESERVED/);
+});
+
+test('positive supervisor handshake precedes mutation and closes inherited mutation-lock fd 9', (t) => {
+  if (process.platform === 'darwin') {
+    t.skip('setsid and Linux descriptor inspection are exercised on GitHub Linux CI');
+    return;
+  }
+  const match = workflow.match(/^ {10}launch_recovery_supervisor\(\) \{([\s\S]*?)^ {10}\}$/m);
+  assert.ok(match);
+  const source = `launch_recovery_supervisor() {${match[1].replace(/^ {10}/gm, '')}\n}`;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oasis-forward-supervisor-handshake-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const helper = path.join(root, 'forward-deploy-recovery.sh');
+  const descriptor = path.join(root, 'descriptor');
+  const order = path.join(root, 'order');
+  fs.writeFileSync(helper, `#!/usr/bin/env bash\nset -euo pipefail\nif [ -e /proc/$$/fd/9 ]; then printf 'OPEN\\n' > "$DESCRIPTOR_FILE"; else printf 'CLOSED\\n' > "$DESCRIPTOR_FILE"; fi\nprintf 'supervisor\\n' >> "$ORDER_FILE"\nprintf 'FORWARD_RECOVERY_SUPERVISOR_READY\\n' > "$HELPER_DIR/recovery-supervisor-ready"\nchmod 600 "$HELPER_DIR/recovery-supervisor-ready"\n`, { mode: 0o700 });
+  const script = `
+    set -euo pipefail
+    recovery_helper="$TEST_ROOT/forward-deploy-recovery.sh"
+    recovery_result="$TEST_ROOT/recovery-result"
+    recovery_ready="$TEST_ROOT/recovery-supervisor-ready"
+    HELPER_DIR="$TEST_ROOT"
+    TARGET_SHA=${FORWARD_TARGET_SHA}
+    ATTEMPT_ID=${forwardAttemptId}
+    APP_URL=https://example.invalid
+    DIAGNOSTIC_TIMEOUT_SECONDS=10
+    REVISION_PROOF_TIMEOUT_SECONDS=30
+    STATE_OPERATION_TIMEOUT_SECONDS=15
+    SHORT_KILL_GRACE_SECONDS=2
+    PHASE_KILL_GRACE_SECONDS=15
+    ROLLBACK_TIMEOUT_SECONDS=300
+    RECOVERY_LOCK_WAIT_SECONDS=2692
+    RECOVERY_SUPERVISOR_HANDSHAKE_SECONDS=10
+    exec 9>"$TEST_ROOT/parent-mutation.lock"
+    ${source}
+    launch_recovery_supervisor
+    printf 'mutation\\n' >> "$ORDER_FILE"
+  `;
+  const result = spawnSync('bash', ['-c', script], {
+    encoding: 'utf8',
+    env: { ...process.env, TEST_ROOT: root, DESCRIPTOR_FILE: descriptor, ORDER_FILE: order },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(fs.readFileSync(descriptor, 'utf8').trim(), 'CLOSED');
+  assert.equal(fs.readFileSync(order, 'utf8'), 'supervisor\nmutation\n');
+  const launch = workflow.indexOf('launch_recovery_supervisor ||');
+  const mutation = workflow.indexOf('NEXT_STATE=MUTATION_STARTED', launch);
+  assert(launch !== -1 && mutation > launch);
+  assert.match(source, /9>&-/);
+});
+
+test('closed SSH output pipe cannot prevent inline legacy rollback', (t) => {
+  const extractFunction = (name) => {
+    const match = workflow.match(new RegExp(`^ {10}${name}\\(\\) \\{([\\s\\S]*?)^ {10}\\}$`, 'm'));
+    assert.ok(match, `${name} must remain extractable`);
+    return `${name}() {${match[1].replace(/^ {10}/gm, '')}\n}`;
+  };
+  const marker = path.join(os.tmpdir(), `oasis-forward-epipe-rollback-${process.pid}`);
+  fs.rmSync(marker, { force: true });
+  t.after(() => fs.rmSync(marker, { force: true }));
+  const script = `
+    set -euo pipefail
+    forward_state_root=/synthetic
+    ATTEMPT_ID=${forwardAttemptId}
+    forward_helper=/synthetic/state.mjs
+    diagnostic_file=/dev/null
+    STATE_OPERATION_TIMEOUT_SECONDS=15
+    SHORT_KILL_GRACE_SECONDS=2
+    failure_armed=1
+    timeout() {
+      while [[ "$1" == --* ]]; do shift; done
+      shift
+      if [ "$1" = env ]; then
+        shift
+        while [[ "$1" == *=* ]]; do export "$1"; shift; done
+      fi
+      "$@"
+    }
+    node() { return 0; }
+    capture_sanitized_diagnostics() { api_state_category=OTHER; web_state_category=OTHER; caddy_state_category=OTHER; api_log_category=NO_MATCH; web_log_category=NO_MATCH; caddy_log_category=NO_MATCH; }
+    persist_failure_evidence() { safe_status FORWARD_FAILURE_EVIDENCE_RECORDED; }
+    rollback_legacy_runtime() { touch "$ROLLBACK_MARKER"; return 0; }
+    ${extractFunction('safe_status')}
+    ${extractFunction('recover_from_failure')}
+    exec 1>&-
+    set +e
+    recover_from_failure UNEXPECTED_FAILURE UNEXPECTED_EXIT
+    set -e
+    [ -f "$ROLLBACK_MARKER" ]
+  `;
+  const result = spawnSync('bash', ['-c', script], {
+    encoding: 'utf8',
+    env: { ...process.env, ROLLBACK_MARKER: marker },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(fs.existsSync(marker), true);
 });
 
 test('API-unhealthy and web-blocked replacement evidence is classified without emitting raw logs', (t) => {
@@ -962,6 +1181,7 @@ test('API-unhealthy and web-blocked replacement evidence is classified without e
   const script = `
     set -euo pipefail
     diagnostic_file="$TEST_DIAGNOSTIC"
+    diagnostic_material="$(<"$diagnostic_file")"
     api_id=${'a'.repeat(64)}
     fake_compose() {
       service="\${!#}"
@@ -972,7 +1192,8 @@ test('API-unhealthy and web-blocked replacement evidence is classified without e
       if [ "$1" = logs ]; then return 0; fi
       return 1
     }
-    timeout() { shift; "$@"; }
+    timeout() { while [[ "$1" == --* ]]; do shift; done; shift; "$@"; }
+    SHORT_KILL_GRACE_SECONDS=2
     DIAGNOSTIC_TIMEOUT_SECONDS=10
     compose=(fake_compose)
     ${stateSource}
@@ -1145,7 +1366,7 @@ esac
   assert.doesNotMatch(unhealthy.stdout, /FORWARD_ROLLBACK_COMPLETE/);
 });
 
-test('detached recovery resumes after transport and supervisor termination and removes every uncommitted target runtime', async (t) => {
+test('lock-wait exhaustion is non-terminal and exactly one resumed supervisor restores immutable legacy', async (t) => {
   if (process.platform === 'darwin') {
     t.skip('the production recovery supervisor requires Linux flock and Bash 4; exercised on GitHub Linux CI');
     return;
@@ -1159,25 +1380,20 @@ test('detached recovery resumes after transport and supervisor termination and r
   });
   await waitForPath(holderReady);
 
-  const firstSupervisor = spawn('bash', [recoveryHelperPath], { env: fixture.env, stdio: 'ignore' });
-  await new Promise((resolve) => setTimeout(resolve, 150));
+  const shortWaitEnv = { ...fixture.env, RECOVERY_LOCK_WAIT_SECONDS: '1' };
+  const firstSupervisor = spawn('bash', [fixture.stagedRecoveryHelper], { env: shortWaitEnv, stdio: 'ignore' });
+  const first = await waitForChild(firstSupervisor, 5000);
+  assert.equal(first.code, 0);
   assert.equal(fs.existsSync(path.join(fixture.helperDir, 'recovery-result')), false);
-  firstSupervisor.kill('SIGTERM');
-  await waitForChild(firstSupervisor);
-  assert.equal(fs.existsSync(path.join(fixture.helperDir, 'recovery-result')), false);
+  assert.equal(fs.existsSync(fixture.stagedRecoveryHelper), true, 'lock timeout must preserve recovery tooling');
+  assert.equal(fs.existsSync(path.join(fixture.helperDir, 'recovery-supervisor-ready')), false);
 
-  const resumedSupervisor = spawn('bash', [recoveryHelperPath], { env: fixture.env, stdio: ['ignore', 'pipe', 'pipe'] });
-  let resumedStdout = '';
-  let resumedStderr = '';
-  resumedSupervisor.stdout.on('data', (chunk) => { resumedStdout += chunk; });
-  resumedSupervisor.stderr.on('data', (chunk) => { resumedStderr += chunk; });
-  await new Promise((resolve) => setTimeout(resolve, 150));
   holder.kill('SIGTERM');
   await waitForChild(holder);
-  const resumed = await waitForChild(resumedSupervisor);
-  assert.equal(resumed.code, 1);
-  assert.equal(resumedStdout, '');
-  assert.equal(resumedStderr, '');
+  const resumedA = spawn('bash', [fixture.stagedRecoveryHelper], { env: shortWaitEnv, stdio: 'ignore' });
+  const resumedB = spawn('bash', [fixture.stagedRecoveryHelper], { env: shortWaitEnv, stdio: 'ignore' });
+  const [resultA, resultB] = await Promise.all([waitForChild(resumedA), waitForChild(resumedB)]);
+  assert.deepEqual([resultA.code, resultB.code].sort(), [0, 1]);
   const result = fs.readFileSync(path.join(fixture.helperDir, 'recovery-result'), 'utf8').trim();
   assert.equal(result, 'FORWARD_RECOVERY_LEGACY_VERIFIED');
   assert.equal(fs.readFileSync(fixture.runtimeMode, 'utf8').trim(), 'legacy');
@@ -1186,6 +1402,7 @@ test('detached recovery resumes after transport and supervisor termination and r
   assert.equal(state.failureClass, 'TRANSPORT_RECOVERY_REQUIRED');
   assert.equal(state.failureEvidence?.phase, 'TRANSPORT');
   const commands = fs.readFileSync(fixture.commandLog, 'utf8');
+  assert.equal((commands.match(/--no-build --pull never/g) ?? []).length, 1);
   assert.match(commands, /--no-build --pull never/);
   assert.match(commands, new RegExp(`oasis-legacy-bootstrap-api:${legacyAttemptId}`));
   assert.match(commands, new RegExp(`oasis-legacy-bootstrap-web:${legacyAttemptId}`));
@@ -1194,6 +1411,9 @@ test('detached recovery resumes after transport and supervisor termination and r
   for (const name of ['recovery-diagnostic', 'recovery-legacy-binding', 'recovery-rollback-override.yml']) {
     assert.equal(fs.existsSync(path.join(fixture.helperDir, name)), false, `${name} must be deleted`);
   }
+  const afterTerminal = spawnSync('bash', [fixture.stagedRecoveryHelper], { env: shortWaitEnv, encoding: 'utf8' });
+  assert.equal(afterTerminal.status, 0, afterTerminal.stderr);
+  assert.equal((fs.readFileSync(fixture.commandLog, 'utf8').match(/--no-build --pull never/g) ?? []).length, 1);
 });
 
 test('recovery authenticates completion written before an uncertain return and does not roll it back', async (t) => {
