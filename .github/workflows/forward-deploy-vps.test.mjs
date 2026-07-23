@@ -812,6 +812,15 @@ test('success, controlled failure, unexpected exit, and TERM remove raw diagnost
       evidence: 'UNEXPECTED_FAILURE:UNEXPECTED_EXIT',
     },
     {
+      name: 'interrupted-fetch',
+      armed: 1,
+      action: 'false',
+      status: 1,
+      fetchPersisted: true,
+      output: 'FORWARD_STATE_RECOVERABLE_FAILURE\nFORWARD_FAILURE_EVIDENCE_RECORDED\nFORWARD_ROLLBACK_COMPLETE\nFORWARD_RECOVERY_REQUIRED\n',
+      evidence: 'CHECKOUT_FAILED:CHECKOUT',
+    },
+    {
       name: 'rollback-failure',
       armed: 1,
       action: 'record_recoverable_failure CONTAINER_HEALTH_FAILED CONTAINER_HEALTH',
@@ -872,6 +881,9 @@ test('success, controlled failure, unexpected exit, and TERM remove raw diagnost
         api_log_category=READINESS_FAILURE
         web_log_category=READINESS_FAILURE
         caddy_log_category=NO_MATCH
+      }
+      fetch_diagnostic_is_persisted() {
+        ${testCase.fetchPersisted ? 'return 0' : 'return 1'}
       }
       persist_failure_evidence() {
         printf '%s:%s' "$1" "$2" > "$TEST_EVIDENCE"
@@ -1907,6 +1919,40 @@ test('lock-wait exhaustion is non-terminal and exactly one resumed supervisor re
   const afterTerminal = spawnSync('bash', [fixture.stagedRecoveryHelper], { env: shortWaitEnv, encoding: 'utf8' });
   assert.equal(afterTerminal.status, 0, afterTerminal.stderr);
   assert.equal((fs.readFileSync(fixture.commandLog, 'utf8').match(/--no-build --pull never/g) ?? []).length, 1);
+});
+
+test('detached recovery preserves a fetch failure persisted immediately before transport loss', async (t) => {
+  if (process.platform === 'darwin') {
+    t.skip('the production recovery supervisor requires Linux flock and Bash 4; exercised on GitHub Linux CI');
+    return;
+  }
+  const fixture = await makeExecutableRecoveryFixture(t);
+  recordFetchDiagnostic({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    exitStatus: 23,
+    category: 'FETCH_PACK_FINALIZATION',
+  });
+  const result = spawnSync('bash', [fixture.stagedRecoveryHelper], {
+    env: fixture.env,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.equal(result.stderr, '');
+  assert.equal(
+    fs.readFileSync(path.join(fixture.helperDir, 'recovery-result'), 'utf8').trim(),
+    'FORWARD_RECOVERY_LEGACY_VERIFIED',
+  );
+  const state = readForwardState({ rootDir: fixture.forwardRoot, attemptId: forwardAttemptId });
+  assert.equal(state.state, FORWARD_STATES.RECOVERABLE_FAILURE);
+  assert.equal(state.failureClass, 'CHECKOUT_FAILED');
+  assert.equal(state.failureEvidence?.phase, 'CHECKOUT');
+  assert.deepEqual(state.fetchDiagnostic, {
+    exitStatus: 23,
+    category: 'FETCH_PACK_FINALIZATION',
+  });
+  assert.equal(fs.readFileSync(fixture.runtimeMode, 'utf8').trim(), 'legacy');
 });
 
 test('recovery authenticates completion written before an uncertain return and does not roll it back', async (t) => {

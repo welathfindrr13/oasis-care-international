@@ -257,6 +257,14 @@ ensure_existing_failure_evidence() {
   esac
 }
 
+fetch_diagnostic_is_persisted() {
+  local fetch_state
+  fetch_state="$(timeout --foreground --signal=TERM --kill-after="${SHORT_KILL_GRACE_SECONDS}s" "${STATE_OPERATION_TIMEOUT_SECONDS}s" \
+    env FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
+    node "$forward_helper" inspect-fetch 2>"$diagnostic_file")" || return 1
+  [ "$fetch_state" = FORWARD_FETCH_DIAGNOSTIC_PRESENT ]
+}
+
 verify_service_health_and_image() {
   local service="$1" expected_image="$2" container_id health_status running_image
   container_id="$(timeout --signal=TERM --kill-after="${SHORT_KILL_GRACE_SECONDS}s" "${DIAGNOSTIC_TIMEOUT_SECONDS}s" "${compose[@]}" ps -q "$service" 2>/dev/null)" || return 1
@@ -360,9 +368,15 @@ case "$state_output" in
     record_recovery_evidence COMPLETION_STATE_UNCERTAIN COMPLETION || true
     ;;
   FORWARD_STATE_MUTATION_STARTED)
+    mutation_failure_class=TRANSPORT_RECOVERY_REQUIRED
+    mutation_failure_phase=TRANSPORT
+    if fetch_diagnostic_is_persisted; then
+      mutation_failure_class=CHECKOUT_FAILED
+      mutation_failure_phase=CHECKOUT
+    fi
     timeout --foreground --signal=TERM --kill-after="${SHORT_KILL_GRACE_SECONDS}s" "${STATE_OPERATION_TIMEOUT_SECONDS}s" \
       env FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
-      NEXT_STATE=RECOVERABLE_FAILURE FAILURE_CLASS=TRANSPORT_RECOVERY_REQUIRED \
+      NEXT_STATE=RECOVERABLE_FAILURE FAILURE_CLASS="$mutation_failure_class" \
       node "$forward_helper" transition >"$diagnostic_file" 2>&1 || {
         if rollback_legacy_runtime; then
           recovery_armed=0
@@ -372,7 +386,7 @@ case "$state_output" in
         fi
         exit 1
       }
-    record_recovery_evidence TRANSPORT_RECOVERY_REQUIRED TRANSPORT || true
+    record_recovery_evidence "$mutation_failure_class" "$mutation_failure_phase" || true
     ;;
   FORWARD_STATE_RECOVERABLE_FAILURE|FORWARD_STATE_COMPLETION_UNCERTAIN)
     ensure_existing_failure_evidence || true

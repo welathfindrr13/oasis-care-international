@@ -927,6 +927,14 @@ async function main() {
       }
       return;
     }
+    if (command === 'inspect-fetch') {
+      const result = readForwardState({
+        rootDir: process.env.FORWARD_STATE_ROOT,
+        attemptId: process.env.ATTEMPT_ID,
+      });
+      process.stdout.write(`FORWARD_FETCH_DIAGNOSTIC_${result.fetchDiagnostic === null ? 'ABSENT' : 'PRESENT'}\n`);
+      return;
+    }
     if (command === 'classify-fetch') {
       const diagnostic = classifyGitFetchDiagnosticFile({
         diagnosticFile: process.env.FETCH_DIAGNOSTIC_FILE,

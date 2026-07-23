@@ -550,6 +550,16 @@ jobs:
             return 0
           }
 
+          fetch_diagnostic_is_persisted() {
+            local fetch_state
+            fetch_state="$(
+              timeout --foreground --signal=TERM --kill-after="${SHORT_KILL_GRACE_SECONDS}s" "${STATE_OPERATION_TIMEOUT_SECONDS}s" \
+                env FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
+                node "$forward_helper" inspect-fetch 2>"$diagnostic_file"
+            )" || return 1
+            [ "$fetch_state" = FORWARD_FETCH_DIAGNOSTIC_PRESENT ]
+          }
+
           rollback_legacy_runtime() {
             local service container_id health_status running_image image_key postgres_container postgres_health
             verify_rollback_aliases || return 1
@@ -595,6 +605,10 @@ jobs:
             trap - HUP INT TERM
             failure_armed=0
             capture_sanitized_diagnostics
+            if [ "$failure_class" != CHECKOUT_FAILED ] && fetch_diagnostic_is_persisted; then
+              failure_class=CHECKOUT_FAILED
+              failure_phase=CHECKOUT
+            fi
             if [ "$failure_class" = COMPLETION_STATE_UNCERTAIN ]; then
               next_state=COMPLETION_UNCERTAIN
             fi
