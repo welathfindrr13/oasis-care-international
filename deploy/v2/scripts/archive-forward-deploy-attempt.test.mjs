@@ -24,8 +24,10 @@ import {
 } from './legacy-bootstrap-state.mjs';
 import {
   FORWARD_STATES,
+  FORWARD_TARGET_SHA,
   prepareForwardState,
   readForwardState,
+  readForwardStateForTarget,
   readLegacyBinding,
   recordFailureEvidence,
   transitionForwardState,
@@ -106,7 +108,7 @@ async function createFixture(t, { state = FORWARD_STATES.RECOVERABLE_FAILURE, wi
 
   await prepareForwardState({
     rootDir: forwardRoot,
-    targetSha: ARCHIVABLE_TARGET_SHA,
+    targetSha: FORWARD_TARGET_SHA,
     workflowSha: ARCHIVABLE_WORKFLOW_SHA,
     originMainSha: ARCHIVABLE_WORKFLOW_SHA,
     repository: ARCHIVABLE_REPOSITORY,
@@ -146,6 +148,12 @@ async function createFixture(t, { state = FORWARD_STATES.RECOVERABLE_FAILURE, wi
       failureClass: 'COMPLETION_STATE_UNCERTAIN',
     });
   }
+
+  const manifestPath = path.join(forwardRoot, 'attempts', ARCHIVABLE_ATTEMPT_ID, 'manifest.json');
+  const historicalManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  historicalManifest.targetSha = ARCHIVABLE_TARGET_SHA;
+  fs.writeFileSync(manifestPath, `${JSON.stringify(historicalManifest)}\n`, { mode: 0o600 });
+  fs.chmodSync(manifestPath, 0o600);
 
   const lockFd = fs.openSync(mutationLock, 'r+');
   t.after(() => {
@@ -443,7 +451,11 @@ test('archives the exact failed attempt atomically and preserves every state byt
   assert.equal(fs.existsSync(fixture.forwardRoot), false);
   assert.equal(result.destinationRoot, fixture.archivedRoot);
   assert.deepEqual(snapshotTree(fixture.archivedRoot), before);
-  const archived = readForwardState({ rootDir: fixture.archivedRoot, attemptId: ARCHIVABLE_ATTEMPT_ID });
+  const archived = readForwardStateForTarget({
+    rootDir: fixture.archivedRoot,
+    attemptId: ARCHIVABLE_ATTEMPT_ID,
+    expectedTargetSha: ARCHIVABLE_TARGET_SHA,
+  });
   assert.equal(archived.state, FORWARD_STATES.RECOVERABLE_FAILURE);
   assert.equal(archived.failureClass, ARCHIVABLE_FAILURE_CLASS);
   assert.deepEqual(archived.failureEvidence, {
@@ -467,7 +479,7 @@ test('a consumed incident can be archived once, a fresh root can be prepared onc
 
   await prepareForwardState({
     rootDir: fixture.forwardRoot,
-    targetSha: ARCHIVABLE_TARGET_SHA,
+    targetSha: FORWARD_TARGET_SHA,
     workflowSha: ARCHIVE_REVIEW_BASE_SHA,
     originMainSha: ARCHIVE_REVIEW_BASE_SHA,
     repository: ARCHIVABLE_REPOSITORY,
@@ -482,7 +494,7 @@ test('a consumed incident can be archived once, a fresh root can be prepared onc
   await assert.rejects(
     prepareForwardState({
       rootDir: fixture.forwardRoot,
-      targetSha: ARCHIVABLE_TARGET_SHA,
+      targetSha: FORWARD_TARGET_SHA,
       workflowSha: ARCHIVE_REVIEW_BASE_SHA,
       originMainSha: ARCHIVE_REVIEW_BASE_SHA,
       repository: ARCHIVABLE_REPOSITORY,
@@ -499,7 +511,11 @@ test('a consumed incident can be archived once, a fresh root can be prepared onc
 test('a valid historical failure with no retained diagnostic evidence remains archivable without inventing evidence', async (t) => {
   const fixture = await createFixture(t, { withEvidence: false });
   await fixture.archive();
-  const archived = readForwardState({ rootDir: fixture.archivedRoot, attemptId: ARCHIVABLE_ATTEMPT_ID });
+  const archived = readForwardStateForTarget({
+    rootDir: fixture.archivedRoot,
+    attemptId: ARCHIVABLE_ATTEMPT_ID,
+    expectedTargetSha: ARCHIVABLE_TARGET_SHA,
+  });
   assert.equal(archived.state, FORWARD_STATES.RECOVERABLE_FAILURE);
   assert.equal(archived.failureClass, ARCHIVABLE_FAILURE_CLASS);
   assert.equal(archived.failureEvidence, null);
@@ -805,6 +821,9 @@ test('the production wrapper is identity- and lock-bound and contains no deploym
   const wrapper = fs.readFileSync(wrapperPath, 'utf8');
   assert.match(wrapper, /EXPECTED_USER=deploy/);
   assert.match(wrapper, /EXPECTED_REPOSITORY_ROOT=\/opt\/oasis-care/);
+  assert.equal(ARCHIVABLE_TARGET_SHA, '18aacd8458a3f96a38bf470d9a4c837ad563fa5c');
+  assert.match(wrapper, /EXPECTED_TARGET_SHA=18aacd8458a3f96a38bf470d9a4c837ad563fa5c/);
+  assert.doesNotMatch(wrapper, /EXPECTED_TARGET_SHA=841b08e886446a7dbf019198b9c36426e245ee21/);
   assert.match(wrapper, /\^\/var\/tmp\/oasis-forward-archive\\\./);
   assert.match(wrapper, /deploy:deploy:700/);
   assert.match(wrapper, /archive_helper="\$helper_dir\/archive-forward-deploy-attempt\.mjs"/);

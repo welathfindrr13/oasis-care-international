@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 
 import {
   FORWARD_STATES,
-  readForwardState,
+  readForwardStateForTarget,
   verifyLegacyStateUnchanged,
 } from './forward-deploy-state.mjs';
 
@@ -165,7 +165,11 @@ function validateIncidentState(state, attemptId) {
 
 function readIncidentState(rootDir, attemptId) {
   try {
-    const state = readForwardState({ rootDir, attemptId });
+    const state = readForwardStateForTarget({
+      rootDir,
+      attemptId,
+      expectedTargetSha: ARCHIVABLE_TARGET_SHA,
+    });
     validateIncidentState(state, attemptId);
     return state;
   } catch (error) {
@@ -176,7 +180,13 @@ function readIncidentState(rootDir, attemptId) {
 
 async function verifyLegacyBinding({ rootDir, attemptId, legacyStateDir, legacyStateHelper }) {
   try {
-    await verifyLegacyStateUnchanged({ rootDir, attemptId, legacyStateDir, legacyStateHelper });
+    await verifyLegacyStateUnchanged({
+      rootDir,
+      attemptId,
+      legacyStateDir,
+      legacyStateHelper,
+      expectedTargetSha: ARCHIVABLE_TARGET_SHA,
+    });
   } catch (error) {
     if (error instanceof ForwardArchiveError) throw error;
     fail('FORWARD_ARCHIVE_LEGACY_UNSAFE');

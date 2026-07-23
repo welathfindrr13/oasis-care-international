@@ -70,8 +70,49 @@ const managerSubject = localSubject("admin", "manager@local.dev");
 const careManagerSubject = localSubject("admin", "care-manager@local.dev");
 const officeSubject = localSubject("admin", "office@local.dev");
 
+function currentLondonNoon(now = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  });
+  const parts = Object.fromEntries(
+    formatter
+      .formatToParts(now)
+      .filter(({ type }) => type !== "literal")
+      .map(({ type, value }) => [type, Number(value)]),
+  );
+  const utcNoon = Date.UTC(parts.year, parts.month - 1, parts.day, 12);
+  const candidates = [utcNoon, utcNoon - 60 * 60 * 1000]
+    .map((value) => new Date(value))
+    .filter((candidate) => {
+      const candidateParts = Object.fromEntries(
+        formatter
+          .formatToParts(candidate)
+          .filter(({ type }) => type !== "literal")
+          .map(({ type, value }) => [type, Number(value)]),
+      );
+      return (
+        candidateParts.year === parts.year &&
+        candidateParts.month === parts.month &&
+        candidateParts.day === parts.day &&
+        candidateParts.hour === 12
+      );
+    });
+  if (candidates.length !== 1) {
+    throw new Error("Unable to resolve a unique London fixture noon");
+  }
+  return candidates[0];
+}
+
 const prisma = new PrismaClient();
-const scheduledStart = new Date(Date.now() + 60 * 60 * 1000);
+// Keep browser visits inside the current London calendar day even when CI runs
+// late in the evening. The UI treats any scheduled visit in today's range as
+// the next visit, so a fixed local noon is deterministic across DST.
+const scheduledStart = currentLondonNoon();
 const scheduledEnd = new Date(scheduledStart.getTime() + 60 * 60 * 1000);
 
 try {
