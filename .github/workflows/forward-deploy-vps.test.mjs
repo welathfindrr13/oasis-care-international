@@ -941,7 +941,8 @@ test('workflow forces excluded medication, no migrations, service-only replaceme
 
 test('effective deploy identity is enforced before helper staging, state preparation, and mutation', () => {
   assert.match(workflow, /OASIS_PRODUCTION_VPS_USER" = "deploy"/);
-  assert.match(workflow, /effective_user="\$\(id -un 2>\/dev\/null\)"\s+\[ "\$effective_user" = deploy \] \|\| exit 1/);
+  assert.match(workflow, /effective_user="\$\(id -un 2>\/dev\/null\)" \|\| fail_target_probe DEPLOY_TARGET_IDENTITY_FAILED/);
+  assert.match(workflow, /\[ "\$effective_user" = deploy \] \|\| fail_target_probe DEPLOY_TARGET_IDENTITY_FAILED/);
   assert.match(workflow, /\[ "\$\(id -un 2>\/dev\/null\)" = "deploy" \] \|\| fail_remote FORWARD_REMOTE_IDENTITY_INVALID/);
   const probe = workflow.indexOf("<<'FORWARD_REMOTE_TARGET_PROBE'");
   const helperDirectory = workflow.indexOf('mktemp -d /var/tmp/oasis-forward-deploy.', probe);
@@ -960,10 +961,27 @@ test('remote target probe executes in Bash and gates helper creation and transfe
   const productionProbe = match[1].replace(/^ {10}/gm, '');
   const markerAssignment = 'target_class_file=/etc/oasis/production-deploy-target-class';
   assert.equal(productionProbe.split(markerAssignment).length - 1, 1);
+  assert.match(productionProbe, /\[ -r "\$target_class_file" \] \|\|\n  fail_target_probe DEPLOY_TARGET_READABILITY_FAILED/);
+
+  const stageStart = workflow.indexOf('      - name: Stage reviewed forward helpers');
+  const stageEnd = workflow.indexOf('      - name: Run approved forward deployment', stageStart);
+  const stage = workflow.slice(stageStart, stageEnd);
+  const reducerMatch = stage.match(
+    /          marker_status=\$\?\n([\s\S]*?)\n          printf 'FORWARD_REMOTE_IDENTITY_VALID\\n'\n          printf 'DEPLOY_TARGET_PRODUCTION\\n'/,
+  );
+  assert.ok(reducerMatch, 'target-probe reducer must remain extractable');
+  const reducer = [
+    'marker_status=$?',
+    reducerMatch[1].replace(/^ {10}/gm, ''),
+    "printf 'FORWARD_REMOTE_IDENTITY_VALID\\n'",
+    "printf 'DEPLOY_TARGET_PRODUCTION\\n'",
+  ].join('\n');
 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oasis-forward-target-probe-'));
   const toolsDir = path.join(root, 'tools');
-  const marker = path.join(root, 'production-deploy-target-class');
+  const etcDir = path.join(root, 'etc');
+  const oasisDir = path.join(etcDir, 'oasis');
+  const marker = path.join(oasisDir, 'production-deploy-target-class');
   const helperDirectory = path.join(root, 'remote-helper-directory');
   const transferMarker = path.join(root, 'helper-transfer');
   fs.mkdirSync(toolsDir, { mode: 0o700 });
@@ -977,36 +995,74 @@ test('remote target probe executes in Bash and gates helper creation and transfe
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  const executableProbe = productionProbe.replace(
-    markerAssignment,
-    'target_class_file="$TEST_TARGET_CLASS_FILE"',
-  );
+  const executableProbe = productionProbe
+    .replace(markerAssignment, 'target_class_file="$TEST_TARGET_CLASS_FILE"')
+    .replace(
+      'for target_class_parent in / /etc /etc/oasis; do',
+      'for target_class_parent in "$TEST_ROOT" "$TEST_ETC_DIR" "$TEST_OASIS_DIR"; do',
+    )
+    .replace(
+      '[ -r "$target_class_file" ] ||\n  fail_target_probe DEPLOY_TARGET_READABILITY_FAILED',
+      '[ "${TEST_FORCE_UNREADABLE:-0}" != 1 ] && [ -r "$target_class_file" ] ||\n'
+        + '  fail_target_probe DEPLOY_TARGET_READABILITY_FAILED',
+    );
   const stageHarness = `
     set -euo pipefail
     marker_capture="$(mktemp)"
-    trap 'rm -f "$marker_capture"' EXIT
+    marker_stderr="$(mktemp)"
+    trap 'rm -f "$marker_capture" "$marker_stderr"' EXIT
     set +e
-    bash -se >"$marker_capture" 2>/dev/null <<'FORWARD_REMOTE_TARGET_PROBE'
+    case "$TEST_SSH_MODE" in
+      remote)
+        bash -se >"$marker_capture" 2>"$marker_stderr" <<'FORWARD_REMOTE_TARGET_PROBE'
 ${executableProbe}
 FORWARD_REMOTE_TARGET_PROBE
-    marker_status=$?
-    set -e
-    if [ "$marker_status" -ne 0 ] || [ "$(cat "$marker_capture")" != $'FORWARD_REMOTE_IDENTITY_VALID\\nDEPLOY_TARGET_PRODUCTION' ]; then
-      printf 'DEPLOY_TARGET_PROOF_FAILED\\n' >&2
-      exit 1
-    fi
-    cat "$marker_capture"
+        ;;
+      status)
+        : > "$marker_capture"
+        printf 'raw transport detail must remain private\\n' > "$marker_stderr"
+        false
+        ;;
+      mismatch)
+        printf 'UNEXPECTED_REMOTE_OUTPUT\\n' > "$marker_capture"
+        printf 'raw remote detail must remain private\\n' > "$marker_stderr"
+        true
+        ;;
+      unknown-failure)
+        printf 'UNEXPECTED_REMOTE_OUTPUT\\n' > "$marker_capture"
+        printf 'raw remote detail must remain private\\n' > "$marker_stderr"
+        false
+        ;;
+    esac
+${reducer}
     mkdir "$TEST_HELPER_DIRECTORY"
     : > "$TEST_TRANSFER_MARKER"
   `;
 
-  const runProbe = ({ effectiveUser = 'deploy', markerContents, markerMode = 0o600 } = {}) => {
-    fs.rmSync(marker, { force: true });
+  const runProbe = ({
+    effectiveUser = 'deploy',
+    markerContents,
+    markerMode = 0o600,
+    markerType = 'file',
+    sshMode = 'remote',
+    traversalFailure = false,
+    forceUnreadable = false,
+  } = {}) => {
+    if (fs.existsSync(marker) && !fs.lstatSync(marker).isSymbolicLink()) fs.chmodSync(marker, 0o600);
+    fs.rmSync(etcDir, { recursive: true, force: true });
     fs.rmSync(helperDirectory, { recursive: true, force: true });
     fs.rmSync(transferMarker, { force: true });
-    if (markerContents !== undefined) {
+    fs.mkdirSync(etcDir, { mode: 0o700 });
+    if (traversalFailure) {
+      fs.writeFileSync(oasisDir, 'not a directory', { mode: 0o600 });
+    } else {
+      fs.mkdirSync(oasisDir, { mode: 0o700 });
+    }
+    if (!traversalFailure && markerType === 'file' && markerContents !== undefined) {
       fs.writeFileSync(marker, markerContents, { mode: markerMode });
       fs.chmodSync(marker, markerMode);
+    } else if (!traversalFailure && markerType === 'symlink') {
+      fs.symlinkSync(path.join(root, 'outside-marker'), marker);
     }
     const result = spawnSync('bash', ['-c', stageHarness], {
       encoding: 'utf8',
@@ -1015,11 +1071,16 @@ FORWARD_REMOTE_TARGET_PROBE
         PATH: `${toolsDir}:${process.env.PATH}`,
         TEST_EFFECTIVE_USER: effectiveUser,
         TEST_TARGET_CLASS_FILE: marker,
+        TEST_ROOT: root,
+        TEST_ETC_DIR: etcDir,
+        TEST_OASIS_DIR: oasisDir,
+        TEST_FORCE_UNREADABLE: forceUnreadable ? '1' : '0',
+        TEST_SSH_MODE: sshMode,
         TEST_HELPER_DIRECTORY: helperDirectory,
         TEST_TRANSFER_MARKER: transferMarker,
       },
     });
-    if (fs.existsSync(marker)) fs.chmodSync(marker, 0o600);
+    if (fs.existsSync(marker) && !fs.lstatSync(marker).isSymbolicLink()) fs.chmodSync(marker, 0o600);
     return result;
   };
 
@@ -1030,15 +1091,59 @@ FORWARD_REMOTE_TARGET_PROBE
   assert.equal(fs.existsSync(transferMarker), true);
 
   for (const failure of [
-    { name: 'wrong user', effectiveUser: 'root', markerContents: 'production\n' },
-    { name: 'missing proof' },
-    { name: 'unreadable proof', markerContents: 'production\n', markerMode: 0o000 },
-    { name: 'incorrect proof', markerContents: 'staging\n' },
+    {
+      name: 'SSH status',
+      sshMode: 'status',
+      category: 'DEPLOY_TARGET_SSH_STATUS_FAILED',
+    },
+    {
+      name: 'wrong user',
+      effectiveUser: 'root',
+      markerContents: 'production\n',
+      category: 'DEPLOY_TARGET_IDENTITY_FAILED',
+    },
+    {
+      name: 'traversal',
+      traversalFailure: true,
+      category: 'DEPLOY_TARGET_TRAVERSAL_FAILED',
+    },
+    {
+      name: 'missing proof',
+      category: 'DEPLOY_TARGET_FILE_TYPE_FAILED',
+    },
+    {
+      name: 'symlink proof',
+      markerType: 'symlink',
+      category: 'DEPLOY_TARGET_FILE_TYPE_FAILED',
+    },
+    {
+      name: 'unreadable proof',
+      markerContents: 'production\n',
+      markerMode: 0o000,
+      forceUnreadable: true,
+      category: 'DEPLOY_TARGET_READABILITY_FAILED',
+    },
+    {
+      name: 'incorrect proof',
+      markerContents: 'staging\n',
+      category: 'DEPLOY_TARGET_VALUE_COMPARISON_FAILED',
+    },
+    {
+      name: 'successful SSH with unexpected output',
+      sshMode: 'mismatch',
+      category: 'DEPLOY_TARGET_OUTPUT_MISMATCH',
+    },
+    {
+      name: 'failed SSH with unexpected output',
+      sshMode: 'unknown-failure',
+      category: 'DEPLOY_TARGET_OUTPUT_MISMATCH',
+    },
   ]) {
     const result = runProbe(failure);
     assert.notEqual(result.status, 0, failure.name);
     assert.equal(result.stdout, '', failure.name);
-    assert.equal(result.stderr, 'DEPLOY_TARGET_PROOF_FAILED\n', failure.name);
+    assert.equal(result.stderr, `${failure.category}\n`, failure.name);
+    assert.doesNotMatch(result.stderr, /raw .* detail/, failure.name);
     assert.equal(fs.existsSync(helperDirectory), false, `${failure.name}: helper directory`);
     assert.equal(fs.existsSync(transferMarker), false, `${failure.name}: helper transfer`);
   }
