@@ -12,9 +12,12 @@ import {
 } from '../../deploy/v2/scripts/legacy-bootstrap-state.mjs';
 import {
   EXPECTED_LEGACY_STATE,
+  FETCH_DIAGNOSTIC_CATEGORIES,
   FORWARD_STATES,
   FORWARD_TARGET_SHA,
   adjudicateForwardStateUnderMutationLock,
+  classifyGitFetchFailure,
+  recordFetchDiagnostic,
   recordFailureEvidence,
   prepareForwardState,
   readForwardState,
@@ -44,6 +47,7 @@ const legacyHelperPath = fileURLToPath(
 const recoveryHelperPath = fileURLToPath(
   new URL('../../deploy/v2/scripts/forward-deploy-recovery.sh', import.meta.url),
 );
+const recoveryHelper = fs.readFileSync(recoveryHelperPath, 'utf8');
 const forwardHelperPath = fileURLToPath(
   new URL('../../deploy/v2/scripts/forward-deploy-state.mjs', import.meta.url),
 );
@@ -688,6 +692,88 @@ test('sanitized failure evidence is immutable, fixed-category, and bound to the 
   assert.doesNotMatch(fs.readFileSync(evidencePath, 'utf8'), /password|secret|token/i);
 });
 
+test('fetch diagnostics preserve exact statuses and reduce stderr to credential-safe fixed categories', () => {
+  const cases = [
+    [23, 'fatal: index-pack failed', 'FETCH_PACK_FINALIZATION'],
+    [42, 'fatal: an unclassified git failure', 'FETCH_UNKNOWN'],
+    [124, 'secret=do-not-retain', 'FETCH_TIMEOUT'],
+    [137, 'token=do-not-retain', 'FETCH_TERMINATED'],
+    [143, 'Authorization: Bearer do-not-retain', 'FETCH_TERMINATED'],
+    [1, 'fatal: Authentication failed for https://user:password@example.invalid/repo.git', 'FETCH_AUTHENTICATION'],
+    [1, 'fatal: unable to access: Could not resolve host: example.invalid', 'FETCH_DNS'],
+    [1, 'fatal: SSL certificate problem: certificate verify failed', 'FETCH_TLS'],
+    [1, 'fatal: unable to connect: Network is unreachable', 'FETCH_NETWORK'],
+    [1, "fatal: couldn't find remote ref main", 'FETCH_REMOTE_REF'],
+    [1, 'error: RPC failed; curl 18 transfer closed with outstanding data', 'FETCH_PACK_TRANSFER'],
+    [1, 'fatal: corrupt object detected', 'FETCH_OBJECT_CORRUPTION'],
+    [1, "error: cannot lock ref 'refs/remotes/origin/main'", 'FETCH_REF_LOCK'],
+    [1, 'fatal: No space left on device', 'FETCH_DISK'],
+    [1, 'fatal: inode allocation exhausted', 'FETCH_INODE'],
+  ];
+  assert.deepEqual(new Set(cases.map(([, , category]) => category)), new Set(FETCH_DIAGNOSTIC_CATEGORIES));
+  for (const [exitStatus, stderr, category] of cases) {
+    assert.deepEqual(classifyGitFetchFailure({ exitStatus, stderr }), { exitStatus, category });
+  }
+  assert.deepEqual(
+    classifyGitFetchFailure({
+      exitStatus: 1,
+      stderr: 'fatal: index-pack failed: No space left on device',
+    }),
+    { exitStatus: 1, category: 'FETCH_DISK' },
+  );
+});
+
+test('fetch diagnostic state is immutable, exact-status, private, and survives the failure transition', async (t) => {
+  const fixture = makeFixture(t);
+  await prepareForward(fixture);
+  transitionForwardState({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    nextState: FORWARD_STATES.MUTATION_STARTED,
+  });
+  const recorded = recordFetchDiagnostic({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    exitStatus: 23,
+    category: 'FETCH_PACK_FINALIZATION',
+  });
+  assert.deepEqual(recorded, { exitStatus: 23, category: 'FETCH_PACK_FINALIZATION' });
+  assert.throws(() => recordFetchDiagnostic({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    exitStatus: 24,
+    category: 'FETCH_UNKNOWN',
+  }), isForwardError);
+  assert.throws(() => transitionForwardState({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    nextState: FORWARD_STATES.COMPLETE,
+  }), isForwardError);
+  assert.throws(() => transitionForwardState({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    nextState: FORWARD_STATES.RECOVERABLE_FAILURE,
+    failureClass: 'BUILD_FAILED',
+  }), isForwardError);
+  transitionForwardState({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    nextState: FORWARD_STATES.RECOVERABLE_FAILURE,
+    failureClass: 'CHECKOUT_FAILED',
+  });
+  const state = readForwardState({ rootDir: fixture.forwardRoot, attemptId: forwardAttemptId });
+  assert.deepEqual(state.fetchDiagnostic, recorded);
+  const diagnosticPath = path.join(
+    fixture.forwardRoot,
+    'attempts',
+    forwardAttemptId,
+    'fetch-diagnostic.json',
+  );
+  assert.equal(fs.statSync(diagnosticPath).mode & 0o777, 0o600);
+  const persisted = fs.readFileSync(diagnosticPath, 'utf8');
+  assert.doesNotMatch(persisted, /password|secret|token|authorization/i);
+});
+
 test('success, controlled failure, unexpected exit, and TERM remove raw diagnostics but preserve recovery helpers', (t) => {
   function extractFunction(name) {
     const match = workflow.match(new RegExp(`^ {10}${name}\\(\\) \\{([\\s\\S]*?)^ {10}\\}$`, 'm'));
@@ -724,6 +810,15 @@ test('success, controlled failure, unexpected exit, and TERM remove raw diagnost
       status: 1,
       output: 'FORWARD_STATE_RECOVERABLE_FAILURE\nFORWARD_FAILURE_EVIDENCE_RECORDED\nFORWARD_ROLLBACK_COMPLETE\nFORWARD_RECOVERY_REQUIRED\n',
       evidence: 'UNEXPECTED_FAILURE:UNEXPECTED_EXIT',
+    },
+    {
+      name: 'interrupted-fetch',
+      armed: 1,
+      action: 'false',
+      status: 1,
+      fetchPersisted: true,
+      output: 'FORWARD_STATE_RECOVERABLE_FAILURE\nFORWARD_FAILURE_EVIDENCE_RECORDED\nFORWARD_ROLLBACK_COMPLETE\nFORWARD_RECOVERY_REQUIRED\n',
+      evidence: 'CHECKOUT_FAILED:CHECKOUT',
     },
     {
       name: 'rollback-failure',
@@ -786,6 +881,9 @@ test('success, controlled failure, unexpected exit, and TERM remove raw diagnost
         api_log_category=READINESS_FAILURE
         web_log_category=READINESS_FAILURE
         caddy_log_category=NO_MATCH
+      }
+      fetch_diagnostic_is_persisted() {
+        ${testCase.fetchPersisted ? 'return 0' : 'return 1'}
       }
       persist_failure_evidence() {
         printf '%s:%s' "$1" "$2" > "$TEST_EVIDENCE"
@@ -1220,6 +1318,8 @@ test('post-mutation git fetch is bounded and a real timeout is reduced to a fixe
   const script = `
     set -euo pipefail
     diagnostic_file="$TEST_ROOT/diagnostic"
+    HELPER_DIR="$TEST_ROOT"
+    fetch_diagnostic_file="$HELPER_DIR/fetch-diagnostic.raw"
     FETCH_TIMEOUT_SECONDS=1
     SHORT_KILL_GRACE_SECONDS=1
     ${extractFunction('safe_status')}
@@ -1244,10 +1344,207 @@ test('post-mutation git fetch is bounded and a real timeout is reduced to a fixe
   assert.equal(fs.readFileSync(commandLog, 'utf8').trim(), 'fetch --no-tags origin main');
 });
 
+test('executable fetch wrapper persists safe evidence before deleting raw stderr and fails closed on persistence errors', async (t) => {
+  if (process.platform === 'darwin') {
+    t.skip('GNU timeout semantics are exercised on GitHub Linux CI');
+    return;
+  }
+  const extractFunction = (name) => {
+    const match = workflow.match(new RegExp(`^ {10}${name}\\(\\) \\{([\\s\\S]*?)^ {10}\\}$`, 'm'));
+    assert.ok(match, `${name} must remain extractable`);
+    return `${name}() {${match[1].replace(/^ {10}/gm, '')}\n}`;
+  };
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oasis-forward-fetch-evidence-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const fakeGit = path.join(root, 'git');
+  fs.writeFileSync(fakeGit, `#!/usr/bin/env bash
+printf '%s' "$FAKE_GIT_STDERR" >&2
+exit "$FAKE_GIT_STATUS"
+`, { mode: 0o755 });
+
+  async function readyState() {
+    const fixture = makeFixture(t);
+    await prepareForward(fixture);
+    transitionForwardState({
+      rootDir: fixture.forwardRoot,
+      attemptId: forwardAttemptId,
+      nextState: FORWARD_STATES.MUTATION_STARTED,
+    });
+    return fixture;
+  }
+
+  function execute({ fixture, status, stderr, failPersistence = false }) {
+    const helperDir = fs.mkdtempSync(path.join(root, 'helper-'));
+    const script = `
+      set -euo pipefail
+      diagnostic_file="$HELPER_DIR/general-diagnostic"
+      fetch_diagnostic_file="$HELPER_DIR/fetch-diagnostic.raw"
+      forward_helper="$FORWARD_HELPER"
+      forward_state_root="$FORWARD_ROOT"
+      ATTEMPT_ID="$FORWARD_ATTEMPT_ID"
+      FETCH_TIMEOUT_SECONDS=5
+      STATE_OPERATION_TIMEOUT_SECONDS=5
+      SHORT_KILL_GRACE_SECONDS=1
+      ${extractFunction('safe_status')}
+      ${extractFunction('bounded_git_fetch')}
+      ${extractFunction('persist_fetch_diagnostic')}
+      set +e
+      bounded_git_fetch
+      status=$?
+      set -e
+      if [ "$status" -eq 0 ]; then
+        rm -f -- "$fetch_diagnostic_file"
+        printf 'FETCH_SUCCEEDED\\n'
+        exit 0
+      fi
+      if persist_fetch_diagnostic "$status"; then
+        printf 'FETCH_PERSISTED_STATUS=%s\\n' "$status"
+      else
+        printf 'FORWARD_FETCH_DIAGNOSTIC_PERSISTENCE_FAILED\\n'
+        exit 9
+      fi
+    `;
+    const result = spawnSync('bash', ['-c', script], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${root}:${process.env.PATH}`,
+        HELPER_DIR: helperDir,
+        FORWARD_HELPER: forwardHelperPath,
+        FORWARD_ROOT: failPersistence ? path.join(root, 'missing-state') : fixture.forwardRoot,
+        FORWARD_ATTEMPT_ID: forwardAttemptId,
+        FAKE_GIT_STATUS: String(status),
+        FAKE_GIT_STDERR: stderr,
+      },
+    });
+    return { result, helperDir };
+  }
+
+  const packFixture = await readyState();
+  const pack = execute({
+    fixture: packFixture,
+    status: 23,
+    stderr: 'fatal: index-pack failed https://user:password@example.invalid/repo.git?token=top-secret',
+  });
+  assert.equal(pack.result.status, 0, pack.result.stderr);
+  assert.match(pack.result.stdout, /FORWARD_FETCH_DIAGNOSTIC_RECORDED/);
+  assert.match(pack.result.stdout, /FORWARD_FETCH_CATEGORY_FETCH_PACK_FINALIZATION/);
+  assert.match(pack.result.stdout, /FETCH_PERSISTED_STATUS=23/);
+  assert.doesNotMatch(pack.result.stdout + pack.result.stderr, /password|top-secret|user:/i);
+  assert.equal(fs.existsSync(path.join(pack.helperDir, 'fetch-diagnostic.raw')), false);
+  assert.deepEqual(
+    readForwardState({ rootDir: packFixture.forwardRoot, attemptId: forwardAttemptId }).fetchDiagnostic,
+    { exitStatus: 23, category: 'FETCH_PACK_FINALIZATION' },
+  );
+
+  const unknownFixture = await readyState();
+  const unknown = execute({
+    fixture: unknownFixture,
+    status: 42,
+    stderr: 'fatal: something new Authorization: Bearer private-value',
+  });
+  assert.equal(unknown.result.status, 0, unknown.result.stderr);
+  assert.match(unknown.result.stdout, /FORWARD_FETCH_CATEGORY_FETCH_UNKNOWN/);
+  assert.match(unknown.result.stdout, /FETCH_PERSISTED_STATUS=42/);
+  assert.doesNotMatch(unknown.result.stdout + unknown.result.stderr, /private-value|Bearer/i);
+  assert.deepEqual(
+    readForwardState({ rootDir: unknownFixture.forwardRoot, attemptId: forwardAttemptId }).fetchDiagnostic,
+    { exitStatus: 42, category: 'FETCH_UNKNOWN' },
+  );
+
+  const failedFixture = await readyState();
+  const persistenceFailure = execute({
+    fixture: failedFixture,
+    status: 17,
+    stderr: 'fatal: index-pack failed token=must-remain-private',
+    failPersistence: true,
+  });
+  assert.equal(persistenceFailure.result.status, 9);
+  assert.match(persistenceFailure.result.stdout, /^FORWARD_FETCH_DIAGNOSTIC_PERSISTENCE_FAILED\n$/);
+  assert.doesNotMatch(persistenceFailure.result.stdout + persistenceFailure.result.stderr, /must-remain-private/i);
+  assert.equal(fs.existsSync(path.join(persistenceFailure.helperDir, 'fetch-diagnostic.raw')), true);
+
+  const successFixture = await readyState();
+  const success = execute({ fixture: successFixture, status: 0, stderr: '' });
+  assert.equal(success.result.status, 0, success.result.stderr);
+  assert.equal(success.result.stdout, 'FETCH_SUCCEEDED\n');
+  assert.equal(fs.existsSync(path.join(success.helperDir, 'fetch-diagnostic.raw')), false);
+  assert.equal(
+    readForwardState({ rootDir: successFixture.forwardRoot, attemptId: forwardAttemptId }).fetchDiagnostic,
+    null,
+  );
+});
+
+test('detached recovery reporting validates and consumes the persisted fetch status and category', async (t) => {
+  if (process.platform === 'darwin') {
+    t.skip('the production recovery helper is exercised on GitHub Linux CI');
+    return;
+  }
+  const fixture = makeFixture(t);
+  await prepareForward(fixture);
+  transitionForwardState({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    nextState: FORWARD_STATES.MUTATION_STARTED,
+  });
+  recordFetchDiagnostic({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    exitStatus: 23,
+    category: 'FETCH_PACK_FINALIZATION',
+  });
+  transitionForwardState({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    nextState: FORWARD_STATES.RECOVERABLE_FAILURE,
+    failureClass: 'CHECKOUT_FAILED',
+  });
+  recordFailureEvidence({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    failureClass: 'CHECKOUT_FAILED',
+    phase: 'CHECKOUT',
+    serviceStates: { api: 'RUNNING_HEALTHY', web: 'RUNNING_HEALTHY', caddy: 'RUNNING_HEALTHY' },
+    logCategories: { api: 'NO_MATCH', web: 'NO_MATCH', caddy: 'NO_MATCH' },
+  });
+  const match = recoveryHelper.match(/^ensure_existing_failure_evidence\(\) \{([\s\S]*?)^\}$/m);
+  assert.ok(match, 'ensure_existing_failure_evidence must remain executable');
+  const functionSource = `ensure_existing_failure_evidence() {${match[1]}\n}`;
+  const diagnostic = path.join(fixture.root, 'recovery-diagnostic');
+  const script = `
+    set -euo pipefail
+    STATE_OPERATION_TIMEOUT_SECONDS=5
+    SHORT_KILL_GRACE_SECONDS=1
+    forward_state_root="$FORWARD_ROOT"
+    ATTEMPT_ID="$FORWARD_ATTEMPT_ID"
+    forward_helper="$FORWARD_HELPER"
+    diagnostic_file="$RECOVERY_DIAGNOSTIC"
+    record_recovery_evidence() { return 99; }
+    ${functionSource}
+    ensure_existing_failure_evidence
+    printf 'RECOVERY_FETCH_DIAGNOSTIC_CONSUMED\\n'
+  `;
+  const result = spawnSync('bash', ['-c', script], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      FORWARD_ROOT: fixture.forwardRoot,
+      FORWARD_ATTEMPT_ID: forwardAttemptId,
+      FORWARD_HELPER: forwardHelperPath,
+      RECOVERY_DIAGNOSTIC: diagnostic,
+    },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, 'RECOVERY_FETCH_DIAGNOSTIC_CONSUMED\n');
+});
+
 test('runner cleanup deletes helpers only for conclusively verified terminal results', () => {
   const match = workflow.match(/^ {10}recovery_result_is_conclusively_safe\(\) \{([\s\S]*?)^ {10}\}$/m);
   assert.ok(match);
   const source = `recovery_result_is_conclusively_safe() {${match[1].replace(/^ {10}/gm, '')}\n}`;
+  const cleanupMatch = workflow.match(/^ {10}recovery_helper_cleanup_is_safe\(\) \{([\s\S]*?)^ {10}\}$/m);
+  assert.ok(cleanupMatch);
+  const cleanupSource = `recovery_helper_cleanup_is_safe() {${cleanupMatch[1].replace(/^ {10}/gm, '')}\n}`;
   const cases = [
     ['FORWARD_RECOVERY_COMPLETE_VERIFIED', 0],
     ['FORWARD_RECOVERY_LEGACY_VERIFIED', 0],
@@ -1262,6 +1559,10 @@ test('runner cleanup deletes helpers only for conclusively verified terminal res
     const result = spawnSync('bash', ['-c', `set +e\n${source}\nrecovery_result_is_conclusively_safe "$1"`, 'bash', category]);
     assert.equal(result.status, expected, category);
   }
+  const safeCleanup = spawnSync('bash', ['-c', `set +e\n${source}\n${cleanupSource}\nrecovery_helper_cleanup_is_safe "$1" "$2"`, 'bash', 'FORWARD_RECOVERY_LEGACY_VERIFIED', '0']);
+  assert.equal(safeCleanup.status, 0);
+  const persistenceUncertain = spawnSync('bash', ['-c', `set +e\n${source}\n${cleanupSource}\nrecovery_helper_cleanup_is_safe "$1" "$2"`, 'bash', 'FORWARD_RECOVERY_LEGACY_VERIFIED', '1']);
+  assert.equal(persistenceUncertain.status, 1);
   assert.doesNotMatch(workflow, /FORWARD_RECOVERY_LOCK_TIMEOUT/);
   assert.match(workflow, /FORWARD_RECOVERY_HELPERS_PRESERVED/);
 });
@@ -1618,6 +1919,40 @@ test('lock-wait exhaustion is non-terminal and exactly one resumed supervisor re
   const afterTerminal = spawnSync('bash', [fixture.stagedRecoveryHelper], { env: shortWaitEnv, encoding: 'utf8' });
   assert.equal(afterTerminal.status, 0, afterTerminal.stderr);
   assert.equal((fs.readFileSync(fixture.commandLog, 'utf8').match(/--no-build --pull never/g) ?? []).length, 1);
+});
+
+test('detached recovery preserves a fetch failure persisted immediately before transport loss', async (t) => {
+  if (process.platform === 'darwin') {
+    t.skip('the production recovery supervisor requires Linux flock and Bash 4; exercised on GitHub Linux CI');
+    return;
+  }
+  const fixture = await makeExecutableRecoveryFixture(t);
+  recordFetchDiagnostic({
+    rootDir: fixture.forwardRoot,
+    attemptId: forwardAttemptId,
+    exitStatus: 23,
+    category: 'FETCH_PACK_FINALIZATION',
+  });
+  const result = spawnSync('bash', [fixture.stagedRecoveryHelper], {
+    env: fixture.env,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.equal(result.stderr, '');
+  assert.equal(
+    fs.readFileSync(path.join(fixture.helperDir, 'recovery-result'), 'utf8').trim(),
+    'FORWARD_RECOVERY_LEGACY_VERIFIED',
+  );
+  const state = readForwardState({ rootDir: fixture.forwardRoot, attemptId: forwardAttemptId });
+  assert.equal(state.state, FORWARD_STATES.RECOVERABLE_FAILURE);
+  assert.equal(state.failureClass, 'CHECKOUT_FAILED');
+  assert.equal(state.failureEvidence?.phase, 'CHECKOUT');
+  assert.deepEqual(state.fetchDiagnostic, {
+    exitStatus: 23,
+    category: 'FETCH_PACK_FINALIZATION',
+  });
+  assert.equal(fs.readFileSync(fixture.runtimeMode, 'utf8').trim(), 'legacy');
 });
 
 test('recovery authenticates completion written before an uncertain return and does not roll it back', async (t) => {

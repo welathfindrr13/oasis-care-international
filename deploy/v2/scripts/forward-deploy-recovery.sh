@@ -210,7 +210,7 @@ record_recovery_evidence() {
 }
 
 ensure_existing_failure_evidence() {
-  local details failure_class='' evidence_state='' phase line
+  local details failure_class='' evidence_state='' fetch_state='' fetch_status='' fetch_category='' phase line
   details="$(timeout --foreground --signal=TERM --kill-after="${SHORT_KILL_GRACE_SECONDS}s" "${STATE_OPERATION_TIMEOUT_SECONDS}s" \
     env FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
     node "$forward_helper" inspect-failure 2>"$diagnostic_file")" || return 1
@@ -218,8 +218,25 @@ ensure_existing_failure_evidence() {
     case "$line" in
       FORWARD_FAILURE_CLASS_*) failure_class="${line#FORWARD_FAILURE_CLASS_}" ;;
       FORWARD_FAILURE_EVIDENCE_*) evidence_state="${line#FORWARD_FAILURE_EVIDENCE_}" ;;
+      FORWARD_FETCH_DIAGNOSTIC_*) fetch_state="${line#FORWARD_FETCH_DIAGNOSTIC_}" ;;
+      FORWARD_FETCH_EXIT_STATUS_*) fetch_status="${line#FORWARD_FETCH_EXIT_STATUS_}" ;;
+      FORWARD_FETCH_CATEGORY_*) fetch_category="${line#FORWARD_FETCH_CATEGORY_}" ;;
+      *) return 1 ;;
     esac
   done <<< "$details"
+  case "$fetch_state" in
+    PRESENT)
+      [[ "$fetch_status" =~ ^([1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$ ]] || return 1
+      case "$fetch_category" in
+        FETCH_TIMEOUT|FETCH_TERMINATED|FETCH_AUTHENTICATION|FETCH_DNS|FETCH_TLS|FETCH_NETWORK|FETCH_REMOTE_REF|FETCH_PACK_TRANSFER|FETCH_PACK_FINALIZATION|FETCH_OBJECT_CORRUPTION|FETCH_REF_LOCK|FETCH_DISK|FETCH_INODE|FETCH_UNKNOWN) ;;
+        *) return 1 ;;
+      esac
+      ;;
+    ABSENT)
+      [ -z "$fetch_status" ] && [ -z "$fetch_category" ] || return 1
+      ;;
+    *) return 1 ;;
+  esac
   case "$failure_class" in
     CHECKOUT_FAILED) phase=CHECKOUT ;;
     PREFLIGHT_FAILED) phase=PREFLIGHT ;;
@@ -238,6 +255,14 @@ ensure_existing_failure_evidence() {
     ABSENT) record_recovery_evidence "$failure_class" "$phase" ;;
     *) return 1 ;;
   esac
+}
+
+fetch_diagnostic_is_persisted() {
+  local fetch_state
+  fetch_state="$(timeout --foreground --signal=TERM --kill-after="${SHORT_KILL_GRACE_SECONDS}s" "${STATE_OPERATION_TIMEOUT_SECONDS}s" \
+    env FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
+    node "$forward_helper" inspect-fetch 2>"$diagnostic_file")" || return 1
+  [ "$fetch_state" = FORWARD_FETCH_DIAGNOSTIC_PRESENT ]
 }
 
 verify_service_health_and_image() {
@@ -343,9 +368,15 @@ case "$state_output" in
     record_recovery_evidence COMPLETION_STATE_UNCERTAIN COMPLETION || true
     ;;
   FORWARD_STATE_MUTATION_STARTED)
+    mutation_failure_class=TRANSPORT_RECOVERY_REQUIRED
+    mutation_failure_phase=TRANSPORT
+    if fetch_diagnostic_is_persisted; then
+      mutation_failure_class=CHECKOUT_FAILED
+      mutation_failure_phase=CHECKOUT
+    fi
     timeout --foreground --signal=TERM --kill-after="${SHORT_KILL_GRACE_SECONDS}s" "${STATE_OPERATION_TIMEOUT_SECONDS}s" \
       env FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
-      NEXT_STATE=RECOVERABLE_FAILURE FAILURE_CLASS=TRANSPORT_RECOVERY_REQUIRED \
+      NEXT_STATE=RECOVERABLE_FAILURE FAILURE_CLASS="$mutation_failure_class" \
       node "$forward_helper" transition >"$diagnostic_file" 2>&1 || {
         if rollback_legacy_runtime; then
           recovery_armed=0
@@ -355,7 +386,7 @@ case "$state_output" in
         fi
         exit 1
       }
-    record_recovery_evidence TRANSPORT_RECOVERY_REQUIRED TRANSPORT || true
+    record_recovery_evidence "$mutation_failure_class" "$mutation_failure_phase" || true
     ;;
   FORWARD_STATE_RECOVERABLE_FAILURE|FORWARD_STATE_COMPLETION_UNCERTAIN)
     ensure_existing_failure_evidence || true
