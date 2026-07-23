@@ -200,29 +200,64 @@ jobs:
         run: |
           set -euo pipefail
           marker_capture="$(mktemp)"
+          marker_stderr="$(mktemp)"
           helper_dir_capture="$(mktemp)"
-          chmod 600 "$marker_capture" "$helper_dir_capture"
-          trap 'rm -f "$marker_capture" "$helper_dir_capture"' EXIT
+          chmod 600 "$marker_capture" "$marker_stderr" "$helper_dir_capture"
+          trap 'rm -f "$marker_capture" "$marker_stderr" "$helper_dir_capture"' EXIT
 
           set +e
           ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
             "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" \
             bash -se \
-            >"$marker_capture" 2>/dev/null <<'FORWARD_REMOTE_TARGET_PROBE'
+            >"$marker_capture" 2>"$marker_stderr" <<'FORWARD_REMOTE_TARGET_PROBE'
           set -euo pipefail
-          effective_user="$(id -un 2>/dev/null)"
-          [ "$effective_user" = deploy ] || exit 1
+          fail_target_probe() {
+            printf '%s\n' "$1"
+            exit 1
+          }
+          effective_user="$(id -un 2>/dev/null)" || fail_target_probe DEPLOY_TARGET_IDENTITY_FAILED
+          [ "$effective_user" = deploy ] || fail_target_probe DEPLOY_TARGET_IDENTITY_FAILED
           target_class_file=/etc/oasis/production-deploy-target-class
-          [ -f "$target_class_file" ] && [ ! -L "$target_class_file" ] && [ -r "$target_class_file" ] || exit 1
-          target_class="$(tr -d '\r\n' < "$target_class_file")"
-          [ "$target_class" = production ] || exit 1
+          for target_class_parent in / /etc /etc/oasis; do
+            [ -d "$target_class_parent" ] && [ -x "$target_class_parent" ] ||
+              fail_target_probe DEPLOY_TARGET_TRAVERSAL_FAILED
+          done
+          [ -f "$target_class_file" ] && [ ! -L "$target_class_file" ] ||
+            fail_target_probe DEPLOY_TARGET_FILE_TYPE_FAILED
+          [ -r "$target_class_file" ] ||
+            fail_target_probe DEPLOY_TARGET_READABILITY_FAILED
+          target_class="$(tr -d '\r\n' < "$target_class_file" 2>/dev/null)" ||
+            fail_target_probe DEPLOY_TARGET_READABILITY_FAILED
+          [ "$target_class" = production ] ||
+            fail_target_probe DEPLOY_TARGET_VALUE_COMPARISON_FAILED
           printf 'FORWARD_REMOTE_IDENTITY_VALID\n'
           printf 'DEPLOY_TARGET_PRODUCTION\n'
           FORWARD_REMOTE_TARGET_PROBE
           marker_status=$?
           set -e
-          if [ "$marker_status" -ne 0 ] || [ "$(cat "$marker_capture")" != $'FORWARD_REMOTE_IDENTITY_VALID\nDEPLOY_TARGET_PRODUCTION' ]; then
-            printf 'DEPLOY_TARGET_PROOF_FAILED\n' >&2
+          marker_output="$(cat "$marker_capture")"
+          expected_marker_output=$'FORWARD_REMOTE_IDENTITY_VALID\nDEPLOY_TARGET_PRODUCTION'
+          if [ "$marker_status" -eq 0 ]; then
+            if [ "$marker_output" != "$expected_marker_output" ]; then
+              printf 'DEPLOY_TARGET_OUTPUT_MISMATCH\n' >&2
+              exit 1
+            fi
+          else
+            case "$marker_output" in
+              DEPLOY_TARGET_IDENTITY_FAILED | \
+              DEPLOY_TARGET_TRAVERSAL_FAILED | \
+              DEPLOY_TARGET_FILE_TYPE_FAILED | \
+              DEPLOY_TARGET_READABILITY_FAILED | \
+              DEPLOY_TARGET_VALUE_COMPARISON_FAILED)
+                printf '%s\n' "$marker_output" >&2
+                ;;
+              "" | "$expected_marker_output")
+                printf 'DEPLOY_TARGET_SSH_STATUS_FAILED\n' >&2
+                ;;
+              *)
+                printf 'DEPLOY_TARGET_OUTPUT_MISMATCH\n' >&2
+                ;;
+            esac
             exit 1
           fi
           printf 'FORWARD_REMOTE_IDENTITY_VALID\n'
