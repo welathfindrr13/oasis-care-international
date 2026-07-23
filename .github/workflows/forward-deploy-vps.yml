@@ -359,6 +359,7 @@ jobs:
           recovery_ready="$HELPER_DIR/recovery-supervisor-ready"
           diagnostic_file="$(mktemp)"
           chmod 600 "$diagnostic_file"
+          fetch_diagnostic_file="$HELPER_DIR/fetch-diagnostic.raw"
           failure_armed=0
 
           cleanup_remote() {
@@ -663,8 +664,11 @@ jobs:
             node "$forward_helper" transition || exit 1
 
           bounded_git_fetch() {
+            [ ! -e "$fetch_diagnostic_file" ] || return 125
+            (umask 077; : > "$fetch_diagnostic_file") || return 125
+            chmod 600 "$fetch_diagnostic_file" || return 125
             timeout --foreground --signal=TERM --kill-after="${SHORT_KILL_GRACE_SECONDS}s" "${FETCH_TIMEOUT_SECONDS}s" \
-              git fetch --no-tags origin main >"$diagnostic_file" 2>&1
+              git fetch --no-tags origin main >/dev/null 2>"$fetch_diagnostic_file"
           }
 
           classify_fetch_status() {
@@ -674,14 +678,52 @@ jobs:
             esac
           }
 
+          persist_fetch_diagnostic() {
+            local fetch_status="$1" classification_output='' classified_status='' classified_category='' line
+            classification_output="$(
+              timeout --foreground --signal=TERM --kill-after="${SHORT_KILL_GRACE_SECONDS}s" "${STATE_OPERATION_TIMEOUT_SECONDS}s" \
+                env FETCH_DIAGNOSTIC_FILE="$fetch_diagnostic_file" FETCH_EXIT_STATUS="$fetch_status" \
+                node "$forward_helper" classify-fetch 2>"$diagnostic_file"
+            )" || return 1
+            while IFS= read -r line; do
+              case "$line" in
+                FETCH_EXIT_STATUS=*)
+                  [ -z "$classified_status" ] || return 1
+                  classified_status="${line#FETCH_EXIT_STATUS=}"
+                  ;;
+                FETCH_ERROR_CATEGORY=*)
+                  [ -z "$classified_category" ] || return 1
+                  classified_category="${line#FETCH_ERROR_CATEGORY=}"
+                  ;;
+                *) return 1 ;;
+              esac
+            done <<< "$classification_output"
+            [ "$classified_status" = "$fetch_status" ] || return 1
+            case "$classified_category" in
+              FETCH_TIMEOUT|FETCH_TERMINATED|FETCH_AUTHENTICATION|FETCH_DNS|FETCH_TLS|FETCH_NETWORK|FETCH_REMOTE_REF|FETCH_PACK_TRANSFER|FETCH_PACK_FINALIZATION|FETCH_OBJECT_CORRUPTION|FETCH_REF_LOCK|FETCH_DISK|FETCH_INODE|FETCH_UNKNOWN) ;;
+              *) return 1 ;;
+            esac
+            timeout --foreground --signal=TERM --kill-after="${SHORT_KILL_GRACE_SECONDS}s" "${STATE_OPERATION_TIMEOUT_SECONDS}s" \
+              env FORWARD_STATE_ROOT="$forward_state_root" ATTEMPT_ID="$ATTEMPT_ID" \
+              FETCH_EXIT_STATUS="$classified_status" FETCH_ERROR_CATEGORY="$classified_category" \
+              node "$forward_helper" record-fetch-diagnostic >"$diagnostic_file" 2>&1 || return 1
+            rm -f -- "$fetch_diagnostic_file" || return 1
+            safe_status FORWARD_FETCH_DIAGNOSTIC_RECORDED
+            safe_status "FORWARD_FETCH_CATEGORY_${classified_category}"
+          }
+
           set +e
           bounded_git_fetch
           fetch_status=$?
           set -e
           if [ "$fetch_status" -ne 0 ]; then
+            if ! persist_fetch_diagnostic "$fetch_status"; then
+              safe_status FORWARD_FETCH_DIAGNOSTIC_PERSISTENCE_FAILED
+            fi
             classify_fetch_status "$fetch_status"
             record_recoverable_failure CHECKOUT_FAILED CHECKOUT
           fi
+          rm -f -- "$fetch_diagnostic_file" || record_recoverable_failure CHECKOUT_FAILED CHECKOUT
 
           if ! timeout --foreground --signal=TERM --kill-after="${SHORT_KILL_GRACE_SECONDS}s" "${CHECKOUT_TIMEOUT_SECONDS}s" \
             bash -c '
@@ -783,10 +825,21 @@ jobs:
             esac
           }
 
+          recovery_helper_cleanup_is_safe() {
+            local recovery_result="$1" diagnostic_persistence_failed="$2"
+            [ "$diagnostic_persistence_failed" -eq 0 ] || return 1
+            recovery_result_is_conclusively_safe "$recovery_result"
+          }
+
           unsafe_output=0
+          diagnostic_persistence_failed=0
           while IFS= read -r line || [ -n "$line" ]; do
             case "$line" in
-              FORWARD_INPUTS_INVALID|FORWARD_TARGET_PROOF_FAILED|FORWARD_REMOTE_IDENTITY_VALID|FORWARD_REMOTE_IDENTITY_INVALID|DEPLOY_TARGET_PRODUCTION|DEPLOY_TARGET_UNKNOWN|DEPLOY_TARGET_NOT_PRODUCTION|REPOSITORY_STATE_UNSAFE|PRODUCTION_MUTATION_LOCKED|FORWARD_MUTATION_LOCK_ACQUIRED|FORWARD_LEGACY_START_VALID|FORWARD_LEGACY_STATE_UNSAFE|FORWARD_LEGACY_REVISION_UNSAFE|FORWARD_RUNNING_IMAGES_UNSAFE|FORWARD_ROLLBACK_IMAGES_UNSAFE|FORWARD_PREFLIGHT_FAILED|FORWARD_FETCH_TIMEOUT|FORWARD_FETCH_FAILED|FORWARD_STATE_PREPARED|FORWARD_STATE_MUTATION_STARTED|FORWARD_STATE_RECOVERABLE_FAILURE|FORWARD_STATE_COMPLETION_UNCERTAIN|FORWARD_STATE_COMPLETE|FORWARD_STATE_ALREADY_CONSUMED|FORWARD_STATE_LOCKED|FORWARD_STATE_INVALID|FORWARD_STATE_IO_UNCERTAIN|FORWARD_FAILURE_EVIDENCE_RECORDED|FORWARD_ROLLBACK_COMPLETE|FORWARD_ROLLBACK_FAILED|FORWARD_RECOVERY_SUPERVISOR_ARMED|FORWARD_COMPLETION_ADJUDICATED|FORWARD_RECOVERY_STATE_UNCERTAIN|FORWARD_RECOVERY_REQUIRED|FORWARD_LEGACY_STATE_UNCHANGED|LEGACY_UNKNOWN|REVISION_AWARE_EXACT|REVISION_UNSAFE|FORWARD_DEPLOY_COMPLETE)
+              FORWARD_INPUTS_INVALID|FORWARD_TARGET_PROOF_FAILED|FORWARD_REMOTE_IDENTITY_VALID|FORWARD_REMOTE_IDENTITY_INVALID|DEPLOY_TARGET_PRODUCTION|DEPLOY_TARGET_UNKNOWN|DEPLOY_TARGET_NOT_PRODUCTION|REPOSITORY_STATE_UNSAFE|PRODUCTION_MUTATION_LOCKED|FORWARD_MUTATION_LOCK_ACQUIRED|FORWARD_LEGACY_START_VALID|FORWARD_LEGACY_STATE_UNSAFE|FORWARD_LEGACY_REVISION_UNSAFE|FORWARD_RUNNING_IMAGES_UNSAFE|FORWARD_ROLLBACK_IMAGES_UNSAFE|FORWARD_PREFLIGHT_FAILED|FORWARD_FETCH_TIMEOUT|FORWARD_FETCH_FAILED|FORWARD_FETCH_DIAGNOSTIC_RECORDED|FORWARD_FETCH_CATEGORY_FETCH_TIMEOUT|FORWARD_FETCH_CATEGORY_FETCH_TERMINATED|FORWARD_FETCH_CATEGORY_FETCH_AUTHENTICATION|FORWARD_FETCH_CATEGORY_FETCH_DNS|FORWARD_FETCH_CATEGORY_FETCH_TLS|FORWARD_FETCH_CATEGORY_FETCH_NETWORK|FORWARD_FETCH_CATEGORY_FETCH_REMOTE_REF|FORWARD_FETCH_CATEGORY_FETCH_PACK_TRANSFER|FORWARD_FETCH_CATEGORY_FETCH_PACK_FINALIZATION|FORWARD_FETCH_CATEGORY_FETCH_OBJECT_CORRUPTION|FORWARD_FETCH_CATEGORY_FETCH_REF_LOCK|FORWARD_FETCH_CATEGORY_FETCH_DISK|FORWARD_FETCH_CATEGORY_FETCH_INODE|FORWARD_FETCH_CATEGORY_FETCH_UNKNOWN|FORWARD_STATE_PREPARED|FORWARD_STATE_MUTATION_STARTED|FORWARD_STATE_RECOVERABLE_FAILURE|FORWARD_STATE_COMPLETION_UNCERTAIN|FORWARD_STATE_COMPLETE|FORWARD_STATE_ALREADY_CONSUMED|FORWARD_STATE_LOCKED|FORWARD_STATE_INVALID|FORWARD_STATE_IO_UNCERTAIN|FORWARD_FAILURE_EVIDENCE_RECORDED|FORWARD_ROLLBACK_COMPLETE|FORWARD_ROLLBACK_FAILED|FORWARD_RECOVERY_SUPERVISOR_ARMED|FORWARD_COMPLETION_ADJUDICATED|FORWARD_RECOVERY_STATE_UNCERTAIN|FORWARD_RECOVERY_REQUIRED|FORWARD_LEGACY_STATE_UNCHANGED|LEGACY_UNKNOWN|REVISION_AWARE_EXACT|REVISION_UNSAFE|FORWARD_DEPLOY_COMPLETE)
+                printf '%s\n' "$line"
+                ;;
+              FORWARD_FETCH_DIAGNOSTIC_PERSISTENCE_FAILED)
+                diagnostic_persistence_failed=1
                 printf '%s\n' "$line"
                 ;;
               *)
@@ -827,7 +880,7 @@ jobs:
 
           if [ -n "$recovery_result" ]; then
             printf '%s\n' "$recovery_result"
-            if recovery_result_is_conclusively_safe "$recovery_result"; then
+            if recovery_helper_cleanup_is_safe "$recovery_result" "$diagnostic_persistence_failed"; then
               ssh -i ~/.ssh/oasis_production_vps -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
                 "$OASIS_PRODUCTION_VPS_USER@$OASIS_PRODUCTION_VPS_HOST" \
                 "[ \"\$(id -un 2>/dev/null)\" = deploy ] && case '$REMOTE_HELPER_DIR' in /var/tmp/oasis-forward-deploy.*) rm -rf -- '$REMOTE_HELPER_DIR' ;; *) exit 1 ;; esac" \

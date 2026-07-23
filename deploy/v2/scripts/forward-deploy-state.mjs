@@ -60,14 +60,33 @@ export const LOG_CATEGORIES = Object.freeze([
   'UNAVAILABLE',
 ]);
 
+export const FETCH_DIAGNOSTIC_CATEGORIES = Object.freeze([
+  'FETCH_TIMEOUT',
+  'FETCH_TERMINATED',
+  'FETCH_AUTHENTICATION',
+  'FETCH_DNS',
+  'FETCH_TLS',
+  'FETCH_NETWORK',
+  'FETCH_REMOTE_REF',
+  'FETCH_PACK_TRANSFER',
+  'FETCH_PACK_FINALIZATION',
+  'FETCH_OBJECT_CORRUPTION',
+  'FETCH_REF_LOCK',
+  'FETCH_DISK',
+  'FETCH_INODE',
+  'FETCH_UNKNOWN',
+]);
+
 const FAILURE_CLASS_SET = new Set(FAILURE_CLASSES);
 const FAILURE_PHASE_SET = new Set(FAILURE_PHASES);
 const SERVICE_STATE_CATEGORY_SET = new Set(SERVICE_STATE_CATEGORIES);
 const LOG_CATEGORY_SET = new Set(LOG_CATEGORIES);
+const FETCH_DIAGNOSTIC_CATEGORY_SET = new Set(FETCH_DIAGNOSTIC_CATEGORIES);
 const MANIFEST_KIND = 'oasis-forward-deploy';
 const MANIFEST_VERSION = 1;
 const MAX_MANIFEST_BYTES = 32 * 1024;
 const MAX_FAILURE_EVIDENCE_BYTES = 4 * 1024;
+const MAX_FETCH_DIAGNOSTIC_BYTES = 64 * 1024;
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const ATTEMPT_ID_PATTERN = /^[0-9a-f]{32}$/;
 const IMAGE_ID_PATTERN = /^sha256:[0-9a-f]{64}$/;
@@ -175,8 +194,22 @@ function pathsFor(rootDir, attemptId) {
     failure: path.join(attempt, 'recoverable-failure'),
     completionUncertain: path.join(attempt, 'completion-uncertain'),
     failureEvidence: path.join(attempt, 'failure-evidence.json'),
+    fetchDiagnostic: path.join(attempt, 'fetch-diagnostic.json'),
     completion: path.join(attempt, 'completion'),
   };
+}
+
+function validateFetchDiagnostic(diagnostic) {
+  exactKeys(diagnostic, ['exitStatus', 'category']);
+  if (
+    !Number.isInteger(diagnostic.exitStatus) ||
+    diagnostic.exitStatus < 1 ||
+    diagnostic.exitStatus > 255 ||
+    !FETCH_DIAGNOSTIC_CATEGORY_SET.has(diagnostic.category)
+  ) {
+    fail();
+  }
+  return diagnostic;
 }
 
 function validateFailureEvidence(evidence, expectedFailureClass) {
@@ -463,6 +496,7 @@ function readForwardStateInternal(paths, { lockHeld = false } = {}) {
     'recoverable-failure',
     'completion-uncertain',
     'failure-evidence.json',
+    'fetch-diagnostic.json',
     'completion',
     ...(lockHeld ? ['transition.lock'] : []),
   ]);
@@ -478,13 +512,16 @@ function readForwardStateInternal(paths, { lockHeld = false } = {}) {
   const failureExists = fs.existsSync(paths.failure);
   const completionUncertainExists = fs.existsSync(paths.completionUncertain);
   const failureEvidenceExists = fs.existsSync(paths.failureEvidence);
+  const fetchDiagnosticExists = fs.existsSync(paths.fetchDiagnostic);
   const completionExists = fs.existsSync(paths.completion);
   if (
     (failureExists && completionExists) ||
     (failureExists && completionUncertainExists) ||
     ((failureExists || completionExists) && !mutationExists) ||
     (completionUncertainExists && !mutationExists) ||
-    (failureEvidenceExists && !failureExists && !completionUncertainExists)
+    (failureEvidenceExists && !failureExists && !completionUncertainExists) ||
+    (fetchDiagnosticExists && !mutationExists) ||
+    (fetchDiagnosticExists && (completionExists || completionUncertainExists))
   ) {
     fail();
   }
@@ -495,6 +532,7 @@ function readForwardStateInternal(paths, { lockHeld = false } = {}) {
     failureClass = fs.readFileSync(paths.failure, 'utf8').trim();
     if (!FAILURE_CLASS_SET.has(failureClass)) fail();
   }
+  if (fetchDiagnosticExists && failureExists && failureClass !== 'CHECKOUT_FAILED') fail();
   if (completionUncertainExists) {
     assertPrivateMode(assertNotSymlink(paths.completionUncertain, 'file'), 0o600);
     const uncertainClass = fs.readFileSync(paths.completionUncertain, 'utf8').trim();
@@ -511,6 +549,15 @@ function readForwardStateInternal(paths, { lockHeld = false } = {}) {
       failureClass,
     );
   }
+  let fetchDiagnostic = null;
+  if (fetchDiagnosticExists) {
+    const diagnosticStat = assertNotSymlink(paths.fetchDiagnostic, 'file');
+    assertPrivateMode(diagnosticStat, 0o600);
+    if (diagnosticStat.size <= 0 || diagnosticStat.size > MAX_FAILURE_EVIDENCE_BYTES) fail();
+    fetchDiagnostic = validateFetchDiagnostic(
+      JSON.parse(fs.readFileSync(paths.fetchDiagnostic, 'utf8')),
+    );
+  }
   if (completionExists) readMarker(paths.completion, COMPLETION_CONTENT);
 
   const state = completionUncertainExists
@@ -522,7 +569,7 @@ function readForwardStateInternal(paths, { lockHeld = false } = {}) {
       : mutationExists
         ? FORWARD_STATES.MUTATION_STARTED
         : FORWARD_STATES.PREPARED;
-  return { manifest, state, failureClass, failureEvidence };
+  return { manifest, state, failureClass, failureEvidence, fetchDiagnostic };
 }
 
 export function readForwardState({ rootDir, attemptId }) {
@@ -541,16 +588,27 @@ export function transitionForwardState({ rootDir, attemptId, nextState, failureC
       if (current.state !== FORWARD_STATES.PREPARED || failureClass != null) fail();
       atomicWrite(paths.mutation, MUTATION_CONTENT);
     } else if (nextState === FORWARD_STATES.RECOVERABLE_FAILURE) {
-      if (current.state !== FORWARD_STATES.MUTATION_STARTED || !FAILURE_CLASS_SET.has(failureClass)) {
+      if (
+        current.state !== FORWARD_STATES.MUTATION_STARTED ||
+        !FAILURE_CLASS_SET.has(failureClass) ||
+        (current.fetchDiagnostic !== null && failureClass !== 'CHECKOUT_FAILED')
+      ) {
         fail();
       }
       atomicWrite(paths.failure, `${failureClass}\n`);
     } else if (nextState === FORWARD_STATES.COMPLETE) {
-      if (current.state !== FORWARD_STATES.MUTATION_STARTED || failureClass != null) fail();
+      if (
+        current.state !== FORWARD_STATES.MUTATION_STARTED ||
+        current.fetchDiagnostic !== null ||
+        failureClass != null
+      ) {
+        fail();
+      }
       atomicWrite(paths.completion, COMPLETION_CONTENT);
     } else if (nextState === FORWARD_STATES.COMPLETION_UNCERTAIN) {
       if (
         (current.state !== FORWARD_STATES.MUTATION_STARTED && current.state !== FORWARD_STATES.COMPLETE) ||
+        current.fetchDiagnostic !== null ||
         failureClass !== 'COMPLETION_STATE_UNCERTAIN'
       ) {
         fail();
@@ -621,6 +679,100 @@ export function recordFailureEvidence({
     releaseDirectoryLock(paths.transitionLock, paths.attempt);
     releaseTransition = false;
     return readForwardState({ rootDir, attemptId }).failureEvidence;
+  } catch (error) {
+    if (releaseTransition && fs.existsSync(paths.transitionLock)) {
+      try {
+        releaseDirectoryLock(paths.transitionLock, paths.attempt);
+      } catch {
+        throw new ForwardStateError('FORWARD_STATE_IO_UNCERTAIN');
+      }
+    }
+    if (error instanceof ForwardStateError) throw error;
+    throw new ForwardStateError('FORWARD_STATE_IO_UNCERTAIN');
+  }
+}
+
+export function redactGitFetchDiagnostic(stderr) {
+  return String(stderr ?? '')
+    .replace(/\b(Authorization\s*:\s*)(?:Basic|Bearer)\s+\S+/gi, '$1[REDACTED]')
+    .replace(/\b(?:gh[pousr]_[A-Za-z0-9_]{16,}|github_pat_[A-Za-z0-9_]{16,}|glpat-[A-Za-z0-9_-]{16,})\b/g, '[REDACTED]')
+    .replace(/(https?:\/\/)([^/\s:@]+):([^/\s@]+)@/gi, '$1[REDACTED]@')
+    .replace(/([?&](?:access_token|auth|authorization|credential|key|password|secret|token)=)[^&#\s]*/gi, '$1[REDACTED]')
+    .replace(/\b((?:access_token|auth|authorization|credential|password|secret|token)\s*[=:]\s*)\S+/gi, '$1[REDACTED]');
+}
+
+export function classifyGitFetchFailure({ exitStatus, stderr }) {
+  const numericStatus = Number(exitStatus);
+  if (!Number.isInteger(numericStatus) || numericStatus < 1 || numericStatus > 255) fail();
+  if (numericStatus === 124) {
+    return validateFetchDiagnostic({ exitStatus: numericStatus, category: 'FETCH_TIMEOUT' });
+  }
+  if (numericStatus === 137 || numericStatus === 143) {
+    return validateFetchDiagnostic({ exitStatus: numericStatus, category: 'FETCH_TERMINATED' });
+  }
+
+  const material = redactGitFetchDiagnostic(stderr).toLowerCase();
+  let category = 'FETCH_UNKNOWN';
+  if (/(authentication failed|permission denied|could not read username|terminal prompts disabled|invalid credentials|repository access denied|http (401|403))/.test(material)) {
+    category = 'FETCH_AUTHENTICATION';
+  } else if (/(could not resolve host|name or service not known|temporary failure in name resolution|nodename nor servname)/.test(material)) {
+    category = 'FETCH_DNS';
+  } else if (/(ssl certificate|tls|certificate verify failed|schannel|gnutls_handshake)/.test(material)) {
+    category = 'FETCH_TLS';
+  } else if (/(could not connect|connection (timed out|refused|reset)|network is unreachable|failed to connect)/.test(material)) {
+    category = 'FETCH_NETWORK';
+  } else if (/(couldn't find remote ref|remote ref .* not found|repository not found|not a git repository|does not appear to be a git repository)/.test(material)) {
+    category = 'FETCH_REMOTE_REF';
+  } else if (/(index-pack failed|invalid index-pack output|unable to index pack|pack finalization|failed to write pack|packfile .* does not match index)/.test(material)) {
+    category = 'FETCH_PACK_FINALIZATION';
+  } else if (/(rpc failed|early eof|unexpected disconnect|fetch-pack:|sideband packet|pack transfer|remote end hung up)/.test(material)) {
+    category = 'FETCH_PACK_TRANSFER';
+  } else if (/(object .* corrupt|corrupt object|bad object|sha1 mismatch|invalid object|unresolved deltas)/.test(material)) {
+    category = 'FETCH_OBJECT_CORRUPTION';
+  } else if (/(cannot lock ref|unable to update local ref|reference broken|\.lock['": ]|ref lock)/.test(material)) {
+    category = 'FETCH_REF_LOCK';
+  } else if (/(inode|too many links)/.test(material)) {
+    category = 'FETCH_INODE';
+  } else if (/(no space left on device|disk quota exceeded|file too large|input\/output error)/.test(material)) {
+    category = 'FETCH_DISK';
+  }
+  return validateFetchDiagnostic({ exitStatus: numericStatus, category });
+}
+
+export function classifyGitFetchDiagnosticFile({ diagnosticFile, exitStatus }) {
+  const resolved = path.resolve(diagnosticFile || '');
+  if (!diagnosticFile || resolved === path.parse(resolved).root) fail();
+  const stat = assertNotSymlink(resolved, 'file');
+  assertPrivateMode(stat, 0o600);
+  if (stat.size > MAX_FETCH_DIAGNOSTIC_BYTES) fail();
+  return classifyGitFetchFailure({
+    exitStatus,
+    stderr: fs.readFileSync(resolved, 'utf8'),
+  });
+}
+
+export function recordFetchDiagnostic({ rootDir, attemptId, exitStatus, category }) {
+  const paths = pathsFor(rootDir, attemptId);
+  const diagnostic = validateFetchDiagnostic({
+    exitStatus: Number(exitStatus),
+    category,
+  });
+  readForwardStateInternal(paths);
+  acquireDirectoryLock(paths.transitionLock, paths.attempt);
+  let releaseTransition = true;
+  try {
+    const current = readForwardStateInternal(paths, { lockHeld: true });
+    if (
+      current.state !== FORWARD_STATES.MUTATION_STARTED ||
+      current.fetchDiagnostic !== null ||
+      fs.existsSync(paths.fetchDiagnostic)
+    ) {
+      fail();
+    }
+    atomicWrite(paths.fetchDiagnostic, `${JSON.stringify(diagnostic)}\n`);
+    releaseDirectoryLock(paths.transitionLock, paths.attempt);
+    releaseTransition = false;
+    return readForwardState({ rootDir, attemptId }).fetchDiagnostic;
   } catch (error) {
     if (releaseTransition && fs.existsSync(paths.transitionLock)) {
       try {
@@ -768,6 +920,30 @@ async function main() {
       }
       process.stdout.write(`FORWARD_FAILURE_CLASS_${result.failureClass}\n`);
       process.stdout.write(`FORWARD_FAILURE_EVIDENCE_${result.failureEvidence === null ? 'ABSENT' : 'PRESENT'}\n`);
+      process.stdout.write(`FORWARD_FETCH_DIAGNOSTIC_${result.fetchDiagnostic === null ? 'ABSENT' : 'PRESENT'}\n`);
+      if (result.fetchDiagnostic !== null) {
+        process.stdout.write(`FORWARD_FETCH_EXIT_STATUS_${result.fetchDiagnostic.exitStatus}\n`);
+        process.stdout.write(`FORWARD_FETCH_CATEGORY_${result.fetchDiagnostic.category}\n`);
+      }
+      return;
+    }
+    if (command === 'classify-fetch') {
+      const diagnostic = classifyGitFetchDiagnosticFile({
+        diagnosticFile: process.env.FETCH_DIAGNOSTIC_FILE,
+        exitStatus: process.env.FETCH_EXIT_STATUS,
+      });
+      process.stdout.write(`FETCH_EXIT_STATUS=${diagnostic.exitStatus}\n`);
+      process.stdout.write(`FETCH_ERROR_CATEGORY=${diagnostic.category}\n`);
+      return;
+    }
+    if (command === 'record-fetch-diagnostic') {
+      recordFetchDiagnostic({
+        rootDir: process.env.FORWARD_STATE_ROOT,
+        attemptId: process.env.ATTEMPT_ID,
+        exitStatus: process.env.FETCH_EXIT_STATUS,
+        category: process.env.FETCH_ERROR_CATEGORY,
+      });
+      process.stdout.write('FORWARD_FETCH_DIAGNOSTIC_RECORDED\n');
       return;
     }
     if (command === 'record-evidence') {
