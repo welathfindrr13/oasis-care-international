@@ -142,7 +142,9 @@ test("a linked fake carer follows the database role despite an admin token claim
   await page.goto("/today");
 
   await expect(page).toHaveURL("/today");
-  await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Today", exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByText("Next visit", { exact: true }).first(),
   ).toBeVisible();
