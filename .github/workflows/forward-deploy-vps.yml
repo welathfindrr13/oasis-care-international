@@ -35,7 +35,7 @@ jobs:
     environment:
       name: production
     env:
-      EXPECTED_TARGET_SHA: 18aacd8458a3f96a38bf470d9a4c837ad563fa5c
+      EXPECTED_TARGET_SHA: 841b08e886446a7dbf019198b9c36426e245ee21
       STATE_OPERATION_TIMEOUT_SECONDS: "15"
       FETCH_TIMEOUT_SECONDS: "90"
       CHECKOUT_TIMEOUT_SECONDS: "60"
@@ -324,7 +324,7 @@ jobs:
           }
 
           [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || fail_remote FORWARD_INPUTS_INVALID
-          [ "$TARGET_SHA" = "18aacd8458a3f96a38bf470d9a4c837ad563fa5c" ] || fail_remote FORWARD_INPUTS_INVALID
+          [ "$TARGET_SHA" = "841b08e886446a7dbf019198b9c36426e245ee21" ] || fail_remote FORWARD_INPUTS_INVALID
           [[ "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] || fail_remote FORWARD_INPUTS_INVALID
           [[ "$ATTEMPT_ID" =~ ^[0-9a-f]{32}$ ]] || fail_remote FORWARD_INPUTS_INVALID
           [ "$REPOSITORY" = "welathfindrr13/oasis-care-international" ] || fail_remote FORWARD_INPUTS_INVALID

@@ -13,7 +13,7 @@ import {
 
 export const ARCHIVE_REVIEW_BASE_SHA = '0d7b8472535220d56efeb56512449cbfcc884ee7';
 export const ARCHIVABLE_ATTEMPT_ID = 'e8db1facbaa5b7e9d45b1994af3211d0';
-export const ARCHIVABLE_TARGET_SHA = '18aacd8458a3f96a38bf470d9a4c837ad563fa5c';
+export const ARCHIVABLE_TARGET_SHA = '841b08e886446a7dbf019198b9c36426e245ee21';
 export const ARCHIVABLE_WORKFLOW_SHA = '5fe23e7e9eac33945763bef272c92f68dd39e4ff';
 export const ARCHIVABLE_FAILURE_CLASS = 'RUNTIME_REPLACEMENT_FAILED';
 export const ARCHIVABLE_REPOSITORY = 'welathfindrr13/oasis-care-international';
