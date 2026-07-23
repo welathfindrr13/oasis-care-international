@@ -268,7 +268,10 @@ function validateRollbackImages(images, legacyAttemptId) {
   return images;
 }
 
-export function validateForwardManifest(manifest) {
+export function validateForwardManifest(
+  manifest,
+  { expectedTargetSha = FORWARD_TARGET_SHA } = {},
+) {
   exactKeys(manifest, [
     'schemaVersion',
     'kind',
@@ -284,10 +287,11 @@ export function validateForwardManifest(manifest) {
     'rollbackImages',
   ]);
   if (
+    !SHA_PATTERN.test(expectedTargetSha || '') ||
     manifest.schemaVersion !== MANIFEST_VERSION ||
     manifest.kind !== MANIFEST_KIND ||
     !ATTEMPT_ID_PATTERN.test(manifest.attemptId) ||
-    manifest.targetSha !== FORWARD_TARGET_SHA ||
+    manifest.targetSha !== expectedTargetSha ||
     !SHA_PATTERN.test(manifest.workflowSha) ||
     manifest.originMainSha !== manifest.workflowSha ||
     manifest.repository !== FORWARD_REPOSITORY ||
@@ -470,7 +474,10 @@ function readMarker(target, expected) {
   if (contents !== expected) fail();
 }
 
-function readForwardStateInternal(paths, { lockHeld = false } = {}) {
+function readForwardStateInternal(
+  paths,
+  { lockHeld = false, expectedTargetSha = FORWARD_TARGET_SHA } = {},
+) {
   assertPrivateMode(assertNotSymlink(paths.root, 'directory'), 0o700);
   if (fs.existsSync(paths.preparationLock)) fail('FORWARD_STATE_LOCKED');
   if (
@@ -506,7 +513,9 @@ function readForwardStateInternal(paths, { lockHeld = false } = {}) {
   const manifestStat = assertNotSymlink(paths.manifest, 'file');
   assertPrivateMode(manifestStat, 0o600);
   if (manifestStat.size <= 0 || manifestStat.size > MAX_MANIFEST_BYTES) fail();
-  const manifest = validateForwardManifest(JSON.parse(fs.readFileSync(paths.manifest, 'utf8')));
+  const manifest = validateForwardManifest(JSON.parse(fs.readFileSync(paths.manifest, 'utf8')), {
+    expectedTargetSha,
+  });
 
   const mutationExists = fs.existsSync(paths.mutation);
   const failureExists = fs.existsSync(paths.failure);
@@ -574,6 +583,11 @@ function readForwardStateInternal(paths, { lockHeld = false } = {}) {
 
 export function readForwardState({ rootDir, attemptId }) {
   return readForwardStateInternal(pathsFor(rootDir, attemptId));
+}
+
+export function readForwardStateForTarget({ rootDir, attemptId, expectedTargetSha }) {
+  if (!SHA_PATTERN.test(expectedTargetSha || '')) fail();
+  return readForwardStateInternal(pathsFor(rootDir, attemptId), { expectedTargetSha });
 }
 
 export function transitionForwardState({ rootDir, attemptId, nextState, failureClass }) {
@@ -791,8 +805,9 @@ export async function verifyLegacyStateUnchanged({
   attemptId,
   legacyStateDir,
   legacyStateHelper,
+  expectedTargetSha = FORWARD_TARGET_SHA,
 }) {
-  const forward = readForwardState({ rootDir, attemptId });
+  const forward = readForwardStateForTarget({ rootDir, attemptId, expectedTargetSha });
   const legacy = await readLegacyBinding({ legacyStateDir, legacyStateHelper });
   if (
     legacy.digest !== forward.manifest.legacyStateDigest ||
