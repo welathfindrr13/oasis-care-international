@@ -145,7 +145,26 @@ test('api production image packages every compiled Oasis workspace dependency', 
   assert.match(apiDockerfile, /COPY --from=build \/app\/libs\/time\/dist \.\/libs\/time\/dist/);
   assert.match(
     apiDockerfile,
+    /chmod 0644[\s\S]*\.\/libs\/auth\/package\.json[\s\S]*\.\/libs\/db\/package\.json[\s\S]*\.\/libs\/time\/package\.json/,
+  );
+  assert.match(
+    apiDockerfile,
     /RUN node -e "require\('@oasis\/auth'\); require\('@oasis\/db'\); require\('@oasis\/time'\)"/,
+  );
+  assert(
+    apiDockerfile.indexOf('USER nestjs') <
+      apiDockerfile.indexOf(
+        `RUN node -e "require('@oasis/auth'); require('@oasis/db'); require('@oasis/time')"`,
+      ),
+    'workspace dependencies must be verified as the production image user',
+  );
+  assert.match(
+    apiProductionImageWorkflow,
+    /chmod 0600[\s\S]*apps\/api\/package\.json[\s\S]*libs\/auth\/package\.json[\s\S]*libs\/db\/package\.json[\s\S]*libs\/time\/package\.json/,
+  );
+  assert.match(
+    apiProductionImageWorkflow,
+    /--user 1001:1001[\s\S]*fs\.accessSync\(require\.resolve\(name \+ '\/package\.json'\), fs\.constants\.R_OK\)/,
   );
 });
 

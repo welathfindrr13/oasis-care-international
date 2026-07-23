@@ -47,7 +47,12 @@ COPY libs/time/package.json ./libs/time/
 
 RUN sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|g' ./libs/auth/package.json && \
     sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|g' ./libs/db/package.json && \
-    sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|g' ./libs/time/package.json
+    sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|g' ./libs/time/package.json && \
+    chmod 0644 \
+      ./apps/api/package.json \
+      ./libs/auth/package.json \
+      ./libs/db/package.json \
+      ./libs/time/package.json
 
 RUN pnpm install --prod --frozen-lockfile
 
@@ -65,15 +70,15 @@ COPY --from=build /app/libs/db/prisma ./libs/db/prisma
 COPY --from=build /app/libs/db/src/generated ./libs/db/src/generated
 COPY --from=build /app/libs/db/src/generated ./libs/db/dist/generated
 
-# Fail the image build if a compiled workspace dependency cannot resolve under
-# the production Node.js runtime.
-RUN node -e "require('@oasis/auth'); require('@oasis/db'); require('@oasis/time')"
-
 COPY apps/api/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001 -G nodejs
 USER nestjs
+
+# Fail the image build if the production user cannot resolve a compiled
+# workspace dependency.
+RUN node -e "require('@oasis/auth'); require('@oasis/db'); require('@oasis/time')"
 
 EXPOSE 4000
 
