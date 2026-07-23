@@ -714,6 +714,13 @@ test('fetch diagnostics preserve exact statuses and reduce stderr to credential-
   for (const [exitStatus, stderr, category] of cases) {
     assert.deepEqual(classifyGitFetchFailure({ exitStatus, stderr }), { exitStatus, category });
   }
+  assert.deepEqual(
+    classifyGitFetchFailure({
+      exitStatus: 1,
+      stderr: 'fatal: index-pack failed: No space left on device',
+    }),
+    { exitStatus: 1, category: 'FETCH_DISK' },
+  );
 });
 
 test('fetch diagnostic state is immutable, exact-status, private, and survives the failure transition', async (t) => {

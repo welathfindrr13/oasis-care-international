@@ -723,18 +723,18 @@ export function classifyGitFetchFailure({ exitStatus, stderr }) {
     category = 'FETCH_NETWORK';
   } else if (/(couldn't find remote ref|remote ref .* not found|repository not found|not a git repository|does not appear to be a git repository)/.test(material)) {
     category = 'FETCH_REMOTE_REF';
-  } else if (/(index-pack failed|invalid index-pack output|unable to index pack|pack finalization|failed to write pack|packfile .* does not match index)/.test(material)) {
-    category = 'FETCH_PACK_FINALIZATION';
-  } else if (/(rpc failed|early eof|unexpected disconnect|fetch-pack:|sideband packet|pack transfer|remote end hung up)/.test(material)) {
-    category = 'FETCH_PACK_TRANSFER';
-  } else if (/(object .* corrupt|corrupt object|bad object|sha1 mismatch|invalid object|unresolved deltas)/.test(material)) {
-    category = 'FETCH_OBJECT_CORRUPTION';
-  } else if (/(cannot lock ref|unable to update local ref|reference broken|\.lock['": ]|ref lock)/.test(material)) {
-    category = 'FETCH_REF_LOCK';
   } else if (/(inode|too many links)/.test(material)) {
     category = 'FETCH_INODE';
   } else if (/(no space left on device|disk quota exceeded|file too large|input\/output error)/.test(material)) {
     category = 'FETCH_DISK';
+  } else if (/(cannot lock ref|unable to update local ref|reference broken|\.lock['": ]|ref lock)/.test(material)) {
+    category = 'FETCH_REF_LOCK';
+  } else if (/(object .* corrupt|corrupt object|bad object|sha1 mismatch|invalid object|unresolved deltas)/.test(material)) {
+    category = 'FETCH_OBJECT_CORRUPTION';
+  } else if (/(index-pack failed|invalid index-pack output|unable to index pack|pack finalization|failed to write pack|packfile .* does not match index)/.test(material)) {
+    category = 'FETCH_PACK_FINALIZATION';
+  } else if (/(rpc failed|early eof|unexpected disconnect|fetch-pack:|sideband packet|pack transfer|remote end hung up)/.test(material)) {
+    category = 'FETCH_PACK_TRANSFER';
   }
   return validateFetchDiagnostic({ exitStatus: numericStatus, category });
 }
