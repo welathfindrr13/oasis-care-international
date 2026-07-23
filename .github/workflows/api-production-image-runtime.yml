@@ -37,6 +37,16 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
+      - name: Reproduce restrictive production manifest source modes
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod 0600 \
+            apps/api/package.json \
+            libs/auth/package.json \
+            libs/db/package.json \
+            libs/time/package.json
+
       - name: Build exact production API image
         shell: bash
         run: |
@@ -72,4 +82,4 @@ jobs:
             --memory 512m \
             --entrypoint node \
             "$image" \
-            -e "for (const name of ['@oasis/auth', '@oasis/db', '@oasis/time']) require(name); console.log('WORKSPACE_RUNTIME_RESOLUTION=PASS')"
+            -e "const fs = require('node:fs'); for (const name of ['@oasis/auth', '@oasis/db', '@oasis/time']) { require(name); fs.accessSync(require.resolve(name + '/package.json'), fs.constants.R_OK); } console.log('WORKSPACE_RUNTIME_RESOLUTION=PASS')"
