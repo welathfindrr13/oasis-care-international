@@ -169,9 +169,15 @@ test("unaffiliated Clerk users are routed into governed company access without s
     `${chooseOrganizationTask}\n${chooseOrganizationTaskActions}`,
     /TaskChooseOrganization|OrganizationSwitcher|createOrganization/i,
   );
-  assert.doesNotMatch(chooseOrganizationTask, /client|person|visit|care record/i);
+  assert.doesNotMatch(
+    chooseOrganizationTask,
+    /client|person|visit|care record/i,
+  );
   assert.match(chooseOrganizationTaskActions, /useOrganizationList/);
   assert.match(chooseOrganizationTaskActions, /setActive/);
+  assert.match(chooseOrganizationTaskActions, /userMemberships\.hasNextPage/);
+  assert.match(chooseOrganizationTaskActions, /userMemberships\.fetchNext/);
+  assert.match(chooseOrganizationTaskActions, /Load more companies/);
   assert.match(
     chooseOrganizationTaskActions,
     /Oasis will still verify your approved internal membership/i,

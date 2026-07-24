@@ -184,6 +184,53 @@ test('an approved user can activate an existing company before Oasis rechecks in
     .toBe('org_synthetic_approved');
 });
 
+test('an approved company remains selectable after loading another Clerk membership page', async ({
+  page,
+}) => {
+  await page.route('**/api/access-context', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        authenticated: true,
+        organizationId: 'organization_synthetic_approved',
+        effectiveRole: 'admin',
+        membershipState: 'ACTIVE',
+        surface: 'ADMIN',
+        linkedIdentityState: 'NOT_REQUIRED',
+        onboardingState: 'READY',
+        resolution: 'READY',
+        capabilities: ['TENANT_ADMIN'],
+        medicationEmarEnabled: false,
+      }),
+    });
+  });
+  await page.goto(
+    '/login?browser_clerk_scenario=paginated-existing-organization',
+  );
+  await page
+    .getByRole('button', { name: 'Continue with paginated company account' })
+    .click();
+
+  await expect(page).toHaveURL('/session-tasks/choose-organization');
+  await expect(
+    page.getByRole('button', { name: 'Continue to Synthetic Approved Care' }),
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: 'Load more companies' }).click();
+  await page
+    .getByRole('button', { name: 'Continue to Synthetic Approved Care' })
+    .click();
+
+  await expect(page).toHaveURL('/today');
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.localStorage.getItem('oasis.synthetic-clerk-organization'),
+      ),
+    )
+    .toBe('org_synthetic_approved');
+});
+
 test('a newly invited Carer creates an account and activates into setup-required access', async ({
   page,
 }) => {
@@ -248,9 +295,7 @@ test('the wrong Clerk account receives only the sanitized activation denial', as
     { key: SESSION_KEY },
   );
   await mockActivation(page, 'forbidden');
-  await page.goto(
-    `/activate-invitation?oasis_invitation_id=${INVITATION_ID}`,
-  );
+  await page.goto(`/activate-invitation?oasis_invitation_id=${INVITATION_ID}`);
   await page.getByRole('button', { name: 'Activate secure workspace' }).click();
   await expect(page.locator('p[role="alert"]')).toHaveText(
     'We could not safely activate this invitation. Use the invited account or try again shortly.',
@@ -258,6 +303,8 @@ test('the wrong Clerk account receives only the sanitized activation denial', as
   await expect(page).toHaveURL(
     `/activate-invitation?oasis_invitation_id=${INVITATION_ID}`,
   );
-  await expect(page.getByText('Invitation activation is unavailable')).toHaveCount(0);
+  await expect(
+    page.getByText('Invitation activation is unavailable'),
+  ).toHaveCount(0);
   await expectAccessible(page);
 });

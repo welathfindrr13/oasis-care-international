@@ -142,6 +142,9 @@ export function useOrganizationList({
   userMemberships?: { infinite?: boolean };
 } = {}) {
   const session = useSyntheticSession();
+  const [membershipPage, setMembershipPage] = useState(0);
+  const isPaginated =
+    session.userId === "user_synthetic_paginated_organization";
   const memberships =
     session.userId === "user_synthetic_existing_organization"
       ? [
@@ -153,7 +156,28 @@ export function useOrganizationList({
             },
           },
         ]
-      : [];
+      : isPaginated
+        ? [
+            {
+              id: "membership_synthetic_other",
+              organization: {
+                id: "org_synthetic_other",
+                name: "Synthetic Other Care",
+              },
+            },
+            ...(membershipPage > 0
+              ? [
+                  {
+                    id: "membership_synthetic_approved",
+                    organization: {
+                      id: "org_synthetic_approved",
+                      name: "Synthetic Approved Care",
+                    },
+                  },
+                ]
+              : []),
+          ]
+        : [];
 
   return {
     isLoaded: session.isLoaded,
@@ -163,8 +187,8 @@ export function useOrganizationList({
     userMemberships: {
       data: memberships,
       isLoading: !session.isLoaded,
-      hasNextPage: false,
-      fetchNext: async () => undefined,
+      hasNextPage: isPaginated && membershipPage === 0,
+      fetchNext: async () => setMembershipPage(1),
     },
   };
 }
@@ -187,6 +211,8 @@ export function SignIn({
   const isNew = scenario === "new";
   const isUnaffiliated = scenario === "unaffiliated";
   const hasExistingOrganization = scenario === "existing-organization";
+  const hasPaginatedOrganization =
+    scenario === "paginated-existing-organization";
   return (
     <button
       type="button"
@@ -201,13 +227,15 @@ export function SignIn({
                 ? "user_synthetic_unaffiliated"
                 : hasExistingOrganization
                   ? "user_synthetic_existing_organization"
-                : "user_synthetic_existing",
+                  : hasPaginatedOrganization
+                    ? "user_synthetic_paginated_organization"
+                    : "user_synthetic_existing",
             token: "",
           },
           false,
         );
         window.location.assign(
-          isUnaffiliated || hasExistingOrganization
+          isUnaffiliated || hasExistingOrganization || hasPaginatedOrganization
             ? taskUrls["choose-organization"] || "/access/no-membership"
             : forceRedirectUrl || "/",
         );
@@ -219,7 +247,9 @@ export function SignIn({
           ? "Continue with unaffiliated account"
           : hasExistingOrganization
             ? "Continue with approved company account"
-          : "Continue with existing account"}
+            : hasPaginatedOrganization
+              ? "Continue with paginated company account"
+              : "Continue with existing account"}
     </button>
   );
 }

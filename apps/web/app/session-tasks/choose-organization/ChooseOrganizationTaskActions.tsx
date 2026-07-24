@@ -9,6 +9,7 @@ export function ChooseOrganizationTaskActions() {
     userMemberships: { infinite: true },
   });
   const [activatingId, setActivatingId] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const memberships = userMemberships.data ?? [];
 
@@ -29,6 +30,24 @@ export function ChooseOrganizationTaskActions() {
     }
   };
 
+  const loadMoreOrganizations = async () => {
+    setIsLoadingMore(true);
+    setError("");
+    try {
+      const fetchNext = userMemberships.fetchNext;
+      if (!fetchNext) {
+        throw new Error("Clerk organization pagination is unavailable");
+      }
+      await fetchNext();
+    } catch {
+      setError(
+        "We could not load more approved companies. Try again or use your invitation link.",
+      );
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
   return (
     <>
       {!isLoaded && (
@@ -43,8 +62,8 @@ export function ChooseOrganizationTaskActions() {
             Continue to an existing company
           </h2>
           <p className="mt-2 text-sm leading-6 text-oasis-muted">
-            Oasis will still verify your approved internal membership before
-            any company information is shown.
+            Oasis will still verify your approved internal membership before any
+            company information is shown.
           </p>
           <ul className="mt-4 space-y-3">
             {memberships.map((membership) => (
@@ -64,11 +83,26 @@ export function ChooseOrganizationTaskActions() {
               </li>
             ))}
           </ul>
+          {userMemberships.hasNextPage && (
+            <button
+              type="button"
+              className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-md border border-oasis-control-border bg-white px-5 py-3 text-sm font-semibold text-oasis-ink hover:bg-base-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oasis-teal focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
+              disabled={isLoadingMore || activatingId !== null}
+              onClick={() => void loadMoreOrganizations()}
+            >
+              {isLoadingMore
+                ? "Loading more companies…"
+                : "Load more companies"}
+            </button>
+          )}
         </div>
       )}
 
       {error && (
-        <p role="alert" className="mb-4 text-sm font-semibold text-oasis-danger">
+        <p
+          role="alert"
+          className="mb-4 text-sm font-semibold text-oasis-danger"
+        >
           {error}
         </p>
       )}
