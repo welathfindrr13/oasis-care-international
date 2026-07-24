@@ -983,10 +983,10 @@ test('exact completion proof requires API, readiness, and web to report the targ
 });
 
 test('workflow is a new one-shot lane bound to the exact application and reviewed workflow SHAs', () => {
-  assert.match(workflow, /EXPECTED_TARGET_SHA: 841b08e886446a7dbf019198b9c36426e245ee21/);
+  assert.match(workflow, /EXPECTED_TARGET_SHA: d656d88ba82fa13abb66e3ba915ba2b6ae283d9e/);
   assert.match(
     docs,
-    /single-use recovery lane for one reviewed application target:\s*`841b08e886446a7dbf019198b9c36426e245ee21`/,
+    /single-use recovery lane for one reviewed application target:\s*`d656d88ba82fa13abb66e3ba915ba2b6ae283d9e`/,
   );
   assert.doesNotMatch(
     docs,

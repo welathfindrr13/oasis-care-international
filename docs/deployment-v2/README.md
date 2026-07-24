@@ -218,7 +218,7 @@ new design and explicit approval; the exception cannot be reused.
 ## Forward Deployment From Durable Legacy Rollback
 
 `Forward Deploy VPS` is a separate, single-use recovery lane for one reviewed application target:
-`841b08e886446a7dbf019198b9c36426e245ee21`. Adding this workflow does not authorize or execute
+`d656d88ba82fa13abb66e3ba915ba2b6ae283d9e`. Adding this workflow does not authorize or execute
 production deployment. It must be reviewed and merged first; a later operator action must use the
 then-current reviewed workflow revision and a fresh attempt identifier.
 
