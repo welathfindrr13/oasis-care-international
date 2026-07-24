@@ -1,10 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 const SESSION_KEY = "oasis.synthetic-clerk-session";
 const ORGANIZATION_KEY = "oasis.synthetic-clerk-organization";
+const ClerkTaskUrlsContext = createContext<Record<string, string>>({});
 
 type SyntheticSession = {
   signedIn: boolean;
@@ -46,9 +47,11 @@ function subjectFromToken(token: string): string {
   }
 }
 
-function writeSession(session: SyntheticSession) {
+function writeSession(session: SyntheticSession, notify = true) {
   window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  window.dispatchEvent(new Event("oasis-synthetic-clerk-session"));
+  if (notify) {
+    window.dispatchEvent(new Event("oasis-synthetic-clerk-session"));
+  }
 }
 
 function useSyntheticSession() {
@@ -77,8 +80,18 @@ function useSyntheticSession() {
   return { ...session, isLoaded };
 }
 
-export function ClerkProvider({ children }: { children: ReactNode }) {
-  return <>{children}</>;
+export function ClerkProvider({
+  children,
+  taskUrls = {},
+}: {
+  children: ReactNode;
+  taskUrls?: Record<string, string>;
+}) {
+  return (
+    <ClerkTaskUrlsContext.Provider value={taskUrls}>
+      {children}
+    </ClerkTaskUrlsContext.Provider>
+  );
 }
 
 export function useAuth() {
@@ -123,6 +136,63 @@ export function useClerk() {
   };
 }
 
+export function useOrganizationList({
+  userMemberships: _userMemberships,
+}: {
+  userMemberships?: { infinite?: boolean };
+} = {}) {
+  const session = useSyntheticSession();
+  const [membershipPage, setMembershipPage] = useState(0);
+  const isPaginated =
+    session.userId === "user_synthetic_paginated_organization";
+  const memberships =
+    session.userId === "user_synthetic_existing_organization"
+      ? [
+          {
+            id: "membership_synthetic_approved",
+            organization: {
+              id: "org_synthetic_approved",
+              name: "Synthetic Approved Care",
+            },
+          },
+        ]
+      : isPaginated
+        ? [
+            {
+              id: "membership_synthetic_other",
+              organization: {
+                id: "org_synthetic_other",
+                name: "Synthetic Other Care",
+              },
+            },
+            ...(membershipPage > 0
+              ? [
+                  {
+                    id: "membership_synthetic_approved",
+                    organization: {
+                      id: "org_synthetic_approved",
+                      name: "Synthetic Approved Care",
+                    },
+                  },
+                ]
+              : []),
+          ]
+        : [];
+
+  return {
+    isLoaded: session.isLoaded,
+    setActive: async ({ organization }: { organization: string }) => {
+      window.localStorage.setItem(ORGANIZATION_KEY, organization);
+    },
+    userMemberships: {
+      data: memberships,
+      isLoading: !session.isLoaded,
+      hasNextPage: isPaginated && membershipPage === 0,
+      fetchNext: async () => setMembershipPage(1),
+    },
+  };
+}
+
 export function SignIn({
   forceRedirectUrl,
 }: {
@@ -131,6 +201,7 @@ export function SignIn({
   routing?: string;
   appearance?: unknown;
 }) {
+  const taskUrls = useContext(ClerkTaskUrlsContext);
   const scenario =
     typeof window === "undefined"
       ? ""
@@ -138,20 +209,47 @@ export function SignIn({
           "browser_clerk_scenario",
         );
   const isNew = scenario === "new";
+  const isUnaffiliated = scenario === "unaffiliated";
+  const hasExistingOrganization = scenario === "existing-organization";
+  const hasPaginatedOrganization =
+    scenario === "paginated-existing-organization";
   return (
     <button
       type="button"
       className="min-h-11 w-full rounded-full bg-slate-950 px-6 py-3 text-sm font-bold text-white"
       onClick={() => {
-        writeSession({
-          signedIn: true,
-          userId: isNew ? "user_synthetic_new" : "user_synthetic_existing",
-          token: "",
-        });
-        window.location.assign(forceRedirectUrl || "/");
+        writeSession(
+          {
+            signedIn: true,
+            userId: isNew
+              ? "user_synthetic_new"
+              : isUnaffiliated
+                ? "user_synthetic_unaffiliated"
+                : hasExistingOrganization
+                  ? "user_synthetic_existing_organization"
+                  : hasPaginatedOrganization
+                    ? "user_synthetic_paginated_organization"
+                    : "user_synthetic_existing",
+            token: "",
+          },
+          false,
+        );
+        window.location.assign(
+          isUnaffiliated || hasExistingOrganization || hasPaginatedOrganization
+            ? taskUrls["choose-organization"] || "/access/no-membership"
+            : forceRedirectUrl || "/",
+        );
       }}
     >
-      {isNew ? "Create invited account" : "Continue with existing account"}
+      {isNew
+        ? "Create invited account"
+        : isUnaffiliated
+          ? "Continue with unaffiliated account"
+          : hasExistingOrganization
+            ? "Continue with approved company account"
+            : hasPaginatedOrganization
+              ? "Continue with paginated company account"
+              : "Continue with existing account"}
     </button>
   );
 }

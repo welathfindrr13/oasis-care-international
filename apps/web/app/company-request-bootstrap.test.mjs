@@ -16,6 +16,15 @@ const acceptInvitationPage = read(
   "./accept-invitation/AcceptInvitationClient.tsx",
 );
 const activationClient = read("./activate-invitation/ActivationClient.tsx");
+const authProviders = read("../components/providers/AppAuthProviders.tsx");
+const chooseOrganizationTask = read(
+  "./session-tasks/choose-organization/page.tsx",
+);
+const chooseOrganizationTaskActions = read(
+  "./session-tasks/choose-organization/ChooseOrganizationTaskActions.tsx",
+);
+const middleware = read("../middleware.ts");
+const accessStatePage = read("./access/[state]/page.tsx");
 
 test("public intake collects only minimal business contact details", () => {
   for (const field of [
@@ -141,4 +150,43 @@ test("Clerk invitations authenticate and activate before entering guided setup",
     /router\.replace\(data\.activateViewerOrganizationInvitation\.nextPath\)/,
   );
   assert.doesNotMatch(activationClient, /email|organizationId:\s*input/i);
+});
+
+test("unaffiliated Clerk users are routed into governed company access without self-provisioning", () => {
+  assert.match(
+    authProviders,
+    /['"]choose-organization['"]:\s*['"]\/session-tasks\/choose-organization['"]/,
+  );
+  assert.match(
+    middleware,
+    /['"]\/session-tasks\/choose-organization\(\.\*\)['"]/,
+  );
+  assert.match(chooseOrganizationTask, /Company access is not ready/);
+  assert.match(chooseOrganizationTask, /href="\/request-access"/);
+  assert.match(chooseOrganizationTask, /secure link in your invitation email/i);
+  assert.match(chooseOrganizationTask, /No care information has been loaded/);
+  assert.doesNotMatch(
+    `${chooseOrganizationTask}\n${chooseOrganizationTaskActions}`,
+    /TaskChooseOrganization|OrganizationSwitcher|createOrganization/i,
+  );
+  assert.doesNotMatch(
+    chooseOrganizationTask,
+    /client|person|visit|care record/i,
+  );
+  assert.match(chooseOrganizationTaskActions, /useOrganizationList/);
+  assert.match(chooseOrganizationTaskActions, /setActive/);
+  assert.match(chooseOrganizationTaskActions, /userMemberships\.hasNextPage/);
+  assert.match(chooseOrganizationTaskActions, /userMemberships\.fetchNext/);
+  assert.match(chooseOrganizationTaskActions, /Load more companies/);
+  assert.match(
+    chooseOrganizationTaskActions,
+    /Oasis will still verify your approved internal membership/i,
+  );
+});
+
+test("the no-membership fallback offers both governed first-Manager and invitation recovery", () => {
+  assert.match(accessStatePage, /Request company access/);
+  assert.match(accessStatePage, /secure link in your invitation email/i);
+  assert.match(accessStatePage, /href="\/request-access"/);
+  assert.match(accessStatePage, /No care information has been loaded/);
 });

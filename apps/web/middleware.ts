@@ -23,6 +23,7 @@ const isPublicRoute = createRouteMatcher([
   '/request-access(.*)',
   '/api/company-access-requests(.*)',
   '/accept-invitation(.*)',
+  '/session-tasks/choose-organization(.*)',
 ])
 const nextAuthMiddleware = withAuth(
   async function middleware(req) {
