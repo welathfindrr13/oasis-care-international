@@ -15,7 +15,11 @@ interface Props {
 export function AppAuthProviders({ children }: Props) {
   if (resolveAuthMode(process.env) === 'clerk') {
     return (
-      <ClerkProvider>
+      <ClerkProvider
+        taskUrls={{
+          'choose-organization': '/session-tasks/choose-organization',
+        }}
+      >
         <ClerkClientAccessProvider>{children}</ClerkClientAccessProvider>
       </ClerkProvider>
     );

@@ -51,6 +51,7 @@ test('pre-workspace and offline routes bypass authoritative workspace redirects'
     '/accept-invitation/complete',
     '/activate-invitation',
     '/activate-invitation/complete',
+    '/session-tasks/choose-organization',
     '/platform',
     '/platform/company-requests',
   ]) {

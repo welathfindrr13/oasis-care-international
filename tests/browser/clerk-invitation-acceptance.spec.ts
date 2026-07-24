@@ -5,6 +5,7 @@ const INVITATION_ID = '11111111-1111-4111-8111-111111111111';
 const SESSION_KEY = 'oasis.synthetic-clerk-session';
 
 async function mockActivation(page: Page, outcome: 'active' | 'forbidden') {
+  let activated = false;
   await page.route('**/api/access-context', async (route) => {
     await route.fulfill({
       status: 200,
@@ -12,12 +13,12 @@ async function mockActivation(page: Page, outcome: 'active' | 'forbidden') {
       body: JSON.stringify({
         authenticated: true,
         organizationId: null,
-        effectiveRole: null,
-        membershipState: 'MISSING',
+        effectiveRole: activated ? 'carer' : null,
+        membershipState: activated ? 'ACTIVE' : 'MISSING',
         surface: 'NONE',
-        linkedIdentityState: 'NOT_REQUIRED',
-        onboardingState: 'NONE',
-        resolution: 'MISSING',
+        linkedIdentityState: activated ? 'REQUIRED' : 'NOT_REQUIRED',
+        onboardingState: activated ? 'SETUP_REQUIRED' : 'NOT_STARTED',
+        resolution: 'DENIED',
         capabilities: [],
       }),
     });
@@ -27,6 +28,7 @@ async function mockActivation(page: Page, outcome: 'active' | 'forbidden') {
       variables?: { input?: { invitationId?: string } };
     };
     expect(payload.variables?.input?.invitationId).toBe(INVITATION_ID);
+    if (outcome === 'active') activated = true;
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -68,6 +70,79 @@ async function waitForClerkStub(page: Page) {
     )
     .toBe(true);
 }
+
+test('an unaffiliated Clerk user reaches governed company access without creating an organization', async ({
+  page,
+}) => {
+  await page.goto('/login?browser_clerk_scenario=unaffiliated');
+  await page
+    .getByRole('button', { name: 'Continue with unaffiliated account' })
+    .click();
+
+  await expect(page).toHaveURL('/session-tasks/choose-organization');
+  await expect(
+    page.getByRole('heading', { name: 'Company access is not ready' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Request company access' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Use a different account' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('No care information has been loaded.'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /create organization/i }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('link', { name: /create organization/i }),
+  ).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.localStorage.getItem('oasis.synthetic-clerk-organization'),
+      ),
+    )
+    .toBeNull();
+  await expectAccessible(page);
+
+  await page.getByRole('link', { name: 'Request company access' }).click();
+  await expect(page).toHaveURL('/request-access');
+  await expect(
+    page.getByRole('heading', {
+      name: 'Request a review for your care company',
+    }),
+  ).toBeVisible();
+});
+
+test('the governed company-access task remains usable without horizontal overflow', async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1440, height: 900 },
+    { width: 320, height: 800 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/session-tasks/choose-organization');
+    await expect(
+      page.getByRole('heading', { name: 'Company access is not ready' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Request company access' }),
+    ).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      )
+      .toBe(true);
+    await expectAccessible(page);
+  }
+});
 
 test('a newly invited Carer creates an account and activates into setup-required access', async ({
   page,
