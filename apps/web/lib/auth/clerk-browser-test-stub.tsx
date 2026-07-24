@@ -136,6 +136,39 @@ export function useClerk() {
   };
 }
 
+export function useOrganizationList({
+  userMemberships: _userMemberships,
+}: {
+  userMemberships?: { infinite?: boolean };
+} = {}) {
+  const session = useSyntheticSession();
+  const memberships =
+    session.userId === "user_synthetic_existing_organization"
+      ? [
+          {
+            id: "membership_synthetic_approved",
+            organization: {
+              id: "org_synthetic_approved",
+              name: "Synthetic Approved Care",
+            },
+          },
+        ]
+      : [];
+
+  return {
+    isLoaded: session.isLoaded,
+    setActive: async ({ organization }: { organization: string }) => {
+      window.localStorage.setItem(ORGANIZATION_KEY, organization);
+    },
+    userMemberships: {
+      data: memberships,
+      isLoading: !session.isLoaded,
+      hasNextPage: false,
+      fetchNext: async () => undefined,
+    },
+  };
+}
+
 export function SignIn({
   forceRedirectUrl,
 }: {
@@ -153,6 +186,7 @@ export function SignIn({
         );
   const isNew = scenario === "new";
   const isUnaffiliated = scenario === "unaffiliated";
+  const hasExistingOrganization = scenario === "existing-organization";
   return (
     <button
       type="button"
@@ -165,13 +199,15 @@ export function SignIn({
               ? "user_synthetic_new"
               : isUnaffiliated
                 ? "user_synthetic_unaffiliated"
+                : hasExistingOrganization
+                  ? "user_synthetic_existing_organization"
                 : "user_synthetic_existing",
             token: "",
           },
           false,
         );
         window.location.assign(
-          isUnaffiliated
+          isUnaffiliated || hasExistingOrganization
             ? taskUrls["choose-organization"] || "/access/no-membership"
             : forceRedirectUrl || "/",
         );
@@ -181,6 +217,8 @@ export function SignIn({
         ? "Create invited account"
         : isUnaffiliated
           ? "Continue with unaffiliated account"
+          : hasExistingOrganization
+            ? "Continue with approved company account"
           : "Continue with existing account"}
     </button>
   );

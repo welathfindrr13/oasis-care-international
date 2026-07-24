@@ -144,6 +144,46 @@ test('the governed company-access task remains usable without horizontal overflo
   }
 });
 
+test('an approved user can activate an existing company before Oasis rechecks internal authority', async ({
+  page,
+}) => {
+  await page.route('**/api/access-context', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        authenticated: true,
+        organizationId: 'organization_synthetic_approved',
+        effectiveRole: 'admin',
+        membershipState: 'ACTIVE',
+        surface: 'ADMIN',
+        linkedIdentityState: 'NOT_REQUIRED',
+        onboardingState: 'READY',
+        resolution: 'READY',
+        capabilities: ['TENANT_ADMIN'],
+        medicationEmarEnabled: false,
+      }),
+    });
+  });
+  await page.goto('/login?browser_clerk_scenario=existing-organization');
+  await page
+    .getByRole('button', { name: 'Continue with approved company account' })
+    .click();
+
+  await expect(page).toHaveURL('/session-tasks/choose-organization');
+  await page
+    .getByRole('button', { name: 'Continue to Synthetic Approved Care' })
+    .click();
+  await expect(page).toHaveURL('/today');
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.localStorage.getItem('oasis.synthetic-clerk-organization'),
+      ),
+    )
+    .toBe('org_synthetic_approved');
+});
+
 test('a newly invited Carer creates an account and activates into setup-required access', async ({
   page,
 }) => {

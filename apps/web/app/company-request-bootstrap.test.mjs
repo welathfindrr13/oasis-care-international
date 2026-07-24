@@ -20,6 +20,9 @@ const authProviders = read("../components/providers/AppAuthProviders.tsx");
 const chooseOrganizationTask = read(
   "./session-tasks/choose-organization/page.tsx",
 );
+const chooseOrganizationTaskActions = read(
+  "./session-tasks/choose-organization/ChooseOrganizationTaskActions.tsx",
+);
 const middleware = read("../middleware.ts");
 const accessStatePage = read("./access/[state]/page.tsx");
 
@@ -163,10 +166,16 @@ test("unaffiliated Clerk users are routed into governed company access without s
   assert.match(chooseOrganizationTask, /secure link in your invitation email/i);
   assert.match(chooseOrganizationTask, /No care information has been loaded/);
   assert.doesNotMatch(
-    chooseOrganizationTask,
-    /TaskChooseOrganization|OrganizationSwitcher|createOrganization|organizationList/i,
+    `${chooseOrganizationTask}\n${chooseOrganizationTaskActions}`,
+    /TaskChooseOrganization|OrganizationSwitcher|createOrganization/i,
   );
   assert.doesNotMatch(chooseOrganizationTask, /client|person|visit|care record/i);
+  assert.match(chooseOrganizationTaskActions, /useOrganizationList/);
+  assert.match(chooseOrganizationTaskActions, /setActive/);
+  assert.match(
+    chooseOrganizationTaskActions,
+    /Oasis will still verify your approved internal membership/i,
+  );
 });
 
 test("the no-membership fallback offers both governed first-Manager and invitation recovery", () => {
