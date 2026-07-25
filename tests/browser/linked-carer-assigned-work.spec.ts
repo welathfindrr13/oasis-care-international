@@ -70,26 +70,26 @@ async function refreshMountedNextAuthSession(
   });
 }
 
-test("an administrator creates a person and schedules an accepted Carer", async ({
+test("an administrator creates a client and schedules an accepted Carer", async ({
   page,
 }) => {
   await signIn(page, {
     email: "admin@local.dev",
     name: "Local Admin",
     role: "user",
-    callbackUrl: "http://localhost:3002/people/new",
+    callbackUrl: "http://localhost:3002/clients/new",
   });
 
-  await page.goto("/people/new");
-  await expect(page.getByRole("heading", { name: "Add person" })).toBeVisible();
+  await page.goto("/clients/new");
+  await expect(page.getByRole("heading", { name: "Add client" })).toBeVisible();
   await page.getByLabel("Full Name *").fill("Browser Journey Person");
   await page.getByLabel("Address Line 1 *").fill("18 Acceptance Lane");
   await page.getByLabel("City *").fill("Leeds");
   await page.getByLabel("Postcode *").fill("LS1 2AB");
   await page.getByLabel(/I confirm that the person has been informed/).check();
-  await page.getByRole("button", { name: "Create person" }).click();
+  await page.getByRole("button", { name: "Create client" }).click();
 
-  await expect(page).toHaveURL(/\/people$/);
+  await expect(page).toHaveURL(/\/clients$/);
   const personRow = page.getByRole("row").filter({
     hasText: "Browser Journey Person",
   });
@@ -881,7 +881,7 @@ test("tenant and family room guessing stays isolated", async ({ page }) => {
   await page.goto(`/people/${SENTINEL_CLIENT_ID}`);
   await expect(
     page.getByRole("heading", {
-      name: /Person Not Found|Unable to Load Person/,
+      name: /Person not found|Unable to load person|Client not found|Unable to load client/i,
     }),
   ).toBeVisible();
   await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);

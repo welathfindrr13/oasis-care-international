@@ -133,7 +133,7 @@ test("a server-signed management session reaches the normal Clerk verifier and s
   await gotoAppRoute(page, `/people/${SENTINEL_CLIENT_ID}`);
   await expect(
     page.getByRole("heading", {
-      name: /Person Not Found|Unable to Load Person/,
+      name: /Person not found|Unable to load person|Client not found|Unable to load client/i,
     }),
   ).toBeVisible();
   await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
