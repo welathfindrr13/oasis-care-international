@@ -277,19 +277,19 @@ export default async function ClientsPage(props: ClientsPageProps) {
                         <td className="mt-4 block md:mt-0 md:table-cell md:px-4 md:py-3">
                           <span className="sr-only md:hidden">Actions</span>
                           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap md:flex-row md:items-center">
-                            <Button asChild variant="ghost" size="sm">
+                            <Button asChild variant="ghost" size="sm" className="scroll-mb-4">
                               <Link href={`/${isAdmin ? 'clients' : 'people'}/${client.id}`}>
                                 View
                               </Link>
                             </Button>
                             {isAdmin && (
                               <>
-                                <Button asChild variant="ghost" size="sm">
+                                <Button asChild variant="ghost" size="sm" className="scroll-mb-4">
                                   <Link href={`/clients/${client.id}/edit`}>
                                     Edit
                                   </Link>
                                 </Button>
-                                <Button asChild variant="ghost" size="sm">
+                                <Button asChild variant="ghost" size="sm" className="scroll-mb-4">
                                   <a href={`/visits/new?clientId=${client.id}`}>
                                     Schedule
                                   </a>
