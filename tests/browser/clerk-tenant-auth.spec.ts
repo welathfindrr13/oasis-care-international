@@ -127,7 +127,9 @@ test("a server-signed management session reaches the normal Clerk verifier and s
 
   await gotoAppRoute(page, "/people");
   await expect(
-    page.getByText("Assigned Fake Client", { exact: true }),
+    page
+      .getByRole("table")
+      .getByText("Assigned Fake Client", { exact: true }),
   ).toBeVisible();
 
   await gotoAppRoute(page, `/people/${SENTINEL_CLIENT_ID}`);
@@ -312,7 +314,9 @@ test("a Platform Owner revokes the exact first Manager before cleanup and the sa
   const managerToken = await activateSignedProfile(managerPage, "manager");
   await gotoAppRoute(managerPage, "/people");
   await expect(
-    managerPage.getByText("Assigned Fake Client", { exact: true }),
+    managerPage
+      .getByRole("table")
+      .getByText("Assigned Fake Client", { exact: true }),
   ).toBeVisible();
 
   const operatorContext = await browser.newContext({
