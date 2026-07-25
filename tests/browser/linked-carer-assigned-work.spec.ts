@@ -966,7 +966,9 @@ test("sign-out, Back, and refresh do not reveal protected content", async ({
   });
   await page.goto("/clients");
   await expect(
-    page.getByText("Assigned Fake Client", { exact: true }).first(),
+    page
+      .getByRole("table")
+      .getByText("Assigned Fake Client", { exact: true }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Open account menu" }).click();
