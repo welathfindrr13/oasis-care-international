@@ -22,6 +22,7 @@ import {
   FamilyMembershipActionInput,
   FamilyInvitationActionInput,
   FamilyConcernReceiptDTO,
+  FamilyCareRoomConcernDTO,
 } from './dto/carebridge.dto';
 import { FamilyInvitationService } from './family-invitation.service';
 import { ManualAudit } from '../common/decorators/manual-audit.decorator';
@@ -86,6 +87,18 @@ export class CarebridgeResolver {
     @Context() ctx: any,
   ) {
     return this.carebridgeService.listConcernInbox(this.viewerFromContext(ctx), status as any);
+  }
+
+  @Query(() => [FamilyCareRoomConcernDTO])
+  @Roles('user')
+  async familyCareRoomConcerns(
+    @Args('careRoomId') careRoomId: string,
+    @Context() ctx: any,
+  ) {
+    return this.carebridgeService.listFamilyCareRoomConcerns(
+      careRoomId,
+      this.viewerFromContext(ctx),
+    );
   }
 
   @Query(() => [VerifiedVisitStoryDTO])

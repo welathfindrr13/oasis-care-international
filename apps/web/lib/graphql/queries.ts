@@ -910,6 +910,23 @@ export interface FamilyConcernReceipt {
   status: string;
 }
 
+export interface FamilyConcernEvent {
+  eventType: string;
+  createdAt: string;
+}
+
+export interface FamilyCareRoomConcern {
+  id: string;
+  title: string;
+  status: string;
+  submittedAt: string;
+  events: FamilyConcernEvent[];
+}
+
+export interface FamilyCareRoomConcernsQueryResponse {
+  familyCareRoomConcerns: FamilyCareRoomConcern[];
+}
+
 export interface RaiseFamilyConcernMutationResponse {
   raiseFamilyCarebridgeConcern: FamilyConcernReceipt;
 }
@@ -1185,6 +1202,21 @@ export const FAMILY_VERIFIED_VISIT_STORIES_QUERY = `
       title
       body
       publishedAt
+    }
+  }
+`;
+
+export const FAMILY_CARE_ROOM_CONCERNS_QUERY = `
+  query FamilyCareRoomConcerns($careRoomId: String!) {
+    familyCareRoomConcerns(careRoomId: $careRoomId) {
+      id
+      title
+      status
+      submittedAt
+      events {
+        eventType
+        createdAt
+      }
     }
   }
 `;

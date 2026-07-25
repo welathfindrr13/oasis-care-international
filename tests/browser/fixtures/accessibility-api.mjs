@@ -11,7 +11,13 @@ const port = Number(process.env.ACCESSIBILITY_FIXTURE_API_PORT || 4014);
 const visitId = "77777777-7777-4777-8777-777777777777";
 const personId = "88888888-8888-4888-8888-888888888888";
 const careRoomId = "99999999-9999-4999-8999-999999999999";
+const emptyConcernRoomId = "13131313-1313-4131-8131-131313131313";
+const unavailableConcernRoomId = "14141414-1414-4141-8141-141414141414";
+const revokedConcernRoomId = "15151515-1515-4151-8151-151515151515";
+const zeroGrantConcernRoomId = "16161616-1616-4161-8161-161616161616";
 const companyRequestId = "10101010-1010-4010-8010-101010101010";
+
+class GraphQLFixtureError extends Error {}
 
 const capabilities = {
   admin: [
@@ -298,7 +304,59 @@ const operationHandlers = new Map([
   ],
   ["CareLogs", () => ({ careLogs: { total: 0, items: [] } })],
   ["FamilyCareRooms", () => ({ familyCareRooms: [] })],
+  [
+    "FamilyCareRoom",
+    (_request, payload) => {
+      const requestedRoomId = payload.variables?.id;
+      if (requestedRoomId === revokedConcernRoomId) {
+        throw new GraphQLFixtureError(
+          "You do not have access to this CareBridge room.",
+        );
+      }
+      return {
+      familyCareRoom: {
+        id: requestedRoomId || careRoomId,
+        clientDisplayName: "Jordan Ellis",
+        canViewApprovedUpdates: true,
+        canRaiseConcerns: requestedRoomId !== zeroGrantConcernRoomId,
+      },
+      };
+    },
+  ],
   ["FamilyVerifiedVisitStories", () => ({ familyVerifiedVisitStories: [] })],
+  [
+    "FamilyCareRoomConcerns",
+    (_request, payload) => {
+      const requestedRoomId = payload.variables?.careRoomId;
+      if (requestedRoomId === unavailableConcernRoomId) {
+        throw new Error("Synthetic concern status unavailable");
+      }
+      if (requestedRoomId === emptyConcernRoomId) {
+        return { familyCareRoomConcerns: [] };
+      }
+      return {
+      familyCareRoomConcerns: [
+        {
+          id: "12121212-1212-4121-8121-121212121212",
+          title:
+            "Please review this clearly fictional family concern with a deliberately long title",
+          status: "ACKNOWLEDGED",
+          submittedAt: "2026-07-24T09:00:00.000Z",
+          events: [
+            {
+              eventType: "RAISED",
+              createdAt: "2026-07-24T09:00:00.000Z",
+            },
+            {
+              eventType: "ACKNOWLEDGED",
+              createdAt: "2026-07-24T09:30:00.000Z",
+            },
+          ],
+        },
+      ],
+      };
+    },
+  ],
   ["CarebridgeConcernInbox", () => ({ carebridgeConcernInbox: [] })],
 ]);
 
@@ -381,7 +439,7 @@ const server = http.createServer((request, response) => {
     try {
       data = graphqlData(payload, request);
     } catch (error) {
-      sendJson(response, 400, {
+      sendJson(response, error instanceof GraphQLFixtureError ? 200 : 400, {
         errors: [
           {
             message:

@@ -514,6 +514,30 @@ export class CarebridgeService {
     return { title: concern.title, status: concern.status };
   }
 
+  async listFamilyCareRoomConcerns(careRoomId: string, viewer: ViewerContext) {
+    const access = await this.requireScopedFamilyRoomAccess(
+      careRoomId,
+      viewer,
+      [AccessGrantScope.RAISE_CONCERNS],
+    );
+    const concerns = await this.repository.listFamilyConcernsForMembership({
+      organizationId: access.room.organization_id,
+      careRoomId: access.room.id,
+      membershipId: access.membership.id,
+    });
+
+    return concerns.map((concern: any) => ({
+      id: concern.id,
+      title: concern.title,
+      status: concern.status,
+      submittedAt: concern.created_at,
+      events: concern.events.map((event: any) => ({
+        eventType: event.event_type,
+        createdAt: event.created_at,
+      })),
+    }));
+  }
+
   private async createConcernForRoom(
     input: RaiseConcernInput,
     viewer: ViewerContext,

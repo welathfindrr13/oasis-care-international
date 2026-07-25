@@ -1,11 +1,19 @@
 import Link from 'next/link'
 import { Header } from '../../../../components/oasis/Header'
 import { FamilyConcernForm } from '../../../../components/carebridge/FamilyConcernForm'
+import { StatePanel } from '../../../../components/ui/StatePanel'
+import {
+  familyConcernEventLabel,
+  familyConcernStatusLabel,
+} from '../../../../lib/family-concern-status'
 import { query } from '../../../../lib/graphql/client'
-import { formatDate } from '../../../../lib/time'
+import { formatDate, formatDateTime } from '../../../../lib/time'
 import {
   FAMILY_CAREBRIDGE_ROOM_QUERY,
+  FAMILY_CARE_ROOM_CONCERNS_QUERY,
   FAMILY_VERIFIED_VISIT_STORIES_QUERY,
+  type FamilyCareRoomConcern,
+  type FamilyCareRoomConcernsQueryResponse,
   type FamilyCareRoomQueryResponse,
   type FamilyCarebridgeRoom,
   type FamilyVerifiedVisitStoriesQueryResponse,
@@ -18,6 +26,12 @@ type RoomResult = {
   room: FamilyCarebridgeRoom | null
   error: string | null
   unavailable: boolean
+}
+
+type ConcernResult = {
+  concerns: FamilyCareRoomConcern[]
+  unavailable: boolean
+  notGranted: boolean
 }
 
 async function getRoomSafe(id: string): Promise<RoomResult> {
@@ -64,6 +78,27 @@ async function getRoomStoriesSafe(
   }
 }
 
+async function getRoomConcernsSafe(careRoomId: string): Promise<ConcernResult> {
+  try {
+    const data = await query<FamilyCareRoomConcernsQueryResponse>(
+      FAMILY_CARE_ROOM_CONCERNS_QUERY,
+      { careRoomId },
+    )
+    return {
+      concerns: data.familyCareRoomConcerns || [],
+      unavailable: false,
+      notGranted: false,
+    }
+  } catch (error) {
+    const notGranted = error instanceof Error && error.message.includes(
+      'You do not have access to this CareBridge room.',
+    )
+    return notGranted
+      ? { concerns: [], unavailable: false, notGranted: true }
+      : { concerns: [], unavailable: true, notGranted: false }
+  }
+}
+
 export default async function FamilyCareRoomPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params
   const roomResult = await getRoomSafe(params.id)
@@ -73,20 +108,24 @@ export default async function FamilyCareRoomPage(props: { params: Promise<{ id: 
       <div className="min-h-screen bg-slate-50">
         <Header />
         <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-          <section className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-            <h1 className="font-heading text-2xl font-semibold text-slate-900">
-              {roomResult.unavailable ? 'Updates temporarily unavailable' : 'Updates unavailable'}
-            </h1>
-            <p className="mt-2 text-sm text-slate-600">
+          <h1 className="font-heading text-2xl font-semibold text-oasis-ink">Family updates</h1>
+          <StatePanel
+            className="mt-6"
+            kind={roomResult.unavailable ? 'unavailable' : 'forbidden'}
+            title={roomResult.unavailable ? 'Updates temporarily unavailable' : 'Updates unavailable'}
+            action={
+              <Link
+                href={roomResult.unavailable ? `/family/care-rooms/${params.id}` : '/family'}
+                className="inline-flex min-h-11 items-center rounded-md border border-oasis-border bg-white px-4 py-2 text-sm font-semibold text-oasis-ink hover:bg-base-gray-50"
+              >
+                {roomResult.unavailable ? 'Try again' : 'Back to family home'}
+              </Link>
+            }
+          >
+            <p>
               {roomResult.error || 'These updates are not available with your current family access.'}
             </p>
-            <Link
-              href={roomResult.unavailable ? `/family/care-rooms/${params.id}` : '/family'}
-              className="mt-4 inline-flex rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              {roomResult.unavailable ? 'Try again' : 'Back to family home'}
-            </Link>
-          </section>
+          </StatePanel>
         </main>
       </div>
     )
@@ -100,6 +139,9 @@ export default async function FamilyCareRoomPage(props: { params: Promise<{ id: 
   } = room.canViewApprovedUpdates
     ? await getRoomStoriesSafe(room.id)
     : { stories: [], unavailable: false, notGranted: true }
+  const concernResult = room.canRaiseConcerns
+    ? await getRoomConcernsSafe(room.id)
+    : { concerns: [], unavailable: false, notGranted: true }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -117,10 +159,8 @@ export default async function FamilyCareRoomPage(props: { params: Promise<{ id: 
           </ol>
         </nav>
 
-        <section className="rounded-3xl border border-sky-100 bg-gradient-to-br from-white via-sky-50 to-cyan-50 p-8 shadow-sm">
-          <p className="mb-3 inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
-            Family updates
-          </p>
+        <section className="border-b border-oasis-border pb-6">
+          <p className="text-sm font-semibold text-oasis-brand">Family updates</p>
           <h1 className="font-heading text-3xl font-bold tracking-tight text-slate-900">{room.clientDisplayName}</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
             Use the family access that the care provider has approved for you.
@@ -182,16 +222,85 @@ export default async function FamilyCareRoomPage(props: { params: Promise<{ id: 
           )}
         </section> : null}
 
-        {room.canRaiseConcerns ? <section id="concerns-help" className="mt-6 scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="font-heading text-xl font-semibold text-slate-900">Tell us about a concern</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            Send a question or concern about {room.clientDisplayName} directly to the care team. This form is not
-            monitored as an emergency service. If someone is in immediate danger, call 999.
-          </p>
-          <div className="mt-5">
-            <FamilyConcernForm careRoomId={room.id} personName={room.clientDisplayName} />
+        <section id="concerns-help" className="mt-6 scroll-mt-24 rounded-md border border-oasis-border bg-white p-6">
+          {room.canRaiseConcerns && !concernResult.notGranted ? (
+            <>
+              <h2 className="font-heading text-xl font-semibold text-slate-900">Tell us about a concern</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Send a question or concern about {room.clientDisplayName} directly to the care team. This form is not
+                monitored as an emergency service. If someone is in immediate danger, call 999.
+              </p>
+              <div className="mt-5">
+                <FamilyConcernForm careRoomId={room.id} personName={room.clientDisplayName} />
+              </div>
+            </>
+          ) : null}
+
+          <div
+            className={room.canRaiseConcerns && !concernResult.notGranted
+              ? 'mt-8 border-t border-oasis-border pt-6'
+              : ''}
+            aria-live="polite"
+          >
+            <h2 className="font-heading text-xl font-semibold text-oasis-ink">Your concerns</h2>
+            <p className="mt-2 text-sm leading-6 text-oasis-muted">
+              Track concerns you sent from this family account.
+            </p>
+            {concernResult.notGranted ? (
+              <StatePanel className="mt-4" kind="forbidden" title="Concern access is not available">
+                <p>Contact the care provider if you think your family access should include concerns.</p>
+              </StatePanel>
+            ) : concernResult.unavailable ? (
+              <StatePanel
+                className="mt-4"
+                kind="unavailable"
+                title="Concern statuses are temporarily unavailable"
+                action={
+                  <Link
+                    href={`/family/care-rooms/${room.id}`}
+                    className="inline-flex min-h-11 items-center rounded-md border border-oasis-border bg-white px-4 py-2 text-sm font-semibold text-oasis-ink hover:bg-base-gray-50"
+                  >
+                    Try again
+                  </Link>
+                }
+              >
+                <p>Your concern has not been changed. Reload this page to try again.</p>
+              </StatePanel>
+            ) : concernResult.concerns.length === 0 ? (
+              <StatePanel className="mt-4" title="No concerns sent">
+                <p>Concerns you send about {room.clientDisplayName} will appear here.</p>
+              </StatePanel>
+            ) : (
+              <div className="mt-4 space-y-4">
+                {concernResult.concerns.map((concern) => (
+                  <article key={concern.id} className="rounded-md border border-oasis-border p-4">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                      <h3 className="font-semibold text-oasis-ink">{concern.title}</h3>
+                      <p className="text-sm font-semibold text-oasis-brand">
+                        {familyConcernStatusLabel(concern.status)}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-sm text-oasis-muted">
+                      Sent {formatDateTime(concern.submittedAt)}
+                    </p>
+                    <ol className="mt-4 border-l-2 border-oasis-border pl-4">
+                      {concern.events.map((event) => (
+                        <li key={`${event.eventType}:${event.createdAt}`} className="pb-3 last:pb-0">
+                          <p className="text-sm font-medium text-oasis-ink">
+                            {familyConcernEventLabel(event.eventType)}
+                          </p>
+                          <p className="text-sm text-oasis-muted">
+                            {formatDateTime(event.createdAt)}
+                          </p>
+                        </li>
+                      ))}
+                    </ol>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
-        </section> : null}
+        </section>
       </main>
     </div>
   )

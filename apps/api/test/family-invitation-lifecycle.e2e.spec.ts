@@ -278,6 +278,14 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     ).expect(200);
     expect(zeroGrantRooms.body.errors).toBeUndefined();
     expect(zeroGrantRooms.body.data.familyCareRooms).toEqual([]);
+    const zeroGrantConcerns = await gql(
+      bearer(familySubject),
+      `query Concerns($id: String!) {
+        familyCareRoomConcerns(careRoomId: $id) { id title status submittedAt }
+      }`,
+      { id: roomId },
+    ).expect(200);
+    expect(zeroGrantConcerns.body.errors).toHaveLength(1);
 
     const partialGrant = await gql(
       bearer(adminSubject),
@@ -372,6 +380,130 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     expect(raisedConcern.body.data.raiseFamilyCarebridgeConcern).toMatchObject({
       title: 'Please call about today',
     });
+    const raisedConcernRecord = await prisma.concern.findFirstOrThrow({
+      where: {
+        care_room_id: roomId,
+        raised_by_membership_id: careRoomMembershipId,
+        title: 'Please call about today',
+      },
+    });
+    const concernsAfterRaise = await gql(
+      bearer(familySubject),
+      `query Concerns($id: String!) {
+        familyCareRoomConcerns(careRoomId: $id) {
+          id title status submittedAt events { eventType createdAt }
+        }
+      }`,
+      { id: roomId },
+    ).expect(200);
+    expect(concernsAfterRaise.body.errors).toBeUndefined();
+    expect(concernsAfterRaise.body.data.familyCareRoomConcerns).toEqual([
+      {
+        id: raisedConcernRecord.id,
+        title: 'Please call about today',
+        status: 'OPEN',
+        submittedAt: expect.any(String),
+        events: [{ eventType: 'RAISED', createdAt: expect.any(String) }],
+      },
+    ]);
+
+    const otherFamilyContact = await prisma.familyContact.create({
+      data: {
+        organization_id: organizationId,
+        full_name: 'Other Synthetic Relative',
+        email: 'other-relative@example.test',
+      },
+    });
+    const otherFamilyMembership = await prisma.careRoomMembership.create({
+      data: {
+        care_room_id: roomId,
+        family_contact_id: otherFamilyContact.id,
+        role: 'FAMILY_VIEWER',
+        status: 'ACTIVE',
+        access_basis: 'CLIENT_CONSENT',
+        accepted_at: new Date(),
+      },
+    });
+    const hiddenConcern = await prisma.concern.create({
+      data: {
+        organization_id: organizationId,
+        care_room_id: roomId,
+        client_id: clientId,
+        title: 'Another relative concern',
+        category: 'COMMUNICATION',
+        status: 'OPEN',
+        raised_by_membership_id: otherFamilyMembership.id,
+      },
+    });
+    await prisma.concernEvent.create({
+      data: {
+        concern_id: hiddenConcern.id,
+        event_type: 'RAISED',
+        actor_type: 'FAMILY',
+      },
+    });
+    const exactMembershipConcerns = await gql(
+      bearer(familySubject),
+      `query Concerns($id: String!) {
+        familyCareRoomConcerns(careRoomId: $id) { id title status }
+      }`,
+      { id: roomId },
+    ).expect(200);
+    expect(exactMembershipConcerns.body.errors).toBeUndefined();
+    expect(exactMembershipConcerns.body.data.familyCareRoomConcerns).toEqual([
+      {
+        id: raisedConcernRecord.id,
+        title: 'Please call about today',
+        status: 'OPEN',
+      },
+    ]);
+
+    const acknowledgedConcern = await gql(
+      bearer(adminSubject),
+      `mutation Acknowledge($input: UpdateConcernStatusInput!) {
+        updateCarebridgeConcern(input: $input) { id status }
+      }`,
+      {
+        input: {
+          concernId: raisedConcernRecord.id,
+          status: 'ACKNOWLEDGED',
+          message: 'Internal reply must not be projected.',
+        },
+      },
+    ).expect(200);
+    expect(acknowledgedConcern.body.errors).toBeUndefined();
+    const concernsAfterAcknowledgement = await gql(
+      bearer(familySubject),
+      `query Concerns($id: String!) {
+        familyCareRoomConcerns(careRoomId: $id) {
+          id title status submittedAt events { eventType createdAt }
+        }
+      }`,
+      { id: roomId },
+    ).expect(200);
+    expect(concernsAfterAcknowledgement.body.errors).toBeUndefined();
+    expect(
+      concernsAfterAcknowledgement.body.data.familyCareRoomConcerns[0],
+    ).toMatchObject({
+      id: raisedConcernRecord.id,
+      title: 'Please call about today',
+      status: 'ACKNOWLEDGED',
+      events: [
+        { eventType: 'RAISED', createdAt: expect.any(String) },
+        { eventType: 'ACKNOWLEDGED', createdAt: expect.any(String) },
+      ],
+    });
+    expect(JSON.stringify(concernsAfterAcknowledgement.body.data)).not.toContain(
+      'Internal reply must not be projected.',
+    );
+    const crossTenantConcernHistory = await gql(
+      bearer(familySubject),
+      `query Concerns($id: String!) {
+        familyCareRoomConcerns(careRoomId: $id) { id title status }
+      }`,
+      { id: otherRoomId },
+    ).expect(200);
+    expect(crossTenantConcernHistory.body.errors).toHaveLength(1);
 
     await gql(
       bearer(adminSubject),
@@ -383,6 +515,14 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
         scopes: ['VIEW_UPDATES', 'VIEW_TASK_SUMMARY'],
       } },
     ).expect(200);
+    const deniedConcernHistory = await gql(
+      bearer(familySubject),
+      `query Concerns($id: String!) {
+        familyCareRoomConcerns(careRoomId: $id) { id title status }
+      }`,
+      { id: roomId },
+    ).expect(200);
+    expect(deniedConcernHistory.body.errors).toHaveLength(1);
     const concernCount = await prisma.concern.count();
     const deniedConcern = await gql(
       bearer(familySubject),
@@ -640,6 +780,20 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     expect(forbiddenConcernFields.body.errors.map((error: any) => error.message).join(' ')).toContain(
       'Cannot query field "clientId"',
     );
+    const forbiddenConcernHistoryFields = await gql(
+      bearer(familySubject),
+      `query Concerns($id: String!) {
+        familyCareRoomConcerns(careRoomId: $id) {
+          id title status submittedAt description messages { body } clientId assignedToUserId
+        }
+      }`,
+      { id: roomId },
+    ).expect(400);
+    expect(
+      forbiddenConcernHistoryFields.body.errors
+        .map((error: any) => error.message)
+        .join(' '),
+    ).toContain('Cannot query field "description"');
 
     const [concurrentGrant, revoked] = await Promise.all([
       gql(
@@ -677,6 +831,15 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     ).expect(200);
     expect(afterRevocation.body.errors).toHaveLength(1);
     expect(afterRevocation.body.data).toBeNull();
+    const concernHistoryAfterRevocation = await gql(
+      bearer(familySubject),
+      `query Concerns($id: String!) {
+        familyCareRoomConcerns(careRoomId: $id) { id }
+      }`,
+      { id: roomId },
+    ).expect(200);
+    expect(concernHistoryAfterRevocation.body.errors).toHaveLength(1);
+    expect(concernHistoryAfterRevocation.body.data).toBeNull();
   });
 
   it('blocks duplicate, wrong-room, partial, medication, and unused grant paths', async () => {

@@ -6,6 +6,7 @@ import {
   CarebridgeContentStatus,
   CareRoomMembershipStatus,
   CareRoomStatus,
+  ConcernEventType,
 } from '@oasis/db';
 
 interface FamilyAccessLookup {
@@ -355,6 +356,46 @@ export class CarebridgeRepository {
         { resolution_due_at: 'asc' },
         { created_at: 'desc' },
       ],
+    });
+  }
+
+  async listFamilyConcernsForMembership(input: {
+    organizationId: string;
+    careRoomId: string;
+    membershipId: string;
+  }) {
+    return this.prisma.concern.findMany({
+      where: {
+        organization_id: input.organizationId,
+        care_room_id: input.careRoomId,
+        raised_by_membership_id: input.membershipId,
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        created_at: true,
+        events: {
+          where: {
+            event_type: {
+              in: [
+                ConcernEventType.RAISED,
+                ConcernEventType.ACKNOWLEDGED,
+                ConcernEventType.RESPONDED,
+                ConcernEventType.RESOLVED,
+                ConcernEventType.REOPENED,
+                ConcernEventType.ESCALATED,
+              ],
+            },
+          },
+          select: {
+            event_type: true,
+            created_at: true,
+          },
+          orderBy: { created_at: 'asc' },
+        },
+      },
+      orderBy: { created_at: 'desc' },
     });
   }
 

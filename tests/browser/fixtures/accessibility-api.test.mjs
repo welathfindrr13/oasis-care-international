@@ -12,12 +12,56 @@ test("returns fixture data only for an exact allowlisted parsed operation name",
     graphqlData({ query: "query Visits { visits { total } }" }, request),
     { visits: { items: [], total: 0 } },
   );
+  assert.deepEqual(
+    graphqlData(
+      {
+        query:
+          "query FamilyCareRoomConcerns($careRoomId: String!) { familyCareRoomConcerns(careRoomId: $careRoomId) { id } }",
+        variables: {
+          careRoomId: "13131313-1313-4131-8131-131313131313",
+        },
+      },
+      request,
+    ),
+    { familyCareRoomConcerns: [] },
+  );
+  assert.throws(
+    () =>
+      graphqlData(
+        {
+          query:
+            "query FamilyCareRoomConcerns($careRoomId: String!) { familyCareRoomConcerns(careRoomId: $careRoomId) { id } }",
+          variables: {
+            careRoomId: "14141414-1414-4141-8141-141414141414",
+          },
+        },
+        request,
+      ),
+    /Synthetic concern status unavailable/,
+  );
   assert.equal(
     parseAllowedOperation({
       query: "query FamilyCareRooms { familyCareRooms { id } }",
       operationName: "FamilyCareRooms",
     }),
     "FamilyCareRooms",
+  );
+  assert.deepEqual(
+    graphqlData(
+      {
+        query:
+          "query FamilyCareRoomConcerns($careRoomId: String!) { familyCareRoomConcerns(careRoomId: $careRoomId) { id title status } }",
+        variables: { careRoomId: "99999999-9999-4999-8999-999999999999" },
+      },
+      request,
+    ).familyCareRoomConcerns.map(({ title, status }) => ({ title, status })),
+    [
+      {
+        title:
+          "Please review this clearly fictional family concern with a deliberately long title",
+        status: "ACKNOWLEDGED",
+      },
+    ],
   );
   assert.deepEqual(
     graphqlData({ query: "query Client($id: String!) { client(id: $id) { id fullName } }" }, request),

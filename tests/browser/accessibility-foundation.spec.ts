@@ -3,6 +3,11 @@ import { expect, test, type Page } from "playwright/test";
 
 const VISIT_ID = "77777777-7777-4777-8777-777777777777";
 const PERSON_ID = "88888888-8888-4888-8888-888888888888";
+const CARE_ROOM_ID = "99999999-9999-4999-8999-999999999999";
+const EMPTY_CONCERN_ROOM_ID = "13131313-1313-4131-8131-131313131313";
+const UNAVAILABLE_CONCERN_ROOM_ID = "14141414-1414-4141-8141-141414141414";
+const REVOKED_CONCERN_ROOM_ID = "15151515-1515-4151-8151-151515151515";
+const ZERO_GRANT_CONCERN_ROOM_ID = "16161616-1616-4161-8161-161616161616";
 const MAX_SEQUENTIAL_FOCUS_STEPS = 80;
 
 type TestProfile = {
@@ -758,6 +763,64 @@ test("Family home", async ({ page }) => {
     page.getByText("You do not have access to anyone’s updates yet."),
   ).toBeVisible();
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
+});
+
+test("Family concern status", async ({ page }) => {
+  await signIn(page, profiles.family);
+  await page.goto(`/family/care-rooms/${CARE_ROOM_ID}`);
+  await expect(page).toHaveURL(
+    new RegExp(`/family/care-rooms/${CARE_ROOM_ID}$`),
+  );
+  await expect(
+    page.getByRole("heading", { name: "Jordan Ellis", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Your concerns", exact: true }),
+  ).toBeVisible();
+  const concern = page.getByRole("article").filter({
+    hasText:
+      "Please review this clearly fictional family concern with a deliberately long title",
+  });
+  await expect(
+    concern.getByText("Acknowledged", { exact: true }).first(),
+  ).toBeVisible();
+  await expectAccessibilityFoundation(page, { repeatedHeader: true });
+
+  await page.goto(`/family/care-rooms/${EMPTY_CONCERN_ROOM_ID}`);
+  await expect(
+    page.getByRole("heading", { name: "No concerns sent", exact: true }),
+  ).toBeVisible();
+
+  await page.goto(`/family/care-rooms/${ZERO_GRANT_CONCERN_ROOM_ID}`);
+  await expect(
+    page.getByRole("heading", {
+      name: "Concern access is not available",
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  await page.goto(`/family/care-rooms/${UNAVAILABLE_CONCERN_ROOM_ID}`);
+  await expect(
+    page.getByRole("heading", {
+      name: "Concern statuses are temporarily unavailable",
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  await page.goto(`/family/care-rooms/${REVOKED_CONCERN_ROOM_ID}`);
+  await expect(
+    page.getByRole("heading", { name: "Updates unavailable", exact: true }),
+  ).toBeVisible();
+
+  await page.goto(`/family/care-rooms/${CARE_ROOM_ID}`);
+  await page.setViewportSize({ width: 320, height: 900 });
+  await expect(
+    page.getByRole("button", { name: "Send concern to the care team" }),
+  ).toBeVisible();
+  const pageOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(pageOverflow).toBe(false);
 });
 
 test("Tenant admin family concerns", async ({ page }) => {
