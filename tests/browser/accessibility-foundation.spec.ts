@@ -317,10 +317,7 @@ test("Tenant admin company setup", async ({ page }) => {
     });
   expect(primarySize.height).toBeGreaterThanOrEqual(44);
   expect(primarySize.width).toBeGreaterThanOrEqual(44);
-  await expectAccessibilityFoundation(page, {
-    repeatedHeader: true,
-    sequentialKeyboardTraversal: false,
-  });
+  await expectAccessibilityFoundation(page, { repeatedHeader: true });
 });
 
 test("Platform Owner first Manager revocation is explicit and recoverable", async ({
@@ -814,6 +811,19 @@ test("Family concern status", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Updates unavailable", exact: true }),
   ).toBeVisible();
+  const revokedHeadingLevels = await page
+    .locator("h1:visible, h2:visible, h3:visible")
+    .evaluateAll((headings) =>
+      headings.map((heading) => Number(heading.tagName.slice(1))),
+  );
+  expect(revokedHeadingLevels).toEqual([1, 2]);
+  const revokedSkipLink = page.getByRole("link", {
+    name: "Skip to main content",
+  });
+  await revokedSkipLink.focus();
+  await expect(revokedSkipLink).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("main#main-content")).toBeFocused();
   await expectAccessibilityFoundation(page, {
     sequentialKeyboardTraversal: false,
   });
