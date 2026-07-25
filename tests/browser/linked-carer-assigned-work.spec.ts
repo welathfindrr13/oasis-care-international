@@ -268,13 +268,16 @@ test("a linked fake carer follows the database role despite an admin token claim
     .getByPlaceholder("Add optional handover details for completion.")
     .fill("Browser journey completed with planned care delivered.");
   const completionDialog = page.waitForEvent("dialog");
-  await page.getByRole("button", { name: "Complete visit" }).click();
+  const completionClick = page
+    .getByRole("button", { name: "Complete visit" })
+    .click();
   const dialog = await completionDialog;
   expect(dialog.type()).toBe("confirm");
   expect(dialog.message()).toBe(
     "Complete the visit for Browser Journey Person? Care notes will become read-only.",
   );
   await dialog.accept();
+  await completionClick;
   await expect(
     page.getByText("Visit completed.", { exact: true }),
   ).toBeVisible();
