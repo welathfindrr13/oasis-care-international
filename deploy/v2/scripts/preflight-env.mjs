@@ -332,10 +332,6 @@ function validate(values) {
         add(errors, `${name} is required when AUTH_IDENTITY_PROVIDER=clerk`);
       }
     }
-    if (!String(values.CLERK_AUDIENCE || '').trim() && !String(values.CLERK_AUTHORIZED_PARTIES || '').trim()) {
-      add(errors, 'CLERK_AUDIENCE or CLERK_AUTHORIZED_PARTIES is required when AUTH_IDENTITY_PROVIDER=clerk');
-    }
-
     const operatorOrganizationId = String(values.PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID || '').trim();
     if (operatorOrganizationId && !/^org_[A-Za-z0-9_-]{3,187}$/.test(operatorOrganizationId)) {
       add(errors, 'PLATFORM_OPERATOR_CLERK_ORGANIZATION_ID must be one exact Clerk organization ID');

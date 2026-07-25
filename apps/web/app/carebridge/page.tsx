@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Header } from '../../components/oasis/Header'
+import { StatePanel } from '../../components/ui/StatePanel'
 import { query } from '../../lib/graphql/client'
 import { CAREBRIDGE_ROOMS_QUERY, type CareRoomsQueryResponse } from '../../lib/graphql/queries'
 
@@ -8,14 +9,18 @@ export const dynamic = 'force-dynamic'
 async function getCareRoomsSafe() {
   try {
     const data = await query<CareRoomsQueryResponse>(CAREBRIDGE_ROOMS_QUERY)
-    return Array.isArray(data.careRooms) ? data.careRooms : []
+    return {
+      rooms: Array.isArray(data.careRooms) ? data.careRooms : [],
+      unavailable: false,
+    }
   } catch {
-    return []
+    return { rooms: [], unavailable: true }
   }
 }
 
 export default async function CareBridgePage() {
-  const rooms = await getCareRoomsSafe()
+  const result = await getCareRoomsSafe()
+  const rooms = result.rooms
   const firstRoom = rooms[0]
 
   return (
@@ -91,7 +96,21 @@ export default async function CareBridgePage() {
         <section className="mt-6 grid gap-4 lg:grid-cols-[1.7fr_1fr]">
           <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="font-heading text-xl font-semibold text-slate-900">Active Family Assurance rooms</h2>
-            {rooms.length === 0 ? (
+            {result.unavailable ? (
+              <StatePanel
+                kind="unavailable"
+                title="Family rooms are unavailable"
+                action={
+                  <form action="/carebridge" method="get">
+                    <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
+                      Try again
+                    </button>
+                  </form>
+                }
+              >
+                Family room data could not be loaded. This is not an empty room list.
+              </StatePanel>
+            ) : rooms.length === 0 ? (
               <p className="mt-3 text-sm leading-6 text-slate-600">
                 No care rooms found yet. Once a room is active, staff can review stories in client context from here.
               </p>

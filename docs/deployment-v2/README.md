@@ -70,7 +70,7 @@ Required areas:
 - Postgres database/user/password;
 - `JWT_SECRET` and `NEXTAUTH_SECRET`;
 - public app/API URLs, with GraphQL routed at `/graphql`;
-- Clerk production auth provider values, including issuer, JWKS URL, public key, sign-in URL, and audience or authorized-party validation.
+- Clerk production auth provider values, including issuer, JWKS URL, public key, sign-in URL, required authorized-party validation, and optional audience validation when configured.
 
 See `docs/deployment-v2/env-matrix.md` for the canonical variable matrix.
 

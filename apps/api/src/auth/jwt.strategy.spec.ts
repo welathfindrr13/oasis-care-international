@@ -70,6 +70,52 @@ describe('JwtStrategy local auth gating', () => {
     expect(() => new JwtStrategy()).not.toThrow();
   });
 
+  it('requires Clerk authorized parties in production even when audience is configured', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.AUTH_IDENTITY_PROVIDER = 'clerk';
+    process.env.CLERK_ISSUER = 'https://clerk.example.org';
+    process.env.CLERK_AUDIENCE = 'oasis-api';
+    delete process.env.CLERK_AUTHORIZED_PARTIES;
+
+    expect(() => new JwtStrategy()).toThrow(
+      'CLERK_AUTHORIZED_PARTIES is required for Clerk authentication in staging or production',
+    );
+  });
+
+  it('initializes production Clerk verification with authorized parties and no audience', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.AUTH_IDENTITY_PROVIDER = 'clerk';
+    process.env.CLERK_ISSUER = 'https://clerk.example.org';
+    process.env.CLERK_AUTHORIZED_PARTIES = 'https://care.example.org';
+    delete process.env.CLERK_AUDIENCE;
+
+    expect(() => new JwtStrategy()).not.toThrow();
+  });
+
+  it('requires azp whenever authorized parties are configured but does not require aud when blank', async () => {
+    process.env.NODE_ENV = 'test';
+    process.env.AUTH_IDENTITY_PROVIDER = 'clerk';
+    process.env.CLERK_ISSUER = 'https://clerk.example.org';
+    process.env.CLERK_AUTHORIZED_PARTIES = 'https://care.example.org';
+    delete process.env.CLERK_AUDIENCE;
+
+    const strategy = new JwtStrategy();
+    const payload = {
+      sub: 'user_123',
+      iss: 'https://clerk.example.org',
+      azp: 'https://care.example.org',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      iat: Math.floor(Date.now() / 1000),
+    };
+
+    await expect(strategy.validate(payload)).resolves.toMatchObject({
+      id: 'user_123',
+    });
+    await expect(strategy.validate({ ...payload, azp: undefined })).rejects.toThrow(
+      'Clerk token authorized party is invalid',
+    );
+  });
+
   it.each([
     ['org:admin', 'admin'],
     ['org:member', 'user'],

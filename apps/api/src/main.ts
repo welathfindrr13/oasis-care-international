@@ -8,6 +8,7 @@ import {
   applyApiHardening,
   createApiValidationPipe,
 } from './security/api-hardening';
+import { createGraphQLAuthenticationMiddleware } from './auth/graphql-authentication.middleware';
 
 async function bootstrap() {
   console.log('>>> BOOTSTRAP START');
@@ -25,6 +26,7 @@ async function bootstrap() {
     .filter(Boolean);
   app.enableCors({ origin: origins, credentials: true });
   applyApiHardening(app);
+  app.use('/graphql', createGraphQLAuthenticationMiddleware());
 
   // Global exception filters
   app.useGlobalFilters(new HttpExceptionFilter());

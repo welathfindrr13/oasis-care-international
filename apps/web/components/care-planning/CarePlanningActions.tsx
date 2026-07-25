@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { EvidenceSourcePicker } from './EvidenceSourcePicker'
 import { clientQuery } from '../../lib/graphql/client-side'
 import {
@@ -24,6 +24,7 @@ import {
   getOrganizationDateUtcRange,
   organizationDateKeyToStoredDateIso,
 } from '../../lib/time'
+import { runConfirmedAction, runSingleFlightAction } from '../../lib/consequential-actions'
 
 interface CarePlanningActionsProps {
   clientId: string
@@ -42,6 +43,7 @@ function toStoredCalendarDate(value: string): string {
 }
 
 export function CarePlanningActions({ clientId, assessments, carePlans, onCompleteRedirectPath }: CarePlanningActionsProps) {
+  const consequentialActionStartedRef = useRef(false)
   const [assessmentTitle, setAssessmentTitle] = useState('')
   const [assessmentSummary, setAssessmentSummary] = useState('')
   const [assessmentReviewDueAt, setAssessmentReviewDueAt] = useState('')
@@ -247,84 +249,111 @@ export function CarePlanningActions({ clientId, assessments, carePlans, onComple
 
   async function completeAssessment() {
     if (!assessmentToComplete) return
+    const assessment = assessments.find((record) => record.id === assessmentToComplete)
 
-    setBusyAction('completeAssessment')
-    setMessage(null)
-    const input: CompleteAssessmentInput = {
-      assessmentId: assessmentToComplete,
-      completedAt: new Date().toISOString(),
-    }
+    await runSingleFlightAction(consequentialActionStartedRef, () =>
+      runConfirmedAction(
+        window.confirm,
+        `Mark “${assessment?.title ?? 'this assessment'}” as complete?`,
+        async () => {
+          setBusyAction('completeAssessment')
+          setMessage(null)
+          const input: CompleteAssessmentInput = {
+            assessmentId: assessmentToComplete,
+            completedAt: new Date().toISOString(),
+          }
 
-    try {
-      await clientQuery(COMPLETE_ASSESSMENT_MUTATION, { input })
-      setMessage({ type: 'success', text: 'Assessment marked complete. Refreshing care spine.' })
-      setTimeout(() => window.location.assign(onCompleteRedirectPath), 700)
-    } catch (error: unknown) {
-      setMessage({
-        type: 'error',
-        text:
-          error instanceof Error
-            ? `Assessment could not be completed yet: ${error.message}`
-            : 'Assessment could not be completed yet.',
-      })
-    } finally {
-      setBusyAction(null)
-    }
+          try {
+            await clientQuery(COMPLETE_ASSESSMENT_MUTATION, { input })
+            setMessage({ type: 'success', text: 'Assessment marked complete. Refreshing care spine.' })
+            setTimeout(() => window.location.assign(onCompleteRedirectPath), 700)
+          } catch (error: unknown) {
+            setMessage({
+              type: 'error',
+              text:
+                error instanceof Error
+                  ? `Assessment could not be completed yet: ${error.message}`
+                  : 'Assessment could not be completed yet.',
+            })
+          } finally {
+            setBusyAction(null)
+          }
+        },
+      ),
+    )
   }
 
   async function approveCarePlan() {
     if (!planToApprove) return
+    const plan = carePlans.find((record) => record.id === planToApprove)
 
-    setBusyAction('approveCarePlan')
-    setMessage(null)
-    const input: ApproveCarePlanInput = {
-      carePlanId: planToApprove,
-      approvedAt: new Date().toISOString(),
-      effectiveFrom: new Date().toISOString(),
-    }
+    await runSingleFlightAction(consequentialActionStartedRef, () =>
+      runConfirmedAction(
+        window.confirm,
+        `Activate “${plan?.title ?? 'this care plan'}”? Any current active plan will be superseded.`,
+        async () => {
+          setBusyAction('approveCarePlan')
+          setMessage(null)
+          const input: ApproveCarePlanInput = {
+            carePlanId: planToApprove,
+            approvedAt: new Date().toISOString(),
+            effectiveFrom: new Date().toISOString(),
+          }
 
-    try {
-      await clientQuery(APPROVE_CARE_PLAN_MUTATION, { input })
-      setMessage({ type: 'success', text: 'Care plan approved and activated. Previous active plans are superseded.' })
-      setTimeout(() => window.location.assign(onCompleteRedirectPath), 700)
-    } catch (error: unknown) {
-      setMessage({
-        type: 'error',
-        text:
-          error instanceof Error
-            ? `Care plan could not be approved yet: ${error.message}`
-            : 'Care plan could not be approved yet.',
-      })
-    } finally {
-      setBusyAction(null)
-    }
+          try {
+            await clientQuery(APPROVE_CARE_PLAN_MUTATION, { input })
+            setMessage({ type: 'success', text: 'Care plan approved and activated. Previous active plans are superseded.' })
+            setTimeout(() => window.location.assign(onCompleteRedirectPath), 700)
+          } catch (error: unknown) {
+            setMessage({
+              type: 'error',
+              text:
+                error instanceof Error
+                  ? `Care plan could not be approved yet: ${error.message}`
+                  : 'Care plan could not be approved yet.',
+            })
+          } finally {
+            setBusyAction(null)
+          }
+        },
+      ),
+    )
   }
 
   async function archiveCarePlan() {
     if (!planToArchive) return
+    const plan = carePlans.find((record) => record.id === planToArchive)
 
-    setBusyAction('archiveCarePlan')
-    setMessage(null)
-    const input: ArchiveCarePlanInput = {
-      carePlanId: planToArchive,
-      effectiveTo: new Date().toISOString(),
-    }
+    await runSingleFlightAction(consequentialActionStartedRef, () =>
+      runConfirmedAction(
+        window.confirm,
+        `Archive “${plan?.title ?? 'this care plan'}”? It will remain in the version history.`,
+        async () => {
+          setBusyAction('archiveCarePlan')
+          setMessage(null)
+          const input: ArchiveCarePlanInput = {
+            carePlanId: planToArchive,
+            effectiveTo: new Date().toISOString(),
+          }
 
-    try {
-      await clientQuery(ARCHIVE_CARE_PLAN_MUTATION, { input })
-      setMessage({ type: 'success', text: 'Care plan archived. Refreshing version history.' })
-      setTimeout(() => window.location.assign(onCompleteRedirectPath), 700)
-    } catch (error: unknown) {
-      setMessage({
-        type: 'error',
-        text:
-          error instanceof Error
-            ? `Care plan could not be archived yet: ${error.message}`
-            : 'Care plan could not be archived yet.',
-      })
-    } finally {
-      setBusyAction(null)
-    }
+          try {
+            await clientQuery(ARCHIVE_CARE_PLAN_MUTATION, { input })
+            setMessage({ type: 'success', text: 'Care plan archived. Refreshing version history.' })
+            setTimeout(() => window.location.assign(onCompleteRedirectPath), 700)
+          } catch (error: unknown) {
+            setMessage({
+              type: 'error',
+              text:
+                error instanceof Error
+                  ? `Care plan could not be archived yet: ${error.message}`
+                  : 'Care plan could not be archived yet.',
+            })
+          } finally {
+            setBusyAction(null)
+          }
+        },
+      ),
+    )
   }
 
   return (
@@ -339,6 +368,8 @@ export function CarePlanningActions({ clientId, assessments, carePlans, onComple
       </p>
       {message && (
         <div
+          role={message.type === 'error' ? 'alert' : 'status'}
+          aria-live={message.type === 'error' ? 'assertive' : 'polite'}
           className={`mt-4 rounded-xl border p-3 text-sm ${
             message.type === 'success'
               ? 'border-emerald-200 bg-emerald-50 text-emerald-900'

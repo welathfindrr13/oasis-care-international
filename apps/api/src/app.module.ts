@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from './config/config.module';
 import { ConfigService } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
@@ -28,6 +29,7 @@ import { AuthAccessModule } from './auth/auth-access.module';
 import { getGraphQLSecurityOptions } from './security/api-hardening';
 import { CompanyAccessModule } from './company-access/company-access.module';
 import { InvitationLifecycleModule } from './invitation-lifecycle/invitation-lifecycle.module';
+import { GqlJwtAuthGuard } from './auth/gql-jwt-auth.guard';
 
 // FIX: ClsModule must come before LoggerModule (RequestIdMiddleware depends on ClsService)
 @Module({
@@ -80,6 +82,10 @@ import { InvitationLifecycleModule } from './invitation-lifecycle/invitation-lif
     JwtStrategy,
     PrismaService,
     AuditLogInterceptor,
+    {
+      provide: APP_GUARD,
+      useExisting: GqlJwtAuthGuard,
+    },
   ],
 })
 export class AppModule {}

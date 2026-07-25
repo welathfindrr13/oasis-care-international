@@ -11,6 +11,7 @@ import {
 import { ManualAudit } from "../common/decorators/manual-audit.decorator";
 import { CompanyAccessService } from "./company-access.service";
 import { CreateCompanyAccessRequestInput } from "./company-access.dto";
+import { Public } from "../auth/public.decorator";
 
 @Controller("company-access-requests")
 @ManualAudit()
@@ -18,6 +19,7 @@ export class CompanyAccessController {
   constructor(private readonly companyAccess: CompanyAccessService) {}
 
   @Post()
+  @Public()
   @HttpCode(202)
   @UsePipes(
     new ValidationPipe({

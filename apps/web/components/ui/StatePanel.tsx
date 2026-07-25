@@ -25,11 +25,17 @@ export function StatePanel({
       role={
         kind === "loading"
           ? "status"
-          : kind === "forbidden"
+          : kind === "forbidden" || kind === "unavailable"
             ? "alert"
             : undefined
       }
-      aria-live={kind === "loading" ? "polite" : undefined}
+      aria-live={
+        kind === "loading"
+          ? "polite"
+          : kind === "forbidden" || kind === "unavailable"
+            ? "assertive"
+            : undefined
+      }
     >
       <StateGlyph kind={kind} />
       <h3 className="mt-3 text-base font-semibold text-oasis-ink">{title}</h3>
