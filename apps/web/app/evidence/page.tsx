@@ -69,7 +69,7 @@ export default async function EvidencePage(props: EvidencePageProps) {
             Inspection-ready evidence dashboard
           </h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-            Use this dashboard to track assessment, care-plan, and evidence-pack completeness by person. Evidence
+            Use this dashboard to track assessment, care-plan, and evidence-pack completeness by client. Evidence
             supports inspection readiness and does not guarantee compliance outcomes.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
@@ -161,7 +161,7 @@ export default async function EvidencePage(props: EvidencePageProps) {
           <div className="mt-4 space-y-3">
             {evidencePacks.length === 0 && (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-                No evidence packs yet for this person. Create a draft pack to begin an inspection-ready trail.
+                No evidence packs yet for this client. Create a draft pack to begin an inspection-ready trail.
               </div>
             )}
             {evidencePacks.map((pack) => (

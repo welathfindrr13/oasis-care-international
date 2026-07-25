@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { Header } from '../../components/oasis/Header'
 import { CarePlanningActions } from '../../components/care-planning/CarePlanningActions'
 import { StatePanel } from '../../components/ui/StatePanel'
@@ -17,6 +18,8 @@ import {
   type ClientsQueryResponse,
   type EvidencePackRecord,
 } from '../../lib/graphql/queries'
+import { getServerAuthContext } from '../../lib/auth/server-auth'
+import { hasAccessCapability } from '../../lib/auth/capabilities'
 
 export const dynamic = 'force-dynamic'
 
@@ -220,6 +223,11 @@ function EvidencePackList({ evidencePacks }: { evidencePacks: EvidencePackRecord
 }
 
 export default async function CarePlanningPage(props: CarePlanningPageProps) {
+  const { accessSnapshot } = await getServerAuthContext()
+  if (!hasAccessCapability(accessSnapshot.capabilities, 'TENANT_ADMIN')) {
+    redirect('/access/unavailable')
+  }
+
   const searchParams = await props.searchParams
   const peopleResult = await getPeopleSafe()
   const people = peopleResult.people
@@ -245,7 +253,7 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
                 This view connects assessments, approved care-plan versions, and inspection-ready evidence packs for
-                each person supported. It keeps the official care record internal while CareBridge can later project
+                each client. It keeps the official care record internal while CareBridge can later project
                 approved family-safe updates from the same source trail.
               </p>
             </div>
@@ -258,14 +266,14 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
                     {selectedPerson.addressLine1}, {selectedPerson.city} {selectedPerson.postcode}
                   </p>
                   <Link
-                    href={`/people/${selectedPerson.id}`}
+                    href={`/clients/${selectedPerson.id}`}
                     className="mt-4 inline-flex rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
                   >
-                    Open person profile
+                    Open client details
                   </Link>
                 </>
               ) : (
-                <p className="mt-2 text-sm leading-6 text-slate-600">Add a person before creating care plans.</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">Add a client before creating care plans.</p>
               )}
             </div>
           </div>
@@ -291,9 +299,9 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
           <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h2 className="font-heading text-lg font-semibold text-slate-950">Choose a person</h2>
+              <h2 className="font-heading text-lg font-semibold text-slate-950">Choose a client</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Care-planning records are scoped to one person and one organisation.
+                Care-planning records are scoped to one client and one organisation.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">

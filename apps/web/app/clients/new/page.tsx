@@ -70,8 +70,7 @@ export default function NewClientPage() {
         },
       });
 
-      // Redirect to the person-centred list on success.
-      router.push('/people');
+      router.push('/clients');
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');
     } finally {
@@ -87,8 +86,8 @@ export default function NewClientPage() {
           <nav className="flex mb-4" aria-label="Breadcrumb">
             <ol role="list" className="flex items-center space-x-2">
               <li>
-                <Link href="/people" className="text-sm font-medium text-slate-500 hover:text-slate-700">
-                  People
+                <Link href="/clients" className="text-sm font-medium text-slate-500 hover:text-slate-700">
+                  Clients
                 </Link>
               </li>
               <li>
@@ -96,26 +95,26 @@ export default function NewClientPage() {
                   <svg className="h-5 w-5 flex-shrink-0 text-slate-300" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
                   </svg>
-                  <span className="ml-2 text-sm font-medium text-slate-900">Add person</span>
+                  <span className="ml-2 text-sm font-medium text-slate-900">Add client</span>
                 </div>
               </li>
             </ol>
           </nav>
           <h1 className="text-3xl font-bold text-slate-900 font-heading">
-            Add person
+            Add client
           </h1>
           <p className="text-slate-500 mt-1">
-            Register a person for care services
+            Add a client to this organisation
           </p>
         </div>
 
         <Card>
           <CardHeader>
             <h2 className="text-xl font-semibold text-slate-900 font-heading">
-              Person information
+              Client information
             </h2>
             <p className="text-sm text-slate-500">
-              Please provide the person&apos;s details below
+              Enter the client&apos;s details below
             </p>
           </CardHeader>
           <CardContent>
@@ -253,7 +252,7 @@ export default function NewClientPage() {
               {/* Actions */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                 <Button asChild variant="ghost">
-                  <Link href="/people">
+                  <Link href="/clients">
                     Cancel
                   </Link>
                 </Button>
@@ -262,7 +261,7 @@ export default function NewClientPage() {
                   variant="primary" 
                   disabled={isSubmitting || !gdprConsent}
                 >
-                  {isSubmitting ? 'Creating...' : 'Create person'}
+                  {isSubmitting ? 'Creating...' : 'Create client'}
                 </Button>
               </div>
             </form>

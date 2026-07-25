@@ -95,8 +95,8 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   const params = await props.params;
   const { client } = await getClientSafe(params.id)
   return {
-    title: client ? `${client.fullName} - Oasis Care` : 'Person Not Found - Oasis Care',
-    description: client ? `Person profile for ${client.fullName}` : 'Person not found',
+    title: client ? `${client.fullName} - Oasis Care` : 'Person not found - Oasis Care',
+    description: client ? `Care details for ${client.fullName}` : 'Person not found',
   }
 }
 
@@ -104,6 +104,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
   const params = await props.params;
   const { roles } = await getServerAuthContext()
   const isAdmin = roles.some((role: unknown) => String(role).toLowerCase() === 'admin')
+  const entityLabel = isAdmin ? 'client' : 'person'
+  const entityLabelPlural = isAdmin ? 'Clients' : 'People'
 
   const { client, error: clientError } = await getClientSafe(params.id)
 
@@ -113,10 +115,12 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
         <Header />
         <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">Unable to Load Person</h1>
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">
+              Unable to load {entityLabel}
+            </h1>
             <p className="text-slate-600 mb-4">{clientError}</p>
             <Button asChild variant="primary">
-              <Link href="/people">Back to People</Link>
+              <Link href="/clients">Back to {entityLabelPlural}</Link>
             </Button>
           </div>
         </main>
@@ -130,10 +134,14 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
         <Header />
         <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">Person Not Found</h1>
-            <p className="text-slate-600 mb-4">The person you&apos;re looking for doesn&apos;t exist.</p>
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">
+              {isAdmin ? 'Client' : 'Person'} not found
+            </h1>
+            <p className="text-slate-600 mb-4">
+              The {entityLabel} you&apos;re looking for doesn&apos;t exist.
+            </p>
             <Button asChild variant="primary">
-              <Link href="/people">Back to People</Link>
+              <Link href="/clients">Back to {entityLabelPlural}</Link>
             </Button>
           </div>
         </main>
@@ -142,7 +150,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
   }
 
   const { visits: recentVisits } = await getRecentVisitsSafe(client.id)
-  const carePlanning = await getCarePlanningSafe(client.id)
+  const carePlanning = isAdmin ? await getCarePlanningSafe(client.id) : null
   const nextVisit = recentVisits.find((visit) => new Date(visit.scheduledStart) > new Date())
   const assessments = carePlanning?.assessments ?? []
   const carePlans = carePlanning?.carePlans ?? []
@@ -158,15 +166,16 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
   const hasCarePlanEvidence = latestPackSourceTypes.has('CARE_PLAN')
   const scheduleVisitHref = `/visits/new?${new URLSearchParams({ clientId: client.id }).toString()}`
   const profileTabs = [
-    { label: 'Overview', href: `/people/${client.id}` },
-    { label: 'Care Plan', href: '/care-planning' },
-    { label: 'Assessments', href: '/care-planning' },
-    { label: 'Visits', href: `/schedule?clientId=${client.id}` },
+    { label: 'Overview', href: `/clients/${client.id}` },
     { label: 'Care Notes', href: `/clients/${client.id}/care-logs` },
-    { label: 'Risks', href: '/care-planning' },
-    { label: 'Family Updates', href: `/clients/${client.id}/carebridge` },
-    { label: 'Documents', href: '/evidence' },
-    { label: 'Audit', href: '/activity' },
+    ...(isAdmin
+      ? [
+          { label: 'Schedule', href: `/schedule?clientId=${client.id}` },
+          { label: 'Family access', href: `/clients/${client.id}/carebridge` },
+          { label: 'Care planning', href: `/care-planning?clientId=${client.id}` },
+          { label: 'Inspection records', href: `/evidence?clientId=${client.id}` },
+        ]
+      : []),
   ]
 
   return (
@@ -176,8 +185,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
         <nav className="mb-6">
           <ol className="flex items-center gap-2 text-sm">
             <li>
-              <Link href="/people" className="text-slate-500 hover:text-slate-700">
-                People
+              <Link href="/clients" className="text-slate-500 hover:text-slate-700">
+                {entityLabelPlural}
               </Link>
             </li>
             <li className="text-slate-400">/</li>
@@ -185,20 +194,26 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
           </ol>
         </nav>
 
-        <div className="flex items-start justify-between mb-8">
+        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">
               {client.fullName}
             </h1>
-            <p className="text-slate-500 mt-1">Person profile · source record {client.id}</p>
+            <p className="text-slate-500 mt-1">
+              {isAdmin ? 'Client details' : 'Person details'}
+            </p>
           </div>
-          <div className="flex items-center gap-3">
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/clients/${client.id}/carebridge`}>Family Updates</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/clients/${client.id}/summary`}>AI Health Summary</Link>
-            </Button>
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap lg:w-auto lg:justify-end">
+            {isAdmin && (
+              <>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/clients/${client.id}/carebridge`}>Family access</Link>
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/clients/${client.id}/summary`}>AI Health Summary</Link>
+                </Button>
+              </>
+            )}
             <Button asChild variant="outline" size="sm">
               <Link href={`/clients/${client.id}/care-logs`}>Care Notes</Link>
             </Button>
@@ -214,12 +229,12 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
                 </Button>
               </>
             )}
-            <DeleteClientButton clientId={client.id} clientName={client.fullName} />
+            {isAdmin && <DeleteClientButton clientId={client.id} clientName={client.fullName} />}
           </div>
         </div>
 
         <section className="mb-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className={`grid gap-3 ${isAdmin ? 'md:grid-cols-4' : ''}`}>
             <div className="rounded-2xl bg-teal-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">Next visit</p>
               <p className="mt-2 text-sm font-semibold text-teal-950">
@@ -228,36 +243,40 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
                   : 'No upcoming visit'}
               </p>
             </div>
-            <div className="rounded-2xl bg-sky-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Assessments</p>
-              <p className="mt-2 text-sm font-semibold text-sky-950">
-                {assessments.length > 0
-                  ? `${completedAssessments.length} completed · ${inProgressAssessments} in progress`
-                  : 'No assessments recorded'}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-amber-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Active care plan</p>
-              <p className="mt-2 text-sm font-semibold text-amber-950">
-                {activeCarePlan
-                  ? `${activeCarePlan.title} · v${activeCarePlan.version}`
-                  : draftCarePlans.length > 0
-                    ? `${draftCarePlans.length} draft ${draftCarePlans.length === 1 ? 'plan' : 'plans'}`
-                    : 'No active or draft plan'}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-slate-100 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Review due</p>
-              <p className="mt-2 text-sm font-semibold text-slate-950">{formatShortDate(reviewDueDate)}</p>
-            </div>
+            {isAdmin && (
+              <>
+                <div className="rounded-2xl bg-sky-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Assessments</p>
+                  <p className="mt-2 text-sm font-semibold text-sky-950">
+                    {assessments.length > 0
+                      ? `${completedAssessments.length} completed · ${inProgressAssessments} in progress`
+                      : 'No assessments recorded'}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-amber-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Active care plan</p>
+                  <p className="mt-2 text-sm font-semibold text-amber-950">
+                    {activeCarePlan
+                      ? `${activeCarePlan.title} · v${activeCarePlan.version}`
+                      : draftCarePlans.length > 0
+                        ? `${draftCarePlans.length} draft ${draftCarePlans.length === 1 ? 'plan' : 'plans'}`
+                        : 'No active or draft plan'}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-slate-100 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Review due</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-950">{formatShortDate(reviewDueDate)}</p>
+                </div>
+              </>
+            )}
           </div>
 
-          <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
+          <div className="mt-5 flex flex-wrap gap-2 pb-1">
             {profileTabs.map((tab) => (
               <Link
                 key={tab.label}
                 href={tab.href}
-                className="shrink-0 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:text-teal-800"
+                className="flex min-h-11 shrink-0 items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-teal-300 hover:text-teal-800"
               >
                 {tab.label}
               </Link>
@@ -269,7 +288,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
-                <h2 className="text-lg font-semibold text-slate-900">Person summary</h2>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  {isAdmin ? 'Client details' : 'Person details'}
+                </h2>
               </CardHeader>
               <CardContent>
                 <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -292,15 +313,20 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-slate-900">Recent Visits</h2>
-                  <Link href={`/visits?clientId=${client.id}`} className="text-sm text-teal-600 hover:text-teal-700">
+                  <h2 className="text-lg font-semibold text-slate-900">Recent visits</h2>
+                  <Link
+                    href={`/visits?clientId=${client.id}`}
+                    className="text-sm font-medium text-oasis-teal-dark hover:text-oasis-ink"
+                  >
                     View all →
                   </Link>
                 </div>
               </CardHeader>
               <CardContent>
                 {recentVisits.length === 0 ? (
-                  <p className="text-slate-500">No visits found for this client yet.</p>
+                  <p className="text-slate-500">
+                    No visits found for this {entityLabel} yet.
+                  </p>
                 ) : (
                   <div className="divide-y divide-slate-100">
                     {recentVisits.map((visit) => {
@@ -360,47 +386,47 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <h2 className="text-lg font-semibold text-slate-900">Evidence packs</h2>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Coverage</p>
-                    <p className="mt-2 text-sm font-semibold text-slate-900">
-                      {evidencePacks.length > 0
-                        ? `${evidencePacks.length} packs · latest includes ${latestEvidencePack?.items.length ?? 0} items`
-                        : 'No evidence packs created'}
-                    </p>
-                    {latestEvidencePack && (
-                      <p className="mt-2 text-xs text-slate-600">
-                        Assessment evidence: {hasAssessmentEvidence ? 'Included' : 'Not included'} · Care plan evidence:{' '}
-                        {hasCarePlanEvidence ? 'Included' : 'Not included'}
+            {isAdmin && (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-lg font-semibold text-slate-900">Evidence packs</h2>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="rounded-xl bg-slate-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Coverage</p>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">
+                        {evidencePacks.length > 0
+                          ? `${evidencePacks.length} packs · latest includes ${latestEvidencePack?.items.length ?? 0} items`
+                          : 'No evidence packs created'}
                       </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
-                      <Link href={`/clients/${client.id}/carebridge`}>Family Updates room</Link>
-                    </Button>
-                    <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
-                      <Link href={`/clients/${client.id}/summary`}>AI Health Summary</Link>
-                    </Button>
-                    <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
-                      <Link href={`/clients/${client.id}/care-logs`}>Care Notes</Link>
-                    </Button>
-                    {isAdmin && (
+                      {latestEvidencePack && (
+                        <p className="mt-2 text-xs text-slate-600">
+                          Assessment evidence: {hasAssessmentEvidence ? 'Included' : 'Not included'} · Care plan evidence:{' '}
+                          {hasCarePlanEvidence ? 'Included' : 'Not included'}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
+                        <Link href={`/clients/${client.id}/carebridge`}>Family Updates room</Link>
+                      </Button>
+                      <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
+                        <Link href={`/clients/${client.id}/summary`}>AI Health Summary</Link>
+                      </Button>
+                      <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
+                        <Link href={`/clients/${client.id}/care-logs`}>Care Notes</Link>
+                      </Button>
                       <Button asChild variant="primary" className="w-full justify-start rounded-xl px-4 py-3 text-left">
                         <a href={scheduleVisitHref}>
                           Schedule care visit
                         </a>
                       </Button>
-                    )}
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </main>

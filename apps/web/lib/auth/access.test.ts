@@ -243,6 +243,23 @@ test('keeps admin-only pages restricted for non-admin staff', () => {
   })
 })
 
+test('care planning requires authoritative tenant administration', () => {
+  assert.deepEqual(
+    resolveAuthoritativeRoute('/care-planning', ready('ADMIN')),
+    { action: 'allow' },
+  )
+  for (const pathname of ['/care-planning', '/care-planning/client-1']) {
+    assert.deepEqual(
+      resolveAuthoritativeRoute(pathname, ready('STAFF')),
+      { action: 'redirect', destination: '/today' },
+    )
+    assert.deepEqual(
+      resolveAuthoritativeRoute(pathname, ready('FAMILY')),
+      { action: 'redirect', destination: '/family' },
+    )
+  }
+})
+
 test('allows admins to open activity reporting', () => {
   const decision = resolveAuthenticatedRoute(
     '/activity',

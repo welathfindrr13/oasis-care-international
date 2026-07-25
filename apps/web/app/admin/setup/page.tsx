@@ -20,10 +20,10 @@ export const metadata: Metadata = {
 
 const steps = [
   {
-    title: "Add a person",
-    description: "Create the first person profile so you can plan their care.",
-    href: "/people/new",
-    action: "Add a person",
+    title: "Add a client",
+    description: "Create the first client record so you can plan their care.",
+    href: "/clients/new",
+    action: "Add a client",
   },
   {
     title: "Invite a carer",
@@ -35,16 +35,16 @@ const steps = [
   {
     title: "Schedule a visit",
     description:
-      "Choose a person, date and time, then assign a carer who has accepted their invitation.",
+      "Choose a client, date and time, then assign a carer who has accepted their invitation.",
     href: "/schedule/new",
     action: "Schedule a visit",
   },
   {
     title: "Set up family updates",
     description:
-      "Open a person profile when you are ready to manage safe Family access and approved updates.",
-    href: "/people",
-    action: "View people",
+      "Open a client record when you are ready to manage safe Family access and approved updates.",
+    href: "/clients",
+    action: "View clients",
   },
 ] as const;
 
@@ -70,7 +70,7 @@ export default async function AdminSetupPage() {
         </p>
 
         <Button asChild size="lg" className="mt-8 w-full sm:w-auto">
-          <Link href="/people/new">Add a person</Link>
+          <Link href="/clients/new">Add a client</Link>
         </Button>
 
         <ol className="mt-10 border-t border-oasis-border">

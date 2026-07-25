@@ -2,8 +2,8 @@ import { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { Header } from '../../../components/oasis/Header'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
-import { hasRole } from '../../../lib/auth/roles'
 import { getServerAuthContext } from '../../../lib/auth/server-auth'
+import { hasAccessCapability } from '../../../lib/auth/capabilities'
 
 export const metadata: Metadata = {
   title: 'Service monitoring - Oasis Care',
@@ -37,9 +37,9 @@ async function getMetrics(): Promise<string> {
 }
 
 export default async function MetricsPage() {
-  const { roles } = await getServerAuthContext()
-  if (!hasRole(roles, 'admin')) {
-    redirect('/activity')
+  const { accessSnapshot } = await getServerAuthContext()
+  if (!hasAccessCapability(accessSnapshot.capabilities, 'TENANT_ADMIN')) {
+    redirect('/access/unavailable')
   }
 
   const metrics = await getMetrics();

@@ -15,8 +15,8 @@ import {
 } from '../../lib/graphql/queries'
 
 export const metadata: Metadata = {
-  title: 'People - Oasis Care',
-  description: 'Manage people supported and their care context',
+  title: 'Clients - Oasis Care',
+  description: 'Manage clients and their care context',
 }
 
 export const dynamic = 'force-dynamic'
@@ -83,17 +83,17 @@ function EmptyState({ isAdmin }: { isAdmin: boolean }) {
         </div>
       </div>
       <h3 className="text-lg font-medium text-text-primary mb-2">
-        No people found
+        {isAdmin ? 'No clients found' : 'No people found'}
       </h3>
       <p className="text-text-secondary mb-4">
         {isAdmin
-          ? 'Get started by adding the first person supported.'
+          ? 'Get started by adding the first client.'
           : 'No people are available right now.'}
       </p>
       {isAdmin && (
         <Button asChild variant="primary">
-          <Link href="/people/new">
-            Add person
+          <Link href="/clients/new">
+            Add client
           </Link>
         </Button>
       )}
@@ -134,41 +134,47 @@ export default async function ClientsPage(props: ClientsPageProps) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="mb-8">
           <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">
-            People
+            {isAdmin ? 'Clients' : 'People'}
           </h1>
           <p className="text-slate-500 mt-1">
-            View each person&apos;s care status, visits, Care Notes, and family access.
+            {isAdmin
+              ? "View each client's care status, visits, Care Notes, and Family access."
+              : "View each person's care status and assigned visits."}
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-text-primary font-heading">
-                  People supported
+                  {isAdmin ? 'Clients supported' : 'People supported'}
                 </h2>
                 <p className="text-sm text-text-secondary">
                   {loadError
-                    ? 'Unable to load people'
+                    ? `Unable to load ${isAdmin ? 'clients' : 'people'}`
                     : hasClients
-                    ? `${clients.length} of ${total} people`
-                    : 'No people found'}
+                    ? `${clients.length} of ${total} ${isAdmin ? 'clients' : 'people'}`
+                    : `No ${isAdmin ? 'clients' : 'people'} found`}
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto">
                 {!isAdmin && (
                   <Button asChild variant="ghost" size="sm">
                     <Link href="/shift">My Shift</Link>
                   </Button>
                 )}
-                <form method="get" action="/people" className="flex items-center gap-2">
+                <form
+                  method="get"
+                  action={isAdmin ? '/clients' : '/people'}
+                  className="flex w-full items-center gap-2 sm:w-auto"
+                >
                   <input
                     type="search"
                     name="search"
                     defaultValue={searchParams.search || ''}
-                    placeholder="Search people..."
-                    className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 w-64"
+                    placeholder={isAdmin ? 'Search clients...' : 'Search people...'}
+                    className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500 sm:w-64"
                   />
                   <Button type="submit" variant="ghost" size="sm">
                     Search
@@ -176,8 +182,8 @@ export default async function ClientsPage(props: ClientsPageProps) {
                 </form>
                 {isAdmin && (
                   <Button asChild variant="primary" size="sm">
-                    <Link href="/people/new">
-                      Add person
+                    <Link href="/clients/new">
+                      Add client
                     </Link>
                   </Button>
                 )}
@@ -198,11 +204,78 @@ export default async function ClientsPage(props: ClientsPageProps) {
                 </div>
               </div>
             ) : hasClients ? (
-              <div className="overflow-x-auto">
+              <>
+                <div
+                  className="grid gap-4 md:hidden"
+                  aria-label={
+                    isAdmin
+                      ? 'Clients supported directory'
+                      : 'People supported directory'
+                  }
+                >
+                  {clients.map((client) => (
+                    <article
+                      key={client.id}
+                      className="rounded-xl border border-base-gray-200 bg-white p-4"
+                    >
+                      <h3 className="font-semibold text-text-primary">
+                        {client.fullName}
+                      </h3>
+                      <p className="mt-2 text-sm text-text-secondary">
+                        {client.addressLine1}
+                        {client.addressLine2 ? `, ${client.addressLine2}` : ''}
+                        <br />
+                        {client.city}, {client.postcode}
+                      </p>
+                      <dl className="mt-4 grid gap-3 text-sm">
+                        <div>
+                          <dt className="font-medium text-text-primary">
+                            Last visit
+                          </dt>
+                          <dd className="text-text-secondary">
+                            {formatVisitDate(client.lastVisitAt)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="font-medium text-text-primary">
+                            Next visit
+                          </dt>
+                          <dd className="text-text-secondary">
+                            {formatVisitDate(client.nextVisitAt)}
+                          </dd>
+                        </div>
+                      </dl>
+                      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                        <Button asChild variant="ghost" size="sm">
+                          <Link
+                            href={`/${isAdmin ? 'clients' : 'people'}/${client.id}`}
+                          >
+                            View
+                          </Link>
+                        </Button>
+                        {isAdmin && (
+                          <>
+                            <Button asChild variant="ghost" size="sm">
+                              <Link href={`/clients/${client.id}/edit`}>
+                                Edit
+                              </Link>
+                            </Button>
+                            <Button asChild variant="ghost" size="sm">
+                              <a href={`/visits/new?clientId=${client.id}`}>
+                                Schedule
+                              </a>
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto md:block">
                 <table
                   className="w-full"
                   role="table"
-                    aria-label="People supported directory"
+                    aria-label={isAdmin ? 'Clients supported directory' : 'People supported directory'}
                 >
                   <thead>
                     <tr className="border-b border-base-gray-200">
@@ -230,13 +303,8 @@ export default async function ClientsPage(props: ClientsPageProps) {
                         className="border-b border-base-gray-100 hover:bg-background-accent transition-colors"
                       >
                         <td className="py-3 px-4">
-                          <div>
-                            <div className="font-medium text-text-primary">
-                              {client.fullName}
-                            </div>
-                            <div className="text-sm text-text-secondary">
-                              ID: {client.id.slice(0, 8)}...
-                            </div>
+                          <div className="font-medium text-text-primary">
+                            {client.fullName}
                           </div>
                         </td>
                         <td className="py-3 px-4">
@@ -265,7 +333,7 @@ export default async function ClientsPage(props: ClientsPageProps) {
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
                             <Button asChild variant="ghost" size="sm">
-                              <Link href={`/people/${client.id}`}>
+                              <Link href={`/${isAdmin ? 'clients' : 'people'}/${client.id}`}>
                                 View
                               </Link>
                             </Button>
@@ -289,7 +357,8 @@ export default async function ClientsPage(props: ClientsPageProps) {
                     ))}
                   </tbody>
                 </table>
-              </div>
+                </div>
+              </>
             ) : (
               <EmptyState isAdmin={isAdmin} />
             )}

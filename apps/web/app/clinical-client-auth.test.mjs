@@ -28,6 +28,10 @@ const metricsSource = readFileSync(
   new URL("admin/metrics/page.tsx", import.meta.url),
   "utf8",
 );
+const carePlanningSource = readFileSync(
+  new URL("care-planning/page.tsx", import.meta.url),
+  "utf8",
+);
 const accessStateSource = readFileSync(
   new URL("access/[state]/page.tsx", import.meta.url),
   "utf8",
@@ -224,6 +228,9 @@ test("public and sign-in copy avoids unsupported assurance and internal product 
 });
 
 test("metrics page reports only observed data and has no inert refresh control", () => {
+  assert.match(metricsSource, /accessSnapshot/);
+  assert.match(metricsSource, /hasAccessCapability\(accessSnapshot\.capabilities, 'TENANT_ADMIN'\)/);
+  assert.match(metricsSource, /redirect\('\/access\/unavailable'\)/);
   assert.match(metricsSource, /This page does not infer service health/);
   assert.match(metricsSource, /does not prove API or database health/);
   assert.doesNotMatch(metricsSource, /✅ Online|✅ Connected|JWT \+ RBAC/);
@@ -234,6 +241,18 @@ test("metrics page reports only observed data and has no inert refresh control",
   assert.match(metricsSource, /This page is restricted/);
   assert.match(metricsSource, /Contact Oasis support if you need access/);
   assert.doesNotMatch(metricsSource, /Manager account is required|administrator account is required/i);
+});
+
+test("care planning checks authoritative tenant administration before loading client data", () => {
+  const capabilityGate = carePlanningSource.indexOf(
+    "hasAccessCapability(accessSnapshot.capabilities, 'TENANT_ADMIN')",
+  );
+  const clientQuery = carePlanningSource.indexOf(
+    "const peopleResult = await getPeopleSafe()",
+  );
+  assert.ok(capabilityGate > -1);
+  assert.ok(clientQuery > capabilityGate);
+  assert.match(carePlanningSource, /redirect\('\/access\/unavailable'\)/);
 });
 
 test("access states give calm actions without resolver jargon", () => {

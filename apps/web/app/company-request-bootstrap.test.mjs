@@ -119,7 +119,7 @@ test("Platform Owners revoke the exact first Manager with accessible recovery st
 
 test("guided setup presents the real company journey without internal language", () => {
   assert.match(setupPage, /Set up your company/);
-  assert.match(setupPage, /Add a person/);
+  assert.match(setupPage, /Add a client/);
   assert.match(setupPage, /Invite a carer/);
   assert.match(setupPage, /must accept the invitation before you can assign/);
   assert.match(setupPage, /Schedule a visit/);

@@ -496,7 +496,7 @@ test("an administrator sees the real company journey without internal setup lang
     page.getByText(/synthetic|canary|fixture|seed|billing/i),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("link", { name: "Add a person", exact: true }).first(),
+    page.getByRole("link", { name: "Add a client", exact: true }).first(),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Invite a carer", exact: true }),

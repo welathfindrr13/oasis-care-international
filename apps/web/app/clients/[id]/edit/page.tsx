@@ -168,7 +168,7 @@ export default function ClientEditPage(props: ClientEditPageProps) {
             </ol>
           </nav>
           <h1 className="text-3xl font-bold text-slate-900 font-heading">
-            Edit Client
+            Edit client
           </h1>
           <p className="text-slate-500 mt-1">
             Update client information
@@ -178,7 +178,7 @@ export default function ClientEditPage(props: ClientEditPageProps) {
         <Card>
           <CardHeader>
             <h2 className="text-xl font-semibold text-slate-900 font-heading">
-              Client Information
+              Client information
             </h2>
             <p className="text-sm text-slate-500">
               Make changes to the client&apos;s details below

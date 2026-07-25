@@ -17,7 +17,7 @@ export type HeaderNavigationItem = {
 
 const adminNavigation: readonly HeaderNavigationItem[] = [
   { id: "today", href: "/today", label: "Today", aliases: ["/dashboard"] },
-  { id: "people", href: "/people", label: "People", aliases: ["/clients"] },
+  { id: "clients", href: "/clients", label: "Clients", aliases: ["/people"] },
   {
     id: "schedule",
     href: "/schedule",
@@ -37,10 +37,15 @@ const adminNavigation: readonly HeaderNavigationItem[] = [
     aliases: ["/carebridge"],
   },
   {
-    id: "reports",
+    id: "care-planning",
+    href: "/care-planning",
+    label: "Care planning",
+  },
+  {
+    id: "inspection-records",
     href: "/evidence",
-    label: "Reports",
-    aliases: ["/reports", "/admin/metrics"],
+    label: "Inspection records",
+    aliases: ["/reports"],
   },
   { id: "settings", href: "/settings", label: "Settings" },
 ];

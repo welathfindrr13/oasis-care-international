@@ -13,17 +13,18 @@ const frontlineCapabilities = [
   "FRONTLINE_SHIFT_VIEW",
 ] as const;
 
-test("admin navigation exposes the seven required operational destinations in order", () => {
+test("admin navigation exposes the eight required operational destinations in order", () => {
   const items = getHeaderNavigation("admin", "/admin/carers");
   assert.deepEqual(
     items.map((item) => item.label),
     [
       "Today",
-      "People",
+      "Clients",
       "Schedule",
       "Workforce",
       "Family updates",
-      "Reports",
+      "Care planning",
+      "Inspection records",
       "Settings",
     ],
   );
@@ -32,15 +33,37 @@ test("admin navigation exposes the seven required operational destinations in or
     "/admin/carers",
   );
   assert.equal(isHeaderNavigationItemActive("/admin/carers", items[3]), true);
+  assert.equal(
+    isHeaderNavigationItemActive(
+      "/people/client-1",
+      items.find((item) => item.label === "Clients")!,
+    ),
+    true,
+  );
+  assert.equal(
+    isHeaderNavigationItemActive(
+      "/reports",
+      items.find((item) => item.label === "Inspection records")!,
+    ),
+    true,
+  );
+  assert.equal(
+    isHeaderNavigationItemActive(
+      "/admin/metrics",
+      items.find((item) => item.label === "Inspection records")!,
+    ),
+    false,
+  );
 });
 
 test("carer and family navigation never inherit admin destinations", () => {
   const forbidden = new Set([
-    "People",
+    "Clients",
     "Schedule",
     "Workforce",
     "Family updates",
-    "Reports",
+    "Care planning",
+    "Inspection records",
   ]);
   for (const surface of ["staff", "family"] as const) {
     const labels = getHeaderNavigation(
