@@ -256,6 +256,7 @@ describe('eMAR real DB flow', () => {
     expect(unauthenticated.body.errors?.[0]?.extensions?.code).toBe(
       'UNAUTHENTICATED',
     );
+    expect(unauthenticated.body.errors).toHaveLength(1);
 
     const disabled = await request(app.getHttpServer())
       .post('/graphql')

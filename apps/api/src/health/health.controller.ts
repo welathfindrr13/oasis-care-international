@@ -1,5 +1,6 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '@oasis/db';
+import { Public } from '../auth/public.decorator';
 
 function healthPayload() {
   const environment =
@@ -18,6 +19,7 @@ function healthPayload() {
 }
 
 @Controller('healthz')
+@Public()
 export class HealthController {
   @Get()
   health() {
@@ -26,6 +28,7 @@ export class HealthController {
 }
 
 @Controller()
+@Public()
 export class StandardHealthController {
   constructor(private readonly prisma: PrismaService) {}
 
@@ -64,6 +67,7 @@ export class StandardHealthController {
 }
 
 @Controller('demo')
+@Public()
 export class DemoController {
   @Get('health')
   demoHealth() {

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Header } from '../../components/oasis/Header'
 import { CarePlanningActions } from '../../components/care-planning/CarePlanningActions'
+import { StatePanel } from '../../components/ui/StatePanel'
 import { query } from '../../lib/graphql/client'
 import {
   formatDate as formatOrganizationDate,
@@ -25,12 +26,12 @@ interface CarePlanningPageProps {
   }>
 }
 
-async function getPeopleSafe(): Promise<ClientListItem[]> {
+async function getPeopleSafe(): Promise<{ people: ClientListItem[]; unavailable: boolean }> {
   try {
     const data = await query<ClientsQueryResponse>(CLIENTS_QUERY, { skip: 0, take: 50 })
-    return data.clients.items
+    return { people: data.clients.items, unavailable: false }
   } catch {
-    return []
+    return { people: [], unavailable: true }
   }
 }
 
@@ -220,9 +221,11 @@ function EvidencePackList({ evidencePacks }: { evidencePacks: EvidencePackRecord
 
 export default async function CarePlanningPage(props: CarePlanningPageProps) {
   const searchParams = await props.searchParams
-  const people = await getPeopleSafe()
+  const peopleResult = await getPeopleSafe()
+  const people = peopleResult.people
   const selectedPerson = people.find((person) => person.id === searchParams?.clientId) ?? people[0]
   const carePlanning = selectedPerson ? await getCarePlanningSafe(selectedPerson.id) : null
+  const carePlanningUnavailable = Boolean(selectedPerson && carePlanning === null)
 
   const assessments = carePlanning?.assessments ?? []
   const carePlans = carePlanning?.carePlans ?? []
@@ -268,7 +271,24 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
           </div>
         </section>
 
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        {peopleResult.unavailable ? (
+          <StatePanel
+            className="mt-6"
+            kind="unavailable"
+            title="Care-planning clients are unavailable"
+            action={
+              <form action="/care-planning" method="get">
+                {searchParams?.clientId ? <input type="hidden" name="clientId" value={searchParams.clientId} /> : null}
+                <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
+                  Try again
+                </button>
+              </form>
+            }
+          >
+            Client records could not be loaded. No care-planning action is available until the connection recovers.
+          </StatePanel>
+        ) : (
+          <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="font-heading text-lg font-semibold text-slate-950">Choose a person</h2>
@@ -295,9 +315,10 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
               })}
             </div>
           </div>
-        </section>
+          </section>
+        )}
 
-        {selectedPerson && (
+        {selectedPerson && !carePlanningUnavailable && (
           <section className="mt-6 grid gap-4 md:grid-cols-4">
             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Assessments</p>
@@ -322,14 +343,26 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
           </section>
         )}
 
-        {carePlanning === null && selectedPerson && (
-          <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
-            Care-planning records could not be loaded for this person. The app is still usable, but this usually means
-            the local schema or session context needs refreshing before write workflows are added.
-          </section>
+        {carePlanningUnavailable && selectedPerson && (
+          <StatePanel
+            className="mt-6"
+            kind="unavailable"
+            title={`Care-planning records for ${selectedPerson.fullName} are unavailable`}
+            action={
+              <form action="/care-planning" method="get">
+                <input type="hidden" name="clientId" value={selectedPerson.id} />
+                <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
+                  Try again
+                </button>
+              </form>
+            }
+          >
+            Existing assessments and plans could not be loaded. No changes can be made until the connection recovers.
+          </StatePanel>
         )}
 
-        <section className="mt-6 grid gap-6 lg:grid-cols-3">
+        {!peopleResult.unavailable && !carePlanningUnavailable && (
+          <section className="mt-6 grid gap-6 lg:grid-cols-3">
           <div className="space-y-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">Assess</p>
@@ -353,9 +386,10 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
             </div>
             <EvidencePackList evidencePacks={evidencePacks} />
           </div>
-        </section>
+          </section>
+        )}
 
-        {selectedPerson && (
+        {selectedPerson && !carePlanningUnavailable && (
           <CarePlanningActions
             clientId={selectedPerson.id}
             assessments={assessments}

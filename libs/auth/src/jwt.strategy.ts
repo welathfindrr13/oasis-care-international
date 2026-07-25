@@ -221,10 +221,26 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return (process.env.AUTH_IDENTITY_PROVIDER || 'cognito').trim().toLowerCase();
   }
 
+  private static getClerkAuthorizedParties(): string[] {
+    return (process.env.CLERK_AUTHORIZED_PARTIES || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+  }
+
+  private static isProductionLikeEnvironment(): boolean {
+    return [process.env.NODE_ENV, process.env.APP_ENV, process.env.APP_ENVIRONMENT]
+      .map((value) => String(value || '').trim().toLowerCase())
+      .some((value) => value === 'production' || value === 'staging');
+  }
+
   private static buildClerkStrategyOptions(jwksTimeoutMs: number): StrategyOptions {
     const issuer = (process.env.CLERK_ISSUER || '').trim();
     if (!issuer) {
       throw new Error('CLERK_ISSUER is required when AUTH_IDENTITY_PROVIDER=clerk');
+    }
+    if (JwtStrategy.isProductionLikeEnvironment() && JwtStrategy.getClerkAuthorizedParties().length === 0) {
+      throw new Error('CLERK_AUTHORIZED_PARTIES is required for Clerk authentication in staging or production');
     }
 
     const jwksUri = (process.env.CLERK_JWKS_URL || `${issuer}/.well-known/jwks.json`).trim();
@@ -317,10 +333,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
-    const configuredParties = (process.env.CLERK_AUTHORIZED_PARTIES || '')
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
+    const configuredParties = JwtStrategy.getClerkAuthorizedParties();
     if (configuredParties.length > 0 && !configuredParties.includes(String(payload.azp || ''))) {
       throw new Error('Clerk token authorized party is invalid');
     }

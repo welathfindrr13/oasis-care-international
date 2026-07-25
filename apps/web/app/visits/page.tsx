@@ -396,7 +396,7 @@ export default async function VisitsPage(props: VisitsPageProps) {
                           </td>
                           <td className="py-3 px-4">
                             <StatusChip
-                              status={visit.status.toLowerCase() as any}
+                              status={visit.status.toLowerCase()}
                             />
                           </td>
                           <td className="py-3 px-4">

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { CarePlanningActions } from '../../components/care-planning/CarePlanningActions'
 import { Header } from '../../components/oasis/Header'
+import { StatePanel } from '../../components/ui/StatePanel'
 import { query } from '../../lib/graphql/client'
 import { formatDate, formatStoredCalendarDate } from '../../lib/time'
 import {
@@ -19,12 +20,12 @@ interface EvidencePageProps {
   }>
 }
 
-async function getPeopleSafe(): Promise<ClientListItem[]> {
+async function getPeopleSafe(): Promise<{ people: ClientListItem[]; unavailable: boolean }> {
   try {
     const data = await query<ClientsQueryResponse>(CLIENTS_QUERY, { skip: 0, take: 50 })
-    return data.clients.items
+    return { people: data.clients.items, unavailable: false }
   } catch {
-    return []
+    return { people: [], unavailable: true }
   }
 }
 
@@ -48,9 +49,11 @@ function formatRecordDate(value?: string | null): string {
 
 export default async function EvidencePage(props: EvidencePageProps) {
   const searchParams = await props.searchParams
-  const people = await getPeopleSafe()
+  const peopleResult = await getPeopleSafe()
+  const people = peopleResult.people
   const selectedPerson = people.find((person) => person.id === searchParams?.clientId) ?? people[0]
   const carePlanning = selectedPerson ? await getEvidenceSafe(selectedPerson.id) : null
+  const evidenceUnavailable = Boolean(selectedPerson && carePlanning === null)
   const carePlans = carePlanning?.carePlans ?? []
   const evidencePacks = carePlanning?.evidencePacks ?? []
   const assessments = carePlanning?.assessments ?? []
@@ -86,7 +89,25 @@ export default async function EvidencePage(props: EvidencePageProps) {
           </div>
         </section>
 
-        {selectedPerson && (
+        {peopleResult.unavailable ? (
+          <StatePanel
+            className="mt-6"
+            kind="unavailable"
+            title="Inspection-record clients are unavailable"
+            action={
+              <form action="/evidence" method="get">
+                {searchParams?.clientId ? <input type="hidden" name="clientId" value={searchParams.clientId} /> : null}
+                <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
+                  Try again
+                </button>
+              </form>
+            }
+          >
+            Client records could not be loaded. No inspection record can be created until the connection recovers.
+          </StatePanel>
+        ) : null}
+
+        {selectedPerson && !evidenceUnavailable && (
           <section className="mt-6 grid gap-4 md:grid-cols-4">
             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Assessments</p>
@@ -113,14 +134,26 @@ export default async function EvidencePage(props: EvidencePageProps) {
           </section>
         )}
 
-        {carePlanning === null && selectedPerson && (
-          <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
-            Evidence could not be loaded for this person. You can still create records, then refresh once the API
-            connection is healthy.
-          </section>
+        {evidenceUnavailable && selectedPerson && (
+          <StatePanel
+            className="mt-6"
+            kind="unavailable"
+            title={`Inspection records for ${selectedPerson.fullName} are unavailable`}
+            action={
+              <form action="/evidence" method="get">
+                <input type="hidden" name="clientId" value={selectedPerson.id} />
+                <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
+                  Try again
+                </button>
+              </form>
+            }
+          >
+            Existing records could not be loaded. No changes can be made until the connection recovers.
+          </StatePanel>
         )}
 
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        {!peopleResult.unavailable && !evidenceUnavailable ? (
+          <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="font-heading text-xl font-bold text-slate-950">Evidence pack timeline</h2>
           <p className="mt-1 text-sm text-slate-600">
             Source-linked evidence packs from approved records. Family and raw operational internals remain restricted.
@@ -155,9 +188,10 @@ export default async function EvidencePage(props: EvidencePageProps) {
               </article>
             ))}
           </div>
-        </section>
+          </section>
+        ) : null}
 
-        {selectedPerson && (
+        {selectedPerson && !evidenceUnavailable && (
           <CarePlanningActions
             clientId={selectedPerson.id}
             assessments={assessments}

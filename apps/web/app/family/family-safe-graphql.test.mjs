@@ -93,5 +93,15 @@ test('staff approval shows and approves the exact versioned family preview', () 
   assert.match(approvalQuery, /familySafeBody/);
   assert.match(approvalQueueItem, /Exact family preview/);
   assert.match(approvalQueueItem, /Approve exact family preview/);
-  assert.match(approvalQueueItem, /disabled=\{busy \|\| !hasFamilyPreview\}/);
+  assert.match(
+    approvalQueueItem,
+    /disabled=\{busy \|\| !hasFamilyPreview \|\| showApproveConfirmation\}/,
+  );
+  assert.match(approvalQueueItem, /role="alertdialog"/);
+  assert.match(approvalQueueItem, /Publish this exact Family update\?/);
+  assert.match(approvalQueueItem, /approveConfirmRef\.current\?\.focus\(\)/);
+  assert.match(approvalQueueItem, /approveTriggerRef\.current\?\.focus\(\)/);
+  assert.match(approvalQueueItem, /if \(approvalStartedRef\.current\) return/);
+  assert.match(approvalQueueItem, /approvalStartedRef\.current = true/);
+  assert.match(approvalQueueItem, /await onApprove\(story\.id\)/);
 });

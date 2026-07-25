@@ -448,7 +448,7 @@ test('failed preflight does not print secret values', () => {
   assert.match(result.stderr, /NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER=clerk/);
 });
 
-test('Clerk production env requires issuer, JWKS, public key, sign-in URL, and audience or azp', () => {
+test('Clerk production env requires issuer, JWKS, public key, sign-in URL, and authorized parties', () => {
   const result = validate(validEnv({
     CLERK_ISSUER: '',
     CLERK_JWKS_URL: '',
@@ -476,7 +476,25 @@ test('Clerk production env requires issuer, JWKS, public key, sign-in URL, and a
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_SIGN_UP_URL')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL')));
   assert(result.errors.some((error) => error.includes('NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL')));
-  assert(result.errors.some((error) => error.includes('CLERK_AUDIENCE or CLERK_AUTHORIZED_PARTIES')));
+  assert(result.errors.some((error) => error.includes('CLERK_AUTHORIZED_PARTIES')));
+});
+
+test('Clerk audience remains optional when authorized parties are configured', () => {
+  const result = validate(validEnv({
+    CLERK_AUDIENCE: '',
+    CLERK_AUTHORIZED_PARTIES: 'https://care.example.org',
+  }));
+
+  assert.deepEqual(result.errors, []);
+});
+
+test('Clerk audience cannot substitute for required authorized parties', () => {
+  const result = validate(validEnv({
+    CLERK_AUDIENCE: 'oasis-production-api',
+    CLERK_AUTHORIZED_PARTIES: '',
+  }));
+
+  assert(result.errors.some((error) => error.includes('CLERK_AUTHORIZED_PARTIES')));
 });
 
 test('preflight required env coverage stays ahead of compose required interpolation', () => {

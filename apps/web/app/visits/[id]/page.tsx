@@ -9,6 +9,7 @@ import { hasAccessCapability } from '../../../lib/auth/capabilities';
 import { Button } from '../../../components/ui/Button';
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card';
 import { clientQuery } from '../../../lib/graphql/client-side';
+import { runConfirmedAction } from '../../../lib/consequential-actions';
 import {
   formatDateTime as formatOrganizationDateTime,
   formatOrganizationDateTimeInput,
@@ -449,29 +450,36 @@ export default function VisitDetailPage() {
 
   async function completeVisit() {
     if (!visit || !canRunVisitWorkflow || !hasStartedVisit || visitIsClosed) return;
+    const personName = visit.client?.fullName || 'this person';
 
-    setCompletingVisit(true);
-    setError(null);
-    setMessage(null);
+    await runConfirmedAction(
+      window.confirm,
+      `Complete the visit for ${personName}? Care notes will become read-only.`,
+      async () => {
+        setCompletingVisit(true);
+        setError(null);
+        setMessage(null);
 
-    try {
-      await clientQuery(
-        COMPLETE_VISIT_MUTATION,
-        {
-          input: {
-            visitId: visit.id,
-            notes: visitCompletionNotes.trim() || undefined,
-          },
-        },
-        { getBearerToken },
-      );
-      setMessage('Visit completed.');
-      await loadWorkspace();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to complete visit');
-    } finally {
-      setCompletingVisit(false);
-    }
+        try {
+          await clientQuery(
+            COMPLETE_VISIT_MUTATION,
+            {
+              input: {
+                visitId: visit.id,
+                notes: visitCompletionNotes.trim() || undefined,
+              },
+            },
+            { getBearerToken },
+          );
+          setMessage('Visit completed.');
+          await loadWorkspace();
+        } catch (err: any) {
+          setError(err?.message || 'Failed to complete visit');
+        } finally {
+          setCompletingVisit(false);
+        }
+      },
+    );
   }
 
   return (

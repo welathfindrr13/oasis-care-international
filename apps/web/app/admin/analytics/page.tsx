@@ -1,5 +1,6 @@
 import { Header } from '../../../components/oasis/Header';
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card';
+import { StatePanel } from '../../../components/ui/StatePanel';
 import { query } from '../../../lib/graphql/client';
 import {
   SHIFT_ANALYTICS_QUERY,
@@ -11,22 +12,15 @@ export const dynamic = 'force-dynamic';
 async function getShiftAnalytics() {
   try {
     const response = await query<ShiftAnalyticsQueryResponse>(SHIFT_ANALYTICS_QUERY);
-    return response.shiftAnalytics;
+    return { analytics: response.shiftAnalytics, unavailable: false };
   } catch {
-    return {
-      activeCarersNow: 0,
-      openShiftCount: 0,
-      clockIns: 0,
-      clockOuts: 0,
-      averageShiftMinutes: 0,
-      clockInMethods: { gps: 0, qr: 0, nfc: 0, phone: 0, manual: 0 },
-      clockOutMethods: { gps: 0, qr: 0, nfc: 0, phone: 0, manual: 0 },
-    };
+    return { analytics: null, unavailable: true };
   }
 }
 
 export default async function AdminAnalyticsPage() {
-  const analytics = await getShiftAnalytics();
+  const result = await getShiftAnalytics();
+  const analytics = result.analytics;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -41,18 +35,36 @@ export default async function AdminAnalyticsPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <MetricCard label="Active Carers" value={analytics.activeCarersNow} />
-          <MetricCard label="Open Shifts" value={analytics.openShiftCount} />
-          <MetricCard label="Clock-ins Today" value={analytics.clockIns} />
-          <MetricCard label="Clock-outs Today" value={analytics.clockOuts} />
-          <MetricCard label="Avg Shift (min)" value={analytics.averageShiftMinutes} />
-        </div>
+        {result.unavailable || !analytics ? (
+          <StatePanel
+            kind="unavailable"
+            title="Workforce analytics are unavailable"
+            action={
+              <form action="/admin/analytics" method="get">
+                <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
+                  Try again
+                </button>
+              </form>
+            }
+          >
+            Shift totals could not be loaded. The service is not reporting zero activity.
+          </StatePanel>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <MetricCard label="Active Carers" value={analytics.activeCarersNow} />
+              <MetricCard label="Open Shifts" value={analytics.openShiftCount} />
+              <MetricCard label="Clock-ins Today" value={analytics.clockIns} />
+              <MetricCard label="Clock-outs Today" value={analytics.clockOuts} />
+              <MetricCard label="Avg Shift (min)" value={analytics.averageShiftMinutes} />
+            </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <MethodCard title="Clock-in Methods" methods={analytics.clockInMethods} />
-          <MethodCard title="Clock-out Methods" methods={analytics.clockOutMethods} />
-        </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <MethodCard title="Clock-in Methods" methods={analytics.clockInMethods} />
+              <MethodCard title="Clock-out Methods" methods={analytics.clockOutMethods} />
+            </div>
+          </>
+        )}
       </main>
     </div>
   );

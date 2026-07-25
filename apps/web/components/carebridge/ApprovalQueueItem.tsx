@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '../ui/Button'
 import type { VerifiedVisitStory } from '../../lib/graphql/queries'
 import { SourceRefList } from './SourceRefList'
@@ -20,8 +20,23 @@ export function ApprovalQueueItem({
   onReject,
 }: ApprovalQueueItemProps) {
   const [showRejectForm, setShowRejectForm] = useState(false)
+  const [showApproveConfirmation, setShowApproveConfirmation] = useState(false)
   const [rejectionReason, setRejectionReason] = useState(story.rejectionReason || '')
+  const approveTriggerRef = useRef<HTMLButtonElement>(null)
+  const approveConfirmRef = useRef<HTMLButtonElement>(null)
+  const approvalStartedRef = useRef(false)
   const hasFamilyPreview = Boolean(story.familySafeTitle && story.familySafeBody && story.familySafeVersion === 1)
+
+  useEffect(() => {
+    if (showApproveConfirmation) {
+      approveConfirmRef.current?.focus()
+    }
+  }, [showApproveConfirmation])
+
+  function cancelApprove() {
+    setShowApproveConfirmation(false)
+    requestAnimationFrame(() => approveTriggerRef.current?.focus())
+  }
 
   return (
     <VerifiedVisitStoryCard
@@ -43,6 +58,45 @@ export function ApprovalQueueItem({
               </p>
             )}
           </section>
+
+          {showApproveConfirmation ? (
+            <section
+              className="rounded-2xl border border-oasis-warning bg-amber-50 p-4"
+              role="alertdialog"
+              aria-labelledby={`approve-title-${story.id}`}
+              aria-describedby={`approve-preview-${story.id}`}
+            >
+              <h4 id={`approve-title-${story.id}`} className="font-semibold text-slate-950">
+                Publish this exact Family update?
+              </h4>
+              <div id={`approve-preview-${story.id}`} className="mt-2 text-sm leading-6 text-slate-700">
+                <p className="font-semibold text-slate-900">{story.familySafeTitle}</p>
+                <p className="mt-1">{story.familySafeBody}</p>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Button
+                  ref={approveConfirmRef}
+                  type="button"
+                  disabled={busy}
+                  onClick={async () => {
+                    if (approvalStartedRef.current) return
+                    approvalStartedRef.current = true
+                    setShowApproveConfirmation(false)
+                    try {
+                      await onApprove(story.id)
+                    } finally {
+                      approvalStartedRef.current = false
+                    }
+                  }}
+                >
+                  Confirm and publish
+                </Button>
+                <Button type="button" variant="ghost" disabled={busy} onClick={cancelApprove}>
+                  Cancel
+                </Button>
+              </div>
+            </section>
+          ) : null}
 
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -88,7 +142,12 @@ export function ApprovalQueueItem({
           ) : null}
 
           <div className="flex flex-wrap gap-3">
-            <Button type="button" disabled={busy || !hasFamilyPreview} onClick={() => onApprove(story.id)}>
+            <Button
+              ref={approveTriggerRef}
+              type="button"
+              disabled={busy || !hasFamilyPreview || showApproveConfirmation}
+              onClick={() => setShowApproveConfirmation(true)}
+            >
               Approve exact family preview
             </Button>
             <Button
