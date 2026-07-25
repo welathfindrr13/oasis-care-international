@@ -21,6 +21,8 @@ import { CarerAccessService } from '../src/carer/carer-access.service';
 import { AuthAccessModule } from '../src/auth/auth-access.module';
 import { MedicationLaunchGuard } from '../src/medication/medication-launch.guard';
 import { formatGraphQLError } from '../src/common/filters/graphql-error.filter';
+import { APP_GUARD } from '@nestjs/core';
+import { GqlJwtAuthGuard } from '../src/auth/gql-jwt-auth.guard';
 
 const EMAR_CARER_ID = '88888888-8888-4888-8888-888888888888';
 
@@ -80,6 +82,10 @@ describe('eMAR real DB flow', () => {
         MedicationLaunchGuard,
         PrismaService,
         CarerAccessService,
+        {
+          provide: APP_GUARD,
+          useExisting: GqlJwtAuthGuard,
+        },
         // Mock Prometheus counters for testing
         { provide: 'medication_administrations_total', useValue: { inc: jest.fn() } },
         { provide: 'medication_overlaps_total', useValue: { inc: jest.fn() } },

@@ -25,7 +25,7 @@ const statusConfig = {
   },
   cancelled: {
     label: 'Cancelled',
-    className: 'bg-base-gray-100 text-base-gray-700 border-base-gray-300'
+    className: 'bg-base-gray-100 text-base-gray-800 border-base-gray-300'
   },
   conflict: {
     label: 'Conflict',
@@ -43,7 +43,7 @@ export function StatusChip({ status, className }: StatusChipProps) {
   const normalizedStatus = status.trim().toLowerCase()
   const config = statusConfig[normalizedStatus as VisitStatus] ?? {
     label: humanizeStatus(status),
-    className: 'bg-base-gray-100 text-base-gray-700 border-base-gray-300'
+    className: 'bg-base-gray-100 text-base-gray-800 border-base-gray-300'
   }
   
   return (

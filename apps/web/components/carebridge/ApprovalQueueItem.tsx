@@ -5,6 +5,7 @@ import { Button } from '../ui/Button'
 import type { VerifiedVisitStory } from '../../lib/graphql/queries'
 import { SourceRefList } from './SourceRefList'
 import { VerifiedVisitStoryCard } from './VerifiedVisitStoryCard'
+import { restoreActionFocus, runSingleFlightAction } from '../../lib/consequential-actions'
 
 interface ApprovalQueueItemProps {
   story: VerifiedVisitStory
@@ -35,7 +36,7 @@ export function ApprovalQueueItem({
 
   function cancelApprove() {
     setShowApproveConfirmation(false)
-    requestAnimationFrame(() => approveTriggerRef.current?.focus())
+    restoreActionFocus(approveTriggerRef.current)
   }
 
   return (
@@ -61,7 +62,7 @@ export function ApprovalQueueItem({
 
           {showApproveConfirmation ? (
             <section
-              className="rounded-2xl border border-oasis-warning bg-amber-50 p-4"
+              className="rounded-2xl border border-oasis-attention bg-amber-50 p-4"
               role="alertdialog"
               aria-labelledby={`approve-title-${story.id}`}
               aria-describedby={`approve-preview-${story.id}`}
@@ -79,14 +80,10 @@ export function ApprovalQueueItem({
                   type="button"
                   disabled={busy}
                   onClick={async () => {
-                    if (approvalStartedRef.current) return
-                    approvalStartedRef.current = true
-                    setShowApproveConfirmation(false)
-                    try {
+                    await runSingleFlightAction(approvalStartedRef, async () => {
+                      setShowApproveConfirmation(false)
                       await onApprove(story.id)
-                    } finally {
-                      approvalStartedRef.current = false
-                    }
+                    })
                   }}
                 >
                   Confirm and publish

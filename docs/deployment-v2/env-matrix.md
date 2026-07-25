@@ -26,8 +26,8 @@ This matrix is generated from current code references and Deployment V2 template
 | `AUTH_IDENTITY_PROVIDER` | API/auth | Yes | No | API JWT strategy, web auth mode, Compose | `clerk` | Preflight fails unless production-like Deployment V2 uses Clerk. |
 | `CLERK_ISSUER` | API auth | Yes | No | JWT strategy, preflight | `https://<clerk-instance>` | API JWT verification fails closed. |
 | `CLERK_JWKS_URL` | API auth | Yes | No | JWT strategy, preflight | `https://<clerk-instance>/.well-known/jwks.json` | API cannot resolve Clerk signing keys. |
-| `CLERK_AUDIENCE` | API auth | Required unless `CLERK_AUTHORIZED_PARTIES` is set | No | JWT strategy, preflight | `oasis-api` | Token audience validation is unavailable. |
-| `CLERK_AUTHORIZED_PARTIES` | API auth | Required unless `CLERK_AUDIENCE` is set | No | JWT strategy, preflight | `https://care.example.com` | Token authorized-party validation is unavailable. |
+| `CLERK_AUDIENCE` | API auth | Optional; enforced whenever configured | No | JWT strategy, preflight | `oasis-api` | Configured token audience validation is unavailable. |
+| `CLERK_AUTHORIZED_PARTIES` | API auth | Required | No | JWT strategy, preflight | `https://care.example.com` | Token authorized-party validation is unavailable. |
 | `CLERK_SECRET_KEY` | Web auth | Yes | No | Clerk middleware/provider, preflight | `sk_live_...` | Clerk server-side middleware cannot verify authenticated sessions safely. |
 | `NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER` | Web auth | Yes | Yes | login/auth mode, Compose | `clerk` | Login may render the wrong provider path. |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Web auth | Yes | Yes | Compose/build args, preflight | `pk_live_...` | Clerk browser session cannot be initialized once live Clerk UI is wired. |

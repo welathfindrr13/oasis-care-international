@@ -10,3 +10,24 @@ export async function runConfirmedAction(
   await action()
   return 'completed'
 }
+
+export async function runSingleFlightAction<T>(
+  startedRef: { current: boolean },
+  action: () => Promise<T>,
+): Promise<T | 'ignored'> {
+  if (startedRef.current) return 'ignored'
+
+  startedRef.current = true
+  try {
+    return await action()
+  } finally {
+    startedRef.current = false
+  }
+}
+
+export function restoreActionFocus(
+  target: { focus: () => void } | null,
+  schedule: (callback: () => void) => void = requestAnimationFrame,
+): void {
+  schedule(() => target?.focus())
+}
