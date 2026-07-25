@@ -274,7 +274,7 @@ test("a linked fake carer follows the database role despite an admin token claim
   const dialog = await completionDialog;
   expect(dialog.type()).toBe("confirm");
   expect(dialog.message()).toBe(
-    "Complete the visit for Browser Journey Person? Care notes will become read-only.",
+    "Complete the visit for Assigned Fake Client? Care notes will become read-only.",
   );
   await dialog.accept();
   await completionClick;
