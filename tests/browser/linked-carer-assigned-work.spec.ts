@@ -416,7 +416,7 @@ test("account switching clears stale capabilities and follows each database memb
     page.getByRole("heading", { name: "Your concern has been sent" }),
   ).toBeVisible();
   await expect(
-    page.getByText(/The care team has received “A question about today”/),
+    page.getByText(/“A question about today” was sent to the care team\./),
   ).toBeVisible();
 });
 
