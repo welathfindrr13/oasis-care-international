@@ -6,9 +6,11 @@ import { query } from '../../lib/graphql/client'
 import { formatDate, formatStoredCalendarDate } from '../../lib/time'
 import {
   CARE_PLANNING_QUERY,
+  CLIENT_QUERY,
   CLIENTS_QUERY,
   type CarePlanningQueryResponse,
   type ClientListItem,
+  type ClientQueryResponse,
   type ClientsQueryResponse,
 } from '../../lib/graphql/queries'
 
@@ -26,6 +28,15 @@ async function getPeopleSafe(): Promise<{ people: ClientListItem[]; unavailable:
     return { people: data.clients.items, unavailable: false }
   } catch {
     return { people: [], unavailable: true }
+  }
+}
+
+async function getRequestedPersonSafe(clientId: string): Promise<ClientListItem | null> {
+  try {
+    const data = await query<ClientQueryResponse>(CLIENT_QUERY, { id: clientId })
+    return data.client
+  } catch {
+    return null
   }
 }
 
@@ -49,9 +60,13 @@ function formatRecordDate(value?: string | null): string {
 
 export default async function EvidencePage(props: EvidencePageProps) {
   const searchParams = await props.searchParams
+  const requestedClientId = searchParams?.clientId?.trim()
   const peopleResult = await getPeopleSafe()
   const people = peopleResult.people
-  const selectedPerson = people.find((person) => person.id === searchParams?.clientId) ?? people[0]
+  const selectedPerson = requestedClientId
+    ? await getRequestedPersonSafe(requestedClientId)
+    : people[0]
+  const requestedPersonUnavailable = Boolean(requestedClientId && !selectedPerson)
   const carePlanning = selectedPerson ? await getEvidenceSafe(selectedPerson.id) : null
   const evidenceUnavailable = Boolean(selectedPerson && carePlanning === null)
   const carePlans = carePlanning?.carePlans ?? []
@@ -107,6 +122,24 @@ export default async function EvidencePage(props: EvidencePageProps) {
           </StatePanel>
         ) : null}
 
+        {requestedPersonUnavailable ? (
+          <StatePanel
+            className="mt-6"
+            kind="unavailable"
+            title="The requested client is unavailable"
+            action={
+              <form action="/evidence" method="get">
+                <input type="hidden" name="clientId" value={requestedClientId} />
+                <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
+                  Try again
+                </button>
+              </form>
+            }
+          >
+            No inspection record has been opened. Check the client link or try again.
+          </StatePanel>
+        ) : null}
+
         {selectedPerson && !evidenceUnavailable && (
           <section className="mt-6 grid gap-4 md:grid-cols-4">
             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -152,7 +185,7 @@ export default async function EvidencePage(props: EvidencePageProps) {
           </StatePanel>
         )}
 
-        {!peopleResult.unavailable && !evidenceUnavailable ? (
+        {!peopleResult.unavailable && !requestedPersonUnavailable && !evidenceUnavailable ? (
           <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="font-heading text-xl font-bold text-slate-950">Evidence pack timeline</h2>
           <p className="mt-1 text-sm text-slate-600">

@@ -106,6 +106,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
   const isAdmin = roles.some((role: unknown) => String(role).toLowerCase() === 'admin')
   const entityLabel = isAdmin ? 'client' : 'person'
   const entityLabelPlural = isAdmin ? 'Clients' : 'People'
+  const directoryHref = isAdmin ? '/clients' : '/people'
 
   const { client, error: clientError } = await getClientSafe(params.id)
 
@@ -120,7 +121,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
             </h1>
             <p className="text-slate-600 mb-4">{clientError}</p>
             <Button asChild variant="primary">
-              <Link href="/clients">Back to {entityLabelPlural}</Link>
+              <Link href={directoryHref}>Back to {entityLabelPlural}</Link>
             </Button>
           </div>
         </main>
@@ -141,7 +142,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
               The {entityLabel} you&apos;re looking for doesn&apos;t exist.
             </p>
             <Button asChild variant="primary">
-              <Link href="/clients">Back to {entityLabelPlural}</Link>
+              <Link href={directoryHref}>Back to {entityLabelPlural}</Link>
             </Button>
           </div>
         </main>
@@ -185,7 +186,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
         <nav className="mb-6">
           <ol className="flex items-center gap-2 text-sm">
             <li>
-              <Link href="/clients" className="text-slate-500 hover:text-slate-700">
+              <Link href={directoryHref} className="text-slate-500 hover:text-slate-700">
                 {entityLabelPlural}
               </Link>
             </li>

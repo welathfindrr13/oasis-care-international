@@ -11,6 +11,7 @@ const clientEdit = read("./clients/[id]/edit/page.tsx");
 const setup = read("./admin/setup/page.tsx");
 const settings = read("./settings/page.tsx");
 const carePlanning = read("./care-planning/page.tsx");
+const evidence = read("./evidence/page.tsx");
 const metrics = read("./admin/metrics/page.tsx");
 const peopleAlias = read("./people/page.tsx");
 const reportsAlias = read("./reports/page.tsx");
@@ -28,6 +29,13 @@ test("Manager client surfaces use one operational vocabulary without internal id
   assert.match(clientEdit, /Edit client/);
   assert.match(setup, /Add a client/);
   assert.match(setup, /View clients/);
+});
+
+test("client directory renders each client once in one responsive table", () => {
+  assert.equal(clientList.match(/clients\.map\(/g)?.length, 1);
+  assert.match(clientList, /className="block w-full md:table"/);
+  assert.match(clientList, /className="hidden md:table-header-group"/);
+  assert.doesNotMatch(clientList, /className="grid gap-4 md:hidden"/);
 });
 
 test("client actions preserve exact context without fake or global tabs", () => {
@@ -62,4 +70,19 @@ test("care planning checks authority before loading the client directory", () =>
   );
   assert.ok(gate > -1);
   assert.ok(query > gate);
+});
+
+test("requested client context is fetched exactly and never falls back to another client", () => {
+  for (const page of [carePlanning, evidence]) {
+    assert.match(page, /CLIENT_QUERY/);
+    assert.match(page, /getRequestedPersonSafe\(requestedClientId\)/);
+    assert.doesNotMatch(page, /people\.find\([^)]*clientId[^)]*\)\s*\?\?\s*people\[0\]/);
+    assert.match(page, /requestedPersonUnavailable/);
+  }
+});
+
+test("client details return each role to an accessible directory", () => {
+  assert.match(clientDetails, /const directoryHref = isAdmin \? '\/clients' : '\/people'/);
+  assert.match(clientDetails, /href=\{directoryHref\}>Back to \{entityLabelPlural\}/);
+  assert.match(clientDetails, /href=\{directoryHref\} className="text-slate-500/);
 });

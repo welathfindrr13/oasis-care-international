@@ -10,11 +10,13 @@ import {
 } from '../../lib/time'
 import {
   CARE_PLANNING_QUERY,
+  CLIENT_QUERY,
   CLIENTS_QUERY,
   type AssessmentRecord,
   type CarePlanRecord,
   type CarePlanningQueryResponse,
   type ClientListItem,
+  type ClientQueryResponse,
   type ClientsQueryResponse,
   type EvidencePackRecord,
 } from '../../lib/graphql/queries'
@@ -35,6 +37,15 @@ async function getPeopleSafe(): Promise<{ people: ClientListItem[]; unavailable:
     return { people: data.clients.items, unavailable: false }
   } catch {
     return { people: [], unavailable: true }
+  }
+}
+
+async function getRequestedPersonSafe(clientId: string): Promise<ClientListItem | null> {
+  try {
+    const data = await query<ClientQueryResponse>(CLIENT_QUERY, { id: clientId })
+    return data.client
+  } catch {
+    return null
   }
 }
 
@@ -229,9 +240,13 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
   }
 
   const searchParams = await props.searchParams
+  const requestedClientId = searchParams?.clientId?.trim()
   const peopleResult = await getPeopleSafe()
   const people = peopleResult.people
-  const selectedPerson = people.find((person) => person.id === searchParams?.clientId) ?? people[0]
+  const selectedPerson = requestedClientId
+    ? await getRequestedPersonSafe(requestedClientId)
+    : people[0]
+  const requestedPersonUnavailable = Boolean(requestedClientId && !selectedPerson)
   const carePlanning = selectedPerson ? await getCarePlanningSafe(selectedPerson.id) : null
   const carePlanningUnavailable = Boolean(selectedPerson && carePlanning === null)
 
@@ -326,6 +341,24 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
           </section>
         )}
 
+        {requestedPersonUnavailable ? (
+          <StatePanel
+            className="mt-6"
+            kind="unavailable"
+            title="The requested client is unavailable"
+            action={
+              <form action="/care-planning" method="get">
+                <input type="hidden" name="clientId" value={requestedClientId} />
+                <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
+                  Try again
+                </button>
+              </form>
+            }
+          >
+            No care-planning record has been opened. Check the client link or try again.
+          </StatePanel>
+        ) : null}
+
         {selectedPerson && !carePlanningUnavailable && (
           <section className="mt-6 grid gap-4 md:grid-cols-4">
             <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -369,7 +402,7 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
           </StatePanel>
         )}
 
-        {!peopleResult.unavailable && !carePlanningUnavailable && (
+        {!peopleResult.unavailable && !requestedPersonUnavailable && !carePlanningUnavailable && (
           <section className="mt-6 grid gap-6 lg:grid-cols-3">
           <div className="space-y-3">
             <div>

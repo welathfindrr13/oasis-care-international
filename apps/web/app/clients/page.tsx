@@ -204,80 +204,12 @@ export default async function ClientsPage(props: ClientsPageProps) {
                 </div>
               </div>
             ) : hasClients ? (
-              <>
-                <div
-                  className="grid gap-4 md:hidden"
-                  aria-label={
-                    isAdmin
-                      ? 'Clients supported directory'
-                      : 'People supported directory'
-                  }
-                >
-                  {clients.map((client) => (
-                    <article
-                      key={client.id}
-                      className="rounded-xl border border-base-gray-200 bg-white p-4"
-                    >
-                      <h3 className="font-semibold text-text-primary">
-                        {client.fullName}
-                      </h3>
-                      <p className="mt-2 text-sm text-text-secondary">
-                        {client.addressLine1}
-                        {client.addressLine2 ? `, ${client.addressLine2}` : ''}
-                        <br />
-                        {client.city}, {client.postcode}
-                      </p>
-                      <dl className="mt-4 grid gap-3 text-sm">
-                        <div>
-                          <dt className="font-medium text-text-primary">
-                            Last visit
-                          </dt>
-                          <dd className="text-text-secondary">
-                            {formatVisitDate(client.lastVisitAt)}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="font-medium text-text-primary">
-                            Next visit
-                          </dt>
-                          <dd className="text-text-secondary">
-                            {formatVisitDate(client.nextVisitAt)}
-                          </dd>
-                        </div>
-                      </dl>
-                      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                        <Button asChild variant="ghost" size="sm">
-                          <Link
-                            href={`/${isAdmin ? 'clients' : 'people'}/${client.id}`}
-                          >
-                            View
-                          </Link>
-                        </Button>
-                        {isAdmin && (
-                          <>
-                            <Button asChild variant="ghost" size="sm">
-                              <Link href={`/clients/${client.id}/edit`}>
-                                Edit
-                              </Link>
-                            </Button>
-                            <Button asChild variant="ghost" size="sm">
-                              <a href={`/visits/new?clientId=${client.id}`}>
-                                Schedule
-                              </a>
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-                <div className="hidden overflow-x-auto md:block">
                 <table
-                  className="w-full"
+                  className="block w-full md:table"
                   role="table"
-                    aria-label={isAdmin ? 'Clients supported directory' : 'People supported directory'}
+                  aria-label={isAdmin ? 'Clients supported directory' : 'People supported directory'}
                 >
-                  <thead>
+                  <thead className="hidden md:table-header-group">
                     <tr className="border-b border-base-gray-200">
                       <th className="text-left py-3 px-4 font-medium text-text-secondary text-sm">
                         Name
@@ -296,42 +228,55 @@ export default async function ClientsPage(props: ClientsPageProps) {
                       </th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="block space-y-4 md:table-row-group md:space-y-0">
                     {clients.map((client) => (
                       <tr
                         key={client.id}
-                        className="border-b border-base-gray-100 hover:bg-background-accent transition-colors"
+                        className="block rounded-xl border border-base-gray-200 bg-white p-4 transition-colors hover:bg-background-accent md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:border-b md:border-base-gray-100 md:p-0"
                       >
-                        <td className="py-3 px-4">
+                        <td className="block md:table-cell md:px-4 md:py-3">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary md:hidden">
+                            Name
+                          </span>
                           <div className="font-medium text-text-primary">
                             {client.fullName}
                           </div>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="mt-3 block md:mt-0 md:table-cell md:px-4 md:py-3">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary md:hidden">
+                            Address
+                          </span>
                           <div className="text-sm text-text-secondary">
                             <div>{client.addressLine1}</div>
                             {client.addressLine2 && <div>{client.addressLine2}</div>}
                             <div>{client.city}, {client.postcode}</div>
                           </div>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="mt-3 block md:mt-0 md:table-cell md:px-4 md:py-3">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary md:hidden">
+                            Last visit
+                          </span>
                           <time
-                            className="text-sm text-text-secondary"
+                            className="block text-sm text-text-secondary"
                             dateTime={client.lastVisitAt || undefined}
                           >
                             {formatVisitDate(client.lastVisitAt)}
                           </time>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="mt-3 block md:mt-0 md:table-cell md:px-4 md:py-3">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary md:hidden">
+                            Next visit
+                          </span>
                           <time
-                            className={`text-sm ${client.nextVisitAt ? 'text-text-primary font-medium' : 'text-text-secondary'}`}
+                            className={`block text-sm ${client.nextVisitAt ? 'text-text-primary font-medium' : 'text-text-secondary'}`}
                             dateTime={client.nextVisitAt || undefined}
                           >
                             {formatVisitDate(client.nextVisitAt)}
                           </time>
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
+                        <td className="mt-4 block md:mt-0 md:table-cell md:px-4 md:py-3">
+                          <span className="sr-only md:hidden">Actions</span>
+                          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap md:flex-row md:items-center">
                             <Button asChild variant="ghost" size="sm">
                               <Link href={`/${isAdmin ? 'clients' : 'people'}/${client.id}`}>
                                 View
@@ -357,8 +302,6 @@ export default async function ClientsPage(props: ClientsPageProps) {
                     ))}
                   </tbody>
                 </table>
-                </div>
-              </>
             ) : (
               <EmptyState isAdmin={isAdmin} />
             )}
