@@ -155,7 +155,7 @@ The main risks are accidentally projecting staff-only concern fields, turning st
 
 - API service, repository and resolver coverage: 56 focused tests passed;
   the complete API unit suite passed 541 tests.
-- Web contract and status-label coverage: 155 tests passed.
+- Web contract, status-label, and StatePanel heading coverage: 157 tests passed.
 - Accessibility fixture allowlist: 4 tests passed.
 - Full responsive accessibility foundation: 48 browser tests passed across
   390×844, 768×1024 and 1440×900, including explicit 320px reflow.

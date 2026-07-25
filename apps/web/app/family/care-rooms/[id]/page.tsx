@@ -111,6 +111,7 @@ export default async function FamilyCareRoomPage(props: { params: Promise<{ id: 
           <h1 className="font-heading text-2xl font-semibold text-oasis-ink">Family updates</h1>
           <StatePanel
             className="mt-6"
+            headingLevel={2}
             kind={roomResult.unavailable ? 'unavailable' : 'forbidden'}
             title={roomResult.unavailable ? 'Updates temporarily unavailable' : 'Updates unavailable'}
             action={

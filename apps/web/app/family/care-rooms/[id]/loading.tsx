@@ -11,6 +11,7 @@ export default function FamilyCareRoomLoading() {
         </h1>
         <StatePanel
           className="mt-6"
+          headingLevel={2}
           kind="loading"
           title="Loading family updates"
         >

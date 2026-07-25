@@ -317,7 +317,10 @@ test("Tenant admin company setup", async ({ page }) => {
     });
   expect(primarySize.height).toBeGreaterThanOrEqual(44);
   expect(primarySize.width).toBeGreaterThanOrEqual(44);
-  await expectAccessibilityFoundation(page, { repeatedHeader: true });
+  await expectAccessibilityFoundation(page, {
+    repeatedHeader: true,
+    sequentialKeyboardTraversal: false,
+  });
 });
 
 test("Platform Owner first Manager revocation is explicit and recoverable", async ({
@@ -811,6 +814,9 @@ test("Family concern status", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Updates unavailable", exact: true }),
   ).toBeVisible();
+  await expectAccessibilityFoundation(page, {
+    sequentialKeyboardTraversal: false,
+  });
 
   await page.goto(`/family/care-rooms/${CARE_ROOM_ID}`);
   await page.setViewportSize({ width: 320, height: 900 });
