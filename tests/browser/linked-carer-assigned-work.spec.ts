@@ -505,7 +505,7 @@ test("an administrator sees the real company journey without internal setup lang
     page.getByRole("link", { name: "Schedule a visit", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "View people", exact: true }),
+    page.getByRole("link", { name: "View clients", exact: true }),
   ).toBeVisible();
 });
 
@@ -962,11 +962,11 @@ test("sign-out, Back, and refresh do not reveal protected content", async ({
     email: "admin@local.dev",
     name: "Local Admin",
     role: "user",
-    callbackUrl: "http://localhost:3002/people",
+    callbackUrl: "http://localhost:3002/clients",
   });
-  await page.goto("/people");
+  await page.goto("/clients");
   await expect(
-    page.getByText("Assigned Fake Client", { exact: true }),
+    page.getByText("Assigned Fake Client", { exact: true }).first(),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Open account menu" }).click();
@@ -977,12 +977,12 @@ test("sign-out, Back, and refresh do not reveal protected content", async ({
   ).toHaveCount(0);
 
   await page.goBack();
-  await expect(page).not.toHaveURL(/\/people(?:\?|$)/);
+  await expect(page).not.toHaveURL(/\/clients(?:\?|$)/);
   await expect(
     page.getByText("Assigned Fake Client", { exact: true }),
   ).toHaveCount(0);
 
-  await page.goto("/people");
+  await page.goto("/clients");
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
   await page.reload();
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
