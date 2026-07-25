@@ -7,6 +7,10 @@ const roomPage = readFileSync(
   new URL('./care-rooms/[id]/page.tsx', import.meta.url),
   'utf8',
 );
+const roomLoading = readFileSync(
+  new URL('./care-rooms/[id]/loading.tsx', import.meta.url),
+  'utf8',
+);
 const queries = readFileSync(
   new URL('../../lib/graphql/queries.ts', import.meta.url),
   'utf8',
@@ -32,6 +36,7 @@ test('family pages use only the family-safe GraphQL operations', () => {
   assert.match(listPage, /FAMILY_CAREBRIDGE_ROOMS_QUERY/);
   assert.match(roomPage, /FAMILY_CAREBRIDGE_ROOM_QUERY/);
   assert.match(roomPage, /FAMILY_VERIFIED_VISIT_STORIES_QUERY/);
+  assert.match(roomPage, /FAMILY_CARE_ROOM_CONCERNS_QUERY/);
   assert.doesNotMatch(listPage, /\n\s*CAREBRIDGE_ROOMS_QUERY[,}]/);
   assert.doesNotMatch(roomPage, /\n\s*VERIFIED_VISIT_STORIES_QUERY[,}]/);
 });
@@ -48,9 +53,11 @@ test('family-safe query selections contain no staff membership or draft fields',
   const familyQueries = `${roomQueries}\n${familyContentQueries}`;
   assert.match(familyQueries, /clientDisplayName/);
   assert.match(familyQueries, /title\s+body\s+publishedAt/);
+  assert.match(familyQueries, /familyCareRoomConcerns/);
+  assert.match(familyQueries, /id\s+title\s+status\s+submittedAt\s+events/);
   assert.doesNotMatch(
     familyQueries,
-    /memberships|familyContact|accessGrants|policy|draftTitle|draftBody|sourceRefs|approvedBy|medication/i,
+    /memberships|familyContact|accessGrants|policy|draftTitle|draftBody|sourceRefs|approvedBy|medication|description|messages|assignedTo/i,
   );
 });
 
@@ -76,6 +83,13 @@ test('family experience uses plain language and exposes the family-safe concern 
   assert.match(listPage, /latestUpdate/);
   assert.match(roomPage, /Tell us about a concern/);
   assert.match(roomPage, /FamilyConcernForm/);
+  assert.match(roomPage, /Your concerns/);
+  assert.match(roomPage, /familyConcernStatusLabel/);
+  assert.match(roomPage, /familyConcernEventLabel/);
+  assert.match(roomPage, /StatePanel/);
+  assert.match(roomLoading, /kind="loading"/);
+  assert.match(concernForm, /router\.refresh\(\)/);
+  assert.match(concernForm, /aria-live="polite"/);
   assert.match(roomPage, /room\.canRaiseConcerns \?/);
   assert.doesNotMatch(concernForm, /FAMILY_CONCERN_CREATE|hasAccessCapability/);
   assert.match(concernForm, /RAISE_FAMILY_CONCERN_MUTATION/);

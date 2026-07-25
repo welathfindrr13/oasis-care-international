@@ -138,6 +138,7 @@ describe('CareBridge access hardening metadata', () => {
     expect(getRoles(CarebridgeResolver.prototype, 'familyCareRooms')).toEqual(['user']);
     expect(getRoles(CarebridgeResolver.prototype, 'familyCareRoom')).toEqual(['user']);
     expect(getRoles(CarebridgeResolver.prototype, 'familyVerifiedVisitStories')).toEqual(['user']);
+    expect(getRoles(CarebridgeResolver.prototype, 'familyCareRoomConcerns')).toEqual(['user']);
     expect(getRoles(CarebridgeResolver.prototype, 'raiseFamilyCarebridgeConcern')).toEqual(['user']);
   });
 });

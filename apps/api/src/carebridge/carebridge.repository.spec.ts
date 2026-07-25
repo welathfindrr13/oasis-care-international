@@ -1,4 +1,8 @@
-import { CareRoomMembershipStatus, CareRoomStatus } from '@oasis/db';
+import {
+  CareRoomMembershipStatus,
+  CareRoomStatus,
+  ConcernEventType,
+} from '@oasis/db';
 import { CarebridgeRepository } from './carebridge.repository';
 
 describe('CarebridgeRepository', () => {
@@ -123,6 +127,60 @@ describe('CarebridgeRepository', () => {
         orderBy: [{ published_at: 'desc' }, { id: 'desc' }],
       }),
     );
+  });
+
+  it('selects only exact-tenant, room, and raising-membership concern status fields', async () => {
+    const prisma = {
+      concern: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const repository = new CarebridgeRepository(prisma as any);
+
+    await repository.listFamilyConcernsForMembership({
+      organizationId: 'org-1',
+      careRoomId: 'room-1',
+      membershipId: 'membership-1',
+    });
+
+    expect(prisma.concern.findMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: 'org-1',
+        care_room_id: 'room-1',
+        raised_by_membership_id: 'membership-1',
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        created_at: true,
+        events: {
+          where: {
+            event_type: {
+              in: [
+                ConcernEventType.RAISED,
+                ConcernEventType.ACKNOWLEDGED,
+                ConcernEventType.RESPONDED,
+                ConcernEventType.RESOLVED,
+                ConcernEventType.REOPENED,
+                ConcernEventType.ESCALATED,
+              ],
+            },
+          },
+          select: {
+            event_type: true,
+            created_at: true,
+          },
+          orderBy: { created_at: 'asc' },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+    const selection = prisma.concern.findMany.mock.calls[0][0].select;
+    expect(selection).not.toHaveProperty('description');
+    expect(selection).not.toHaveProperty('messages');
+    expect(selection).not.toHaveProperty('priority');
+    expect(selection).not.toHaveProperty('client_id');
   });
 
   it('publishes only one exact draft transition', async () => {

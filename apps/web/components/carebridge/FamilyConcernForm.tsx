@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState, useTransition, type FormEvent } from 'react'
 import { clientQuery } from '../../lib/graphql/client-side'
 import {
   RAISE_FAMILY_CONCERN_MUTATION,
@@ -23,6 +24,8 @@ const categories = [
 
 export function FamilyConcernForm({ careRoomId, personName }: FamilyConcernFormProps) {
   const access = useClientAccess()
+  const router = useRouter()
+  const [refreshing, startRefresh] = useTransition()
   const [category, setCategory] = useState<(typeof categories)[number]['value']>('COMMUNICATION')
   const [severity, setSeverity] = useState('MEDIUM')
   const [title, setTitle] = useState('')
@@ -61,6 +64,7 @@ export function FamilyConcernForm({ careRoomId, personName }: FamilyConcernFormP
       setDescription('')
       setCategory('COMMUNICATION')
       setSeverity('MEDIUM')
+      startRefresh(() => router.refresh())
     } catch {
       setError('We could not send your concern. Please try again or contact the care provider directly.')
     } finally {
@@ -68,27 +72,24 @@ export function FamilyConcernForm({ careRoomId, personName }: FamilyConcernFormP
     }
   }
 
-  if (submittedTitle) {
-    return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4" role="status">
-        <h3 className="font-semibold text-emerald-900">Your concern has been sent</h3>
-        <p className="mt-1 text-sm leading-6 text-emerald-800">
-          The care team has received “{submittedTitle}”. They will review it and contact you using your agreed contact
-          details.
-        </p>
-        <button
-          type="button"
-          onClick={() => setSubmittedTitle(null)}
-          className="mt-3 text-sm font-semibold text-emerald-900 underline underline-offset-2"
-        >
-          Send another concern
-        </button>
-      </div>
-    )
-  }
-
   return (
-    <form className="space-y-4" onSubmit={submitConcern}>
+    <div>
+      {submittedTitle ? (
+        <div
+          className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 p-4"
+          role="status"
+          aria-live="polite"
+        >
+          <h3 className="font-semibold text-emerald-900">Your concern has been sent</h3>
+          <p className="mt-1 text-sm leading-6 text-emerald-800">
+            “{submittedTitle}” was sent to the care team.
+          </p>
+          {refreshing ? (
+            <p className="mt-1 text-sm text-emerald-800">Updating the status list…</p>
+          ) : null}
+        </div>
+      ) : null}
+      <form className="space-y-4" onSubmit={submitConcern}>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="text-sm font-medium text-slate-800">
           What is this about?
@@ -131,7 +132,7 @@ export function FamilyConcernForm({ careRoomId, personName }: FamilyConcernFormP
         Tell us more <span className="font-normal text-slate-500">(optional)</span>
         <textarea
           maxLength={2000}
-          rows={5}
+          rows={3}
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           className="mt-2 block w-full rounded-xl border border-slate-300 p-3 text-slate-900"
@@ -152,6 +153,7 @@ export function FamilyConcernForm({ careRoomId, personName }: FamilyConcernFormP
       >
         {submitting ? 'Sending…' : 'Send concern to the care team'}
       </button>
-    </form>
+      </form>
+    </div>
   )
 }

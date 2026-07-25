@@ -7,15 +7,19 @@ export function StatePanel({
   action,
   children,
   className,
+  headingLevel = 3,
   kind = "empty",
   title,
 }: {
   action?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  headingLevel?: 2 | 3;
   kind?: StateKind;
   title: string;
 }) {
+  const Heading = headingLevel === 2 ? "h2" : "h3";
+
   return (
     <div
       className={cn(
@@ -38,7 +42,9 @@ export function StatePanel({
       }
     >
       <StateGlyph kind={kind} />
-      <h3 className="mt-3 text-base font-semibold text-oasis-ink">{title}</h3>
+      <Heading className="mt-3 text-base font-semibold text-oasis-ink">
+        {title}
+      </Heading>
       <div className="mx-auto mt-1 max-w-xl text-sm leading-6 text-oasis-muted">
         {children}
       </div>

@@ -74,6 +74,7 @@ describe('CarebridgeService', () => {
     appendConcernMessage: jest.fn(),
     createFamilyPulse: jest.fn(),
     listConcernsForOrganization: jest.fn(),
+    listFamilyConcernsForMembership: jest.fn(),
     findConcernById: jest.fn(),
     updateConcern: jest.fn(),
   };
@@ -1067,6 +1068,98 @@ describe('CarebridgeService', () => {
       }),
     );
     expect(result.id).toBe('concern-1');
+  });
+
+  it('lists only the exact family membership concern projection', async () => {
+    repository.findRoomByIdForFamilyAccess.mockResolvedValue({
+      id: 'room-1',
+      organization_id: 'org-1',
+      client_id: 'client-1',
+      memberships: [
+        familyMembership({
+          authSubject: 'family-subject',
+          scopes: [AccessGrantScope.RAISE_CONCERNS],
+        }),
+      ],
+    } as any);
+    repository.listFamilyConcernsForMembership.mockResolvedValue([
+      {
+        id: 'concern-1',
+        title: 'Please call about today',
+        status: 'ACKNOWLEDGED',
+        created_at: new Date('2026-04-24T09:00:00Z'),
+        events: [
+          { event_type: 'RAISED', created_at: new Date('2026-04-24T09:00:00Z') },
+          {
+            event_type: 'ACKNOWLEDGED',
+            created_at: new Date('2026-04-24T09:30:00Z'),
+          },
+        ],
+      },
+    ] as any);
+
+    const result = await service.listFamilyCareRoomConcerns('room-1', {
+      role: 'user',
+      organizationId: 'org-1',
+      authSubject: 'family-subject',
+    });
+
+    expect(accessService.requireFamilyScopes).toHaveBeenCalledWith({
+      membershipId: 'membership-1',
+      careRoomId: 'room-1',
+      organizationId: 'org-1',
+      authSubject: 'family-subject',
+      requiredScopes: [AccessGrantScope.RAISE_CONCERNS],
+    });
+    expect(repository.listFamilyConcernsForMembership).toHaveBeenCalledWith({
+      organizationId: 'org-1',
+      careRoomId: 'room-1',
+      membershipId: 'membership-1',
+    });
+    expect(result).toEqual([
+      {
+        id: 'concern-1',
+        title: 'Please call about today',
+        status: 'ACKNOWLEDGED',
+        submittedAt: new Date('2026-04-24T09:00:00Z'),
+        events: [
+          { eventType: 'RAISED', createdAt: new Date('2026-04-24T09:00:00Z') },
+          {
+            eventType: 'ACKNOWLEDGED',
+            createdAt: new Date('2026-04-24T09:30:00Z'),
+          },
+        ],
+      },
+    ]);
+    expect(JSON.stringify(result)).not.toMatch(
+      /description|message|deadline|priority|severity|assignment|actor|clientId/i,
+    );
+  });
+
+  it('does not query concerns when the family concern grant is denied', async () => {
+    repository.findRoomByIdForFamilyAccess.mockResolvedValue({
+      id: 'room-1',
+      organization_id: 'org-1',
+      client_id: 'client-1',
+      memberships: [familyMembership({ authSubject: 'family-subject' })],
+    } as any);
+    accessService.requireFamilyScopes.mockRejectedValue(
+      new BaseHttpException(
+        ErrorCode.FORBIDDEN_INSUFFICIENT_PERMISSIONS,
+        'Family access is not permitted for this care room.',
+        403,
+      ),
+    );
+
+    await expect(
+      service.listFamilyCareRoomConcerns('room-1', {
+        role: 'user',
+        organizationId: 'org-1',
+        authSubject: 'family-subject',
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+
+    expect(repository.listFamilyConcernsForMembership).not.toHaveBeenCalled();
   });
 
   it('keeps staff concern creation organization-scoped without family attribution', async () => {

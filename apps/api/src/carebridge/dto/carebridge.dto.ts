@@ -333,6 +333,33 @@ export class FamilyConcernReceiptDTO {
 }
 
 @ObjectType()
+export class FamilyConcernEventDTO {
+  @Field(() => ConcernEventType)
+  eventType!: ConcernEventType;
+
+  @Field()
+  createdAt!: Date;
+}
+
+@ObjectType()
+export class FamilyCareRoomConcernDTO {
+  @Field(() => ID)
+  id!: string;
+
+  @Field()
+  title!: string;
+
+  @Field(() => ConcernStatus)
+  status!: ConcernStatus;
+
+  @Field()
+  submittedAt!: Date;
+
+  @Field(() => [FamilyConcernEventDTO])
+  events!: FamilyConcernEventDTO[];
+}
+
+@ObjectType()
 export class FamilyPulseDTO {
   @Field(() => ID)
   id!: string;
