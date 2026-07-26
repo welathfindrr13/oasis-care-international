@@ -386,25 +386,20 @@ test("Tenant admin client detail reflows at 320 CSS pixels", async ({
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
 });
 
-test("Carer profile copy remains person-centred until route narrowing", async ({
+test("Carers cannot open generic client profile aliases", async ({
   page,
 }) => {
   await signIn(page, profiles.carer);
-  await page.goto(`/clients/${PERSON_ID}`);
-  await expect(
-    page.getByRole("heading", { name: "Jordan Ellis", exact: true }),
-  ).toBeVisible();
-  await expect(page.getByText("Person details", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Care Notes" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Family access" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Care planning" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Inspection records" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Family Updates room" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "AI Health Summary" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Evidence packs" })).toHaveCount(0);
-  await expect(page.getByText("Assessments", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Active care plan", { exact: true })).toHaveCount(0);
-  await expect(page.getByText(/\bclient\b/i)).toHaveCount(0);
+  for (const pathname of [`/clients/${PERSON_ID}`, `/people/${PERSON_ID}`]) {
+    await page.goto(pathname);
+    await expect(page).toHaveURL(/\/today$/);
+    await expect(
+      page.getByRole("heading", { name: "Today", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Jordan Ellis", exact: true }),
+    ).toHaveCount(0);
+  }
 });
 
 test("Platform Owner first Manager revocation is explicit and recoverable", async ({
@@ -831,12 +826,45 @@ test("visit detail", async ({ page }) => {
   await page.goto(`/visits/${VISIT_ID}`);
   await expect(page).toHaveURL(new RegExp(`/visits/${VISIT_ID}$`));
   await expect(
-    page.getByRole("heading", { name: "Jordan Ellis" }),
+    page.getByRole("heading", { name: "Jordan Ellis", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Visit details" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "About Jordan Ellis" }),
+  ).toBeVisible();
+  await expect(page.getByText("12 Test Lane, Leeds, LS1 1AA")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Person details" })).toHaveCount(0);
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
+});
+
+test("Carer visit workflow reflows with a reachable mobile next action", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "phone-390x844");
+  await page.setViewportSize({ width: 320, height: 844 });
+  await signIn(page, profiles.carer);
+  await page.goto(`/visits/${VISIT_ID}`);
+
+  const nextAction = page.getByLabel("Next visit action");
+  await expect(nextAction).toBeVisible();
+  await expect(
+    nextAction.getByRole("button", { name: "Start visit" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+
+  for (const control of [
+    page.getByRole("button", { name: "Start visit" }).first(),
+    nextAction.getByRole("button", { name: "Start visit" }),
+  ]) {
+    const box = await control.boundingBox();
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+  }
 });
 
 test("Family home", async ({ page }) => {

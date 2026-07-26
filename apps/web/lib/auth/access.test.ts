@@ -347,7 +347,7 @@ test('redirects logged-out management requests to login before render', () => {
   })
 })
 
-test('frontline carers can open only assigned-work and profile routes', () => {
+test('frontline carers can open assigned work but not generic client profiles', () => {
   const capabilities = [
     'PROFILE_HELP_VIEW',
     'FRONTLINE_SHIFT_VIEW',
@@ -363,7 +363,6 @@ test('frontline carers can open only assigned-work and profile routes', () => {
     '/schedule/visit-1',
     '/shift',
     '/settings',
-    '/clients/client-1',
   ]) {
     assert.deepEqual(resolveAuthenticatedRoute(pathname, ['carer'], capabilities), {
       action: 'allow',
@@ -372,6 +371,8 @@ test('frontline carers can open only assigned-work and profile routes', () => {
 
   for (const pathname of [
     '/people',
+    '/people/client-1',
+    '/clients/client-1',
     '/schedule',
     '/schedule/new',
     '/medication',
@@ -386,5 +387,15 @@ test('frontline carers can open only assigned-work and profile routes', () => {
       action: 'redirect',
       destination: '/today',
     }, pathname)
+  }
+})
+
+test('tenant administrators retain access to both client profile aliases', () => {
+  for (const pathname of ['/clients/client-1', '/people/client-1']) {
+    assert.deepEqual(
+      resolveAuthenticatedRoute(pathname, ['admin'], ['TENANT_ADMIN']),
+      { action: 'allow' },
+      pathname,
+    )
   }
 })

@@ -1,12 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useClientAccess } from '../../components/providers/ClientAccessProvider';
 import { Header } from '../../components/oasis/Header';
+import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
+import { StatePanel } from '../../components/ui/StatePanel';
 import { clientQuery } from '../../lib/graphql/client-side';
+import { runSingleFlightAction } from '../../lib/consequential-actions';
 import { formatDateTime as formatOrganizationDateTime } from '../../lib/time';
 import {
   CLOCK_IN_MUTATION,
@@ -20,6 +23,7 @@ import {
   type MyRecentShiftsQueryResponse,
   type ShiftVerificationMethod,
 } from '../../lib/graphql/queries';
+import { shiftVerificationLabel } from './shiftPresentation';
 
 type LocationPayload = {
   method: ShiftVerificationMethod;
@@ -50,9 +54,11 @@ export default function ShiftPage() {
   const [recentShifts, setRecentShifts] = useState<CarerShift[]>([]);
   const [consentChecked, setConsentChecked] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [statusUnavailable, setStatusUnavailable] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const shiftActionStartedRef = useRef(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -66,8 +72,12 @@ export default function ShiftPage() {
 
       setActiveShift(activeRes.myActiveShift || null);
       setRecentShifts(recentRes.myRecentShifts || []);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load shift status');
+      setStatusUnavailable(false);
+    } catch {
+      setStatusUnavailable(true);
+      setError(
+        'We could not load your shift status. Check your connection and try again.',
+      );
     } finally {
       setLoading(false);
     }
@@ -116,31 +126,37 @@ export default function ShiftPage() {
 
   const handleClockIn = useCallback(async () => {
     if (!consentChecked) {
-      setError('Please confirm consent for location processing before clock in.');
+      setError(
+        'Confirm that you understand how location is used before you clock in.',
+      );
       return;
     }
 
-    setSubmitting(true);
-    setError(null);
-    setSuccess(null);
+    await runSingleFlightAction(shiftActionStartedRef, async () => {
+      setSubmitting(true);
+      setError(null);
+      setSuccess(null);
 
-    try {
-      const payload = await getLocationPayload();
-      const result = await clientQuery<ClockInMutationResponse>(CLOCK_IN_MUTATION, {
-        input: {
-          ...payload,
-          source: 'web',
-          notes: payload.method === 'MANUAL' ? 'Manual verification fallback used' : undefined,
-        },
-      });
-      setActiveShift(result.clockIn);
-      setSuccess(`Clocked in at ${formatDateTime(result.clockIn.clockInAt)}`);
-      await loadData();
-    } catch (err: any) {
-      setError(err?.message || 'Clock in failed');
-    } finally {
-      setSubmitting(false);
-    }
+      try {
+        const payload = await getLocationPayload();
+        const result = await clientQuery<ClockInMutationResponse>(CLOCK_IN_MUTATION, {
+          input: {
+            ...payload,
+            source: 'web',
+            notes: payload.method === 'MANUAL' ? 'Manual verification fallback used' : undefined,
+          },
+        });
+        setActiveShift(result.clockIn);
+        setSuccess(`Clocked in at ${formatDateTime(result.clockIn.clockInAt)}.`);
+        await loadData();
+      } catch {
+        setError(
+          'We could not clock you in. Check your connection and try again.',
+        );
+      } finally {
+        setSubmitting(false);
+      }
+    });
   }, [consentChecked, getLocationPayload, loadData]);
 
   const handleClockOut = useCallback(async () => {
@@ -149,152 +165,229 @@ export default function ShiftPage() {
       return;
     }
 
-    setSubmitting(true);
-    setError(null);
-    setSuccess(null);
+    await runSingleFlightAction(shiftActionStartedRef, async () => {
+      setSubmitting(true);
+      setError(null);
+      setSuccess(null);
 
-    try {
-      const payload = await getLocationPayload();
-      const result = await clientQuery<ClockOutMutationResponse>(CLOCK_OUT_MUTATION, {
-        input: {
-          shiftId: activeShift.id,
-          ...payload,
-          source: 'web',
-          notes: payload.method === 'MANUAL' ? 'Manual verification fallback used' : undefined,
-        },
-      });
-      setActiveShift(result.clockOut);
-      setSuccess(`Clocked out at ${formatDateTime(result.clockOut.clockOutAt)}`);
-      await loadData();
-    } catch (err: any) {
-      setError(err?.message || 'Clock out failed');
-    } finally {
-      setSubmitting(false);
-    }
+      try {
+        const payload = await getLocationPayload();
+        const result = await clientQuery<ClockOutMutationResponse>(CLOCK_OUT_MUTATION, {
+          input: {
+            shiftId: activeShift.id,
+            ...payload,
+            source: 'web',
+            notes: payload.method === 'MANUAL' ? 'Manual verification fallback used' : undefined,
+          },
+        });
+        setActiveShift(result.clockOut);
+        setSuccess(`Clocked out at ${formatDateTime(result.clockOut.clockOutAt)}.`);
+        await loadData();
+      } catch {
+        setError(
+          'We could not clock you out. Check your connection and try again.',
+        );
+      } finally {
+        setSubmitting(false);
+      }
+    });
   }, [activeShift, getLocationPayload, loadData]);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-oasis-canvas">
       <Header />
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
         <div>
-          <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">Shift Clock</h1>
-          <p className="text-slate-500 mt-1">
-            Clock in and out with proof-of-presence for payroll and compliance.
+          <h1 className="font-heading text-3xl font-bold tracking-tight text-oasis-ink">
+            My shift
+          </h1>
+          <p className="mt-2 max-w-2xl leading-7 text-oasis-muted">
+            Clock in when you start work and clock out when you finish.
           </p>
         </div>
 
-        {(error || success) && (
-          <div
-            className={`rounded-lg border p-4 text-sm ${
-              error
-                ? 'border-red-200 bg-red-50 text-red-700'
-                : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-            }`}
+        {error && (
+          <Alert
+            tone="danger"
+            title={
+              statusUnavailable
+                ? 'Shift status unavailable'
+                : 'Shift action not completed'
+            }
           >
-            {error || success}
-          </div>
+            {error}
+          </Alert>
+        )}
+        {success && (
+          <Alert tone="success" live title="Shift status updated">
+            {success}
+          </Alert>
         )}
 
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-slate-900 font-heading">Current status</h2>
-            <p className="text-sm text-slate-500">
-              Location is collected only at clock-in/out events, not continuously.
+            <h2 className="font-heading text-xl font-semibold text-oasis-ink">
+              Current status
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-oasis-muted">
+              Oasis asks for your location only when you clock in or out. If it
+              is unavailable or you decline, Oasis records a manual check. Your
+              location is not tracked continuously.
             </p>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-slate-600">Loading shift status...</p>
+              <p className="text-oasis-muted" role="status" aria-live="polite">
+                Loading shift status…
+              </p>
+            ) : statusUnavailable ? (
+              <StatePanel
+                action={
+                  <Button
+                    onClick={() => {
+                      setSuccess(null);
+                      void loadData();
+                    }}
+                  >
+                    Try again
+                  </Button>
+                }
+                kind="unavailable"
+                title="Shift status unavailable"
+              >
+                <p>
+                  No shift action is available until your current status can be
+                  checked.
+                </p>
+              </StatePanel>
             ) : isAdmin ? (
               <div className="space-y-3">
-                <p className="text-slate-700">
-                  Admin accounts do not perform shift clock actions.
+                <p className="text-oasis-muted">
+                  Shift actions are available to Carers.
                 </p>
-                <Button asChild variant="primary" size="sm">
-                  <Link href="/admin/analytics">View Shift Analytics</Link>
+                <Button asChild variant="secondary">
+                  <Link href="/admin/analytics">Open shift analytics</Link>
                 </Button>
               </div>
             ) : isCarer ? (
-              <div className="space-y-4">
-                <div className="rounded-lg bg-slate-100 px-4 py-3">
-                  <div className="text-sm text-slate-500">Status</div>
-                  <div className="text-lg font-semibold text-slate-900">
-                    {activeShift?.isActive ? 'Clocked In' : 'Clocked Out'}
+              <div className="space-y-5">
+                <div className="border-l-4 border-oasis-teal bg-base-gray-50 px-4 py-3">
+                  <div className="text-sm font-medium text-oasis-muted">
+                    Status
+                  </div>
+                  <div className="mt-1 text-xl font-semibold text-oasis-ink">
+                    {activeShift?.isActive ? 'Clocked in' : 'Not clocked in'}
                   </div>
                   {activeShift?.isActive && (
-                    <div className="text-sm text-slate-600 mt-1">
-                      Since {formatDateTime(activeShift.clockInAt)} ({formatDuration(activeShift.clockInAt)})
+                    <div className="mt-1 text-sm leading-6 text-oasis-muted">
+                      Since {formatDateTime(activeShift.clockInAt)} (
+                      {formatDuration(activeShift.clockInAt)})
                     </div>
                   )}
                 </div>
 
                 {!activeShift?.isActive && (
-                  <label className="flex items-start gap-3 text-sm text-slate-700">
+                  <label className="flex min-h-11 cursor-pointer items-start gap-3 py-2 text-sm leading-6 text-oasis-ink">
                     <input
                       type="checkbox"
                       checked={consentChecked}
                       onChange={(e) => setConsentChecked(e.target.checked)}
-                      className="mt-1"
+                      className="mt-0.5 h-5 w-5 shrink-0 accent-oasis-teal"
                     />
                     <span>
-                      I confirm I understand location proof is processed for workforce management,
-                      payroll verification, safeguarding, and compliance obligations.
+                      I understand how location is used when I clock in or out.
                     </span>
                   </label>
                 )}
 
-                <div className="flex items-center gap-3">
+                <div>
                   {activeShift?.isActive ? (
-                    <Button variant="primary" onClick={handleClockOut} disabled={submitting}>
-                      {submitting ? 'Clocking out...' : 'Clock Out'}
+                    <Button
+                      className="w-full sm:w-auto"
+                      size="lg"
+                      onClick={handleClockOut}
+                      disabled={submitting}
+                    >
+                      {submitting ? 'Clocking out…' : 'Clock out'}
                     </Button>
                   ) : (
-                    <Button variant="primary" onClick={handleClockIn} disabled={submitting || !consentChecked}>
-                      {submitting ? 'Clocking in...' : 'Clock In'}
+                    <Button
+                      className="w-full sm:w-auto"
+                      size="lg"
+                      onClick={handleClockIn}
+                      disabled={submitting || !consentChecked}
+                    >
+                      {submitting ? 'Clocking in…' : 'Clock in'}
                     </Button>
                   )}
-
-                  <Button
-                    variant="ghost"
-                    onClick={loadData}
-                    disabled={loading || submitting}
-                    aria-label="Refresh shift status and recent shifts"
-                  >
-                    Refresh
-                  </Button>
+                  <p className="mt-3 text-sm leading-6 text-oasis-muted">
+                    Clocking in and out needs an internet connection.
+                  </p>
                 </div>
               </div>
             ) : (
-              <p className="text-slate-700">This page is available to carers and admins only.</p>
+              <p className="text-oasis-muted">
+                This page is available to Carers and Managers only.
+              </p>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-slate-900 font-heading">Recent shift events</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-heading text-xl font-semibold text-oasis-ink">
+                  Recent shifts
+                </h2>
+                <p className="mt-1 text-sm text-oasis-muted">
+                  Your five most recent shift records.
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSuccess(null);
+                  void loadData();
+                }}
+                disabled={loading || submitting}
+                aria-label="Refresh shift status and recent shifts"
+              >
+                Refresh status
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-slate-600">Loading recent shifts...</p>
+              <p className="text-oasis-muted" role="status">
+                Loading recent shifts…
+              </p>
             ) : recentShifts.length === 0 ? (
-              <p className="text-slate-600">No recent shifts found.</p>
+              <p className="text-oasis-muted">
+                No recent shifts yet. Your completed shifts will appear here.
+              </p>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-oasis-border">
                 {recentShifts.map((shift) => (
-                  <div key={shift.id} className="py-3 flex items-center justify-between gap-4">
+                  <div
+                    key={shift.id}
+                    className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
                     <div>
-                      <div className="font-medium text-slate-900">
+                      <div className="font-medium text-oasis-ink">
                         {formatDateTime(shift.clockInAt)}
-                        {shift.clockOutAt ? ` → ${formatDateTime(shift.clockOutAt)}` : ' → Active'}
+                        {shift.clockOutAt
+                          ? ` → ${formatDateTime(shift.clockOutAt)}`
+                          : ' → Active'}
                       </div>
-                      <div className="text-sm text-slate-500">
-                        In: {shift.clockInProof.method}
-                        {shift.clockOutProof?.method ? ` | Out: ${shift.clockOutProof.method}` : ''}
+                      <div className="mt-1 text-sm text-oasis-muted">
+                        In: {shiftVerificationLabel(shift.clockInProof.method)}
+                        {shift.clockOutProof?.method
+                          ? ` · Out: ${shiftVerificationLabel(shift.clockOutProof.method)}`
+                          : ''}
                       </div>
                     </div>
-                    <div className="text-sm text-slate-600 tabular-nums">
+                    <div className="text-sm tabular-nums text-oasis-muted">
                       {formatDuration(shift.clockInAt, shift.clockOutAt)}
                     </div>
                   </div>
