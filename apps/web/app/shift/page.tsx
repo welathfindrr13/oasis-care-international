@@ -55,6 +55,7 @@ export default function ShiftPage() {
   const [consentChecked, setConsentChecked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [statusUnavailable, setStatusUnavailable] = useState(false);
+  const [recentShiftsUnavailable, setRecentShiftsUnavailable] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -65,19 +66,28 @@ export default function ShiftPage() {
     setError(null);
 
     try {
-      const [activeRes, recentRes] = await Promise.all([
+      const [activeResult, recentResult] = await Promise.allSettled([
         clientQuery<MyActiveShiftQueryResponse>(MY_ACTIVE_SHIFT_QUERY),
         clientQuery<MyRecentShiftsQueryResponse>(MY_RECENT_SHIFTS_QUERY, { take: 5 }),
       ]);
 
-      setActiveShift(activeRes.myActiveShift || null);
-      setRecentShifts(recentRes.myRecentShifts || []);
-      setStatusUnavailable(false);
-    } catch {
-      setStatusUnavailable(true);
-      setError(
-        'We could not load your shift status. Check your connection and try again.',
-      );
+      if (activeResult.status === 'fulfilled') {
+        setActiveShift(activeResult.value.myActiveShift || null);
+        setStatusUnavailable(false);
+      } else {
+        setStatusUnavailable(true);
+        setError(
+          'We could not load your shift status. Check your connection and try again.',
+        );
+      }
+
+      if (recentResult.status === 'fulfilled') {
+        setRecentShifts(recentResult.value.myRecentShifts || []);
+        setRecentShiftsUnavailable(false);
+      } else {
+        setRecentShifts([]);
+        setRecentShiftsUnavailable(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -362,6 +372,26 @@ export default function ShiftPage() {
               <p className="text-oasis-muted" role="status">
                 Loading recent shifts…
               </p>
+            ) : recentShiftsUnavailable ? (
+              <StatePanel
+                action={
+                  <Button
+                    onClick={() => {
+                      setSuccess(null);
+                      void loadData();
+                    }}
+                  >
+                    Try again
+                  </Button>
+                }
+                kind="unavailable"
+                title="Recent shifts are unavailable"
+              >
+                <p>
+                  Your current shift action is still available. Check your
+                  connection and try loading the history again.
+                </p>
+              </StatePanel>
             ) : recentShifts.length === 0 ? (
               <p className="text-oasis-muted">
                 No recent shifts yet. Your completed shifts will appear here.

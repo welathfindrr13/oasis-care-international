@@ -740,6 +740,7 @@ describe('Visit E2E Tests', () => {
               recordVisitTaskOutcome(input: $input) {
                 id
                 isCompleted
+                hasRecordedOutcome
                 notes
               }
             }
@@ -757,6 +758,7 @@ describe('Visit E2E Tests', () => {
       expect(taskOutcomeResponse.body.data.recordVisitTaskOutcome).toMatchObject({
         id: taskId,
         isCompleted: false,
+        hasRecordedOutcome: true,
       });
       expect(taskOutcomeResponse.body.data.recordVisitTaskOutcome.notes).toContain('VISIT_TASK_OUTCOME::');
       expect(taskOutcomeResponse.body.data.recordVisitTaskOutcome.notes).toContain('"outcome":"NOT_REQUIRED"');

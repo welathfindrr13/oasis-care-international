@@ -36,6 +36,7 @@ type VisitTask = {
   taskName: string;
   description?: string | null;
   isCompleted: boolean;
+  hasRecordedOutcome: boolean;
   completedAt?: string | null;
   notes?: string | null;
 };
@@ -104,6 +105,7 @@ const VISIT_QUERY = `
         taskName
         description
         isCompleted
+        hasRecordedOutcome
         completedAt
         notes
       }
@@ -347,7 +349,9 @@ export default function VisitDetailPage() {
 
   const hasStartedVisit = visit?.status === 'IN_PROGRESS' || visit?.status === 'COMPLETED';
   const visitIsClosed = visit?.status === 'COMPLETED' || visit?.status === 'CANCELLED';
-  const hasRecordedCare = completedTasks > 0 || careLogs.length > 0;
+  const hasRecordedCare =
+    (visit?.tasks || []).some((task) => task.hasRecordedOutcome) ||
+    careLogs.length > 0;
 
   async function startVisit() {
     if (!visit || !canRunVisitWorkflow || visit.status !== 'SCHEDULED') return;

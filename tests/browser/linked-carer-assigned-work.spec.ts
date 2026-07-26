@@ -182,6 +182,46 @@ test("rapid repeated shift actions dispatch exactly one mutation", async ({
   ).toHaveCount(0);
 });
 
+test("a recent-shift history failure does not block the current shift action", async ({
+  page,
+}) => {
+  await page.context().clearPermissions();
+  await signIn(page, {
+    email: "carer@local.dev",
+    name: "Local Carer",
+    role: "admin",
+    callbackUrl: "http://localhost:3002/shift",
+  });
+  await page.route("**/api/graphql", async (route) => {
+    const body = route.request().postData() || "";
+    if (body.includes("query MyRecentShifts")) {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "synthetic history outage" }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto("/shift");
+
+  await expect(page.getByText("Not clocked in", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Recent shifts are unavailable" }),
+  ).toBeVisible();
+  await page
+    .getByLabel("I understand how location is used when I clock in or out.")
+    .check();
+  await expect(
+    page.getByRole("button", { name: "Clock in", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    page.getByText("Shift status unavailable", { exact: true }),
+  ).toHaveCount(0);
+});
+
 test("a linked fake carer follows the database role despite an admin token claim", async ({
   page,
 }) => {
@@ -341,11 +381,18 @@ test("a linked fake carer follows the database role despite an admin token claim
   const activeVisitAccessibility = await new AxeBuilder({ page }).analyze();
   expect(activeVisitAccessibility.violations).toEqual([]);
 
-  await page.getByRole("button", { name: "Mark done" }).click();
+  await page.getByRole("button", { name: "Mark not required" }).click();
   await expect(
-    page.getByText("Care action marked done.", { exact: true }),
+    page.getByText("Care action marked not required.", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Done", { exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(
+    page
+      .getByRole("region", { name: "Next visit action" })
+      .getByRole("button", { name: "Complete visit" }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   await page
     .getByPlaceholder(

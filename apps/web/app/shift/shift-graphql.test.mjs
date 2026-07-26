@@ -11,11 +11,14 @@ test('requires an exact shift ID in the clock-out GraphQL contract', () => {
   assert.match(page, /input:\s*{\s*shiftId: activeShift\.id,/);
 });
 
-test('Refresh genuinely reloads both supported shift queries', () => {
+test('Refresh reloads both shift queries without coupling their failure states', () => {
   assert.match(
     page,
-    /Promise\.all\(\[\s*clientQuery<MyActiveShiftQueryResponse>\(MY_ACTIVE_SHIFT_QUERY\),\s*clientQuery<MyRecentShiftsQueryResponse>\(MY_RECENT_SHIFTS_QUERY,/,
+    /Promise\.allSettled\(\[\s*clientQuery<MyActiveShiftQueryResponse>\(MY_ACTIVE_SHIFT_QUERY\),\s*clientQuery<MyRecentShiftsQueryResponse>\(MY_RECENT_SHIFTS_QUERY,/,
   );
+  assert.match(page, /if \(activeResult\.status === 'fulfilled'\)/);
+  assert.match(page, /if \(recentResult\.status === 'fulfilled'\)/);
+  assert.match(page, /title="Recent shifts are unavailable"/);
   assert.match(page, /void loadData\(\)/);
   assert.match(page, /aria-label="Refresh shift status and recent shifts"/);
   assert.match(page, /disabled={loading \|\| submitting}/);

@@ -73,6 +73,9 @@ export class VisitTaskDTO {
   @Field()
   isCompleted!: boolean;
 
+  @Field()
+  hasRecordedOutcome!: boolean;
+
   @Field(() => Date, { nullable: true })
   completedAt?: Date | null;
 
