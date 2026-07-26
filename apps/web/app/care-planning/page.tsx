@@ -8,14 +8,14 @@ import { query } from '../../lib/graphql/client'
 import { formatDate as formatOrganizationDate } from '../../lib/time'
 import {
   CARE_PLANNING_QUERY,
-  CLIENT_QUERY,
-  CLIENTS_QUERY,
+  CLIENT_CONTEXT_QUERY,
+  CLIENT_CONTEXTS_QUERY,
   type AssessmentRecord,
   type CarePlanRecord,
   type CarePlanningQueryResponse,
-  type ClientListItem,
-  type ClientQueryResponse,
-  type ClientsQueryResponse,
+  type ClientContext,
+  type ClientContextQueryResponse,
+  type ClientContextsQueryResponse,
 } from '../../lib/graphql/queries'
 import { getServerAuthContext } from '../../lib/auth/server-auth'
 import { hasAccessCapability } from '../../lib/auth/capabilities'
@@ -29,14 +29,17 @@ interface CarePlanningPageProps {
 }
 
 async function getClientsSafe(): Promise<{
-  clients: ClientListItem[]
+  clients: ClientContext[]
   unavailable: boolean
 }> {
   try {
-    const data = await query<ClientsQueryResponse>(CLIENTS_QUERY, {
-      skip: 0,
-      take: 50,
-    })
+    const data = await query<ClientContextsQueryResponse>(
+      CLIENT_CONTEXTS_QUERY,
+      {
+        skip: 0,
+        take: 50,
+      },
+    )
     return { clients: data.clients.items, unavailable: false }
   } catch {
     return { clients: [], unavailable: true }
@@ -45,9 +48,11 @@ async function getClientsSafe(): Promise<{
 
 async function getRequestedClientSafe(
   clientId: string,
-): Promise<ClientListItem | null> {
+): Promise<ClientContext | null> {
   try {
-    const data = await query<ClientQueryResponse>(CLIENT_QUERY, { id: clientId })
+    const data = await query<ClientContextQueryResponse>(CLIENT_CONTEXT_QUERY, {
+      id: clientId,
+    })
     return data.client
   } catch {
     return null
@@ -85,11 +90,7 @@ function statusLabel(status: string): string {
   return status.replace(/_/g, ' ').toLowerCase()
 }
 
-function AssessmentList({
-  assessments,
-}: {
-  assessments: AssessmentRecord[]
-}) {
+function AssessmentList({ assessments }: { assessments: AssessmentRecord[] }) {
   if (assessments.length === 0) {
     return (
       <StatePanel title="No assessments yet">
@@ -161,7 +162,8 @@ function CarePlanList({ carePlans }: { carePlans: CarePlanRecord[] }) {
                 {plan.title}
               </h3>
               <p className="mt-1 text-sm text-oasis-muted">
-                Version {plan.version} · effective {formatDate(plan.effectiveFrom)}
+                Version {plan.version} · effective{' '}
+                {formatDate(plan.effectiveFrom)}
                 {' · '}review due {formatDate(plan.reviewDueAt)}
               </p>
             </div>
@@ -330,7 +332,10 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
           </StatePanel>
         ) : null}
 
-        {selectedClient && !carePlanningUnavailable ? (
+        {selectedClient &&
+        !clientsResult.unavailable &&
+        !requestedClientUnavailable &&
+        !carePlanningUnavailable ? (
           <>
             <section className="mt-8" aria-labelledby="assessments-heading">
               <h2

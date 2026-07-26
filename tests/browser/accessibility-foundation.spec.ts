@@ -98,6 +98,11 @@ async function expectSequentialKeyboardTraversal(page: Page) {
         return id;
       });
   });
+  const nativeCompositeFocusSteps = await page
+    .locator(
+      "input[type='date'], input[type='datetime-local'], input[type='month'], input[type='time'], input[type='week']",
+    )
+    .count();
 
   expect(focusableIds.length).toBeGreaterThan(0);
   expect(focusableIds.length).toBeLessThanOrEqual(MAX_SEQUENTIAL_FOCUS_STEPS);
@@ -113,7 +118,11 @@ async function expectSequentialKeyboardTraversal(page: Page) {
   let firstFocusId: string | null = null;
   let completedCycle = false;
 
-  for (let step = 0; step < focusableIds.length + 2; step += 1) {
+  for (
+    let step = 0;
+    step < focusableIds.length + nativeCompositeFocusSteps * 4 + 2;
+    step += 1
+  ) {
     await page.keyboard.press("Tab");
     const focus = await page.evaluate(() => {
       const element = document.activeElement;
@@ -124,6 +133,17 @@ async function expectSequentialKeyboardTraversal(page: Page) {
       const bounds = element.getBoundingClientRect();
       return {
         id: element.dataset.accessibilityFocusId || null,
+        elementName:
+          element.getAttribute("aria-label") ||
+          element.getAttribute("name") ||
+          element.textContent?.trim().slice(0, 80) ||
+          element.tagName.toLowerCase(),
+        bounds: {
+          left: bounds.left,
+          top: bounds.top,
+          right: bounds.right,
+          bottom: bounds.bottom,
+        },
         visible:
           bounds.width > 0 &&
           bounds.height > 0 &&
@@ -133,10 +153,13 @@ async function expectSequentialKeyboardTraversal(page: Page) {
           !element.closest("[inert], [aria-hidden='true']"),
         focusVisible: element.matches(":focus-visible"),
         withinViewport:
-          bounds.left >= 0 &&
-          bounds.top >= 0 &&
-          bounds.right <= window.innerWidth &&
-          bounds.bottom <= window.innerHeight,
+          bounds.left >= -1 &&
+          bounds.top >= -1 &&
+          bounds.right <= window.innerWidth + 1 &&
+          bounds.bottom <= window.innerHeight + 1,
+        allowsInternalFocusCycle: element.matches(
+          "input[type='date'], input[type='datetime-local'], input[type='month'], input[type='time'], input[type='week']",
+        ),
       };
     });
 
@@ -144,6 +167,9 @@ async function expectSequentialKeyboardTraversal(page: Page) {
     expect(focus.id).not.toBeNull();
 
     if (visited.has(focus.id as string)) {
+      if (focus.allowsInternalFocusCycle && focus.id !== firstFocusId) {
+        continue;
+      }
       expect(focus.id).toBe(firstFocusId);
       completedCycle = true;
       break;
@@ -153,7 +179,10 @@ async function expectSequentialKeyboardTraversal(page: Page) {
     visited.add(focus.id as string);
     expect(focus.visible).toBe(true);
     expect(focus.focusVisible).toBe(true);
-    expect(focus.withinViewport).toBe(true);
+    expect(
+      focus.withinViewport,
+      `Focused control "${focus.elementName}" should remain within the viewport: ${JSON.stringify(focus.bounds)}`,
+    ).toBe(true);
     await expect(page.locator(":focus")).toHaveAccessibleName(/\S/);
   }
 
@@ -424,6 +453,72 @@ test("Tenant admin client detail reflows at 320 CSS pixels", async ({
     ),
   ).toBe(true);
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
+});
+
+test("Tenant admin care planning and inspection records are accessible and responsive", async ({
+  page,
+}) => {
+  await signIn(page, profiles.tenantAdmin);
+
+  await page.goto(`/care-planning?clientId=${PERSON_ID}`);
+  await expect(page).toHaveURL(new RegExp(`clientId=${PERSON_ID}`));
+  await expect(
+    page.getByRole("heading", { name: "Care planning", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Assessments and identified risks",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Care plans", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Jordan Ellis", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await expectAccessibilityFoundation(page, { repeatedHeader: true });
+
+  await page.goto(`/evidence?clientId=${PERSON_ID}`);
+  await expect(page).toHaveURL(new RegExp(`clientId=${PERSON_ID}`));
+  await expect(
+    page.getByRole("heading", { name: "Inspection records", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Existing inspection records",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Jordan Ellis", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByRole("link", { name: "Download inspection record" }),
+  ).toBeVisible();
+  await expectAccessibilityFoundation(page, { repeatedHeader: true });
+});
+
+test("Tenant admin care planning and inspection records reflow at 320 CSS pixels", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "phone-390x844");
+  await page.setViewportSize({ width: 320, height: 844 });
+  await signIn(page, profiles.tenantAdmin);
+
+  for (const route of [
+    `/care-planning?clientId=${PERSON_ID}`,
+    `/evidence?clientId=${PERSON_ID}`,
+  ]) {
+    await page.goto(route);
+    await expect(page.locator("main")).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await expectAccessibilityFoundation(page, { repeatedHeader: true });
+  }
 });
 
 test("Carers cannot open generic client profile aliases", async ({

@@ -140,6 +140,214 @@ describe('CarePlanningRepository', () => {
     expect(prisma.evidencePack.create).not.toHaveBeenCalled();
   });
 
+  it('accepts operational evidence sources only after every server lookup proves the organisation calendar period', async () => {
+    const { prisma, repository } = createRepository();
+    prisma.client.findFirst.mockResolvedValue({ id: 'client-1' });
+    prisma.visit.findFirst.mockResolvedValue({ id: 'visit-1' });
+    prisma.careLog.findFirst.mockResolvedValue({ id: 'care-log-1' });
+    prisma.medicationAdministration.findFirst.mockResolvedValue({
+      id: 'medication-1',
+    });
+    prisma.concern.findFirst.mockResolvedValue({ id: 'concern-1' });
+    prisma.evidencePack.create.mockResolvedValue({ id: 'pack-1' });
+
+    await repository.createEvidencePack('org-1', {
+      clientId: 'client-1',
+      status: 'DRAFT' as any,
+      periodStart: new Date('2026-05-01T00:00:00.000Z'),
+      periodEnd: new Date('2026-05-07T00:00:00.000Z'),
+      items: [
+        {
+          sourceType: EvidenceSourceTypeGQL.VISIT,
+          sourceId: 'visit-1',
+          occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+          headline: 'Visit record',
+        },
+        {
+          sourceType: EvidenceSourceTypeGQL.CARE_LOG,
+          sourceId: 'care-log-1',
+          occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+          headline: 'Care note record',
+        },
+        {
+          sourceType: EvidenceSourceTypeGQL.MEDICATION_ADMINISTRATION,
+          sourceId: 'medication-1',
+          occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+          headline: 'Medication support record',
+        },
+        {
+          sourceType: EvidenceSourceTypeGQL.CONCERN,
+          sourceId: 'concern-1',
+          occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+          headline: 'Concern record',
+        },
+      ],
+    });
+
+    expect(prisma.visit.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'visit-1',
+        organization_id: 'org-1',
+        client_id: 'client-1',
+        deleted_at: null,
+        scheduled_start: {
+          gte: new Date('2026-04-30T23:00:00.000Z'),
+          lt: new Date('2026-05-07T23:00:00.000Z'),
+        },
+      },
+      select: { id: true },
+    });
+    expect(prisma.careLog.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'care-log-1',
+        organization_id: 'org-1',
+        client_id: 'client-1',
+        deleted_at: null,
+        occurred_at: {
+          gte: new Date('2026-04-30T23:00:00.000Z'),
+          lt: new Date('2026-05-07T23:00:00.000Z'),
+        },
+      },
+      select: { id: true },
+    });
+    expect(prisma.medicationAdministration.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'medication-1',
+        deleted_at: null,
+        scheduled_time: {
+          gte: new Date('2026-04-30T23:00:00.000Z'),
+          lt: new Date('2026-05-07T23:00:00.000Z'),
+        },
+        OR: [
+          {
+            visit: {
+              is: {
+                organization_id: 'org-1',
+                client_id: 'client-1',
+                deleted_at: null,
+              },
+            },
+          },
+          {
+            prescription: {
+              client: {
+                id: 'client-1',
+                organization_id: 'org-1',
+                deleted_at: null,
+              },
+            },
+          },
+        ],
+      },
+      select: { id: true },
+    });
+    expect(prisma.concern.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'concern-1',
+        organization_id: 'org-1',
+        client_id: 'client-1',
+        created_at: {
+          gte: new Date('2026-04-30T23:00:00.000Z'),
+          lt: new Date('2026-05-07T23:00:00.000Z'),
+        },
+      },
+      select: { id: true },
+    });
+    expect(prisma.evidencePack.create).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    {
+      label: 'visit',
+      model: 'visit',
+      sourceType: EvidenceSourceTypeGQL.VISIT,
+      sourceId: 'visit-outside-period',
+      dateField: 'scheduled_start',
+    },
+    {
+      label: 'care note',
+      model: 'careLog',
+      sourceType: EvidenceSourceTypeGQL.CARE_LOG,
+      sourceId: 'care-log-outside-period',
+      dateField: 'occurred_at',
+    },
+    {
+      label: 'medication support',
+      model: 'medicationAdministration',
+      sourceType: EvidenceSourceTypeGQL.MEDICATION_ADMINISTRATION,
+      sourceId: 'medication-outside-period',
+      dateField: 'scheduled_time',
+    },
+    {
+      label: 'concern',
+      model: 'concern',
+      sourceType: EvidenceSourceTypeGQL.CONCERN,
+      sourceId: 'concern-outside-period',
+      dateField: 'created_at',
+    },
+  ])(
+    'rejects an out-of-period $label source and creates no evidence pack',
+    async ({ model, sourceType, sourceId, dateField }) => {
+      const { prisma, repository } = createRepository();
+      prisma.client.findFirst.mockResolvedValue({ id: 'client-1' });
+      prisma[model].findFirst.mockResolvedValue(null);
+
+      await expect(
+        repository.createEvidencePack('org-1', {
+          clientId: 'client-1',
+          status: 'DRAFT' as any,
+          periodStart: new Date('2026-05-01T00:00:00.000Z'),
+          periodEnd: new Date('2026-05-07T00:00:00.000Z'),
+          items: [
+            {
+              sourceType,
+              sourceId,
+              occurredAt: new Date('2026-05-03T12:00:00.000Z'),
+              headline: 'Untrusted client-supplied timestamp',
+            },
+          ],
+        }),
+      ).rejects.toBeInstanceOf(BaseHttpException);
+
+      expect(prisma[model].findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: sourceId,
+            [dateField]: {
+              gte: new Date('2026-04-30T23:00:00.000Z'),
+              lt: new Date('2026-05-07T23:00:00.000Z'),
+            },
+          }),
+          select: { id: true },
+        }),
+      );
+      expect(prisma.evidencePack.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects an operational source without a server-verifiable identifier before creation', async () => {
+    const { prisma, repository } = createRepository();
+    prisma.client.findFirst.mockResolvedValue({ id: 'client-1' });
+
+    await expect(
+      repository.createEvidencePack('org-1', {
+        clientId: 'client-1',
+        status: 'DRAFT' as any,
+        periodStart: new Date('2026-05-01T00:00:00.000Z'),
+        periodEnd: new Date('2026-05-07T00:00:00.000Z'),
+        items: [
+          {
+            sourceType: EvidenceSourceTypeGQL.VISIT,
+            headline: 'Missing source identifier',
+          },
+        ],
+      }),
+    ).rejects.toThrow('Evidence source identifier is required');
+
+    expect(prisma.visit.findFirst).not.toHaveBeenCalled();
+    expect(prisma.evidencePack.create).not.toHaveBeenCalled();
+  });
+
   it('writes explicit UTC calendar keys to date-only fields in GMT and BST seasons', async () => {
     const { prisma, repository } = createRepository();
     prisma.client.findFirst.mockResolvedValue({ id: 'client-1' });

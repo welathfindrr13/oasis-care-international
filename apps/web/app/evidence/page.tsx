@@ -8,12 +8,12 @@ import { hasAccessCapability } from '../../lib/auth/capabilities'
 import { getServerAuthContext } from '../../lib/auth/server-auth'
 import { query } from '../../lib/graphql/client'
 import {
-  CLIENT_QUERY,
-  CLIENTS_QUERY,
+  CLIENT_CONTEXT_QUERY,
+  CLIENT_CONTEXTS_QUERY,
   INSPECTION_RECORDS_QUERY,
-  type ClientListItem,
-  type ClientQueryResponse,
-  type ClientsQueryResponse,
+  type ClientContext,
+  type ClientContextQueryResponse,
+  type ClientContextsQueryResponse,
   type InspectionRecord,
   type InspectionRecordsQueryResponse,
 } from '../../lib/graphql/queries'
@@ -21,10 +21,7 @@ import {
   groupInspectionRecordItems,
   inspectionRecordTypeLabel,
 } from '../../lib/inspection-records'
-import {
-  formatDate,
-  formatStoredCalendarDate,
-} from '../../lib/time'
+import { formatDate, formatStoredCalendarDate } from '../../lib/time'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,14 +32,17 @@ interface EvidencePageProps {
 }
 
 async function getClientsSafe(): Promise<{
-  clients: ClientListItem[]
+  clients: ClientContext[]
   unavailable: boolean
 }> {
   try {
-    const data = await query<ClientsQueryResponse>(CLIENTS_QUERY, {
-      skip: 0,
-      take: 50,
-    })
+    const data = await query<ClientContextsQueryResponse>(
+      CLIENT_CONTEXTS_QUERY,
+      {
+        skip: 0,
+        take: 50,
+      },
+    )
     return { clients: data.clients.items, unavailable: false }
   } catch {
     return { clients: [], unavailable: true }
@@ -51,9 +51,11 @@ async function getClientsSafe(): Promise<{
 
 async function getRequestedClientSafe(
   clientId: string,
-): Promise<ClientListItem | null> {
+): Promise<ClientContext | null> {
   try {
-    const data = await query<ClientQueryResponse>(CLIENT_QUERY, { id: clientId })
+    const data = await query<ClientContextQueryResponse>(CLIENT_CONTEXT_QUERY, {
+      id: clientId,
+    })
     return data.client
   } catch {
     return null
@@ -108,8 +110,8 @@ function InspectionRecordList({
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <h3 className="font-heading text-lg font-semibold text-oasis-ink">
-                  {clientName}: {formatStoredCalendarDate(record.periodStart)} to{' '}
-                  {formatStoredCalendarDate(record.periodEnd)}
+                  {clientName}: {formatStoredCalendarDate(record.periodStart)}{' '}
+                  to {formatStoredCalendarDate(record.periodEnd)}
                 </h3>
                 <p className="mt-1 text-sm text-oasis-muted">
                   Created {formatDate(record.generatedAt)}
@@ -183,9 +185,7 @@ export default async function EvidencePage(props: EvidencePageProps) {
   const inspectionData = selectedClient
     ? await getInspectionRecordsSafe(selectedClient.id)
     : null
-  const recordsUnavailable = Boolean(
-    selectedClient && inspectionData === null,
-  )
+  const recordsUnavailable = Boolean(selectedClient && inspectionData === null)
   const assessments = inspectionData?.assessments ?? []
   const carePlans = inspectionData?.carePlans ?? []
   const records = inspectionData?.evidencePacks ?? []
@@ -202,9 +202,9 @@ export default async function EvidencePage(props: EvidencePageProps) {
             Inspection records
           </h1>
           <p className="mt-3 max-w-3xl text-base leading-7 text-oasis-muted">
-            Prepare selected records for {selectedClient?.fullName ?? 'a client'}.
-            These records support inspection preparation but do not guarantee an
-            inspection outcome.
+            Prepare selected records for{' '}
+            {selectedClient?.fullName ?? 'a client'}. These records support
+            inspection preparation but do not guarantee an inspection outcome.
           </p>
         </header>
 
@@ -303,9 +303,15 @@ export default async function EvidencePage(props: EvidencePageProps) {
           </StatePanel>
         ) : null}
 
-        {selectedClient && !recordsUnavailable ? (
+        {selectedClient &&
+        !clientsResult.unavailable &&
+        !requestedClientUnavailable &&
+        !recordsUnavailable ? (
           <>
-            <section className="mt-8" aria-labelledby="existing-records-heading">
+            <section
+              className="mt-8"
+              aria-labelledby="existing-records-heading"
+            >
               <h2
                 id="existing-records-heading"
                 className="font-heading text-2xl font-bold text-oasis-ink"

@@ -153,6 +153,24 @@ const operationHandlers = new Map([
     }),
   ],
   [
+    "ClientContexts",
+    () => ({
+      clients: {
+        items: [{ id: personId, fullName: "Jordan Ellis" }],
+        total: 1,
+      },
+    }),
+  ],
+  [
+    "ClientContext",
+    () => ({
+      client: {
+        id: personId,
+        fullName: "Jordan Ellis",
+      },
+    }),
+  ],
+  [
     "CareRooms",
     () => ({
       careRooms: [
@@ -335,6 +353,34 @@ const operationHandlers = new Map([
       evidencePacks: [],
     }),
   ],
+  [
+    "InspectionRecords",
+    () => ({
+      assessments: [],
+      carePlans: [],
+      evidencePacks: [
+        {
+          id: "17171717-1717-4171-8171-171717171717",
+          clientId: personId,
+          carePlanId: null,
+          status: "DRAFT",
+          kind: "INSPECTION",
+          periodStart: "2026-07-01",
+          periodEnd: "2026-07-24",
+          generatedAt: "2026-07-24T10:00:00.000Z",
+          publishedAt: null,
+          items: [
+            {
+              id: "18181818-1818-4181-8181-181818181818",
+              sourceType: "VISIT",
+              occurredAt: "2026-07-23T09:00:00.000Z",
+            },
+          ],
+        },
+      ],
+    }),
+  ],
+  ["EvidenceSourceCandidates", () => ({ evidenceSourceCandidates: [] })],
   ["FamilyCareRooms", () => ({ familyCareRooms: [] })],
   [
     "FamilyCareRoom",

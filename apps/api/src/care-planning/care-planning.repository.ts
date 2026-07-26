@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '@oasis/db';
 import {
+  organizationCalendarDayUtcRange,
   organizationCalendarDateToUtcStoredDate,
   parseStoredCalendarDateInput,
 } from '@oasis/time';
@@ -93,10 +94,7 @@ export class CarePlanningRepository {
     });
   }
 
-  async completeAssessment(
-    organizationId: string,
-    input: CompleteAssessmentInput,
-  ): Promise<any | null> {
+  async completeAssessment(organizationId: string, input: CompleteAssessmentInput): Promise<any | null> {
     const result = await this.assessmentModel().updateMany({
       where: {
         id: input.assessmentId,
@@ -168,10 +166,7 @@ export class CarePlanningRepository {
     });
   }
 
-  async approveCarePlan(
-    organizationId: string,
-    input: ApproveCarePlanInput,
-  ): Promise<any | null> {
+  async approveCarePlan(organizationId: string, input: ApproveCarePlanInput): Promise<any | null> {
     const current = await this.getCarePlan(organizationId, input.carePlanId);
     if (!current) {
       return null;
@@ -222,10 +217,7 @@ export class CarePlanningRepository {
     });
   }
 
-  async archiveCarePlan(
-    organizationId: string,
-    input: ArchiveCarePlanInput,
-  ): Promise<any | null> {
+  async archiveCarePlan(organizationId: string, input: ArchiveCarePlanInput): Promise<any | null> {
     const result = await this.carePlanModel().updateMany({
       where: {
         id: input.carePlanId,
@@ -378,22 +370,22 @@ export class CarePlanningRepository {
       candidates.push(...concerns.map((concern: any) => this.mapConcernCandidate(concern)));
     }
 
-    return candidates
-      .sort((left, right) => right.occurredAt.getTime() - left.occurredAt.getTime())
-      .slice(0, take);
+    return candidates.sort((left, right) => right.occurredAt.getTime() - left.occurredAt.getTime()).slice(0, take);
   }
 
   async createEvidencePack(organizationId: string, input: CreateEvidencePackInput): Promise<any> {
     const orgId = assertTenantIdForSensitiveWrite('EvidencePack', organizationId);
     let periodStart: Date;
     let periodEnd: Date;
+    let sourcePeriodStart: Date;
+    let sourcePeriodEndExclusive: Date;
     try {
-      periodStart = organizationCalendarDateToUtcStoredDate(
-        parseStoredCalendarDateInput(input.periodStart),
-      );
-      periodEnd = organizationCalendarDateToUtcStoredDate(
-        parseStoredCalendarDateInput(input.periodEnd),
-      );
+      const periodStartCalendar = parseStoredCalendarDateInput(input.periodStart);
+      const periodEndCalendar = parseStoredCalendarDateInput(input.periodEnd);
+      periodStart = organizationCalendarDateToUtcStoredDate(periodStartCalendar);
+      periodEnd = organizationCalendarDateToUtcStoredDate(periodEndCalendar);
+      sourcePeriodStart = organizationCalendarDayUtcRange(periodStartCalendar, orgId).start;
+      sourcePeriodEndExclusive = organizationCalendarDayUtcRange(periodEndCalendar, orgId).end;
     } catch {
       throw new BaseHttpException(
         ErrorCode.VALIDATION_FAILED,
@@ -405,8 +397,6 @@ export class CarePlanningRepository {
     if (input.carePlanId) {
       await this.assertCarePlanInOrganization(orgId, input.clientId, input.carePlanId);
     }
-    await this.assertEvidenceSourcesInOrganization(orgId, input.clientId, input.items ?? []);
-
     const items = input.items ?? [];
     if (periodStart > periodEnd) {
       throw new BaseHttpException(
@@ -415,6 +405,13 @@ export class CarePlanningRepository {
         HttpStatus.BAD_REQUEST,
       );
     }
+    await this.assertEvidenceSourcesInOrganization(
+      orgId,
+      input.clientId,
+      items,
+      sourcePeriodStart,
+      sourcePeriodEndExclusive,
+    );
     return this.evidencePackModel().create({
       data: {
         organization_id: orgId,
@@ -463,11 +460,7 @@ export class CarePlanningRepository {
     });
   }
 
-  async recordEvidencePackExport(
-    organizationId: string,
-    id: string,
-    actorUserId?: string | null,
-  ): Promise<any | null> {
+  async recordEvidencePackExport(organizationId: string, id: string, actorUserId?: string | null): Promise<any | null> {
     const pack = await this.getEvidencePack(organizationId, id);
     if (!pack) {
       return null;
@@ -546,8 +539,7 @@ export class CarePlanningRepository {
       createdBy: this.formatName(administration.visit?.carer) ?? administration.administered_by ?? null,
       status: administration.status,
       previewText:
-        this.truncateText(administration.notes) ??
-        'Medication support outcome selected as inspection-ready evidence.',
+        this.truncateText(administration.notes) ?? 'Medication support outcome selected as inspection-ready evidence.',
     };
   }
 
@@ -594,6 +586,8 @@ export class CarePlanningRepository {
     organizationId: string,
     clientId: string,
     visitId: string,
+    periodStart?: Date,
+    periodEndExclusive?: Date,
   ): Promise<void> {
     const visit = await (this.prisma as any).visit.findFirst({
       where: {
@@ -601,6 +595,14 @@ export class CarePlanningRepository {
         organization_id: organizationId,
         client_id: clientId,
         deleted_at: null,
+        ...(periodStart && periodEndExclusive
+          ? {
+              scheduled_start: {
+                gte: periodStart,
+                lt: periodEndExclusive,
+              },
+            }
+          : {}),
       },
       select: { id: true },
     });
@@ -654,21 +656,48 @@ export class CarePlanningRepository {
     organizationId: string,
     clientId: string,
     items: NonNullable<CreateEvidencePackInput['items']>,
+    periodStart: Date,
+    periodEndExclusive: Date,
   ): Promise<void> {
     for (const item of items) {
-      if (!item.sourceId || item.sourceType === EvidenceSourceTypeGQL.MANUAL_NOTE) {
+      if (item.sourceType === EvidenceSourceTypeGQL.MANUAL_NOTE) {
         continue;
+      }
+      if (!item.sourceId) {
+        throw new BaseHttpException(
+          ErrorCode.VALIDATION_FAILED,
+          'Evidence source identifier is required',
+          HttpStatus.BAD_REQUEST,
+        );
       }
 
       switch (item.sourceType) {
         case EvidenceSourceTypeGQL.VISIT:
-          await this.assertVisitInOrganization(organizationId, clientId, item.sourceId);
+          await this.assertVisitInOrganization(
+            organizationId,
+            clientId,
+            item.sourceId,
+            periodStart,
+            periodEndExclusive,
+          );
           break;
         case EvidenceSourceTypeGQL.CARE_LOG:
-          await this.assertCareLogInOrganization(organizationId, clientId, item.sourceId);
+          await this.assertCareLogInOrganization(
+            organizationId,
+            clientId,
+            item.sourceId,
+            periodStart,
+            periodEndExclusive,
+          );
           break;
         case EvidenceSourceTypeGQL.MEDICATION_ADMINISTRATION:
-          await this.assertMedicationAdministrationInOrganization(organizationId, clientId, item.sourceId);
+          await this.assertMedicationAdministrationInOrganization(
+            organizationId,
+            clientId,
+            item.sourceId,
+            periodStart,
+            periodEndExclusive,
+          );
           break;
         case EvidenceSourceTypeGQL.ASSESSMENT:
           await this.assertAssessmentInOrganization(organizationId, clientId, item.sourceId);
@@ -677,7 +706,13 @@ export class CarePlanningRepository {
           await this.assertCarePlanInOrganization(organizationId, clientId, item.sourceId);
           break;
         case EvidenceSourceTypeGQL.CONCERN:
-          await this.assertConcernInOrganization(organizationId, clientId, item.sourceId);
+          await this.assertConcernInOrganization(
+            organizationId,
+            clientId,
+            item.sourceId,
+            periodStart,
+            periodEndExclusive,
+          );
           break;
         default:
           this.throwScopedRecordNotFound('Evidence source not found');
@@ -689,6 +724,8 @@ export class CarePlanningRepository {
     organizationId: string,
     clientId: string,
     careLogId: string,
+    periodStart: Date,
+    periodEndExclusive: Date,
   ): Promise<void> {
     const careLog = await (this.prisma as any).careLog.findFirst({
       where: {
@@ -696,6 +733,10 @@ export class CarePlanningRepository {
         organization_id: organizationId,
         client_id: clientId,
         deleted_at: null,
+        occurred_at: {
+          gte: periodStart,
+          lt: periodEndExclusive,
+        },
       },
       select: { id: true },
     });
@@ -709,11 +750,17 @@ export class CarePlanningRepository {
     organizationId: string,
     clientId: string,
     medicationAdministrationId: string,
+    periodStart: Date,
+    periodEndExclusive: Date,
   ): Promise<void> {
     const administration = await (this.prisma as any).medicationAdministration.findFirst({
       where: {
         id: medicationAdministrationId,
         deleted_at: null,
+        scheduled_time: {
+          gte: periodStart,
+          lt: periodEndExclusive,
+        },
         OR: [
           {
             visit: {
@@ -747,12 +794,18 @@ export class CarePlanningRepository {
     organizationId: string,
     clientId: string,
     concernId: string,
+    periodStart: Date,
+    periodEndExclusive: Date,
   ): Promise<void> {
     const concern = await (this.prisma as any).concern.findFirst({
       where: {
         id: concernId,
         organization_id: organizationId,
         client_id: clientId,
+        created_at: {
+          gte: periodStart,
+          lt: periodEndExclusive,
+        },
       },
       select: { id: true },
     });
@@ -763,11 +816,7 @@ export class CarePlanningRepository {
   }
 
   private throwScopedRecordNotFound(message: string): never {
-    throw new BaseHttpException(
-      ErrorCode.VALIDATION_FAILED,
-      message,
-      HttpStatus.NOT_FOUND,
-    );
+    throw new BaseHttpException(ErrorCode.VALIDATION_FAILED, message, HttpStatus.NOT_FOUND);
   }
 
   private assessmentModel(): any {

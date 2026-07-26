@@ -8,6 +8,8 @@ import {
   type SelectionSetNode,
 } from 'graphql'
 import {
+  CLIENT_CONTEXT_QUERY,
+  CLIENT_CONTEXTS_QUERY,
   EVIDENCE_SOURCE_CANDIDATES_QUERY,
   INSPECTION_RECORD_CLIENT_QUERY,
   INSPECTION_RECORD_EXPORT_QUERY,
@@ -31,7 +33,10 @@ function fieldAt(document: DocumentNode, path: string[]): FieldNode {
         selection.kind === Kind.FIELD && selection.name.value === name,
     )
     assert.ok(current, `Expected GraphQL field ${path.join('.')}`)
-    assert.ok(current.selectionSet, `Expected ${path.join('.')} to select fields`)
+    assert.ok(
+      current.selectionSet,
+      `Expected ${path.join('.')} to select fields`,
+    )
     selectionSet = current.selectionSet
   }
   return current!
@@ -40,7 +45,9 @@ function fieldAt(document: DocumentNode, path: string[]): FieldNode {
 function selectedNames(field: FieldNode): string[] {
   assert.ok(field.selectionSet)
   return field.selectionSet.selections
-    .filter((selection): selection is FieldNode => selection.kind === Kind.FIELD)
+    .filter(
+      (selection): selection is FieldNode => selection.kind === Kind.FIELD,
+    )
     .map((selection) => selection.name.value)
     .sort()
 }
@@ -51,6 +58,20 @@ test('inspection source candidate query selects safe metadata only', () => {
     selectedNames(fieldAt(document, ['evidenceSourceCandidates'])),
     ['id', 'occurredAt', 'sourceType', 'status'],
   )
+})
+
+test('care-planning client context queries select identifiers and names only', () => {
+  const listDocument = parse(CLIENT_CONTEXTS_QUERY)
+  assert.deepEqual(selectedNames(fieldAt(listDocument, ['clients', 'items'])), [
+    'fullName',
+    'id',
+  ])
+
+  const detailDocument = parse(CLIENT_CONTEXT_QUERY)
+  assert.deepEqual(selectedNames(fieldAt(detailDocument, ['client'])), [
+    'fullName',
+    'id',
+  ])
 })
 
 test('inspection workspace query selects safe record summaries only', () => {

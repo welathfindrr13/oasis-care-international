@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { clientQuery } from '../../lib/graphql/client-side'
 import {
   CREATE_EVIDENCE_PACK_MUTATION,
@@ -42,17 +42,33 @@ export function InspectionRecordActions({
   const [periodStart, setPeriodStart] = useState('')
   const [periodEnd, setPeriodEnd] = useState('')
   const [linkedCarePlanId, setLinkedCarePlanId] = useState('')
-  const [selectedAssessmentIds, setSelectedAssessmentIds] = useState<string[]>([])
+  const [selectedAssessmentIds, setSelectedAssessmentIds] = useState<string[]>(
+    [],
+  )
   const [selectedCarePlanIds, setSelectedCarePlanIds] = useState<string[]>([])
   const [selectedOperationalSources, setSelectedOperationalSources] = useState<
     InspectionSourceCandidate[]
   >([])
+  const [operationalSourcesReady, setOperationalSourcesReady] = useState(false)
   const [errors, setErrors] = useState<InspectionRecordValidationErrors>({})
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{
     type: 'success' | 'error'
     text: string
   } | null>(null)
+  const handleSelectedOperationalSourcesChange = useCallback(
+    (sources: InspectionSourceCandidate[]) => {
+      setSelectedOperationalSources(sources)
+      setErrors((current) => ({ ...current, sources: undefined }))
+    },
+    [],
+  )
+  const handleOperationalSourcesReadinessChange = useCallback(
+    (ready: boolean) => {
+      setOperationalSourcesReady(ready)
+    },
+    [],
+  )
 
   function toggleSelection(
     id: string,
@@ -100,6 +116,15 @@ export function InspectionRecordActions({
       periodEnd,
       selectedSourceCount: items.length,
     })
+    if (
+      periodStart &&
+      periodEnd &&
+      Object.keys(nextErrors).length === 0 &&
+      !operationalSourcesReady
+    ) {
+      nextErrors.sources =
+        'Wait for recorded items to finish loading before creating this inspection record.'
+    }
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) {
       focusFirstError(nextErrors)
@@ -136,7 +161,10 @@ export function InspectionRecordActions({
   }
 
   return (
-    <section className="mt-8" aria-labelledby="create-inspection-record-heading">
+    <section
+      className="mt-8"
+      aria-labelledby="create-inspection-record-heading"
+    >
       <h2
         id="create-inspection-record-heading"
         className="font-heading text-xl font-bold text-oasis-ink"
@@ -186,7 +214,12 @@ export function InspectionRecordActions({
               }
               onChange={(event) => {
                 setPeriodStart(event.target.value)
-                setErrors((current) => ({ ...current, periodStart: undefined }))
+                setSelectedOperationalSources([])
+                setOperationalSourcesReady(false)
+                setErrors((current) => ({
+                  ...current,
+                  periodStart: undefined,
+                }))
               }}
               className={controlClassName}
             />
@@ -214,6 +247,8 @@ export function InspectionRecordActions({
               }
               onChange={(event) => {
                 setPeriodEnd(event.target.value)
+                setSelectedOperationalSources([])
+                setOperationalSourcesReady(false)
                 setErrors((current) => ({ ...current, periodEnd: undefined }))
               }}
               className={controlClassName}
@@ -256,7 +291,9 @@ export function InspectionRecordActions({
           ref={sourceGroupRef}
           tabIndex={-1}
           aria-invalid={Boolean(errors.sources)}
-          aria-describedby={errors.sources ? 'inspection-sources-error' : undefined}
+          aria-describedby={
+            errors.sources ? 'inspection-sources-error' : undefined
+          }
           className="mt-5 rounded-md border border-oasis-border bg-base-gray-50 p-4 focus-visible:outline-none"
         >
           <legend className="px-1 text-sm font-semibold text-oasis-ink">
@@ -334,7 +371,8 @@ export function InspectionRecordActions({
                         }}
                       />
                       <span>
-                        v{plan.version} {plan.title} ({plan.status.toLowerCase()})
+                        v{plan.version} {plan.title} (
+                        {plan.status.toLowerCase()})
                       </span>
                     </label>
                   ))}
@@ -350,10 +388,8 @@ export function InspectionRecordActions({
             periodStart={periodStart}
             periodEnd={periodEnd}
             selectedSources={selectedOperationalSources}
-            onSelectedSourcesChange={(sources) => {
-              setSelectedOperationalSources(sources)
-              setErrors((current) => ({ ...current, sources: undefined }))
-            }}
+            onSelectedSourcesChange={handleSelectedOperationalSourcesChange}
+            onReadinessChange={handleOperationalSourcesReadinessChange}
             disabled={busy}
           />
         ) : null}
@@ -364,7 +400,14 @@ export function InspectionRecordActions({
           </FieldError>
         ) : null}
 
-        <Button type="submit" className="mt-5 w-full sm:w-auto" disabled={busy}>
+        <Button
+          type="submit"
+          className="mt-5 w-full sm:w-auto"
+          disabled={
+            busy ||
+            Boolean(periodStart && periodEnd && !operationalSourcesReady)
+          }
+        >
           {busy ? 'Creating inspection record…' : 'Create inspection record'}
         </Button>
       </form>

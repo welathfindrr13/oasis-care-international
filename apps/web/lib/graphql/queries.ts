@@ -193,6 +193,22 @@ export interface InspectionRecordClientQueryResponse {
   };
 }
 
+export interface ClientContext {
+  id: string;
+  fullName: string;
+}
+
+export interface ClientContextsQueryResponse {
+  clients: {
+    items: ClientContext[];
+    total: number;
+  };
+}
+
+export interface ClientContextQueryResponse {
+  client: ClientContext;
+}
+
 /**
  * Query to fetch clients with pagination and search
  * Note: lastVisitAt and nextVisitAt are not yet supported by the API
@@ -229,6 +245,27 @@ export const CLIENT_QUERY = `
 export const INSPECTION_RECORD_CLIENT_QUERY = `
   query InspectionRecordClient($id: String!) {
     client(id: $id) {
+      fullName
+    }
+  }
+`;
+
+export const CLIENT_CONTEXTS_QUERY = `
+  query ClientContexts($skip: Int, $take: Int) {
+    clients(skip: $skip, take: $take) {
+      items {
+        id
+        fullName
+      }
+      total
+    }
+  }
+`;
+
+export const CLIENT_CONTEXT_QUERY = `
+  query ClientContext($id: String!) {
+    client(id: $id) {
+      id
       fullName
     }
   }

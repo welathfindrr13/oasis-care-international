@@ -8,9 +8,7 @@ import {
   type InspectionSourceCandidate,
   type OperationalInspectionSourceType,
 } from '../../lib/graphql/queries'
-import {
-  inspectionRecordTypeLabel,
-} from '../../lib/inspection-records'
+import { inspectionRecordTypeLabel } from '../../lib/inspection-records'
 import { formatDateTime, getOrganizationDateUtcRange } from '../../lib/time'
 import { Button } from '../ui/Button'
 import { StatePanel } from '../ui/StatePanel'
@@ -22,6 +20,7 @@ interface InspectionRecordSourcePickerProps {
   periodEnd: string
   selectedSources: InspectionSourceCandidate[]
   onSelectedSourcesChange: (sources: InspectionSourceCandidate[]) => void
+  onReadinessChange: (ready: boolean) => void
   disabled?: boolean
 }
 
@@ -59,6 +58,7 @@ export function InspectionRecordSourcePicker({
   periodEnd,
   selectedSources,
   onSelectedSourcesChange,
+  onReadinessChange,
   disabled = false,
 }: InspectionRecordSourcePickerProps) {
   const [enabledSourceTypes, setEnabledSourceTypes] = useState<
@@ -77,12 +77,14 @@ export function InspectionRecordSourcePicker({
       setCandidates([])
       setError(false)
       setLoading(false)
+      onReadinessChange(enabledSourceTypes.length === 0)
       return
     }
 
     let ignore = false
     setLoading(true)
     setError(false)
+    onReadinessChange(false)
 
     clientQuery<EvidenceSourceCandidatesQueryResponse>(
       EVIDENCE_SOURCE_CANDIDATES_QUERY,
@@ -105,11 +107,14 @@ export function InspectionRecordSourcePicker({
             ),
         )
         setCandidates(safeCandidates)
+        onReadinessChange(true)
       })
       .catch(() => {
         if (!ignore) {
           setCandidates([])
           setError(true)
+          onSelectedSourcesChange([])
+          onReadinessChange(false)
         }
       })
       .finally(() => {
@@ -119,15 +124,24 @@ export function InspectionRecordSourcePicker({
     return () => {
       ignore = true
     }
-  }, [clientId, periodStart, periodEnd, enabledSourceTypes])
+  }, [
+    clientId,
+    periodStart,
+    periodEnd,
+    enabledSourceTypes,
+    onReadinessChange,
+    onSelectedSourcesChange,
+  ])
 
   function toggleFilter(sourceType: OperationalInspectionSourceType) {
-    setEnabledSourceTypes((current) =>
-      current.includes(sourceType)
-        ? current.filter((item) => item !== sourceType)
-        : SOURCE_FILTERS.map((filter) => filter.value).filter(
-            (item) => item === sourceType || current.includes(item),
-          ),
+    const next = enabledSourceTypes.includes(sourceType)
+      ? enabledSourceTypes.filter((item) => item !== sourceType)
+      : SOURCE_FILTERS.map((filter) => filter.value).filter(
+          (item) => item === sourceType || enabledSourceTypes.includes(item),
+        )
+    setEnabledSourceTypes(next)
+    onSelectedSourcesChange(
+      selectedSources.filter((source) => next.includes(source.sourceType)),
     )
   }
 
@@ -153,7 +167,10 @@ export function InspectionRecordSourcePicker({
         content are not shown or copied into the inspection record.
       </p>
 
-      <div className="mt-3 flex flex-wrap gap-2" aria-label="Record type filters">
+      <div
+        className="mt-3 flex flex-wrap gap-2"
+        aria-label="Record type filters"
+      >
         {SOURCE_FILTERS.map((filter) => {
           const active = enabledSourceTypes.includes(filter.value)
           return (
@@ -196,10 +213,7 @@ export function InspectionRecordSourcePicker({
       !error &&
       enabledSourceTypes.length > 0 &&
       candidates.length === 0 ? (
-        <StatePanel
-          className="mt-4"
-          title="No recorded items in this period"
-        >
+        <StatePanel className="mt-4" title="No recorded items in this period">
           Change the dates or record types if you expected to find an item.
         </StatePanel>
       ) : null}
@@ -226,7 +240,7 @@ export function InspectionRecordSourcePicker({
                   </span>
                 </span>
                 <StatusLabel tone={selected ? 'success' : 'neutral'}>
-                  {selected ? 'Included' : candidate.status ?? 'Available'}
+                  {selected ? 'Included' : (candidate.status ?? 'Available')}
                 </StatusLabel>
               </button>
             )
@@ -234,7 +248,11 @@ export function InspectionRecordSourcePicker({
         </div>
       ) : null}
 
-      <p className="mt-4 text-sm font-medium text-oasis-ink" role="status" aria-live="polite">
+      <p
+        className="mt-4 text-sm font-medium text-oasis-ink"
+        role="status"
+        aria-live="polite"
+      >
         {selectedSources.length}{' '}
         {selectedSources.length === 1 ? 'record' : 'records'} selected
       </p>
