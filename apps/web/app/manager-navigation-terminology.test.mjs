@@ -78,6 +78,8 @@ test("requested client context is fetched exactly and never falls back to anothe
     assert.match(page, /getRequestedPersonSafe\(requestedClientId\)/);
     assert.doesNotMatch(page, /people\.find\([^)]*clientId[^)]*\)\s*\?\?\s*people\[0\]/);
     assert.match(page, /requestedPersonUnavailable/);
+    assert.match(page, /const requestedClientInvalid = Array\.isArray\(requestedClientParam\)/);
+    assert.match(page, /selectedPerson && !peopleResult\.unavailable/);
   }
 });
 

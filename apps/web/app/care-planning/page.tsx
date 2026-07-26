@@ -27,7 +27,7 @@ export const dynamic = 'force-dynamic'
 
 interface CarePlanningPageProps {
   searchParams?: Promise<{
-    clientId?: string
+    clientId?: string | string[]
   }>
 }
 
@@ -240,13 +240,19 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
   }
 
   const searchParams = await props.searchParams
-  const requestedClientId = searchParams?.clientId?.trim()
+  const requestedClientParam = searchParams?.clientId
+  const requestedClientInvalid = Array.isArray(requestedClientParam)
+  const requestedClientId =
+    typeof requestedClientParam === 'string' ? requestedClientParam.trim() : undefined
   const peopleResult = await getPeopleSafe()
   const people = peopleResult.people
-  const selectedPerson = requestedClientId
-    ? await getRequestedPersonSafe(requestedClientId)
-    : people[0]
-  const requestedPersonUnavailable = Boolean(requestedClientId && !selectedPerson)
+  const selectedPerson = requestedClientInvalid
+    ? null
+    : requestedClientId
+      ? await getRequestedPersonSafe(requestedClientId)
+      : people[0]
+  const requestedPersonUnavailable =
+    requestedClientInvalid || Boolean(requestedClientId && !selectedPerson)
   const carePlanning = selectedPerson ? await getCarePlanningSafe(selectedPerson.id) : null
   const carePlanningUnavailable = Boolean(selectedPerson && carePlanning === null)
 
@@ -301,7 +307,7 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
             title="Care-planning clients are unavailable"
             action={
               <form action="/care-planning" method="get">
-                {searchParams?.clientId ? <input type="hidden" name="clientId" value={searchParams.clientId} /> : null}
+                {requestedClientId ? <input type="hidden" name="clientId" value={requestedClientId} /> : null}
                 <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
                   Try again
                 </button>
@@ -348,7 +354,7 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
             title="The requested client is unavailable"
             action={
               <form action="/care-planning" method="get">
-                <input type="hidden" name="clientId" value={requestedClientId} />
+                {requestedClientId ? <input type="hidden" name="clientId" value={requestedClientId} /> : null}
                 <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
                   Try again
                 </button>
@@ -430,7 +436,7 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
           </section>
         )}
 
-        {selectedPerson && !carePlanningUnavailable && (
+        {selectedPerson && !peopleResult.unavailable && !carePlanningUnavailable && (
           <CarePlanningActions
             clientId={selectedPerson.id}
             assessments={assessments}

@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic'
 
 interface EvidencePageProps {
   searchParams?: Promise<{
-    clientId?: string
+    clientId?: string | string[]
   }>
 }
 
@@ -60,13 +60,19 @@ function formatRecordDate(value?: string | null): string {
 
 export default async function EvidencePage(props: EvidencePageProps) {
   const searchParams = await props.searchParams
-  const requestedClientId = searchParams?.clientId?.trim()
+  const requestedClientParam = searchParams?.clientId
+  const requestedClientInvalid = Array.isArray(requestedClientParam)
+  const requestedClientId =
+    typeof requestedClientParam === 'string' ? requestedClientParam.trim() : undefined
   const peopleResult = await getPeopleSafe()
   const people = peopleResult.people
-  const selectedPerson = requestedClientId
-    ? await getRequestedPersonSafe(requestedClientId)
-    : people[0]
-  const requestedPersonUnavailable = Boolean(requestedClientId && !selectedPerson)
+  const selectedPerson = requestedClientInvalid
+    ? null
+    : requestedClientId
+      ? await getRequestedPersonSafe(requestedClientId)
+      : people[0]
+  const requestedPersonUnavailable =
+    requestedClientInvalid || Boolean(requestedClientId && !selectedPerson)
   const carePlanning = selectedPerson ? await getEvidenceSafe(selectedPerson.id) : null
   const evidenceUnavailable = Boolean(selectedPerson && carePlanning === null)
   const carePlans = carePlanning?.carePlans ?? []
@@ -111,7 +117,7 @@ export default async function EvidencePage(props: EvidencePageProps) {
             title="Inspection-record clients are unavailable"
             action={
               <form action="/evidence" method="get">
-                {searchParams?.clientId ? <input type="hidden" name="clientId" value={searchParams.clientId} /> : null}
+                {requestedClientId ? <input type="hidden" name="clientId" value={requestedClientId} /> : null}
                 <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
                   Try again
                 </button>
@@ -129,7 +135,7 @@ export default async function EvidencePage(props: EvidencePageProps) {
             title="The requested client is unavailable"
             action={
               <form action="/evidence" method="get">
-                <input type="hidden" name="clientId" value={requestedClientId} />
+                {requestedClientId ? <input type="hidden" name="clientId" value={requestedClientId} /> : null}
                 <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
                   Try again
                 </button>
@@ -224,7 +230,7 @@ export default async function EvidencePage(props: EvidencePageProps) {
           </section>
         ) : null}
 
-        {selectedPerson && !evidenceUnavailable && (
+        {selectedPerson && !peopleResult.unavailable && !evidenceUnavailable && (
           <CarePlanningActions
             clientId={selectedPerson.id}
             assessments={assessments}
