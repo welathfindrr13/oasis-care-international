@@ -88,3 +88,26 @@ test("client details return each role to an accessible directory", () => {
   assert.match(clientDetails, /href=\{directoryHref\}>Back to \{entityLabelPlural\}/);
   assert.match(clientDetails, /href=\{directoryHref\} className="text-slate-500/);
 });
+
+test("client details do not advertise admin-only care notes to Carers", () => {
+  assert.match(
+    clientDetails,
+    /isAdmin\s*\?\s*\[\s*\{ label: 'Care Notes', href: `\/clients\/\$\{client\.id\}\/care-logs` \}/,
+  );
+  assert.match(
+    clientDetails,
+    /\{isAdmin && \(\s*<>\s*<Button[\s\S]*?Care Notes/,
+  );
+});
+
+test("partial visit and care-planning failures are unavailable, never empty", () => {
+  assert.match(clientDetails, /const \{ visits: recentVisits, error: visitsError \}/);
+  assert.match(clientDetails, /const carePlanningError = carePlanningResult\?\.error/);
+  assert.match(clientDetails, /kind="unavailable"[\s\S]*title="Recent visits are unavailable"/);
+  assert.match(clientDetails, /kind="unavailable"[\s\S]*title="Next visit is unavailable"/);
+  assert.match(clientDetails, /kind="unavailable"[\s\S]*title="Inspection records are unavailable"/);
+  assert.match(clientDetails, /visitsError\s*\?\s*'Visit information unavailable'/);
+  assert.match(clientDetails, /carePlanningError\s*\?\s*'Assessment information unavailable'/);
+  assert.match(clientDetails, /carePlanningError\s*\?\s*'Care-plan information unavailable'/);
+  assert.match(clientDetails, /carePlanningError\s*\?\s*'Review information unavailable'/);
+});

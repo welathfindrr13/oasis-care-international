@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Header } from '../../../components/oasis/Header'
 import { Card, CardContent, CardHeader } from '../../../components/ui/Card'
 import { Button } from '../../../components/ui/Button'
+import { StatePanel } from '../../../components/ui/StatePanel'
 import { DeleteClientButton } from '../../../components/oasis/DeleteClientButton'
 import { getServerAuthContext } from '../../../lib/auth/server-auth'
 import { query } from '../../../lib/graphql/client'
@@ -64,9 +65,15 @@ async function getRecentVisitsSafe(clientId: string) {
 
 async function getCarePlanningSafe(clientId: string) {
   try {
-    return await query<CarePlanningQueryResponse>(CARE_PLANNING_QUERY, { clientId, take: 20 })
-  } catch {
-    return null
+    return {
+      carePlanning: await query<CarePlanningQueryResponse>(CARE_PLANNING_QUERY, { clientId, take: 20 }),
+      error: null as string | null,
+    }
+  } catch (error: any) {
+    return {
+      carePlanning: null,
+      error: error?.message || 'Failed to load care-planning records',
+    }
   }
 }
 
@@ -150,9 +157,13 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
     )
   }
 
-  const { visits: recentVisits } = await getRecentVisitsSafe(client.id)
-  const carePlanning = isAdmin ? await getCarePlanningSafe(client.id) : null
-  const nextVisit = recentVisits.find((visit) => new Date(visit.scheduledStart) > new Date())
+  const { visits: recentVisits, error: visitsError } = await getRecentVisitsSafe(client.id)
+  const carePlanningResult = isAdmin ? await getCarePlanningSafe(client.id) : null
+  const carePlanning = carePlanningResult?.carePlanning ?? null
+  const carePlanningError = carePlanningResult?.error ?? null
+  const nextVisit = visitsError
+    ? null
+    : recentVisits.find((visit) => new Date(visit.scheduledStart) > new Date())
   const assessments = carePlanning?.assessments ?? []
   const carePlans = carePlanning?.carePlans ?? []
   const evidencePacks = carePlanning?.evidencePacks ?? []
@@ -168,9 +179,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
   const scheduleVisitHref = `/visits/new?${new URLSearchParams({ clientId: client.id }).toString()}`
   const profileTabs = [
     { label: 'Overview', href: `/clients/${client.id}` },
-    { label: 'Care Notes', href: `/clients/${client.id}/care-logs` },
     ...(isAdmin
       ? [
+          { label: 'Care Notes', href: `/clients/${client.id}/care-logs` },
           { label: 'Schedule', href: `/schedule?clientId=${client.id}` },
           { label: 'Family access', href: `/clients/${client.id}/carebridge` },
           { label: 'Care planning', href: `/care-planning?clientId=${client.id}` },
@@ -213,13 +224,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
                 <Button asChild variant="outline" size="sm">
                   <Link href={`/clients/${client.id}/summary`}>AI Health Summary</Link>
                 </Button>
-              </>
-            )}
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/clients/${client.id}/care-logs`}>Care Notes</Link>
-            </Button>
-            {isAdmin && (
-              <>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/clients/${client.id}/care-logs`}>Care Notes</Link>
+                </Button>
                 <Button asChild variant="secondary" size="sm">
                   <Link href={`/clients/${client.id}/edit`}>Edit</Link>
                 </Button>
@@ -239,9 +246,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
             <div className="rounded-2xl bg-teal-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">Next visit</p>
               <p className="mt-2 text-sm font-semibold text-teal-950">
-                {nextVisit
-                  ? formatShortDateTime(nextVisit.scheduledStart)
-                  : 'No upcoming visit'}
+                {visitsError
+                  ? 'Visit information unavailable'
+                  : nextVisit
+                    ? formatShortDateTime(nextVisit.scheduledStart)
+                    : 'No upcoming visit'}
               </p>
             </div>
             {isAdmin && (
@@ -249,24 +258,30 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
                 <div className="rounded-2xl bg-sky-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Assessments</p>
                   <p className="mt-2 text-sm font-semibold text-sky-950">
-                    {assessments.length > 0
-                      ? `${completedAssessments.length} completed · ${inProgressAssessments} in progress`
-                      : 'No assessments recorded'}
+                    {carePlanningError
+                      ? 'Assessment information unavailable'
+                      : assessments.length > 0
+                        ? `${completedAssessments.length} completed · ${inProgressAssessments} in progress`
+                        : 'No assessments recorded'}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-amber-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Active care plan</p>
                   <p className="mt-2 text-sm font-semibold text-amber-950">
-                    {activeCarePlan
-                      ? `${activeCarePlan.title} · v${activeCarePlan.version}`
-                      : draftCarePlans.length > 0
-                        ? `${draftCarePlans.length} draft ${draftCarePlans.length === 1 ? 'plan' : 'plans'}`
-                        : 'No active or draft plan'}
+                    {carePlanningError
+                      ? 'Care-plan information unavailable'
+                      : activeCarePlan
+                        ? `${activeCarePlan.title} · v${activeCarePlan.version}`
+                        : draftCarePlans.length > 0
+                          ? `${draftCarePlans.length} draft ${draftCarePlans.length === 1 ? 'plan' : 'plans'}`
+                          : 'No active or draft plan'}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-slate-100 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">Review due</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-950">{formatShortDate(reviewDueDate)}</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-950">
+                    {carePlanningError ? 'Review information unavailable' : formatShortDate(reviewDueDate)}
+                  </p>
                 </div>
               </>
             )}
@@ -324,7 +339,16 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
                 </div>
               </CardHeader>
               <CardContent>
-                {recentVisits.length === 0 ? (
+                {visitsError ? (
+                  <StatePanel
+                    action={<Link href={`/clients/${client.id}`}>Try again</Link>}
+                    headingLevel={2}
+                    kind="unavailable"
+                    title="Recent visits are unavailable"
+                  >
+                    We could not load recent visits. No visit records have been changed.
+                  </StatePanel>
+                ) : recentVisits.length === 0 ? (
                   <p className="text-slate-500">
                     No visits found for this {entityLabel} yet.
                   </p>
@@ -369,7 +393,16 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
                 <h2 className="text-lg font-semibold text-slate-900">Next Visit</h2>
               </CardHeader>
               <CardContent>
-                {nextVisit ? (
+                {visitsError ? (
+                  <StatePanel
+                    action={<Link href={`/clients/${client.id}`}>Try again</Link>}
+                    headingLevel={2}
+                    kind="unavailable"
+                    title="Next visit is unavailable"
+                  >
+                    We could not confirm the next visit. Try again before relying on this information.
+                  </StatePanel>
+                ) : nextVisit ? (
                   <div className="bg-teal-50 rounded-xl p-4">
                     <p className="text-lg font-semibold text-teal-900">
                       {formatDate(nextVisit.scheduledStart, {
@@ -393,38 +426,49 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
                   <h2 className="text-lg font-semibold text-slate-900">Evidence packs</h2>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    <div className="rounded-xl bg-slate-50 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Coverage</p>
-                      <p className="mt-2 text-sm font-semibold text-slate-900">
-                        {evidencePacks.length > 0
-                          ? `${evidencePacks.length} packs · latest includes ${latestEvidencePack?.items.length ?? 0} items`
-                          : 'No evidence packs created'}
-                      </p>
-                      {latestEvidencePack && (
-                        <p className="mt-2 text-xs text-slate-600">
-                          Assessment evidence: {hasAssessmentEvidence ? 'Included' : 'Not included'} · Care plan evidence:{' '}
-                          {hasCarePlanEvidence ? 'Included' : 'Not included'}
+                  {carePlanningError ? (
+                    <StatePanel
+                      action={<Link href={`/clients/${client.id}`}>Try again</Link>}
+                      headingLevel={2}
+                      kind="unavailable"
+                      title="Inspection records are unavailable"
+                    >
+                      We could not load inspection-record coverage. No records have been changed.
+                    </StatePanel>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="rounded-xl bg-slate-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Coverage</p>
+                        <p className="mt-2 text-sm font-semibold text-slate-900">
+                          {evidencePacks.length > 0
+                            ? `${evidencePacks.length} packs · latest includes ${latestEvidencePack?.items.length ?? 0} items`
+                            : 'No evidence packs created'}
                         </p>
-                      )}
+                        {latestEvidencePack && (
+                          <p className="mt-2 text-xs text-slate-600">
+                            Assessment evidence: {hasAssessmentEvidence ? 'Included' : 'Not included'} · Care plan evidence:{' '}
+                            {hasCarePlanEvidence ? 'Included' : 'Not included'}
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
+                          <Link href={`/clients/${client.id}/carebridge`}>Family Updates room</Link>
+                        </Button>
+                        <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
+                          <Link href={`/clients/${client.id}/summary`}>AI Health Summary</Link>
+                        </Button>
+                        <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
+                          <Link href={`/clients/${client.id}/care-logs`}>Care Notes</Link>
+                        </Button>
+                        <Button asChild variant="primary" className="w-full justify-start rounded-xl px-4 py-3 text-left">
+                          <a href={scheduleVisitHref}>
+                            Schedule care visit
+                          </a>
+                        </Button>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
-                        <Link href={`/clients/${client.id}/carebridge`}>Family Updates room</Link>
-                      </Button>
-                      <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
-                        <Link href={`/clients/${client.id}/summary`}>AI Health Summary</Link>
-                      </Button>
-                      <Button asChild variant="ghost" className="w-full justify-start rounded-xl px-4 py-3 text-left text-slate-700">
-                        <Link href={`/clients/${client.id}/care-logs`}>Care Notes</Link>
-                      </Button>
-                      <Button asChild variant="primary" className="w-full justify-start rounded-xl px-4 py-3 text-left">
-                        <a href={scheduleVisitHref}>
-                          Schedule care visit
-                        </a>
-                      </Button>
-                    </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             )}
