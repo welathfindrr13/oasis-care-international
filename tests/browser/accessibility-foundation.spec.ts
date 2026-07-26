@@ -555,6 +555,7 @@ test("Platform Owner cleanup attention remains truthful and retryable", async ({
     page.getByText("Cleanup needs attention", { exact: true }),
   ).toBeVisible();
   await page.waitForLoadState("networkidle");
+  await expect(page).toHaveTitle(/\S/);
   await expectAccessibilityFoundation(page, {
     sequentialKeyboardTraversal: false,
   });
