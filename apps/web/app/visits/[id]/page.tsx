@@ -16,6 +16,7 @@ import {
   formatTime as formatOrganizationTime,
   organizationDateTimeInputToIso,
 } from '../../../lib/time';
+import { hasRecordedVisitCare } from '../visitProgress';
 
 type VisitStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 type TaskOutcome = 'DONE' | 'NOT_DONE' | 'REFUSED' | 'NOT_REQUIRED' | 'CONCERN_RAISED';
@@ -349,9 +350,10 @@ export default function VisitDetailPage() {
 
   const hasStartedVisit = visit?.status === 'IN_PROGRESS' || visit?.status === 'COMPLETED';
   const visitIsClosed = visit?.status === 'COMPLETED' || visit?.status === 'CANCELLED';
-  const hasRecordedCare =
-    (visit?.tasks || []).some((task) => task.hasRecordedOutcome) ||
-    careLogs.length > 0;
+  const hasRecordedCare = hasRecordedVisitCare(
+    visit?.tasks || [],
+    careLogs.length,
+  );
 
   async function startVisit() {
     if (!visit || !canRunVisitWorkflow || visit.status !== 'SCHEDULED') return;
