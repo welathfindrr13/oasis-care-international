@@ -187,6 +187,28 @@ export interface ClientQueryResponse {
   client: ClientListItem;
 }
 
+export interface InspectionRecordClientQueryResponse {
+  client: {
+    fullName: string;
+  };
+}
+
+export interface ClientContext {
+  id: string;
+  fullName: string;
+}
+
+export interface ClientContextsQueryResponse {
+  clients: {
+    items: ClientContext[];
+    total: number;
+  };
+}
+
+export interface ClientContextQueryResponse {
+  client: ClientContext;
+}
+
 /**
  * Query to fetch clients with pagination and search
  * Note: lastVisitAt and nextVisitAt are not yet supported by the API
@@ -216,6 +238,35 @@ export const CLIENT_QUERY = `
       addressLine2
       city
       postcode
+    }
+  }
+`;
+
+export const INSPECTION_RECORD_CLIENT_QUERY = `
+  query InspectionRecordClient($id: String!) {
+    client(id: $id) {
+      fullName
+    }
+  }
+`;
+
+export const CLIENT_CONTEXTS_QUERY = `
+  query ClientContexts($skip: Int, $take: Int) {
+    clients(skip: $skip, take: $take) {
+      items {
+        id
+        fullName
+      }
+      total
+    }
+  }
+`;
+
+export const CLIENT_CONTEXT_QUERY = `
+  query ClientContext($id: String!) {
+    client(id: $id) {
+      id
+      fullName
     }
   }
 `;
@@ -257,18 +308,20 @@ export interface CarePlanRecord {
   updatedAt: string;
 }
 
-export interface EvidencePackItemRecord {
+export type InspectionRecordSourceType =
+  | "VISIT"
+  | "CARE_LOG"
+  | "ASSESSMENT"
+  | "CARE_PLAN"
+  | "CONCERN";
+
+export interface InspectionRecordItem {
   id: string;
-  sourceType: string;
-  sourceId?: string | null;
+  sourceType: InspectionRecordSourceType;
   occurredAt?: string | null;
-  headline: string;
-  detail?: string | null;
-  metadata?: Record<string, unknown> | null;
-  createdAt: string;
 }
 
-export interface EvidencePackRecord {
+export interface InspectionRecord {
   id: string;
   clientId: string;
   carePlanId?: string | null;
@@ -276,41 +329,50 @@ export interface EvidencePackRecord {
   kind: string;
   periodStart: string;
   periodEnd: string;
-  summary?: Record<string, unknown> | null;
-  sourceRefs: Record<string, unknown>;
-  generatedBy: string;
   generatedAt: string;
   publishedAt?: string | null;
-  items: EvidencePackItemRecord[];
-  createdAt: string;
-  updatedAt: string;
+  items: InspectionRecordItem[];
 }
 
-export type OperationalEvidenceSourceType =
-  | "VISIT"
-  | "CARE_LOG"
-  | "MEDICATION_ADMINISTRATION"
-  | "CONCERN";
+export type OperationalInspectionSourceType = "VISIT" | "CARE_LOG" | "CONCERN";
 
-export interface EvidenceSourceCandidateRecord {
+export interface InspectionSourceCandidate {
   id: string;
-  sourceType: OperationalEvidenceSourceType;
-  title: string;
-  subtitle?: string | null;
+  sourceType: OperationalInspectionSourceType;
   occurredAt: string;
-  createdBy?: string | null;
   status?: string | null;
-  previewText?: string | null;
 }
 
 export interface EvidenceSourceCandidatesQueryResponse {
-  evidenceSourceCandidates: EvidenceSourceCandidateRecord[];
+  evidenceSourceCandidates: InspectionSourceCandidate[];
 }
 
 export interface CarePlanningQueryResponse {
   assessments: AssessmentRecord[];
   carePlans: CarePlanRecord[];
-  evidencePacks: EvidencePackRecord[];
+}
+
+export type InspectionAssessmentRecord = Pick<
+  AssessmentRecord,
+  "id" | "title" | "status" | "completedAt" | "createdAt"
+>;
+
+export type InspectionCarePlanRecord = Pick<
+  CarePlanRecord,
+  | "id"
+  | "title"
+  | "status"
+  | "version"
+  | "assessmentId"
+  | "approvedAt"
+  | "effectiveFrom"
+  | "createdAt"
+>;
+
+export interface InspectionRecordsQueryResponse {
+  assessments: InspectionAssessmentRecord[];
+  carePlans: InspectionCarePlanRecord[];
+  evidencePacks: InspectionRecord[];
 }
 
 export interface CreateAssessmentInput {
@@ -426,6 +488,28 @@ export const CARE_PLANNING_QUERY = `
       createdAt
       updatedAt
     }
+  }
+`;
+
+export const INSPECTION_RECORDS_QUERY = `
+  query InspectionRecords($clientId: String!, $take: Int) {
+    assessments(clientId: $clientId, take: $take) {
+      id
+      status
+      title
+      completedAt
+      createdAt
+    }
+    carePlans(clientId: $clientId, take: $take) {
+      id
+      assessmentId
+      status
+      version
+      title
+      effectiveFrom
+      approvedAt
+      createdAt
+    }
     evidencePacks(clientId: $clientId, take: $take) {
       id
       clientId
@@ -434,23 +518,13 @@ export const CARE_PLANNING_QUERY = `
       kind
       periodStart
       periodEnd
-      summary
-      sourceRefs
-      generatedBy
       generatedAt
       publishedAt
       items {
         id
         sourceType
-        sourceId
         occurredAt
-        headline
-        detail
-        metadata
-        createdAt
       }
-      createdAt
-      updatedAt
     }
   }
 `;
@@ -460,47 +534,32 @@ export const EVIDENCE_SOURCE_CANDIDATES_QUERY = `
     evidenceSourceCandidates(input: $input) {
       id
       sourceType
-      title
-      subtitle
       occurredAt
-      createdBy
       status
-      previewText
     }
   }
 `;
 
-export interface EvidencePackQueryResponse {
-  getEvidencePack: EvidencePackRecord;
+export interface InspectionRecordExportQueryResponse {
+  getEvidencePack: InspectionRecord;
 }
 
-export const EVIDENCE_PACK_QUERY = `
-  query EvidencePack($id: String!) {
+export const INSPECTION_RECORD_EXPORT_QUERY = `
+  query InspectionRecordExport($id: String!) {
     getEvidencePack(id: $id) {
       id
       clientId
-      carePlanId
       status
       kind
       periodStart
       periodEnd
-      summary
-      sourceRefs
-      generatedBy
       generatedAt
       publishedAt
       items {
         id
         sourceType
-        sourceId
         occurredAt
-        headline
-        detail
-        metadata
-        createdAt
       }
-      createdAt
-      updatedAt
     }
   }
 `;
@@ -599,14 +658,6 @@ export const CREATE_EVIDENCE_PACK_MUTATION = `
       periodEnd
       generatedAt
       publishedAt
-      items {
-        id
-        sourceType
-        headline
-        detail
-      }
-      createdAt
-      updatedAt
     }
   }
 `;

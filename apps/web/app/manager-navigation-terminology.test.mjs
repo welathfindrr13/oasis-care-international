@@ -61,32 +61,77 @@ test("compatible aliases remain while service monitoring stays separate", () => 
   assert.match(metrics, /TENANT_ADMIN/);
 });
 
-test("care planning checks authority before loading the client directory", () => {
-  const gate = carePlanning.indexOf(
-    "hasAccessCapability(accessSnapshot.capabilities, 'TENANT_ADMIN')",
-  );
-  const query = carePlanning.indexOf(
-    "const peopleResult = await getPeopleSafe()",
-  );
-  assert.ok(gate > -1);
-  assert.ok(query > gate);
+test("care planning and inspection records check authority before loading clients", () => {
+  for (const page of [carePlanning, evidence]) {
+    const gate = page.search(
+      /hasAccessCapability\(accessSnapshot\.capabilities,\s*["']TENANT_ADMIN["']\)/,
+    );
+    const query = page.indexOf("const clientsResult = await getClientsSafe()");
+    assert.ok(gate > -1);
+    assert.ok(query > gate);
+  }
 });
 
 test("requested client context is fetched exactly and never falls back to another client", () => {
   for (const page of [carePlanning, evidence]) {
-    assert.match(page, /CLIENT_QUERY/);
-    assert.match(page, /getRequestedPersonSafe\(requestedClientId\)/);
-    assert.doesNotMatch(page, /people\.find\([^)]*clientId[^)]*\)\s*\?\?\s*people\[0\]/);
-    assert.match(page, /requestedPersonUnavailable/);
-    assert.match(page, /const requestedClientInvalid = Array\.isArray\(requestedClientParam\)/);
-    assert.match(page, /selectedPerson && !peopleResult\.unavailable/);
+    assert.match(page, /CLIENT_CONTEXTS_QUERY/);
+    assert.match(page, /CLIENT_CONTEXT_QUERY/);
+    assert.doesNotMatch(page, /\bCLIENTS_QUERY\b/);
+    assert.doesNotMatch(page, /\bCLIENT_QUERY\b/);
+    assert.match(page, /getRequestedClientSafe\(requestedClientId\)/);
+    assert.doesNotMatch(
+      page,
+      /clients\.find\([^)]*clientId[^)]*\)\s*\?\?\s*clients\[0\]/,
+    );
+    assert.match(page, /requestedClientUnavailable/);
+    assert.match(
+      page,
+      /const requestedClientInvalid = Array\.isArray\(requestedClientParam\)/,
+    );
   }
 });
 
+test("client-list or requested-client failure keeps every mutation and download surface closed", () => {
+  assert.match(
+    carePlanning,
+    /\{selectedClient\s*&&\s*!clientsResult\.unavailable\s*&&\s*!requestedClientUnavailable\s*&&\s*!carePlanningUnavailable\s*\?\s*\([\s\S]*?<CarePlanningActions/,
+  );
+  assert.match(
+    evidence,
+    /\{selectedClient\s*&&\s*!clientsResult\.unavailable\s*&&\s*!requestedClientUnavailable\s*&&\s*!recordsUnavailable\s*\?\s*\([\s\S]*?<InspectionRecordList[\s\S]*?<InspectionRecordActions/,
+  );
+});
+
+test("care planning and inspection records keep their actions separate", () => {
+  assert.doesNotMatch(
+    carePlanning,
+    /InspectionRecordActions|Create inspection record|Evidence packs/,
+  );
+  assert.doesNotMatch(
+    evidence,
+    /CarePlanningActions|Create assessment|Activate care plan|Archive care plan/,
+  );
+  assert.match(carePlanning, /CarePlanningActions/);
+  assert.match(evidence, /InspectionRecordActions/);
+  assert.doesNotMatch(
+    carePlanning + evidence,
+    /proof-led|source-linked|bg-gradient/,
+  );
+});
+
 test("client details return each role to an accessible directory", () => {
-  assert.match(clientDetails, /const directoryHref = isAdmin \? '\/clients' : '\/people'/);
-  assert.match(clientDetails, /href=\{directoryHref\}>Back to \{entityLabelPlural\}/);
-  assert.match(clientDetails, /href=\{directoryHref\} className="text-slate-500/);
+  assert.match(
+    clientDetails,
+    /const directoryHref = isAdmin \? '\/clients' : '\/people'/,
+  );
+  assert.match(
+    clientDetails,
+    /href=\{directoryHref\}>Back to \{entityLabelPlural\}/,
+  );
+  assert.match(
+    clientDetails,
+    /href=\{directoryHref\} className="text-slate-500/,
+  );
 });
 
 test("client details do not advertise admin-only care notes to Carers", () => {
@@ -101,13 +146,40 @@ test("client details do not advertise admin-only care notes to Carers", () => {
 });
 
 test("partial visit and care-planning failures are unavailable, never empty", () => {
-  assert.match(clientDetails, /const \{ visits: recentVisits, error: visitsError \}/);
-  assert.match(clientDetails, /const carePlanningError = carePlanningResult\?\.error/);
-  assert.match(clientDetails, /kind="unavailable"[\s\S]*title="Recent visits are unavailable"/);
-  assert.match(clientDetails, /kind="unavailable"[\s\S]*title="Next visit is unavailable"/);
-  assert.match(clientDetails, /kind="unavailable"[\s\S]*title="Inspection records are unavailable"/);
-  assert.match(clientDetails, /visitsError\s*\?\s*'Visit information unavailable'/);
-  assert.match(clientDetails, /carePlanningError\s*\?\s*'Assessment information unavailable'/);
-  assert.match(clientDetails, /carePlanningError\s*\?\s*'Care-plan information unavailable'/);
-  assert.match(clientDetails, /carePlanningError\s*\?\s*'Review information unavailable'/);
+  assert.match(
+    clientDetails,
+    /const \{ visits: recentVisits, error: visitsError \}/,
+  );
+  assert.match(
+    clientDetails,
+    /const carePlanningError = carePlanningResult\?\.error/,
+  );
+  assert.match(
+    clientDetails,
+    /kind="unavailable"[\s\S]*title="Recent visits are unavailable"/,
+  );
+  assert.match(
+    clientDetails,
+    /kind="unavailable"[\s\S]*title="Next visit is unavailable"/,
+  );
+  assert.match(
+    clientDetails,
+    /kind="unavailable"[\s\S]*title="Inspection records are unavailable"/,
+  );
+  assert.match(
+    clientDetails,
+    /visitsError\s*\?\s*'Visit information unavailable'/,
+  );
+  assert.match(
+    clientDetails,
+    /carePlanningError\s*\?\s*'Assessment information unavailable'/,
+  );
+  assert.match(
+    clientDetails,
+    /carePlanningError\s*\?\s*'Care-plan information unavailable'/,
+  );
+  assert.match(
+    clientDetails,
+    /carePlanningError\s*\?\s*'Review information unavailable'/,
+  );
 });

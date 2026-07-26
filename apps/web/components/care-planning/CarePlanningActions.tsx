@@ -1,7 +1,8 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { EvidenceSourcePicker } from './EvidenceSourcePicker'
+import { Alert } from '../ui/Alert'
+import { Button } from '../ui/Button'
 import { clientQuery } from '../../lib/graphql/client-side'
 import {
   APPROVE_CARE_PLAN_MUTATION,
@@ -9,7 +10,6 @@ import {
   COMPLETE_ASSESSMENT_MUTATION,
   CREATE_ASSESSMENT_MUTATION,
   CREATE_CARE_PLAN_MUTATION,
-  CREATE_EVIDENCE_PACK_MUTATION,
   type ApproveCarePlanInput,
   type ArchiveCarePlanInput,
   type AssessmentRecord,
@@ -17,19 +17,20 @@ import {
   type CompleteAssessmentInput,
   type CreateAssessmentInput,
   type CreateCarePlanInput,
-  type CreateEvidencePackInput,
-  type EvidenceSourceCandidateRecord,
 } from '../../lib/graphql/queries'
-import {
-  getOrganizationDateUtcRange,
-  organizationDateKeyToStoredDateIso,
-} from '../../lib/time'
+import { getOrganizationDateUtcRange } from '../../lib/time'
 import { runConfirmedAction, runSingleFlightAction } from '../../lib/consequential-actions'
+
+type CarePlanningAssessment = Pick<AssessmentRecord, 'id' | 'title' | 'status'>
+type CarePlanningPlan = Pick<
+  CarePlanRecord,
+  'id' | 'title' | 'status' | 'version'
+>
 
 interface CarePlanningActionsProps {
   clientId: string
-  assessments: AssessmentRecord[]
-  carePlans: CarePlanRecord[]
+  assessments: CarePlanningAssessment[]
+  carePlans: CarePlanningPlan[]
   onCompleteRedirectPath: string
 }
 
@@ -38,11 +39,15 @@ function toIsoDateEnd(value: string): string {
   return new Date(new Date(range.end).getTime() - 1).toISOString()
 }
 
-function toStoredCalendarDate(value: string): string {
-  return organizationDateKeyToStoredDateIso(value)
-}
+const controlClassName =
+  'mt-1 min-h-11 w-full rounded-md border border-oasis-control-border bg-white px-3 py-2 text-sm text-oasis-ink focus-visible:outline-none'
 
-export function CarePlanningActions({ clientId, assessments, carePlans, onCompleteRedirectPath }: CarePlanningActionsProps) {
+export function CarePlanningActions({
+  clientId,
+  assessments,
+  carePlans,
+  onCompleteRedirectPath,
+}: CarePlanningActionsProps) {
   const consequentialActionStartedRef = useRef(false)
   const [assessmentTitle, setAssessmentTitle] = useState('')
   const [assessmentSummary, setAssessmentSummary] = useState('')
@@ -51,103 +56,17 @@ export function CarePlanningActions({ clientId, assessments, carePlans, onComple
   const [carePlanSafetyNotes, setCarePlanSafetyNotes] = useState('')
   const [carePlanAssessmentId, setCarePlanAssessmentId] = useState('')
   const [carePlanReviewDueAt, setCarePlanReviewDueAt] = useState('')
-  const [evidenceKind, setEvidenceKind] = useState('INSPECTION')
-  const [evidencePeriodStart, setEvidencePeriodStart] = useState('')
-  const [evidencePeriodEnd, setEvidencePeriodEnd] = useState('')
-  const [evidencePlanId, setEvidencePlanId] = useState('')
-  const [selectedEvidenceAssessmentIds, setSelectedEvidenceAssessmentIds] = useState<string[]>([])
-  const [selectedEvidenceCarePlanIds, setSelectedEvidenceCarePlanIds] = useState<string[]>([])
-  const [selectedOperationalEvidenceSources, setSelectedOperationalEvidenceSources] = useState<EvidenceSourceCandidateRecord[]>([])
   const [assessmentToComplete, setAssessmentToComplete] = useState('')
   const [planToApprove, setPlanToApprove] = useState('')
   const [planToArchive, setPlanToArchive] = useState('')
   const [busyAction, setBusyAction] = useState<string | null>(null)
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [message, setMessage] = useState<{
+    type: 'success' | 'error'
+    text: string
+  } | null>(null)
 
-  function toggleSelection(id: string, selectedIds: string[], setSelectedIds: (next: string[]) => void) {
-    setSelectedIds(selectedIds.includes(id) ? selectedIds.filter((itemId) => itemId !== id) : [...selectedIds, id])
-  }
-
-  function buildEvidenceItems(): CreateEvidencePackInput['items'] {
-    const items: CreateEvidencePackInput['items'] = []
-    const planIds = Array.from(new Set([evidencePlanId, ...selectedEvidenceCarePlanIds].filter(Boolean)))
-    const selectedPlans = carePlans.filter((plan) => planIds.includes(plan.id))
-    const selectedAssessmentIds = new Set(selectedEvidenceAssessmentIds)
-
-    selectedPlans.forEach((selectedPlan) => {
-      items.push({
-        sourceType: 'CARE_PLAN',
-        sourceId: selectedPlan.id,
-        occurredAt: selectedPlan.approvedAt ?? selectedPlan.effectiveFrom ?? selectedPlan.createdAt,
-        headline: `Care plan evidence: ${selectedPlan.title}`,
-        detail: `Version ${selectedPlan.version} care plan captured as a governed evidence source.`,
-        metadata: {
-          status: selectedPlan.status,
-          version: selectedPlan.version,
-          reviewDueAt: selectedPlan.reviewDueAt,
-        },
-      })
-      if (selectedPlan.assessmentId) {
-        selectedAssessmentIds.add(selectedPlan.assessmentId)
-      }
-    })
-
-    Array.from(selectedAssessmentIds)
-      .map((assessmentId) => assessments.find((assessment) => assessment.id === assessmentId))
-      .filter((assessment): assessment is AssessmentRecord => Boolean(assessment))
-      .forEach((assessment) => {
-        items.push({
-          sourceType: 'ASSESSMENT',
-          sourceId: assessment.id,
-          occurredAt: assessment.completedAt ?? assessment.createdAt,
-          headline: `Assessment evidence: ${assessment.title}`,
-          detail: assessment.summary ?? 'Selected assessment captured as governed evidence source.',
-          metadata: {
-            status: assessment.status,
-            source: assessment.source,
-            reviewDueAt: assessment.reviewDueAt,
-          },
-        })
-      })
-
-    selectedOperationalEvidenceSources.forEach((source) => {
-      items.push({
-        sourceType: source.sourceType,
-        sourceId: source.id,
-        occurredAt: source.occurredAt,
-        headline: source.title,
-        detail: [source.subtitle, source.previewText].filter(Boolean).join(' · ') || undefined,
-        metadata: {
-          source: 'evidence-source-picker',
-          status: source.status,
-          createdBy: source.createdBy,
-          sourceType: source.sourceType,
-        },
-      })
-    })
-
-    items.push({
-      sourceType: 'MANUAL_NOTE',
-      headline: selectedPlans.length
-        ? 'Evidence pack created with selected care-planning sources'
-        : 'Evidence pack created from care planning dashboard',
-      detail:
-        selectedOperationalEvidenceSources.length > 0
-          ? 'Evidence pack includes selected operational sources from the staff-only evidence source picker.'
-          : 'Evidence pack created from care planning dashboard. Add operational sources when recorded evidence is available.',
-      metadata: {
-        source: 'care-planning-ui',
-        selectedCarePlanId: evidencePlanId || null,
-        selectedCarePlanIds: planIds,
-        selectedAssessmentIds: Array.from(selectedAssessmentIds),
-        selectedOperationalSources: selectedOperationalEvidenceSources.map((source) => ({
-          id: source.id,
-          sourceType: source.sourceType,
-        })),
-      },
-    })
-
-    return items
+  function refreshAfterSuccess() {
+    setTimeout(() => window.location.assign(onCompleteRedirectPath), 700)
   }
 
   async function submitAssessment() {
@@ -159,23 +78,25 @@ export function CarePlanningActions({ clientId, assessments, carePlans, onComple
       status: 'DRAFT',
       title: assessmentTitle.trim(),
       summary: assessmentSummary.trim() || undefined,
-      findings: { baseline: 'Initial assessment created from care planning workspace.' },
+      findings: {},
       riskFlags: {},
       recommendedActions: {},
-      reviewDueAt: assessmentReviewDueAt ? toIsoDateEnd(assessmentReviewDueAt) : undefined,
+      reviewDueAt: assessmentReviewDueAt
+        ? toIsoDateEnd(assessmentReviewDueAt)
+        : undefined,
     }
 
     try {
       await clientQuery(CREATE_ASSESSMENT_MUTATION, { input })
-      setMessage({ type: 'success', text: 'Assessment created. Refreshing to load the latest record.' })
-      setTimeout(() => window.location.assign(onCompleteRedirectPath), 700)
-    } catch (error: unknown) {
+      setMessage({
+        type: 'success',
+        text: 'Assessment created. The latest assessment will now load.',
+      })
+      refreshAfterSuccess()
+    } catch {
       setMessage({
         type: 'error',
-        text:
-          error instanceof Error
-            ? `Assessment could not be created yet: ${error.message}`
-            : 'Assessment could not be created yet.',
+        text: 'The assessment could not be created. Check your connection and try again.',
       })
     } finally {
       setBusyAction(null)
@@ -185,62 +106,34 @@ export function CarePlanningActions({ clientId, assessments, carePlans, onComple
   async function submitCarePlan() {
     setBusyAction('carePlan')
     setMessage(null)
+    const nextVersion =
+      Math.max(0, ...carePlans.map((plan) => plan.version)) + 1
     const input: CreateCarePlanInput = {
       clientId,
       assessmentId: carePlanAssessmentId || undefined,
       status: 'DRAFT',
-      version: 1,
+      version: nextVersion,
       title: carePlanTitle.trim(),
-      goals: { primaryGoal: 'Draft goals captured for manager review.' },
-      interventions: { initialIntervention: 'Care actions to be refined before activation.' },
+      goals: {},
+      interventions: {},
       safetyNotes: carePlanSafetyNotes.trim() || undefined,
       effectiveFrom: new Date().toISOString(),
-      reviewDueAt: carePlanReviewDueAt ? toIsoDateEnd(carePlanReviewDueAt) : undefined,
+      reviewDueAt: carePlanReviewDueAt
+        ? toIsoDateEnd(carePlanReviewDueAt)
+        : undefined,
     }
 
     try {
       await clientQuery(CREATE_CARE_PLAN_MUTATION, { input })
-      setMessage({ type: 'success', text: 'Care plan draft created. Refreshing to show version state.' })
-      setTimeout(() => window.location.assign(onCompleteRedirectPath), 700)
-    } catch (error: unknown) {
       setMessage({
-        type: 'error',
-        text:
-          error instanceof Error
-            ? `Care plan could not be created yet: ${error.message}`
-            : 'Care plan could not be created yet.',
+        type: 'success',
+        text: 'Care plan draft created. The new version will now load.',
       })
-    } finally {
-      setBusyAction(null)
-    }
-  }
-
-  async function submitEvidencePack() {
-    setBusyAction('evidencePack')
-    setMessage(null)
-    const input: CreateEvidencePackInput = {
-      clientId,
-      carePlanId: evidencePlanId || undefined,
-      status: 'DRAFT',
-      kind: evidenceKind.trim() || 'INSPECTION',
-      periodStart: toStoredCalendarDate(evidencePeriodStart),
-      periodEnd: toStoredCalendarDate(evidencePeriodEnd),
-      sourceRefs: { source: 'care-planning-ui' },
-      summary: { note: 'Inspection-ready evidence pack draft.' },
-      items: buildEvidenceItems(),
-    }
-
-    try {
-      await clientQuery(CREATE_EVIDENCE_PACK_MUTATION, { input })
-      setMessage({ type: 'success', text: 'Evidence pack draft created. Refreshing dashboard now.' })
-      setTimeout(() => window.location.assign(onCompleteRedirectPath), 700)
-    } catch (error: unknown) {
+      refreshAfterSuccess()
+    } catch {
       setMessage({
         type: 'error',
-        text:
-          error instanceof Error
-            ? `Evidence pack could not be created yet: ${error.message}`
-            : 'Evidence pack could not be created yet.',
+        text: 'The care plan draft could not be created. Check your connection and try again.',
       })
     } finally {
       setBusyAction(null)
@@ -249,7 +142,9 @@ export function CarePlanningActions({ clientId, assessments, carePlans, onComple
 
   async function completeAssessment() {
     if (!assessmentToComplete) return
-    const assessment = assessments.find((record) => record.id === assessmentToComplete)
+    const assessment = assessments.find(
+      (record) => record.id === assessmentToComplete,
+    )
 
     await runSingleFlightAction(consequentialActionStartedRef, () =>
       runConfirmedAction(
@@ -265,15 +160,15 @@ export function CarePlanningActions({ clientId, assessments, carePlans, onComple
 
           try {
             await clientQuery(COMPLETE_ASSESSMENT_MUTATION, { input })
-            setMessage({ type: 'success', text: 'Assessment marked complete. Refreshing care spine.' })
-            setTimeout(() => window.location.assign(onCompleteRedirectPath), 700)
-          } catch (error: unknown) {
+            setMessage({
+              type: 'success',
+              text: 'Assessment marked complete. The assessment list will now refresh.',
+            })
+            refreshAfterSuccess()
+          } catch {
             setMessage({
               type: 'error',
-              text:
-                error instanceof Error
-                  ? `Assessment could not be completed yet: ${error.message}`
-                  : 'Assessment could not be completed yet.',
+              text: 'The assessment could not be completed. Check your connection and try again.',
             })
           } finally {
             setBusyAction(null)
@@ -302,15 +197,15 @@ export function CarePlanningActions({ clientId, assessments, carePlans, onComple
 
           try {
             await clientQuery(APPROVE_CARE_PLAN_MUTATION, { input })
-            setMessage({ type: 'success', text: 'Care plan approved and activated. Previous active plans are superseded.' })
-            setTimeout(() => window.location.assign(onCompleteRedirectPath), 700)
-          } catch (error: unknown) {
+            setMessage({
+              type: 'success',
+              text: 'Care plan activated. Any previous active plan has been superseded.',
+            })
+            refreshAfterSuccess()
+          } catch {
             setMessage({
               type: 'error',
-              text:
-                error instanceof Error
-                  ? `Care plan could not be approved yet: ${error.message}`
-                  : 'Care plan could not be approved yet.',
+              text: 'The care plan could not be activated. Check your connection and try again.',
             })
           } finally {
             setBusyAction(null)
@@ -338,15 +233,15 @@ export function CarePlanningActions({ clientId, assessments, carePlans, onComple
 
           try {
             await clientQuery(ARCHIVE_CARE_PLAN_MUTATION, { input })
-            setMessage({ type: 'success', text: 'Care plan archived. Refreshing version history.' })
-            setTimeout(() => window.location.assign(onCompleteRedirectPath), 700)
-          } catch (error: unknown) {
+            setMessage({
+              type: 'success',
+              text: 'Care plan archived. The version history will now refresh.',
+            })
+            refreshAfterSuccess()
+          } catch {
             setMessage({
               type: 'error',
-              text:
-                error instanceof Error
-                  ? `Care plan could not be archived yet: ${error.message}`
-                  : 'Care plan could not be archived yet.',
+              text: 'The care plan could not be archived. Check your connection and try again.',
             })
           } finally {
             setBusyAction(null)
@@ -357,240 +252,288 @@ export function CarePlanningActions({ clientId, assessments, carePlans, onComple
   }
 
   return (
-    <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-heading text-xl font-bold text-slate-950">Assess, Plan, Prove actions</h2>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Person-scoped actions</p>
+    <section className="mt-8 space-y-8" aria-labelledby="care-planning-actions-heading">
+      <div>
+        <h2
+          id="care-planning-actions-heading"
+          className="font-heading text-xl font-bold text-oasis-ink"
+        >
+          Add care-planning records
+        </h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-oasis-muted">
+          Add only information that has been reviewed for this client. Empty
+          structured fields stay empty until they are recorded through the
+          appropriate assessment or plan workflow.
+        </p>
       </div>
-      <p className="mt-2 text-sm text-slate-600">
-        Create assessment records, draft care plans, and evidence packs from this person context. This creates
-        inspection-ready evidence records and does not guarantee compliance outcomes.
-      </p>
-      {message && (
-        <div
-          role={message.type === 'error' ? 'alert' : 'status'}
-          aria-live={message.type === 'error' ? 'assertive' : 'polite'}
-          className={`mt-4 rounded-xl border p-3 text-sm ${
-            message.type === 'success'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-              : 'border-amber-200 bg-amber-50 text-amber-900'
-          }`}
+
+      {message ? (
+        <Alert
+          tone={message.type === 'success' ? 'success' : 'danger'}
+          live
         >
           {message.text}
-        </div>
-      )}
+        </Alert>
+      ) : null}
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-3">
-        <article className="rounded-xl border border-slate-200 p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">Assess</p>
-          <label className="mt-3 block text-sm font-medium text-slate-700">Assessment title</label>
-          <input value={assessmentTitle} onChange={(e) => setAssessmentTitle(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-          <label className="mt-3 block text-sm font-medium text-slate-700">Summary</label>
-          <textarea value={assessmentSummary} onChange={(e) => setAssessmentSummary(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" rows={3} />
-          <label className="mt-3 block text-sm font-medium text-slate-700">Review due</label>
-          <input type="date" value={assessmentReviewDueAt} onChange={(e) => setAssessmentReviewDueAt(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-          <button disabled={busyAction !== null || !assessmentTitle.trim()} onClick={submitAssessment} className="mt-4 w-full rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
-            {busyAction === 'assessment' ? 'Creating...' : 'Create assessment'}
-          </button>
-        </article>
-
-        <article className="rounded-xl border border-slate-200 p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">Plan</p>
-          <label className="mt-3 block text-sm font-medium text-slate-700">Care-plan title</label>
-          <input value={carePlanTitle} onChange={(e) => setCarePlanTitle(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-          <label className="mt-3 block text-sm font-medium text-slate-700">Linked assessment (optional)</label>
-          <input value={carePlanAssessmentId} onChange={(e) => setCarePlanAssessmentId(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Assessment ID" />
-          <label className="mt-3 block text-sm font-medium text-slate-700">Safety notes</label>
-          <textarea value={carePlanSafetyNotes} onChange={(e) => setCarePlanSafetyNotes(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" rows={3} />
-          <label className="mt-3 block text-sm font-medium text-slate-700">Review due</label>
-          <input type="date" value={carePlanReviewDueAt} onChange={(e) => setCarePlanReviewDueAt(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-          <button disabled={busyAction !== null || !carePlanTitle.trim()} onClick={submitCarePlan} className="mt-4 w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
-            {busyAction === 'carePlan' ? 'Creating...' : 'Create care plan draft'}
-          </button>
-        </article>
-
-        <article className="rounded-xl border border-slate-200 p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">Prove</p>
-          <label className="mt-3 block text-sm font-medium text-slate-700">Pack kind</label>
-          <input value={evidenceKind} onChange={(e) => setEvidenceKind(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-          <label className="mt-3 block text-sm font-medium text-slate-700">Linked care plan (optional)</label>
-          <select
-            value={evidencePlanId}
-            onChange={(e) => {
-              const nextPlanId = e.target.value
-              setEvidencePlanId(nextPlanId)
-              if (nextPlanId && !selectedEvidenceCarePlanIds.includes(nextPlanId)) {
-                setSelectedEvidenceCarePlanIds([...selectedEvidenceCarePlanIds, nextPlanId])
-              }
-            }}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+      <div className="grid gap-6 lg:grid-cols-2">
+        <form
+          className="rounded-md border border-oasis-border bg-white p-5"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void submitAssessment()
+          }}
+        >
+          <h3 className="font-heading text-lg font-semibold text-oasis-ink">
+            Create assessment
+          </h3>
+          <label
+            htmlFor="assessment-title"
+            className="mt-4 block text-sm font-medium text-oasis-ink"
           >
-            <option value="">No linked care plan</option>
-            {carePlans.map((plan) => (
-              <option key={plan.id} value={plan.id}>
-                v{plan.version} {plan.title}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-xs text-slate-500">
-            Linking a care plan anchors this pack to care-planning governance and includes that plan as evidence.
-          </p>
-          <fieldset className="mt-3 rounded-lg border border-slate-200 p-3">
-            <legend className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">Include care-plan versions</legend>
-            <div className="mt-2 max-h-28 space-y-2 overflow-y-auto pr-1">
-              {carePlans.length === 0 ? (
-                <p className="text-xs text-slate-500">No care plans available yet.</p>
-              ) : (
-                carePlans.map((plan) => (
-                  <label key={plan.id} className="flex items-start gap-2 text-sm text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={selectedEvidenceCarePlanIds.includes(plan.id)}
-                      onChange={() => toggleSelection(plan.id, selectedEvidenceCarePlanIds, setSelectedEvidenceCarePlanIds)}
-                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
-                    />
-                    <span>
-                      v{plan.version} {plan.title} ({plan.status.toLowerCase()})
-                    </span>
-                  </label>
-                ))
-              )}
-            </div>
-          </fieldset>
-          <fieldset className="mt-3 rounded-lg border border-slate-200 p-3">
-            <legend className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">Include assessments</legend>
-            <div className="mt-2 max-h-28 space-y-2 overflow-y-auto pr-1">
-              {assessments.length === 0 ? (
-                <p className="text-xs text-slate-500">No assessments available yet.</p>
-              ) : (
-                assessments.map((assessment) => (
-                  <label key={assessment.id} className="flex items-start gap-2 text-sm text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={selectedEvidenceAssessmentIds.includes(assessment.id)}
-                      onChange={() =>
-                        toggleSelection(assessment.id, selectedEvidenceAssessmentIds, setSelectedEvidenceAssessmentIds)
-                      }
-                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
-                    />
-                    <span>
-                      {assessment.title} ({assessment.status.toLowerCase()})
-                    </span>
-                  </label>
-                ))
-              )}
-            </div>
-          </fieldset>
-          <p className="mt-2 text-xs text-slate-500">
-            Visits, care notes, and concerns will be added in the source picker once those list
-            queries are wired.
-          </p>
-          <label className="mt-3 block text-sm font-medium text-slate-700">Period start</label>
-          <input type="date" value={evidencePeriodStart} onChange={(e) => setEvidencePeriodStart(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-          <label className="mt-3 block text-sm font-medium text-slate-700">Period end</label>
-          <input type="date" value={evidencePeriodEnd} onChange={(e) => setEvidencePeriodEnd(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-          {evidencePeriodStart && evidencePeriodEnd && (
-            <EvidenceSourcePicker
-              clientId={clientId}
-              periodStart={evidencePeriodStart}
-              periodEnd={evidencePeriodEnd}
-              selectedSources={selectedOperationalEvidenceSources}
-              onSelectedSourcesChange={setSelectedOperationalEvidenceSources}
-              disabled={busyAction !== null}
-            />
-          )}
-          <button disabled={busyAction !== null || !evidencePeriodStart || !evidencePeriodEnd} onClick={submitEvidencePack} className="mt-4 w-full rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
-            {busyAction === 'evidencePack' ? 'Creating...' : 'Create evidence pack'}
-          </button>
-        </article>
-      </div>
-
-      <div className="mt-5 grid gap-4 lg:grid-cols-3">
-        <article className="rounded-xl border border-teal-100 bg-teal-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">Review</p>
-          <h3 className="mt-1 font-semibold text-slate-950">Complete assessment</h3>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            Mark a draft or in-review assessment as complete before it informs care-plan approval.
-          </p>
-          <select
-            value={assessmentToComplete}
-            onChange={(event) => setAssessmentToComplete(event.target.value)}
-            className="mt-3 w-full rounded-lg border border-teal-200 bg-white px-3 py-2 text-sm"
+            Assessment title
+          </label>
+          <input
+            id="assessment-title"
+            required
+            value={assessmentTitle}
+            onChange={(event) => setAssessmentTitle(event.target.value)}
+            className={controlClassName}
+          />
+          <label
+            htmlFor="assessment-summary"
+            className="mt-4 block text-sm font-medium text-oasis-ink"
           >
-            <option value="">Choose assessment</option>
+            Summary
+          </label>
+          <textarea
+            id="assessment-summary"
+            value={assessmentSummary}
+            onChange={(event) => setAssessmentSummary(event.target.value)}
+            className={controlClassName}
+            rows={4}
+          />
+          <label
+            htmlFor="assessment-review-date"
+            className="mt-4 block text-sm font-medium text-oasis-ink"
+          >
+            Review due
+          </label>
+          <input
+            id="assessment-review-date"
+            type="date"
+            value={assessmentReviewDueAt}
+            onChange={(event) => setAssessmentReviewDueAt(event.target.value)}
+            className={controlClassName}
+          />
+          <Button
+            type="submit"
+            className="mt-5 w-full sm:w-auto"
+            disabled={busyAction !== null || !assessmentTitle.trim()}
+          >
+            {busyAction === 'assessment'
+              ? 'Creating assessment…'
+              : 'Create assessment'}
+          </Button>
+        </form>
+
+        <form
+          className="rounded-md border border-oasis-border bg-white p-5"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void submitCarePlan()
+          }}
+        >
+          <h3 className="font-heading text-lg font-semibold text-oasis-ink">
+            Create care plan draft
+          </h3>
+          <label
+            htmlFor="care-plan-title"
+            className="mt-4 block text-sm font-medium text-oasis-ink"
+          >
+            Care plan title
+          </label>
+          <input
+            id="care-plan-title"
+            required
+            value={carePlanTitle}
+            onChange={(event) => setCarePlanTitle(event.target.value)}
+            className={controlClassName}
+          />
+          <label
+            htmlFor="care-plan-assessment"
+            className="mt-4 block text-sm font-medium text-oasis-ink"
+          >
+            Linked assessment (optional)
+          </label>
+          <select
+            id="care-plan-assessment"
+            value={carePlanAssessmentId}
+            onChange={(event) => setCarePlanAssessmentId(event.target.value)}
+            className={controlClassName}
+          >
+            <option value="">No linked assessment</option>
             {assessments.map((assessment) => (
               <option key={assessment.id} value={assessment.id}>
                 {assessment.title} ({assessment.status.toLowerCase()})
               </option>
             ))}
           </select>
-          <button
-            disabled={busyAction !== null || !assessmentToComplete}
-            onClick={completeAssessment}
-            className="mt-3 w-full rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          <label
+            htmlFor="care-plan-safety-notes"
+            className="mt-4 block text-sm font-medium text-oasis-ink"
           >
-            {busyAction === 'completeAssessment' ? 'Completing...' : 'Mark complete'}
-          </button>
-        </article>
-
-        <article className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Approve</p>
-          <h3 className="mt-1 font-semibold text-slate-950">Activate care plan</h3>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            Approving a plan makes it active and supersedes any previous active plan for this person.
-          </p>
-          <select
-            value={planToApprove}
-            onChange={(event) => setPlanToApprove(event.target.value)}
-            className="mt-3 w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"
+            Safety notes
+          </label>
+          <textarea
+            id="care-plan-safety-notes"
+            value={carePlanSafetyNotes}
+            onChange={(event) => setCarePlanSafetyNotes(event.target.value)}
+            className={controlClassName}
+            rows={4}
+          />
+          <label
+            htmlFor="care-plan-review-date"
+            className="mt-4 block text-sm font-medium text-oasis-ink"
           >
-            <option value="">Choose care plan</option>
-            {carePlans
-              .filter((plan) => plan.status !== 'ARCHIVED')
-              .map((plan) => (
-                <option key={plan.id} value={plan.id}>
-                  v{plan.version} {plan.title} ({plan.status.toLowerCase()})
-                </option>
-              ))}
-          </select>
-          <button
-            disabled={busyAction !== null || !planToApprove}
-            onClick={approveCarePlan}
-            className="mt-3 w-full rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            Review due
+          </label>
+          <input
+            id="care-plan-review-date"
+            type="date"
+            value={carePlanReviewDueAt}
+            onChange={(event) => setCarePlanReviewDueAt(event.target.value)}
+            className={controlClassName}
+          />
+          <Button
+            type="submit"
+            className="mt-5 w-full sm:w-auto"
+            disabled={busyAction !== null || !carePlanTitle.trim()}
           >
-            {busyAction === 'approveCarePlan' ? 'Approving...' : 'Approve and activate'}
-          </button>
-        </article>
-
-        <article className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Archive</p>
-          <h3 className="mt-1 font-semibold text-slate-950">Archive care plan</h3>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            Archive plans that are no longer used while preserving version history for evidence.
-          </p>
-          <select
-            value={planToArchive}
-            onChange={(event) => setPlanToArchive(event.target.value)}
-            className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-          >
-            <option value="">Choose care plan</option>
-            {carePlans
-              .filter((plan) => plan.status !== 'ARCHIVED')
-              .map((plan) => (
-                <option key={plan.id} value={plan.id}>
-                  v{plan.version} {plan.title} ({plan.status.toLowerCase()})
-                </option>
-              ))}
-          </select>
-          <button
-            disabled={busyAction !== null || !planToArchive}
-            onClick={archiveCarePlan}
-            className="mt-3 w-full rounded-lg bg-slate-800 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {busyAction === 'archiveCarePlan' ? 'Archiving...' : 'Archive plan'}
-          </button>
-        </article>
+            {busyAction === 'carePlan'
+              ? 'Creating care plan draft…'
+              : 'Create care plan draft'}
+          </Button>
+        </form>
       </div>
+
+      <section aria-labelledby="review-care-planning-heading">
+        <h2
+          id="review-care-planning-heading"
+          className="font-heading text-xl font-bold text-oasis-ink"
+        >
+          Review care planning
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-oasis-muted">
+          Select the exact record before completing, activating, or archiving
+          it. You will be asked to confirm the action.
+        </p>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          <div className="rounded-md border border-oasis-border bg-white p-4">
+            <label
+              htmlFor="assessment-to-complete"
+              className="block text-sm font-semibold text-oasis-ink"
+            >
+              Complete assessment
+            </label>
+            <select
+              id="assessment-to-complete"
+              value={assessmentToComplete}
+              onChange={(event) => setAssessmentToComplete(event.target.value)}
+              className={controlClassName}
+            >
+              <option value="">Choose assessment</option>
+              {assessments
+                .filter((assessment) => assessment.status !== 'COMPLETED')
+                .map((assessment) => (
+                  <option key={assessment.id} value={assessment.id}>
+                    {assessment.title} ({assessment.status.toLowerCase()})
+                  </option>
+                ))}
+            </select>
+            <Button
+              type="button"
+              className="mt-4 w-full"
+              disabled={busyAction !== null || !assessmentToComplete}
+              onClick={() => void completeAssessment()}
+            >
+              {busyAction === 'completeAssessment'
+                ? 'Completing assessment…'
+                : 'Mark complete'}
+            </Button>
+          </div>
+
+          <div className="rounded-md border border-oasis-border bg-white p-4">
+            <label
+              htmlFor="plan-to-activate"
+              className="block text-sm font-semibold text-oasis-ink"
+            >
+              Activate care plan
+            </label>
+            <select
+              id="plan-to-activate"
+              value={planToApprove}
+              onChange={(event) => setPlanToApprove(event.target.value)}
+              className={controlClassName}
+            >
+              <option value="">Choose care plan</option>
+              {carePlans
+                .filter((plan) => plan.status !== 'ARCHIVED')
+                .map((plan) => (
+                  <option key={plan.id} value={plan.id}>
+                    v{plan.version} {plan.title} ({plan.status.toLowerCase()})
+                  </option>
+                ))}
+            </select>
+            <Button
+              type="button"
+              className="mt-4 w-full"
+              disabled={busyAction !== null || !planToApprove}
+              onClick={() => void approveCarePlan()}
+            >
+              {busyAction === 'approveCarePlan'
+                ? 'Activating care plan…'
+                : 'Activate care plan'}
+            </Button>
+          </div>
+
+          <div className="rounded-md border border-oasis-border bg-white p-4">
+            <label
+              htmlFor="plan-to-archive"
+              className="block text-sm font-semibold text-oasis-ink"
+            >
+              Archive care plan
+            </label>
+            <select
+              id="plan-to-archive"
+              value={planToArchive}
+              onChange={(event) => setPlanToArchive(event.target.value)}
+              className={controlClassName}
+            >
+              <option value="">Choose care plan</option>
+              {carePlans
+                .filter((plan) => plan.status !== 'ARCHIVED')
+                .map((plan) => (
+                  <option key={plan.id} value={plan.id}>
+                    v{plan.version} {plan.title} ({plan.status.toLowerCase()})
+                  </option>
+                ))}
+            </select>
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-4 w-full"
+              disabled={busyAction !== null || !planToArchive}
+              onClick={() => void archiveCarePlan()}
+            >
+              {busyAction === 'archiveCarePlan'
+                ? 'Archiving care plan…'
+                : 'Archive care plan'}
+            </Button>
+          </div>
+        </div>
+      </section>
     </section>
   )
 }
