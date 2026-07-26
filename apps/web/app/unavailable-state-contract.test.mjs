@@ -19,7 +19,7 @@ test('care-planning and inspection records distinguish unavailable data and pres
     assert.match(page, /kind="unavailable"/);
     assert.match(page, new RegExp(`form action="${route}" method="get"`));
     assert.match(page, /name="clientId"/);
-    assert.match(page, /No changes can be made until the connection recovers/);
+    assert.match(page, /No\s+changes\s+can be made until the connection recovers/);
   }
 });
 

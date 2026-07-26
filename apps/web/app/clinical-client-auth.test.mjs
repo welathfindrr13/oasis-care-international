@@ -248,7 +248,7 @@ test("care planning checks authoritative tenant administration before loading cl
     "hasAccessCapability(accessSnapshot.capabilities, 'TENANT_ADMIN')",
   );
   const clientQuery = carePlanningSource.indexOf(
-    "const peopleResult = await getPeopleSafe()",
+    "const clientsResult = await getClientsSafe()",
   );
   assert.ok(capabilityGate > -1);
   assert.ok(clientQuery > capabilityGate);

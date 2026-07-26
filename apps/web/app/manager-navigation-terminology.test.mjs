@@ -61,26 +61,36 @@ test("compatible aliases remain while service monitoring stays separate", () => 
   assert.match(metrics, /TENANT_ADMIN/);
 });
 
-test("care planning checks authority before loading the client directory", () => {
-  const gate = carePlanning.indexOf(
-    "hasAccessCapability(accessSnapshot.capabilities, 'TENANT_ADMIN')",
-  );
-  const query = carePlanning.indexOf(
-    "const peopleResult = await getPeopleSafe()",
-  );
-  assert.ok(gate > -1);
-  assert.ok(query > gate);
+test("care planning and inspection records check authority before loading clients", () => {
+  for (const page of [carePlanning, evidence]) {
+    const gate = page.indexOf(
+      "hasAccessCapability(accessSnapshot.capabilities, 'TENANT_ADMIN')",
+    );
+    const query = page.indexOf(
+      "const clientsResult = await getClientsSafe()",
+    );
+    assert.ok(gate > -1);
+    assert.ok(query > gate);
+  }
 });
 
 test("requested client context is fetched exactly and never falls back to another client", () => {
   for (const page of [carePlanning, evidence]) {
     assert.match(page, /CLIENT_QUERY/);
-    assert.match(page, /getRequestedPersonSafe\(requestedClientId\)/);
-    assert.doesNotMatch(page, /people\.find\([^)]*clientId[^)]*\)\s*\?\?\s*people\[0\]/);
-    assert.match(page, /requestedPersonUnavailable/);
+    assert.match(page, /getRequestedClientSafe\(requestedClientId\)/);
+    assert.doesNotMatch(page, /clients\.find\([^)]*clientId[^)]*\)\s*\?\?\s*clients\[0\]/);
+    assert.match(page, /requestedClientUnavailable/);
     assert.match(page, /const requestedClientInvalid = Array\.isArray\(requestedClientParam\)/);
-    assert.match(page, /selectedPerson && !peopleResult\.unavailable/);
+    assert.match(page, /selectedClient && !recordsUnavailable|selectedClient && !carePlanningUnavailable/);
   }
+});
+
+test("care planning and inspection records keep their actions separate", () => {
+  assert.doesNotMatch(carePlanning, /InspectionRecordActions|Create inspection record|Evidence packs/);
+  assert.doesNotMatch(evidence, /CarePlanningActions|Create assessment|Activate care plan|Archive care plan/);
+  assert.match(carePlanning, /CarePlanningActions/);
+  assert.match(evidence, /InspectionRecordActions/);
+  assert.doesNotMatch(carePlanning + evidence, /proof-led|source-linked|bg-gradient/);
 });
 
 test("client details return each role to an accessible directory", () => {

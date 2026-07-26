@@ -1,18 +1,30 @@
 import Link from 'next/link'
-import { CarePlanningActions } from '../../components/care-planning/CarePlanningActions'
+import { redirect } from 'next/navigation'
 import { Header } from '../../components/oasis/Header'
+import { InspectionRecordActions } from '../../components/evidence/InspectionRecordActions'
 import { StatePanel } from '../../components/ui/StatePanel'
+import { StatusLabel, type StatusTone } from '../../components/ui/StatusLabel'
+import { hasAccessCapability } from '../../lib/auth/capabilities'
+import { getServerAuthContext } from '../../lib/auth/server-auth'
 import { query } from '../../lib/graphql/client'
-import { formatDate, formatStoredCalendarDate } from '../../lib/time'
 import {
-  CARE_PLANNING_QUERY,
   CLIENT_QUERY,
   CLIENTS_QUERY,
-  type CarePlanningQueryResponse,
+  INSPECTION_RECORDS_QUERY,
   type ClientListItem,
   type ClientQueryResponse,
   type ClientsQueryResponse,
+  type InspectionRecord,
+  type InspectionRecordsQueryResponse,
 } from '../../lib/graphql/queries'
+import {
+  groupInspectionRecordItems,
+  inspectionRecordTypeLabel,
+} from '../../lib/inspection-records'
+import {
+  formatDate,
+  formatStoredCalendarDate,
+} from '../../lib/time'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,16 +34,24 @@ interface EvidencePageProps {
   }>
 }
 
-async function getPeopleSafe(): Promise<{ people: ClientListItem[]; unavailable: boolean }> {
+async function getClientsSafe(): Promise<{
+  clients: ClientListItem[]
+  unavailable: boolean
+}> {
   try {
-    const data = await query<ClientsQueryResponse>(CLIENTS_QUERY, { skip: 0, take: 50 })
-    return { people: data.clients.items, unavailable: false }
+    const data = await query<ClientsQueryResponse>(CLIENTS_QUERY, {
+      skip: 0,
+      take: 50,
+    })
+    return { clients: data.clients.items, unavailable: false }
   } catch {
-    return { people: [], unavailable: true }
+    return { clients: [], unavailable: true }
   }
 }
 
-async function getRequestedPersonSafe(clientId: string): Promise<ClientListItem | null> {
+async function getRequestedClientSafe(
+  clientId: string,
+): Promise<ClientListItem | null> {
   try {
     const data = await query<ClientQueryResponse>(CLIENT_QUERY, { id: clientId })
     return data.client
@@ -40,204 +60,278 @@ async function getRequestedPersonSafe(clientId: string): Promise<ClientListItem 
   }
 }
 
-async function getEvidenceSafe(clientId: string): Promise<CarePlanningQueryResponse | null> {
+async function getInspectionRecordsSafe(
+  clientId: string,
+): Promise<InspectionRecordsQueryResponse | null> {
   try {
-    return await query<CarePlanningQueryResponse>(CARE_PLANNING_QUERY, { clientId, take: 20 })
+    return await query<InspectionRecordsQueryResponse>(
+      INSPECTION_RECORDS_QUERY,
+      { clientId, take: 20 },
+    )
   } catch {
     return null
   }
 }
 
-function formatInstantDate(value?: string | null): string {
-  if (!value) return 'Not set'
-  return formatDate(value)
+function statusTone(status: string): StatusTone {
+  if (status === 'PUBLISHED' || status === 'COMPILED') return 'success'
+  if (status === 'DRAFT') return 'attention'
+  return 'neutral'
 }
 
-function formatRecordDate(value?: string | null): string {
-  if (!value) return 'Not set'
-  return formatStoredCalendarDate(value)
+function statusLabel(status: string): string {
+  return status.replace(/_/g, ' ').toLowerCase()
+}
+
+function InspectionRecordList({
+  records,
+  clientName,
+}: {
+  records: InspectionRecord[]
+  clientName: string
+}) {
+  if (records.length === 0) {
+    return (
+      <StatePanel title="No inspection records yet">
+        Create a record when you need to prepare selected information for this
+        client.
+      </StatePanel>
+    )
+  }
+
+  return (
+    <div className="divide-y divide-oasis-border border-y border-oasis-border">
+      {records.map((record) => {
+        const groups = groupInspectionRecordItems(record.items)
+        return (
+          <article key={record.id} className="py-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h3 className="font-heading text-lg font-semibold text-oasis-ink">
+                  {clientName}: {formatStoredCalendarDate(record.periodStart)} to{' '}
+                  {formatStoredCalendarDate(record.periodEnd)}
+                </h3>
+                <p className="mt-1 text-sm text-oasis-muted">
+                  Created {formatDate(record.generatedAt)}
+                  {record.publishedAt
+                    ? ` · published ${formatDate(record.publishedAt)}`
+                    : ''}
+                </p>
+              </div>
+              <StatusLabel tone={statusTone(record.status)}>
+                {statusLabel(record.status)}
+              </StatusLabel>
+            </div>
+
+            <div className="mt-4">
+              <h4 className="text-sm font-semibold text-oasis-ink">
+                Included records
+              </h4>
+              {groups.length > 0 ? (
+                <ul className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-sm text-oasis-muted">
+                  {groups.map((group) => (
+                    <li key={group.sourceType}>
+                      <span className="font-semibold text-oasis-ink">
+                        {inspectionRecordTypeLabel(group.sourceType)}
+                      </span>{' '}
+                      {group.count}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-oasis-muted">
+                  No record items have been included yet.
+                </p>
+              )}
+            </div>
+
+            <Link
+              href={`/api/evidence-packs/${record.id}/export`}
+              className="mt-4 inline-flex min-h-11 items-center rounded-md border border-oasis-control-border bg-white px-4 py-2 text-sm font-semibold text-oasis-ink"
+            >
+              Download inspection record
+            </Link>
+          </article>
+        )
+      })}
+    </div>
+  )
 }
 
 export default async function EvidencePage(props: EvidencePageProps) {
+  const { accessSnapshot } = await getServerAuthContext()
+  if (!hasAccessCapability(accessSnapshot.capabilities, 'TENANT_ADMIN')) {
+    redirect('/access/unavailable')
+  }
+
   const searchParams = await props.searchParams
   const requestedClientParam = searchParams?.clientId
   const requestedClientInvalid = Array.isArray(requestedClientParam)
   const requestedClientId =
-    typeof requestedClientParam === 'string' ? requestedClientParam.trim() : undefined
-  const peopleResult = await getPeopleSafe()
-  const people = peopleResult.people
-  const selectedPerson = requestedClientInvalid
+    typeof requestedClientParam === 'string'
+      ? requestedClientParam.trim()
+      : undefined
+  const clientsResult = await getClientsSafe()
+  const clients = clientsResult.clients
+  const selectedClient = requestedClientInvalid
     ? null
     : requestedClientId
-      ? await getRequestedPersonSafe(requestedClientId)
-      : people[0]
-  const requestedPersonUnavailable =
-    requestedClientInvalid || Boolean(requestedClientId && !selectedPerson)
-  const carePlanning = selectedPerson ? await getEvidenceSafe(selectedPerson.id) : null
-  const evidenceUnavailable = Boolean(selectedPerson && carePlanning === null)
-  const carePlans = carePlanning?.carePlans ?? []
-  const evidencePacks = carePlanning?.evidencePacks ?? []
-  const assessments = carePlanning?.assessments ?? []
-  const latestPack = evidencePacks[0]
+      ? await getRequestedClientSafe(requestedClientId)
+      : clients[0]
+  const requestedClientUnavailable =
+    requestedClientInvalid || Boolean(requestedClientId && !selectedClient)
+  const inspectionData = selectedClient
+    ? await getInspectionRecordsSafe(selectedClient.id)
+    : null
+  const recordsUnavailable = Boolean(
+    selectedClient && inspectionData === null,
+  )
+  const assessments = inspectionData?.assessments ?? []
+  const carePlans = inspectionData?.carePlans ?? []
+  const records = inspectionData?.evidencePacks ?? []
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-secondary">
       <Header />
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-        <section className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-8 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-700">Prove</p>
-          <h1 className="mt-3 font-heading text-3xl font-black tracking-tight text-slate-950">
-            Inspection-ready evidence dashboard
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+        <header className="border-b border-oasis-border pb-6">
+          <p className="text-sm font-semibold text-oasis-teal">
+            Inspection records
+          </p>
+          <h1 className="mt-2 font-heading text-3xl font-bold tracking-tight text-oasis-ink">
+            Inspection records
           </h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-            Use this dashboard to track assessment, care-plan, and evidence-pack completeness by client. Evidence
-            supports inspection readiness and does not guarantee compliance outcomes.
+          <p className="mt-3 max-w-3xl text-base leading-7 text-oasis-muted">
+            Prepare selected records for {selectedClient?.fullName ?? 'a client'}.
+            These records support inspection preparation but do not guarantee an
+            inspection outcome.
           </p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            {people.slice(0, 8).map((person) => (
-              <Link
-                key={person.id}
-                href={`/evidence?clientId=${person.id}`}
-                className={`rounded-full border px-4 py-2 text-sm font-semibold ${
-                  selectedPerson?.id === person.id
-                    ? 'border-emerald-700 bg-emerald-700 text-white'
-                    : 'border-slate-300 bg-white text-slate-700'
-                }`}
-              >
-                {person.fullName}
-              </Link>
-            ))}
-          </div>
-        </section>
+        </header>
 
-        {peopleResult.unavailable ? (
+        {clientsResult.unavailable ? (
           <StatePanel
             className="mt-6"
             kind="unavailable"
-            title="Inspection-record clients are unavailable"
+            headingLevel={2}
+            title="Clients are unavailable"
             action={
               <form action="/evidence" method="get">
-                {requestedClientId ? <input type="hidden" name="clientId" value={requestedClientId} /> : null}
-                <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
+                {requestedClientId ? (
+                  <input
+                    type="hidden"
+                    name="clientId"
+                    value={requestedClientId}
+                  />
+                ) : null}
+                <button type="submit" className="button-primary">
                   Try again
                 </button>
               </form>
             }
           >
-            Client records could not be loaded. No inspection record can be created until the connection recovers.
+            Client records could not be loaded. No inspection record can be
+            created until the connection recovers.
           </StatePanel>
-        ) : null}
-
-        {requestedPersonUnavailable ? (
-          <StatePanel
-            className="mt-6"
-            kind="unavailable"
-            title="The requested client is unavailable"
-            action={
-              <form action="/evidence" method="get">
-                {requestedClientId ? <input type="hidden" name="clientId" value={requestedClientId} /> : null}
-                <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
-                  Try again
-                </button>
-              </form>
-            }
+        ) : (
+          <nav
+            className="mt-6 border-b border-oasis-border pb-5"
+            aria-label="Choose a client for inspection records"
           >
-            No inspection record has been opened. Check the client link or try again.
-          </StatePanel>
-        ) : null}
-
-        {selectedPerson && !evidenceUnavailable && (
-          <section className="mt-6 grid gap-4 md:grid-cols-4">
-            <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Assessments</p>
-              <p className="mt-2 text-3xl font-black text-slate-950">{assessments.length}</p>
-              <p className="mt-1 text-sm text-slate-500">Assess records available</p>
-            </article>
-            <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Active plan</p>
-              <p className="mt-2 text-3xl font-black text-slate-950">
-                {carePlans.some((plan) => plan.status === 'ACTIVE') ? 'Yes' : 'No'}
-              </p>
-              <p className="mt-1 text-sm text-slate-500">Plan status for evidence context</p>
-            </article>
-            <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Evidence packs</p>
-              <p className="mt-2 text-3xl font-black text-slate-950">{evidencePacks.length}</p>
-              <p className="mt-1 text-sm text-slate-500">Pack drafts and published records</p>
-            </article>
-            <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Latest pack</p>
-              <p className="mt-2 text-xl font-black text-slate-950">{formatInstantDate(latestPack?.generatedAt)}</p>
-              <p className="mt-1 text-sm text-slate-500">{latestPack ? latestPack.status : 'No evidence pack yet'}</p>
-            </article>
-          </section>
-        )}
-
-        {evidenceUnavailable && selectedPerson && (
-          <StatePanel
-            className="mt-6"
-            kind="unavailable"
-            title={`Inspection records for ${selectedPerson.fullName} are unavailable`}
-            action={
-              <form action="/evidence" method="get">
-                <input type="hidden" name="clientId" value={selectedPerson.id} />
-                <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
-                  Try again
-                </button>
-              </form>
-            }
-          >
-            Existing records could not be loaded. No changes can be made until the connection recovers.
-          </StatePanel>
-        )}
-
-        {!peopleResult.unavailable && !requestedPersonUnavailable && !evidenceUnavailable ? (
-          <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="font-heading text-xl font-bold text-slate-950">Evidence pack timeline</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Source-linked evidence packs from approved records. Family and raw operational internals remain restricted.
-          </p>
-          <div className="mt-4 space-y-3">
-            {evidencePacks.length === 0 && (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-                No evidence packs yet for this client. Create a draft pack to begin an inspection-ready trail.
-              </div>
-            )}
-            {evidencePacks.map((pack) => (
-              <article key={pack.id} className="rounded-xl border border-slate-200 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-semibold text-slate-900">
-                    {pack.kind} · {formatRecordDate(pack.periodStart)} to {formatRecordDate(pack.periodEnd)}
-                  </p>
-                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                    {pack.status}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-slate-600">
-                  {pack.items.length} evidence items · generated {formatInstantDate(pack.generatedAt)}
-                </p>
-                <div className="mt-3">
+            <h2 className="text-base font-semibold text-oasis-ink">
+              Choose a client
+            </h2>
+            {clients.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {clients.map((client) => (
                   <Link
-                    href={`/api/evidence-packs/${pack.id}/export`}
-                    className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 transition-colors hover:bg-emerald-100"
+                    key={client.id}
+                    href={`/evidence?clientId=${client.id}`}
+                    aria-current={
+                      selectedClient?.id === client.id ? 'page' : undefined
+                    }
+                    className={`inline-flex min-h-11 items-center rounded-md border px-3 py-2 text-sm font-semibold ${
+                      selectedClient?.id === client.id
+                        ? 'border-oasis-teal bg-oasis-teal text-white'
+                        : 'border-oasis-control-border bg-white text-oasis-ink'
+                    }`}
                   >
-                    Download PDF
+                    {client.fullName}
                   </Link>
-                </div>
-              </article>
-            ))}
-          </div>
-          </section>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-oasis-muted">
+                Add a client before creating an inspection record.
+              </p>
+            )}
+          </nav>
+        )}
+
+        {requestedClientUnavailable ? (
+          <StatePanel
+            className="mt-6"
+            kind="unavailable"
+            headingLevel={2}
+            title="The requested client is unavailable"
+          >
+            No inspection record has been opened. Check the client link or
+            choose another client.
+          </StatePanel>
         ) : null}
 
-        {selectedPerson && !peopleResult.unavailable && !evidenceUnavailable && (
-          <CarePlanningActions
-            clientId={selectedPerson.id}
-            assessments={assessments}
-            carePlans={carePlans}
-            onCompleteRedirectPath={`/evidence?clientId=${selectedPerson.id}`}
-          />
-        )}
+        {recordsUnavailable && selectedClient ? (
+          <StatePanel
+            className="mt-6"
+            kind="unavailable"
+            headingLevel={2}
+            title={`Inspection records for ${selectedClient.fullName} are unavailable`}
+            action={
+              <form action="/evidence" method="get">
+                <input
+                  type="hidden"
+                  name="clientId"
+                  value={selectedClient.id}
+                />
+                <button type="submit" className="button-primary">
+                  Try again
+                </button>
+              </form>
+            }
+          >
+            Existing records and available source types could not be loaded. No
+            changes can be made until the connection recovers.
+          </StatePanel>
+        ) : null}
+
+        {selectedClient && !recordsUnavailable ? (
+          <>
+            <section className="mt-8" aria-labelledby="existing-records-heading">
+              <h2
+                id="existing-records-heading"
+                className="font-heading text-2xl font-bold text-oasis-ink"
+              >
+                Existing inspection records
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-oasis-muted">
+                Each record shows the client, covered period, included record
+                types, current state, and download action.
+              </p>
+              <div className="mt-4">
+                <InspectionRecordList
+                  records={records}
+                  clientName={selectedClient.fullName}
+                />
+              </div>
+            </section>
+
+            <InspectionRecordActions
+              clientId={selectedClient.id}
+              assessments={assessments}
+              carePlans={carePlans}
+              onCompleteRedirectPath={`/evidence?clientId=${selectedClient.id}`}
+            />
+          </>
+        ) : null}
       </main>
     </div>
   )

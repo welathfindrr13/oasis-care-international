@@ -11,9 +11,11 @@ import { formatDateTime, formatDate, formatTime } from '../../../lib/time'
 import {
   CARE_PLANNING_QUERY,
   CLIENT_QUERY,
+  INSPECTION_RECORDS_QUERY,
   VISITS_QUERY,
   type CarePlanningQueryResponse,
   type ClientQueryResponse,
+  type InspectionRecordsQueryResponse,
   type VisitsQueryResponse,
 } from '../../../lib/graphql/queries'
 
@@ -65,8 +67,21 @@ async function getRecentVisitsSafe(clientId: string) {
 
 async function getCarePlanningSafe(clientId: string) {
   try {
+    const [carePlanning, inspectionRecords] = await Promise.all([
+      query<CarePlanningQueryResponse>(CARE_PLANNING_QUERY, {
+        clientId,
+        take: 20,
+      }),
+      query<InspectionRecordsQueryResponse>(INSPECTION_RECORDS_QUERY, {
+        clientId,
+        take: 20,
+      }),
+    ])
     return {
-      carePlanning: await query<CarePlanningQueryResponse>(CARE_PLANNING_QUERY, { clientId, take: 20 }),
+      carePlanning: {
+        ...carePlanning,
+        evidencePacks: inspectionRecords.evidencePacks,
+      },
       error: null as string | null,
     }
   } catch (error: any) {
@@ -166,14 +181,14 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
     : recentVisits.find((visit) => new Date(visit.scheduledStart) > new Date())
   const assessments = carePlanning?.assessments ?? []
   const carePlans = carePlanning?.carePlans ?? []
-  const evidencePacks = carePlanning?.evidencePacks ?? []
+  const inspectionRecords = carePlanning?.evidencePacks ?? []
   const completedAssessments = assessments.filter((assessment) => assessment.status === 'COMPLETED')
   const inProgressAssessments = assessments.length - completedAssessments.length
   const activeCarePlan = carePlans.find((plan) => plan.status === 'ACTIVE')
   const draftCarePlans = carePlans.filter((plan) => plan.status === 'DRAFT')
   const reviewDueDate = activeCarePlan?.reviewDueAt ?? assessments.find((assessment) => assessment.reviewDueAt)?.reviewDueAt ?? null
-  const latestEvidencePack = evidencePacks[0]
-  const latestPackSourceTypes = new Set((latestEvidencePack?.items ?? []).map((item) => item.sourceType))
+  const latestInspectionRecord = inspectionRecords[0]
+  const latestPackSourceTypes = new Set((latestInspectionRecord?.items ?? []).map((item) => item.sourceType))
   const hasAssessmentEvidence = latestPackSourceTypes.has('ASSESSMENT')
   const hasCarePlanEvidence = latestPackSourceTypes.has('CARE_PLAN')
   const scheduleVisitHref = `/visits/new?${new URLSearchParams({ clientId: client.id }).toString()}`
@@ -423,7 +438,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
             {isAdmin && (
               <Card>
                 <CardHeader>
-                  <h2 className="text-lg font-semibold text-slate-900">Evidence packs</h2>
+                  <h2 className="text-lg font-semibold text-slate-900">Inspection records</h2>
                 </CardHeader>
                 <CardContent>
                   {carePlanningError ? (
@@ -440,11 +455,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ id: st
                       <div className="rounded-xl bg-slate-50 p-4">
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Coverage</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900">
-                          {evidencePacks.length > 0
-                            ? `${evidencePacks.length} packs · latest includes ${latestEvidencePack?.items.length ?? 0} items`
-                            : 'No evidence packs created'}
+                          {inspectionRecords.length > 0
+                            ? `${inspectionRecords.length} records · latest includes ${latestInspectionRecord?.items.length ?? 0} items`
+                            : 'No inspection records created'}
                         </p>
-                        {latestEvidencePack && (
+                        {latestInspectionRecord && (
                           <p className="mt-2 text-xs text-slate-600">
                             Assessment evidence: {hasAssessmentEvidence ? 'Included' : 'Not included'} · Care plan evidence:{' '}
                             {hasCarePlanEvidence ? 'Included' : 'Not included'}

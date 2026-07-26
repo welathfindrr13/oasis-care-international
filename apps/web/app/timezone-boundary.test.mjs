@@ -21,8 +21,9 @@ test('care-log month filters share organization calendar boundaries with summari
 
 test('person and care-planning views do not format or filter care dates in the host timezone', () => {
   const person = read('./clients/[id]/page.tsx')
-  const picker = read('../components/care-planning/EvidenceSourcePicker.tsx')
+  const picker = read('../components/evidence/InspectionRecordSourcePicker.tsx')
   const actions = read('../components/care-planning/CarePlanningActions.tsx')
+  const inspectionActions = read('../components/evidence/InspectionRecordActions.tsx')
 
   assert.match(person, /return formatDateTime\(value, \{ weekday: ['"]short['"] \}\)/)
   assert.match(person, /return formatDate\(value\)/)
@@ -31,28 +32,29 @@ test('person and care-planning views do not format or filter care dates in the h
   assert.match(picker, /formatDateTime\(value, \{ year: undefined \}\)/)
   assert.doesNotMatch(picker, /T00:00:00\.000Z|T23:59:59\.000Z/)
   assert.match(actions, /getOrganizationDateUtcRange\(value\)/)
-  assert.match(actions, /organizationDateKeyToStoredDateIso\(value\)/)
   assert.doesNotMatch(actions, /T00:00:00\.000Z|T23:59:59\.000Z/)
+  assert.match(inspectionActions, /organizationDateKeyToStoredDateIso\(periodStart\)/)
+  assert.match(inspectionActions, /organizationDateKeyToStoredDateIso\(periodEnd\)/)
 })
 
-test('evidence dashboard and PDF use central instant and stored-date formatters', () => {
+test('inspection records and PDF use central instant and stored-date formatters', () => {
   const dashboard = read('./evidence/page.tsx')
-  const pdf = read('../components/evidence/EvidencePackPdf.tsx')
+  const pdf = read('../components/evidence/InspectionRecordPdf.tsx')
 
   for (const source of [dashboard, pdf]) {
     assert.match(source, /formatStoredCalendarDate/)
     assert.doesNotMatch(source, /new Intl\.DateTimeFormat/)
   }
-  assert.match(dashboard, /formatDate\(value\)/)
+  assert.match(dashboard, /formatDate\(record\.generatedAt\)/)
   assert.match(pdf, /formatDateTime\(value\)/)
 })
 
-test('care-planning evidence periods render date-only fields without host timezone shifts', () => {
-  const source = read('./care-planning/page.tsx')
+test('inspection-record periods render date-only fields without host timezone shifts', () => {
+  const source = read('./evidence/page.tsx')
 
-  assert.match(source, /formatStoredCalendarDate\(pack\.periodStart\)/)
-  assert.match(source, /formatStoredCalendarDate\(pack\.periodEnd\)/)
-  assert.doesNotMatch(source, /formatDate\(pack\.period(?:Start|End)\)/)
+  assert.match(source, /formatStoredCalendarDate\(record\.periodStart\)/)
+  assert.match(source, /formatStoredCalendarDate\(record\.periodEnd\)/)
+  assert.doesNotMatch(source, /formatDate\(record\.period(?:Start|End)\)/)
 })
 
 test('health summary generation sends inclusive stored calendar keys', () => {

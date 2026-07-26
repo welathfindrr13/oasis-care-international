@@ -303,6 +303,7 @@ const managementRoutes = [
   '/admin/carers',
   '/admin/analytics',
   '/admin/metrics',
+  '/care-planning',
   '/people/new',
   '/clients/new',
   '/schedule/new',
