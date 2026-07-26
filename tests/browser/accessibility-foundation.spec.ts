@@ -300,7 +300,7 @@ test("Tenant admin company setup", async ({ page }) => {
     page.getByText("Meadow Care Services", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Add a person", exact: true }).first(),
+    page.getByRole("link", { name: "Add a client", exact: true }).first(),
   ).toBeVisible();
   await expect(
     page.getByText(/must accept the invitation before you can assign/),
@@ -309,7 +309,7 @@ test("Tenant admin company setup", async ({ page }) => {
     page.getByText(/synthetic|canary|fixture|seed|internal organization ID/i),
   ).toHaveCount(0);
   const primarySize = await page
-    .getByRole("link", { name: "Add a person", exact: true })
+    .getByRole("link", { name: "Add a client", exact: true })
     .first()
     .evaluate((element) => {
       const bounds = element.getBoundingClientRect();
@@ -318,6 +318,93 @@ test("Tenant admin company setup", async ({ page }) => {
   expect(primarySize.height).toBeGreaterThanOrEqual(44);
   expect(primarySize.width).toBeGreaterThanOrEqual(44);
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
+});
+
+test("Tenant admin client navigation keeps context and hides internal IDs", async ({
+  page,
+}) => {
+  await signIn(page, profiles.tenantAdmin);
+  await page.goto("/clients");
+  await expect(page).toHaveURL(/\/clients$/);
+  await expect(
+    page.getByRole("heading", { name: "Clients", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Add client", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/^ID:/)).toHaveCount(0);
+  const compactNavigation = page.getByRole("button", {
+    name: "Open navigation",
+  });
+  if (await compactNavigation.isVisible()) {
+    await compactNavigation.click();
+  }
+  await expect(
+    page.getByRole("link", { name: "Clients", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  const closeNavigation = page.getByRole("button", {
+    name: "Close navigation",
+  });
+  if (await closeNavigation.isVisible()) {
+    await closeNavigation.click();
+  }
+  await expectAccessibilityFoundation(page, { repeatedHeader: true });
+
+  await page.goto(`/clients/${PERSON_ID}`);
+  await expect(
+    page.getByRole("heading", { name: "Jordan Ellis", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Client details", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/^ID:/)).toHaveCount(0);
+  await expectAccessibilityFoundation(page, { repeatedHeader: true });
+
+  await page.goto(`/care-planning?clientId=${PERSON_ID}`);
+  await expect(page).toHaveURL(new RegExp(`clientId=${PERSON_ID}`));
+  await expect(page.getByText("Jordan Ellis", { exact: true }).first()).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
+
+test("Tenant admin client detail reflows at 320 CSS pixels", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "phone-390x844");
+  await page.setViewportSize({ width: 320, height: 844 });
+  await signIn(page, profiles.tenantAdmin);
+  await page.goto(`/clients/${PERSON_ID}`);
+  await expect(
+    page.getByRole("heading", { name: "Jordan Ellis", exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await expectAccessibilityFoundation(page, { repeatedHeader: true });
+});
+
+test("Carer profile copy remains person-centred until route narrowing", async ({
+  page,
+}) => {
+  await signIn(page, profiles.carer);
+  await page.goto(`/clients/${PERSON_ID}`);
+  await expect(
+    page.getByRole("heading", { name: "Jordan Ellis", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Person details", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Care Notes" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Family access" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Care planning" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Inspection records" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Family Updates room" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "AI Health Summary" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Evidence packs" })).toHaveCount(0);
+  await expect(page.getByText("Assessments", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Active care plan", { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/\bclient\b/i)).toHaveCount(0);
 });
 
 test("Platform Owner first Manager revocation is explicit and recoverable", async ({

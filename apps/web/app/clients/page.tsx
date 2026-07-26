@@ -15,8 +15,8 @@ import {
 } from '../../lib/graphql/queries'
 
 export const metadata: Metadata = {
-  title: 'People - Oasis Care',
-  description: 'Manage people supported and their care context',
+  title: 'Clients - Oasis Care',
+  description: 'Manage clients and their care context',
 }
 
 export const dynamic = 'force-dynamic'
@@ -83,17 +83,17 @@ function EmptyState({ isAdmin }: { isAdmin: boolean }) {
         </div>
       </div>
       <h3 className="text-lg font-medium text-text-primary mb-2">
-        No people found
+        {isAdmin ? 'No clients found' : 'No people found'}
       </h3>
       <p className="text-text-secondary mb-4">
         {isAdmin
-          ? 'Get started by adding the first person supported.'
+          ? 'Get started by adding the first client.'
           : 'No people are available right now.'}
       </p>
       {isAdmin && (
         <Button asChild variant="primary">
-          <Link href="/people/new">
-            Add person
+          <Link href="/clients/new">
+            Add client
           </Link>
         </Button>
       )}
@@ -134,41 +134,47 @@ export default async function ClientsPage(props: ClientsPageProps) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="mb-8">
           <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">
-            People
+            {isAdmin ? 'Clients' : 'People'}
           </h1>
           <p className="text-slate-500 mt-1">
-            View each person&apos;s care status, visits, Care Notes, and family access.
+            {isAdmin
+              ? "View each client's care status, visits, Care Notes, and Family access."
+              : "View each person's care status and assigned visits."}
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-text-primary font-heading">
-                  People supported
+                  {isAdmin ? 'Clients supported' : 'People supported'}
                 </h2>
                 <p className="text-sm text-text-secondary">
                   {loadError
-                    ? 'Unable to load people'
+                    ? `Unable to load ${isAdmin ? 'clients' : 'people'}`
                     : hasClients
-                    ? `${clients.length} of ${total} people`
-                    : 'No people found'}
+                    ? `${clients.length} of ${total} ${isAdmin ? 'clients' : 'people'}`
+                    : `No ${isAdmin ? 'clients' : 'people'} found`}
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto">
                 {!isAdmin && (
                   <Button asChild variant="ghost" size="sm">
                     <Link href="/shift">My Shift</Link>
                   </Button>
                 )}
-                <form method="get" action="/people" className="flex items-center gap-2">
+                <form
+                  method="get"
+                  action={isAdmin ? '/clients' : '/people'}
+                  className="flex w-full items-center gap-2 sm:w-auto"
+                >
                   <input
                     type="search"
                     name="search"
                     defaultValue={searchParams.search || ''}
-                    placeholder="Search people..."
-                    className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 w-64"
+                    placeholder={isAdmin ? 'Search clients...' : 'Search people...'}
+                    className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500 sm:w-64"
                   />
                   <Button type="submit" variant="ghost" size="sm">
                     Search
@@ -176,8 +182,8 @@ export default async function ClientsPage(props: ClientsPageProps) {
                 </form>
                 {isAdmin && (
                   <Button asChild variant="primary" size="sm">
-                    <Link href="/people/new">
-                      Add person
+                    <Link href="/clients/new">
+                      Add client
                     </Link>
                   </Button>
                 )}
@@ -198,13 +204,12 @@ export default async function ClientsPage(props: ClientsPageProps) {
                 </div>
               </div>
             ) : hasClients ? (
-              <div className="overflow-x-auto">
                 <table
-                  className="w-full"
+                  className="block w-full md:table"
                   role="table"
-                    aria-label="People supported directory"
+                  aria-label={isAdmin ? 'Clients supported directory' : 'People supported directory'}
                 >
-                  <thead>
+                  <thead className="hidden md:table-header-group">
                     <tr className="border-b border-base-gray-200">
                       <th className="text-left py-3 px-4 font-medium text-text-secondary text-sm">
                         Name
@@ -223,60 +228,68 @@ export default async function ClientsPage(props: ClientsPageProps) {
                       </th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="block space-y-4 md:table-row-group md:space-y-0">
                     {clients.map((client) => (
                       <tr
                         key={client.id}
-                        className="border-b border-base-gray-100 hover:bg-background-accent transition-colors"
+                        className="block rounded-xl border border-base-gray-200 bg-white p-4 transition-colors hover:bg-background-accent md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:border-b md:border-base-gray-100 md:p-0"
                       >
-                        <td className="py-3 px-4">
-                          <div>
-                            <div className="font-medium text-text-primary">
-                              {client.fullName}
-                            </div>
-                            <div className="text-sm text-text-secondary">
-                              ID: {client.id.slice(0, 8)}...
-                            </div>
+                        <td className="block md:table-cell md:px-4 md:py-3">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary md:hidden">
+                            Name
+                          </span>
+                          <div className="font-medium text-text-primary">
+                            {client.fullName}
                           </div>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="mt-3 block md:mt-0 md:table-cell md:px-4 md:py-3">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary md:hidden">
+                            Address
+                          </span>
                           <div className="text-sm text-text-secondary">
                             <div>{client.addressLine1}</div>
                             {client.addressLine2 && <div>{client.addressLine2}</div>}
                             <div>{client.city}, {client.postcode}</div>
                           </div>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="mt-3 block md:mt-0 md:table-cell md:px-4 md:py-3">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary md:hidden">
+                            Last visit
+                          </span>
                           <time
-                            className="text-sm text-text-secondary"
+                            className="block text-sm text-text-secondary"
                             dateTime={client.lastVisitAt || undefined}
                           >
                             {formatVisitDate(client.lastVisitAt)}
                           </time>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="mt-3 block md:mt-0 md:table-cell md:px-4 md:py-3">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary md:hidden">
+                            Next visit
+                          </span>
                           <time
-                            className={`text-sm ${client.nextVisitAt ? 'text-text-primary font-medium' : 'text-text-secondary'}`}
+                            className={`block text-sm ${client.nextVisitAt ? 'text-text-primary font-medium' : 'text-text-secondary'}`}
                             dateTime={client.nextVisitAt || undefined}
                           >
                             {formatVisitDate(client.nextVisitAt)}
                           </time>
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <Button asChild variant="ghost" size="sm">
-                              <Link href={`/people/${client.id}`}>
+                        <td className="mt-4 block md:mt-0 md:table-cell md:px-4 md:py-3">
+                          <span className="sr-only md:hidden">Actions</span>
+                          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap md:flex-row md:items-center">
+                            <Button asChild variant="ghost" size="sm" className="scroll-mb-4">
+                              <Link href={`/${isAdmin ? 'clients' : 'people'}/${client.id}`}>
                                 View
                               </Link>
                             </Button>
                             {isAdmin && (
                               <>
-                                <Button asChild variant="ghost" size="sm">
+                                <Button asChild variant="ghost" size="sm" className="scroll-mb-4">
                                   <Link href={`/clients/${client.id}/edit`}>
                                     Edit
                                   </Link>
                                 </Button>
-                                <Button asChild variant="ghost" size="sm">
+                                <Button asChild variant="ghost" size="sm" className="scroll-mb-4">
                                   <a href={`/visits/new?clientId=${client.id}`}>
                                     Schedule
                                   </a>
@@ -289,7 +302,6 @@ export default async function ClientsPage(props: ClientsPageProps) {
                     ))}
                   </tbody>
                 </table>
-              </div>
             ) : (
               <EmptyState isAdmin={isAdmin} />
             )}

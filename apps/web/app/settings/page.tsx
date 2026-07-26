@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button';
 import { InstallAppPrompt } from '../../components/pwa/InstallAppPrompt';
 import { useClientAccess } from '../../components/providers/ClientAccessProvider';
 import { resolveAuthMode } from '../../lib/auth/mode';
+import { hasAccessCapability } from '../../lib/auth/capabilities';
 
 function formatRole(role: string): string {
   return role.replace(/_/g, ' ').replace(/\b\w/g, (value) => value.toUpperCase());
@@ -45,6 +46,10 @@ function NextAuthSettings() {
 
 function SettingsContent({ userName, userEmail }: { userName: string; userEmail: string }) {
   const { roles, accessContext, isAdmin, isCarer } = useClientAccess();
+  const canManageTenant = hasAccessCapability(
+    accessContext.capabilities,
+    'TENANT_ADMIN',
+  );
   const primaryRole = roles[0] || 'Access pending';
   const isRestrictedManagement =
     accessContext.surface === 'staff' && accessContext.homePath === '/settings';
@@ -130,7 +135,7 @@ function SettingsContent({ userName, userEmail }: { userName: string; userEmail:
                       <Link href="/schedule">Open Schedule</Link>
                     </Button>
                     <Button asChild variant="ghost">
-                      <Link href="/people">Open People</Link>
+                      <Link href="/clients">Open Clients</Link>
                     </Button>
                     <Button asChild variant="ghost">
                       <Link href="/family-updates">Open Family Updates</Link>
@@ -155,6 +160,24 @@ function SettingsContent({ userName, userEmail }: { userName: string; userEmail:
               </div>
             </CardContent>
           </Card>}
+
+          {canManageTenant && (
+            <Card>
+              <CardHeader>
+                <h2 className="text-xl font-semibold text-slate-900 font-heading">
+                  Service monitoring
+                </h2>
+                <p className="text-sm text-slate-500">
+                  Review operational service health separately from client inspection records.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <Button asChild variant="outline">
+                  <Link href="/admin/metrics">Open service monitoring</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

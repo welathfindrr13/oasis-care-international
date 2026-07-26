@@ -128,11 +128,12 @@ test("representative workforce screen uses the shared operational foundation", (
 test("admin shell uses the required destinations without emoji navigation", () => {
   for (const label of [
     "Today",
-    "People",
+    "Clients",
     "Schedule",
     "Workforce",
     "Family updates",
-    "Reports",
+    "Care planning",
+    "Inspection records",
     "Settings",
   ]) {
     assert.match(navigation, new RegExp(`label: ["']${label}["']`));
@@ -159,10 +160,11 @@ test("carer profile help exposes only carer-safe operational shortcuts", () => {
   const adminShortcuts =
     settings.match(/\{isAdmin && \(\s*<>[\s\S]*?<\/\>\s*\)\}/)?.[0] || "";
   assert.match(adminShortcuts, /href="\/schedule"/);
-  assert.match(adminShortcuts, /href="\/people"/);
+  assert.match(adminShortcuts, /href="\/clients"/);
   assert.match(adminShortcuts, /href="\/family-updates"/);
   assert.doesNotMatch(adminShortcuts, /href="\/(?:medication|emar)"/);
   assert.doesNotMatch(adminShortcuts, /href="\/visits"/);
+  assert.match(settings, /href="\/admin\/metrics">Open service monitoring/);
   assert.match(settings, /\{isCarer && \([\s\S]*?href="\/visits"/);
 });
 

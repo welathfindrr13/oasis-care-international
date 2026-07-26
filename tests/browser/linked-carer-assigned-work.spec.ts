@@ -70,26 +70,26 @@ async function refreshMountedNextAuthSession(
   });
 }
 
-test("an administrator creates a person and schedules an accepted Carer", async ({
+test("an administrator creates a client and schedules an accepted Carer", async ({
   page,
 }) => {
   await signIn(page, {
     email: "admin@local.dev",
     name: "Local Admin",
     role: "user",
-    callbackUrl: "http://localhost:3002/people/new",
+    callbackUrl: "http://localhost:3002/clients/new",
   });
 
-  await page.goto("/people/new");
-  await expect(page.getByRole("heading", { name: "Add person" })).toBeVisible();
+  await page.goto("/clients/new");
+  await expect(page.getByRole("heading", { name: "Add client" })).toBeVisible();
   await page.getByLabel("Full Name *").fill("Browser Journey Person");
   await page.getByLabel("Address Line 1 *").fill("18 Acceptance Lane");
   await page.getByLabel("City *").fill("Leeds");
   await page.getByLabel("Postcode *").fill("LS1 2AB");
   await page.getByLabel(/I confirm that the person has been informed/).check();
-  await page.getByRole("button", { name: "Create person" }).click();
+  await page.getByRole("button", { name: "Create client" }).click();
 
-  await expect(page).toHaveURL(/\/people$/);
+  await expect(page).toHaveURL(/\/clients$/);
   const personRow = page.getByRole("row").filter({
     hasText: "Browser Journey Person",
   });
@@ -496,7 +496,7 @@ test("an administrator sees the real company journey without internal setup lang
     page.getByText(/synthetic|canary|fixture|seed|billing/i),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("link", { name: "Add a person", exact: true }).first(),
+    page.getByRole("link", { name: "Add a client", exact: true }).first(),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Invite a carer", exact: true }),
@@ -505,7 +505,7 @@ test("an administrator sees the real company journey without internal setup lang
     page.getByRole("link", { name: "Schedule a visit", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "View people", exact: true }),
+    page.getByRole("link", { name: "View clients", exact: true }),
   ).toBeVisible();
 });
 
@@ -881,7 +881,7 @@ test("tenant and family room guessing stays isolated", async ({ page }) => {
   await page.goto(`/people/${SENTINEL_CLIENT_ID}`);
   await expect(
     page.getByRole("heading", {
-      name: /Person Not Found|Unable to Load Person/,
+      name: /Person not found|Unable to load person|Client not found|Unable to load client/i,
     }),
   ).toBeVisible();
   await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
@@ -962,11 +962,13 @@ test("sign-out, Back, and refresh do not reveal protected content", async ({
     email: "admin@local.dev",
     name: "Local Admin",
     role: "user",
-    callbackUrl: "http://localhost:3002/people",
+    callbackUrl: "http://localhost:3002/clients",
   });
-  await page.goto("/people");
+  await page.goto("/clients");
   await expect(
-    page.getByText("Assigned Fake Client", { exact: true }),
+    page
+      .getByRole("table")
+      .getByText("Assigned Fake Client", { exact: true }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Open account menu" }).click();
@@ -977,12 +979,12 @@ test("sign-out, Back, and refresh do not reveal protected content", async ({
   ).toHaveCount(0);
 
   await page.goBack();
-  await expect(page).not.toHaveURL(/\/people(?:\?|$)/);
+  await expect(page).not.toHaveURL(/\/clients(?:\?|$)/);
   await expect(
     page.getByText("Assigned Fake Client", { exact: true }),
   ).toHaveCount(0);
 
-  await page.goto("/people");
+  await page.goto("/clients");
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
   await page.reload();
   await expect(page).toHaveURL(/\/login(?:\?|$)/);

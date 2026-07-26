@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { Header } from '../../components/oasis/Header'
 import { CarePlanningActions } from '../../components/care-planning/CarePlanningActions'
 import { StatePanel } from '../../components/ui/StatePanel'
@@ -9,20 +10,24 @@ import {
 } from '../../lib/time'
 import {
   CARE_PLANNING_QUERY,
+  CLIENT_QUERY,
   CLIENTS_QUERY,
   type AssessmentRecord,
   type CarePlanRecord,
   type CarePlanningQueryResponse,
   type ClientListItem,
+  type ClientQueryResponse,
   type ClientsQueryResponse,
   type EvidencePackRecord,
 } from '../../lib/graphql/queries'
+import { getServerAuthContext } from '../../lib/auth/server-auth'
+import { hasAccessCapability } from '../../lib/auth/capabilities'
 
 export const dynamic = 'force-dynamic'
 
 interface CarePlanningPageProps {
   searchParams?: Promise<{
-    clientId?: string
+    clientId?: string | string[]
   }>
 }
 
@@ -32,6 +37,15 @@ async function getPeopleSafe(): Promise<{ people: ClientListItem[]; unavailable:
     return { people: data.clients.items, unavailable: false }
   } catch {
     return { people: [], unavailable: true }
+  }
+}
+
+async function getRequestedPersonSafe(clientId: string): Promise<ClientListItem | null> {
+  try {
+    const data = await query<ClientQueryResponse>(CLIENT_QUERY, { id: clientId })
+    return data.client
+  } catch {
+    return null
   }
 }
 
@@ -220,10 +234,25 @@ function EvidencePackList({ evidencePacks }: { evidencePacks: EvidencePackRecord
 }
 
 export default async function CarePlanningPage(props: CarePlanningPageProps) {
+  const { accessSnapshot } = await getServerAuthContext()
+  if (!hasAccessCapability(accessSnapshot.capabilities, 'TENANT_ADMIN')) {
+    redirect('/access/unavailable')
+  }
+
   const searchParams = await props.searchParams
+  const requestedClientParam = searchParams?.clientId
+  const requestedClientInvalid = Array.isArray(requestedClientParam)
+  const requestedClientId =
+    typeof requestedClientParam === 'string' ? requestedClientParam.trim() : undefined
   const peopleResult = await getPeopleSafe()
   const people = peopleResult.people
-  const selectedPerson = people.find((person) => person.id === searchParams?.clientId) ?? people[0]
+  const selectedPerson = requestedClientInvalid
+    ? null
+    : requestedClientId
+      ? await getRequestedPersonSafe(requestedClientId)
+      : people[0]
+  const requestedPersonUnavailable =
+    requestedClientInvalid || Boolean(requestedClientId && !selectedPerson)
   const carePlanning = selectedPerson ? await getCarePlanningSafe(selectedPerson.id) : null
   const carePlanningUnavailable = Boolean(selectedPerson && carePlanning === null)
 
@@ -245,7 +274,7 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
                 This view connects assessments, approved care-plan versions, and inspection-ready evidence packs for
-                each person supported. It keeps the official care record internal while CareBridge can later project
+                each client. It keeps the official care record internal while CareBridge can later project
                 approved family-safe updates from the same source trail.
               </p>
             </div>
@@ -258,14 +287,14 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
                     {selectedPerson.addressLine1}, {selectedPerson.city} {selectedPerson.postcode}
                   </p>
                   <Link
-                    href={`/people/${selectedPerson.id}`}
+                    href={`/clients/${selectedPerson.id}`}
                     className="mt-4 inline-flex rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
                   >
-                    Open person profile
+                    Open client details
                   </Link>
                 </>
               ) : (
-                <p className="mt-2 text-sm leading-6 text-slate-600">Add a person before creating care plans.</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">Add a client before creating care plans.</p>
               )}
             </div>
           </div>
@@ -278,7 +307,7 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
             title="Care-planning clients are unavailable"
             action={
               <form action="/care-planning" method="get">
-                {searchParams?.clientId ? <input type="hidden" name="clientId" value={searchParams.clientId} /> : null}
+                {requestedClientId ? <input type="hidden" name="clientId" value={requestedClientId} /> : null}
                 <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
                   Try again
                 </button>
@@ -291,9 +320,9 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
           <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h2 className="font-heading text-lg font-semibold text-slate-950">Choose a person</h2>
+              <h2 className="font-heading text-lg font-semibold text-slate-950">Choose a client</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Care-planning records are scoped to one person and one organisation.
+                Care-planning records are scoped to one client and one organisation.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -317,6 +346,24 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
           </div>
           </section>
         )}
+
+        {requestedPersonUnavailable ? (
+          <StatePanel
+            className="mt-6"
+            kind="unavailable"
+            title="The requested client is unavailable"
+            action={
+              <form action="/care-planning" method="get">
+                {requestedClientId ? <input type="hidden" name="clientId" value={requestedClientId} /> : null}
+                <button type="submit" className="rounded-md bg-oasis-teal px-4 py-2 text-sm font-semibold text-white">
+                  Try again
+                </button>
+              </form>
+            }
+          >
+            No care-planning record has been opened. Check the client link or try again.
+          </StatePanel>
+        ) : null}
 
         {selectedPerson && !carePlanningUnavailable && (
           <section className="mt-6 grid gap-4 md:grid-cols-4">
@@ -361,7 +408,7 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
           </StatePanel>
         )}
 
-        {!peopleResult.unavailable && !carePlanningUnavailable && (
+        {!peopleResult.unavailable && !requestedPersonUnavailable && !carePlanningUnavailable && (
           <section className="mt-6 grid gap-6 lg:grid-cols-3">
           <div className="space-y-3">
             <div>
@@ -389,7 +436,7 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
           </section>
         )}
 
-        {selectedPerson && !carePlanningUnavailable && (
+        {selectedPerson && !peopleResult.unavailable && !carePlanningUnavailable && (
           <CarePlanningActions
             clientId={selectedPerson.id}
             assessments={assessments}

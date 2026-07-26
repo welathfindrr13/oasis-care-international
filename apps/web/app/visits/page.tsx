@@ -374,7 +374,7 @@ export default async function VisitsPage(props: VisitsPageProps) {
                           <td className="py-3 px-4">
                             <div>
                               <div className="font-medium text-text-primary">
-                                {visit.client?.fullName || 'Unknown person'}
+                                {visit.client?.fullName || (isAdmin ? 'Unknown client' : 'Unknown person')}
                               </div>
                               <div className="text-sm text-text-secondary">
                                 {visit.client &&
@@ -403,8 +403,8 @@ export default async function VisitsPage(props: VisitsPageProps) {
                             <div className="flex items-center gap-2">
                               {visit.clientId ? (
                                 <Button asChild variant="ghost" size="sm">
-                                  <Link href={`/people/${visit.clientId}`}>
-                                    Person
+                                  <Link href={`/${isAdmin ? 'clients' : 'people'}/${visit.clientId}`}>
+                                    {isAdmin ? 'Client' : 'Person'}
                                   </Link>
                                 </Button>
                               ) : (

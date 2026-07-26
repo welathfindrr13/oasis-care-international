@@ -116,6 +116,30 @@ const operationHandlers = new Map([
   ],
   ["Visits", () => ({ visits: { items: [], total: 0 } })],
   [
+    "Clients",
+    () => ({
+      clients: {
+        items: [
+          {
+            id: personId,
+            fullName: "Jordan Ellis",
+            addressLine1: "12 Test Lane",
+            addressLine2: null,
+            city: "Leeds",
+            postcode: "LS1 1AA",
+            phone: null,
+            email: null,
+            dateOfBirth: null,
+            gender: null,
+            lastVisit: null,
+            nextVisit: null,
+          },
+        ],
+        total: 1,
+      },
+    }),
+  ],
+  [
     "Client",
     () => ({
       client: {
@@ -303,6 +327,14 @@ const operationHandlers = new Map([
     }),
   ],
   ["CareLogs", () => ({ careLogs: { total: 0, items: [] } })],
+  [
+    "CarePlanning",
+    () => ({
+      assessments: [],
+      carePlans: [],
+      evidencePacks: [],
+    }),
+  ],
   ["FamilyCareRooms", () => ({ familyCareRooms: [] })],
   [
     "FamilyCareRoom",

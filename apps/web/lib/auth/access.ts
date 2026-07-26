@@ -41,6 +41,7 @@ const ADMIN_ONLY_PATHS = [
   /^\/staff(?:\/|$)/,
   /^\/evidence(?:\/|$)/,
   /^\/reports(?:\/|$)/,
+  /^\/care-planning(?:\/|$)/,
   /^\/clients\/new$/,
   /^\/people\/new$/,
   /^\/visits\/new$/,
