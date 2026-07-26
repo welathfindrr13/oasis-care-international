@@ -395,7 +395,7 @@ test("Carer profile copy remains person-centred until route narrowing", async ({
     page.getByRole("heading", { name: "Jordan Ellis", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("Person details", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Care Notes" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Care Notes" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Family access" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Care planning" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Inspection records" })).toHaveCount(0);
