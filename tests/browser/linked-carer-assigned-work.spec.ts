@@ -124,6 +124,104 @@ test("an administrator creates a client and schedules an accepted Carer", async 
   await expect(visitRow).toContainText("Scheduled");
 });
 
+test("rapid repeated shift actions dispatch exactly one mutation", async ({
+  page,
+}) => {
+  await page.context().clearPermissions();
+  await signIn(page, {
+    email: "carer@local.dev",
+    name: "Local Carer",
+    role: "admin",
+    callbackUrl: "http://localhost:3002/shift",
+  });
+  await page.goto("/shift");
+
+  await expect(
+    page.getByRole("heading", { name: "My shift", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Not clocked in", { exact: true })).toBeVisible();
+  await page
+    .getByLabel("I understand how location is used when I clock in or out.")
+    .check();
+
+  let clockInRequests = 0;
+  let clockOutRequests = 0;
+  page.on("request", (request) => {
+    if (!request.url().includes("/api/graphql")) return;
+    const body = request.postData() || "";
+    if (body.includes("mutation ClockIn")) clockInRequests += 1;
+    if (body.includes("mutation ClockOut")) clockOutRequests += 1;
+  });
+
+  await page
+    .getByRole("button", { name: "Clock in", exact: true })
+    .evaluate((button: HTMLButtonElement) => {
+      button.click();
+      button.click();
+    });
+
+  await expect(page.getByText("Clocked in", { exact: true })).toBeVisible();
+  await expect(page.getByText(/^Clocked in at /)).toBeVisible();
+  expect(clockInRequests).toBe(1);
+  await expect(
+    page.getByText("Shift action not completed", { exact: true }),
+  ).toHaveCount(0);
+
+  await page
+    .getByRole("button", { name: "Clock out", exact: true })
+    .evaluate((button: HTMLButtonElement) => {
+      button.click();
+      button.click();
+    });
+
+  await expect(page.getByText("Not clocked in", { exact: true })).toBeVisible();
+  await expect(page.getByText(/^Clocked out at /)).toBeVisible();
+  expect(clockOutRequests).toBe(1);
+  await expect(
+    page.getByText("Shift action not completed", { exact: true }),
+  ).toHaveCount(0);
+});
+
+test("a recent-shift history failure does not block the current shift action", async ({
+  page,
+}) => {
+  await page.context().clearPermissions();
+  await signIn(page, {
+    email: "carer@local.dev",
+    name: "Local Carer",
+    role: "admin",
+    callbackUrl: "http://localhost:3002/shift",
+  });
+  await page.route("**/api/graphql", async (route) => {
+    const body = route.request().postData() || "";
+    if (body.includes("query MyRecentShifts")) {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "synthetic history outage" }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto("/shift");
+
+  await expect(page.getByText("Not clocked in", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Recent shifts are unavailable" }),
+  ).toBeVisible();
+  await page
+    .getByLabel("I understand how location is used when I clock in or out.")
+    .check();
+  await expect(
+    page.getByRole("button", { name: "Clock in", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    page.getByText("Shift status unavailable", { exact: true }),
+  ).toHaveCount(0);
+});
+
 test("a linked fake carer follows the database role despite an admin token claim", async ({
   page,
 }) => {
@@ -162,11 +260,21 @@ test("a linked fake carer follows the database role despite an admin token claim
 
   await expect(page).toHaveURL(`/schedule/${VISIT_ID}`);
   await expect(
-    page.getByRole("heading", { name: "Assigned Fake Client" }),
+    page.getByRole("heading", { name: "Assigned Fake Client", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("Browser Carer", { exact: true })).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Visit details" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "About Assigned Fake Client" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("10 Canary Street, London, SW1A 1AA", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Person details" })).toHaveCount(0);
+  await expect(
+    page.getByText("Recording visit activity requires an internet connection."),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Step 3. Care notes" }),
@@ -232,29 +340,73 @@ test("a linked fake carer follows the database role despite an admin token claim
     page.getByText("Confirm assigned visit", { exact: true }),
   ).toBeVisible();
 
+  let startMutationRequests = 0;
+  let careNoteMutationRequests = 0;
+  let completionMutationRequests = 0;
+  page.on("request", (request) => {
+    if (!request.url().includes("/api/graphql")) return;
+    const body = request.postData() || "";
+    if (body.includes("mutation StartVisit")) startMutationRequests += 1;
+    if (body.includes("mutation SubmitVisitCareNote")) careNoteMutationRequests += 1;
+    if (body.includes("mutation CompleteVisit")) completionMutationRequests += 1;
+  });
+
   const startVisit = page.getByRole("button", { name: "Start visit" });
   await expect(startVisit).toBeEnabled();
-  await startVisit.click();
+  await startVisit.evaluate((button: HTMLButtonElement) => {
+    button.click();
+    button.click();
+  });
 
-  await expect(page.getByText("Visit started.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("status")).toHaveText("Visit started.");
+  expect(startMutationRequests).toBe(1);
   await expect(page.getByText("in progress", { exact: true })).toHaveCount(2);
   await expect(page.getByRole("button", { name: "Mark done" })).toBeEnabled();
+  for (const controlName of [
+    "Category",
+    "Occurred at",
+    "Care note",
+    "Completion note",
+  ]) {
+    const control = page.getByLabel(controlName, { exact: true });
+    await expect(control).toBeVisible();
+    const controlBox = await control.boundingBox();
+    expect(controlBox?.height).toBeGreaterThanOrEqual(44);
+  }
+  const escalationControl = page.getByLabel("This needed escalation");
+  const escalationControlBox = await escalationControl.boundingBox();
+  expect(escalationControlBox?.height).toBeGreaterThanOrEqual(20);
+  const escalationTargetBox = await escalationControl.locator("..").boundingBox();
+  expect(escalationTargetBox?.height).toBeGreaterThanOrEqual(44);
+  const activeVisitAccessibility = await new AxeBuilder({ page }).analyze();
+  expect(activeVisitAccessibility.violations).toEqual([]);
 
-  await page.getByRole("button", { name: "Mark done" }).click();
+  await page.getByRole("button", { name: "Mark not required" }).click();
   await expect(
-    page.getByText("Care action marked done.", { exact: true }),
+    page.getByText("Care action marked not required.", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Done", { exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(
+    page
+      .getByRole("region", { name: "Next visit action" })
+      .getByRole("button", { name: "Complete visit" }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   await page
     .getByPlaceholder(
       "Record care delivered, person response, and any handover details.",
     )
     .fill("Browser journey care note recorded by the assigned Carer.");
-  await page.getByRole("button", { name: "Record care note" }).click();
-  await expect(
-    page.getByText("Care note recorded.", { exact: true }),
-  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Record care note" })
+    .evaluate((button: HTMLButtonElement) => {
+      button.click();
+      button.click();
+    });
+  await expect(page.getByRole("status")).toHaveText("Care note recorded.");
+  expect(careNoteMutationRequests).toBe(1);
   await expect(
     page
       .getByRole("heading", { name: "Recent care notes" })
@@ -264,23 +416,45 @@ test("a linked fake carer follows the database role despite an admin token claim
       }),
   ).toBeVisible();
 
+  await page.getByLabel("This needed escalation").check();
+  const escalationRecipient = page.getByLabel("Escalated to");
+  await escalationRecipient.fill("Synthetic team lead");
+  const escalationRecipientBox = await escalationRecipient.boundingBox();
+  expect(escalationRecipientBox?.height).toBeGreaterThanOrEqual(44);
+  await page
+    .getByPlaceholder(
+      "Record care delivered, person response, and any handover details.",
+    )
+    .fill("Browser journey escalation note.");
+  await page
+    .getByRole("button", { name: "Record care note" })
+    .evaluate((button: HTMLButtonElement) => {
+      button.click();
+      button.click();
+    });
+  await expect(page.getByRole("status")).toHaveText(
+    "Care note recorded and marked for escalation.",
+  );
+  expect(careNoteMutationRequests).toBe(2);
+
   await page
     .getByPlaceholder("Add optional handover details for completion.")
     .fill("Browser journey completed with planned care delivered.");
-  const completionDialog = page.waitForEvent("dialog");
-  const completionClick = page
+  page.once("dialog", async (dialog) => {
+    expect(dialog.type()).toBe("confirm");
+    expect(dialog.message()).toBe(
+      "Complete the visit for Assigned Fake Client? Care notes will become read-only.",
+    );
+    await dialog.accept();
+  });
+  await page
     .getByRole("button", { name: "Complete visit" })
-    .click();
-  const dialog = await completionDialog;
-  expect(dialog.type()).toBe("confirm");
-  expect(dialog.message()).toBe(
-    "Complete the visit for Assigned Fake Client? Care notes will become read-only.",
-  );
-  await dialog.accept();
-  await completionClick;
-  await expect(
-    page.getByText("Visit completed.", { exact: true }),
-  ).toBeVisible();
+    .evaluate((button: HTMLButtonElement) => {
+      button.click();
+      button.click();
+    });
+  await expect(page.getByRole("status")).toHaveText("Visit completed.");
+  expect(completionMutationRequests).toBe(1);
   await expect(page.getByText("completed", { exact: true })).toHaveCount(2);
 
   await signIn(page, {
@@ -396,7 +570,7 @@ test("account switching clears stale capabilities and follows each database memb
   await page.getByRole("link", { name: "View updates" }).click();
   await expect(page).toHaveURL(`/family/care-rooms/${CARE_ROOM_ID}`);
   await expect(
-    page.getByRole("heading", { name: "Assigned Fake Client" }),
+    page.getByRole("heading", { name: "Assigned Fake Client", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText(

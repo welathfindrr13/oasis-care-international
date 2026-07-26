@@ -14,6 +14,7 @@ import { CareLogDTO } from '../care-log/dto/care-log.dto';
 import { requireOperationalActor } from '../carer/carer-access.service';
 import { RequireCapabilities } from '../auth/access-capability';
 import { ManualAudit } from '../common/decorators/manual-audit.decorator';
+import { VISIT_TASK_OUTCOME_PREFIX } from './visit.constants';
 
 export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator => SetMetadata('roles', roles);
 
@@ -169,6 +170,9 @@ export class VisitResolver {
       taskName: task.task_name,
       description: task.description,
       isCompleted: task.is_completed,
+      hasRecordedOutcome: String(task.notes || '')
+        .split('\n')
+        .some((line) => line.trim().startsWith(VISIT_TASK_OUTCOME_PREFIX)),
       completedAt: task.completed_at,
       notes: task.notes,
       createdAt: task.created_at,

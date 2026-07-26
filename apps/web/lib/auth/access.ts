@@ -54,7 +54,6 @@ const FRONTLINE_PATHS = [
   /^\/schedule\/[^/]+$/,
   /^\/shift(?:\/|$)/,
   /^\/settings(?:\/|$)/,
-  /^\/clients\/[^/]+$/,
 ]
 const FAMILY_PATH = /^\/family(?:\/|$)/
 const SETTINGS_PATH = /^\/settings(?:\/|$)/

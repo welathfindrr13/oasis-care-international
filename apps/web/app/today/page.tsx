@@ -22,6 +22,7 @@ import {
   formatTime,
   getLondonDayUtcRange,
 } from '../../lib/time'
+import { todayShiftAction } from '../shift/shiftPresentation'
 
 export const dynamic = 'force-dynamic'
 
@@ -203,27 +204,43 @@ function CarerTodayBoundary({
         </p>
 
         {canViewShift && (
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
-            <div>
-              <p className="text-sm font-semibold text-slate-950">
-                {data.shiftUnavailable
-                  ? 'Shift status unavailable'
-                  : data.activeShift
-                    ? `Shift started at ${formatTime(data.activeShift.clockInAt)}`
-                    : 'You are not clocked in'}
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
-                {data.shiftUnavailable
-                  ? 'Open My shift to try again.'
-                  : data.activeShift
-                    ? 'Your shift is active.'
-                    : 'Clock in when you are ready to start work.'}
-              </p>
+          <section
+            aria-labelledby="today-shift-heading"
+            className="mt-6 border border-oasis-border border-l-4 border-l-oasis-teal bg-white p-5"
+          >
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2
+                  id="today-shift-heading"
+                  className="text-lg font-bold text-oasis-ink"
+                >
+                  My shift
+                </h2>
+                <p className="mt-2 text-base font-semibold text-oasis-ink">
+                  {data.shiftUnavailable
+                    ? 'Shift status unavailable'
+                    : data.activeShift
+                      ? `Shift started at ${formatTime(data.activeShift.clockInAt)}`
+                      : 'You are not clocked in'}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-oasis-muted">
+                  {data.shiftUnavailable
+                    ? 'Open My shift to try loading your status again.'
+                    : data.activeShift
+                      ? 'Your shift is active. Open it when you are ready to clock out.'
+                      : 'Clock in when you are ready to start work.'}
+                </p>
+              </div>
+              <Button asChild className="w-full shrink-0 sm:w-auto" size="lg">
+                <Link href="/shift">
+                  {todayShiftAction({
+                    active: Boolean(data.activeShift?.isActive),
+                    unavailable: data.shiftUnavailable,
+                  })}
+                </Link>
+              </Button>
             </div>
-            <Button asChild variant="secondary" size="sm">
-              <Link href="/shift">Open my shift</Link>
-            </Button>
-          </div>
+          </section>
         )}
 
         {data.visits.length === 0 ? (

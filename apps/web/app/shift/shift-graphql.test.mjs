@@ -11,12 +11,33 @@ test('requires an exact shift ID in the clock-out GraphQL contract', () => {
   assert.match(page, /input:\s*{\s*shiftId: activeShift\.id,/);
 });
 
-test('Refresh genuinely reloads both supported shift queries', () => {
+test('Refresh reloads both shift queries without coupling their failure states', () => {
   assert.match(
     page,
-    /Promise\.all\(\[\s*clientQuery<MyActiveShiftQueryResponse>\(MY_ACTIVE_SHIFT_QUERY\),\s*clientQuery<MyRecentShiftsQueryResponse>\(MY_RECENT_SHIFTS_QUERY,/,
+    /Promise\.allSettled\(\[\s*clientQuery<MyActiveShiftQueryResponse>\(MY_ACTIVE_SHIFT_QUERY\),\s*clientQuery<MyRecentShiftsQueryResponse>\(MY_RECENT_SHIFTS_QUERY,/,
   );
-  assert.match(page, /onClick={loadData}/);
+  assert.match(page, /if \(activeResult\.status === 'fulfilled'\)/);
+  assert.match(page, /if \(recentResult\.status === 'fulfilled'\)/);
+  assert.match(page, /title="Recent shifts are unavailable"/);
+  assert.match(page, /void loadData\(\)/);
   assert.match(page, /aria-label="Refresh shift status and recent shifts"/);
   assert.match(page, /disabled={loading \|\| submitting}/);
+});
+
+test('shift feedback and consent remain accessible', () => {
+  assert.match(page, /<Alert\s+tone="danger"/);
+  assert.match(page, /<Alert tone="success" live/);
+  assert.match(page, /className="flex min-h-11 cursor-pointer/);
+  assert.match(
+    page,
+    /Clocking in and out needs an internet connection\./,
+  );
+});
+
+test('clock-in and clock-out share the ref-backed single-flight boundary', () => {
+  assert.match(page, /const shiftActionStartedRef = useRef\(false\)/);
+  assert.equal(
+    page.match(/runSingleFlightAction\(shiftActionStartedRef/g)?.length,
+    2,
+  );
 });

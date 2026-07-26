@@ -16,6 +16,7 @@ import {
   formatTime as formatOrganizationTime,
   organizationDateTimeInputToIso,
 } from '../../../lib/time';
+import { hasRecordedVisitCare } from '../visitProgress';
 
 type VisitStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 type TaskOutcome = 'DONE' | 'NOT_DONE' | 'REFUSED' | 'NOT_REQUIRED' | 'CONCERN_RAISED';
@@ -36,6 +37,7 @@ type VisitTask = {
   taskName: string;
   description?: string | null;
   isCompleted: boolean;
+  hasRecordedOutcome: boolean;
   completedAt?: string | null;
   notes?: string | null;
 };
@@ -104,6 +106,7 @@ const VISIT_QUERY = `
         taskName
         description
         isCompleted
+        hasRecordedOutcome
         completedAt
         notes
       }
@@ -262,7 +265,10 @@ export default function VisitDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const startStartedRef = useRef(false);
+  const careNoteStartedRef = useRef(false);
   const completionStartedRef = useRef(false);
+  const taskOutcomeStartedRef = useRef(new Set<string>());
 
   const [startingVisit, setStartingVisit] = useState(false);
   const [recordingTaskId, setRecordingTaskId] = useState<string | null>(null);
@@ -344,31 +350,38 @@ export default function VisitDetailPage() {
 
   const hasStartedVisit = visit?.status === 'IN_PROGRESS' || visit?.status === 'COMPLETED';
   const visitIsClosed = visit?.status === 'COMPLETED' || visit?.status === 'CANCELLED';
+  const hasRecordedCare = hasRecordedVisitCare(
+    visit?.tasks || [],
+    careLogs.length,
+  );
 
   async function startVisit() {
     if (!visit || !canRunVisitWorkflow || visit.status !== 'SCHEDULED') return;
 
-    setStartingVisit(true);
-    setError(null);
-    setMessage(null);
+    await runSingleFlightAction(startStartedRef, async () => {
+      setStartingVisit(true);
+      setError(null);
+      setMessage(null);
 
-    try {
-      await clientQuery(
-        START_VISIT_MUTATION,
-        { visitId: visit.id },
-        { getBearerToken },
-      );
-      setMessage('Visit started.');
-      await loadWorkspace();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to start visit');
-    } finally {
-      setStartingVisit(false);
-    }
+      try {
+        await clientQuery(
+          START_VISIT_MUTATION,
+          { visitId: visit.id },
+          { getBearerToken },
+        );
+        setMessage('Visit started.');
+        await loadWorkspace();
+      } catch (err: any) {
+        setError(err?.message || 'Failed to start visit');
+      } finally {
+        setStartingVisit(false);
+      }
+    });
   }
 
   async function recordCareActionOutcome(task: VisitTask, outcome: TaskOutcome) {
     if (!visit || !canRunVisitWorkflow || !hasStartedVisit || visitIsClosed) return;
+    if (taskOutcomeStartedRef.current.has(task.id)) return;
 
     const notesByOutcome: Record<TaskOutcome, string> = {
       DONE: `Completed during visit: ${task.taskName}`,
@@ -378,6 +391,7 @@ export default function VisitDetailPage() {
       CONCERN_RAISED: `Concern raised during visit: ${task.taskName}`,
     };
 
+    taskOutcomeStartedRef.current.add(task.id);
     setRecordingTaskId(task.id);
     setError(null);
     setMessage(null);
@@ -399,6 +413,7 @@ export default function VisitDetailPage() {
     } catch (err: any) {
       setError(err?.message || 'Failed to record care action outcome');
     } finally {
+      taskOutcomeStartedRef.current.delete(task.id);
       setRecordingTaskId(null);
     }
   }
@@ -412,40 +427,48 @@ export default function VisitDetailPage() {
       return;
     }
 
-    setSubmittingCareNote(true);
-    setError(null);
-    setMessage(null);
+    const wasEscalated = careNoteEscalated;
 
-    try {
-      await clientQuery(
-        SUBMIT_CARE_NOTE_MUTATION,
-        {
-          input: {
-            visitId: visit.id,
-            category: careNoteCategory,
-            notes: careNoteNotes.trim(),
-            occurredAt: careNoteOccurredAt
-              ? organizationDateTimeInputToIso(careNoteOccurredAt)
-              : undefined,
-            escalated: careNoteEscalated,
-            escalatedTo: careNoteEscalatedTo.trim() || undefined,
+    await runSingleFlightAction(careNoteStartedRef, async () => {
+      setSubmittingCareNote(true);
+      setError(null);
+      setMessage(null);
+
+      try {
+        await clientQuery(
+          SUBMIT_CARE_NOTE_MUTATION,
+          {
+            input: {
+              visitId: visit.id,
+              category: careNoteCategory,
+              notes: careNoteNotes.trim(),
+              occurredAt: careNoteOccurredAt
+                ? organizationDateTimeInputToIso(careNoteOccurredAt)
+                : undefined,
+              escalated: careNoteEscalated,
+              escalatedTo: careNoteEscalatedTo.trim() || undefined,
+            },
           },
-        },
-        { getBearerToken },
-      );
+          { getBearerToken },
+        );
 
-      setCareNoteCategory('OTHER');
-      setCareNoteOccurredAt(nowLocalDatetime());
-      setCareNoteNotes('');
-      setCareNoteEscalated(false);
-      setCareNoteEscalatedTo('');
-      setMessage('Care note recorded.');
-      await loadWorkspace();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to record care note');
-    } finally {
-      setSubmittingCareNote(false);
-    }
+        setCareNoteCategory('OTHER');
+        setCareNoteOccurredAt(nowLocalDatetime());
+        setCareNoteNotes('');
+        setCareNoteEscalated(false);
+        setCareNoteEscalatedTo('');
+        setMessage(
+          wasEscalated
+            ? 'Care note recorded and marked for escalation.'
+            : 'Care note recorded.',
+        );
+        await loadWorkspace();
+      } catch (err: any) {
+        setError(err?.message || 'Failed to record care note');
+      } finally {
+        setSubmittingCareNote(false);
+      }
+    });
   }
 
   async function completeVisit() {
@@ -487,16 +510,11 @@ export default function VisitDetailPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 pb-28 pt-8 sm:px-6 sm:pb-8">
         <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
           <Link href={isAdmin ? '/schedule' : '/visits'} className="text-teal-700 hover:text-teal-800">
             ← {isAdmin ? 'Back to Schedule' : 'Back to my visits'}
           </Link>
-          {visit?.client && (
-            <Link href={`/clients/${visit.client.id}`} className="text-slate-500 hover:text-slate-700">
-              Person details
-            </Link>
-          )}
         </div>
 
         <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
@@ -527,36 +545,56 @@ export default function VisitDetailPage() {
         )}
 
         {!loading && message && (
-          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+          <div
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700"
+          >
             {message}
           </div>
         )}
 
         {!loading && visit && (
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700 xl:col-span-3">
+              Recording visit activity requires an internet connection.
+            </p>
             <div className="space-y-6 xl:col-span-2">
+              <Card>
+                <CardHeader>
+                  <h2 className="text-xl font-semibold text-slate-900">
+                    About {visit.client?.fullName || 'the person you support'}
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    The visit details you need for this assigned call.
+                  </p>
+                </CardHeader>
+                <CardContent className="mb-0">
+                  <p className="text-sm font-medium text-slate-900">
+                    {[
+                      visit.client?.addressLine1,
+                      visit.client?.addressLine2,
+                      visit.client?.city,
+                      visit.client?.postcode,
+                    ]
+                      .filter(Boolean)
+                      .join(', ') || 'Address not recorded'}
+                  </p>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <h2 className="text-xl font-semibold text-slate-900">Visit details</h2>
                   <p className="text-sm text-slate-500">Who you are visiting, where to go, and the planned time.</p>
                 </CardHeader>
                 <CardContent className="mb-0 grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="rounded-lg bg-slate-50 p-4">
-                    <p className="text-sm text-slate-500">Person</p>
-                    <p className="mt-1 text-base font-medium text-slate-900">{visit.client?.fullName || visit.clientId}</p>
-                    {visit.client?.addressLine1 && (
-                      <p className="mt-1 text-sm text-slate-600">
-                        {[visit.client.addressLine1, visit.client.addressLine2, visit.client.city, visit.client.postcode]
-                          .filter(Boolean)
-                          .join(', ')}
-                      </p>
-                    )}
-                  </div>
                   {isAdmin && (
                     <div className="rounded-lg bg-slate-50 p-4">
                       <p className="text-sm text-slate-500">Assigned Carer</p>
                       <p className="mt-1 text-base font-medium text-slate-900">
-                        {visit.carer ? `${visit.carer.firstName} ${visit.carer.lastName}` : visit.carerId}
+                        {visit.carer ? `${visit.carer.firstName} ${visit.carer.lastName}` : 'Not assigned'}
                       </p>
                       {visit.carer?.phone && <p className="mt-1 text-sm text-slate-600">{visit.carer.phone}</p>}
                     </div>
@@ -584,7 +622,7 @@ export default function VisitDetailPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card id="start-visit">
                 <CardHeader>
                   <h2 className="text-xl font-semibold text-slate-900">Step 1. Start visit</h2>
                   <p className="text-sm text-slate-500">Start when you arrive before recording care actions and notes.</p>
@@ -610,7 +648,7 @@ export default function VisitDetailPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card id="care-actions">
                 <CardHeader>
                   <h2 className="text-xl font-semibold text-slate-900">Step 2. Care actions</h2>
                   <p className="text-sm text-slate-500">
@@ -676,7 +714,7 @@ export default function VisitDetailPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card id="care-notes">
                 <CardHeader>
                   <h2 className="text-xl font-semibold text-slate-900">Step 3. Care notes</h2>
                   <p className="text-sm text-slate-500">Record the care provided and anything the team needs to follow up.</p>
@@ -697,11 +735,14 @@ export default function VisitDetailPage() {
                   ) : (
                     <form className="space-y-4" onSubmit={handleCreateCareNote}>
                       <div>
-                        <label className="mb-1 block text-sm text-slate-600">Category</label>
+                        <label htmlFor="care-note-category" className="mb-1 block text-sm text-slate-600">
+                          Category
+                        </label>
                         <select
+                          id="care-note-category"
                           value={careNoteCategory}
                           onChange={(event) => setCareNoteCategory(event.target.value as CareLogCategory)}
-                          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                          className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2"
                         >
                           {CARE_LOG_CATEGORIES.map((category) => (
                             <option key={category.value} value={category.value}>
@@ -711,17 +752,23 @@ export default function VisitDetailPage() {
                         </select>
                       </div>
                       <div>
-                        <label className="mb-1 block text-sm text-slate-600">Occurred at</label>
+                        <label htmlFor="care-note-occurred-at" className="mb-1 block text-sm text-slate-600">
+                          Occurred at
+                        </label>
                         <input
+                          id="care-note-occurred-at"
                           type="datetime-local"
                           value={careNoteOccurredAt}
                           onChange={(event) => setCareNoteOccurredAt(event.target.value)}
-                          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                          className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2"
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-sm text-slate-600">Care note</label>
+                        <label htmlFor="care-note-notes" className="mb-1 block text-sm text-slate-600">
+                          Care note
+                        </label>
                         <textarea
+                          id="care-note-notes"
                           value={careNoteNotes}
                           onChange={(event) => setCareNoteNotes(event.target.value)}
                           rows={4}
@@ -729,22 +776,26 @@ export default function VisitDetailPage() {
                           placeholder="Record care delivered, person response, and any handover details."
                         />
                       </div>
-                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                      <label className="flex min-h-11 items-center gap-3 text-sm text-slate-700">
                         <input
                           type="checkbox"
                           checked={careNoteEscalated}
                           onChange={(event) => setCareNoteEscalated(event.target.checked)}
+                          className="h-5 w-5 shrink-0"
                         />
                         This needed escalation
                       </label>
                       {careNoteEscalated && (
                         <div>
-                          <label className="mb-1 block text-sm text-slate-600">Escalated to</label>
+                          <label htmlFor="care-note-escalated-to" className="mb-1 block text-sm text-slate-600">
+                            Escalated to
+                          </label>
                           <input
+                            id="care-note-escalated-to"
                             type="text"
                             value={careNoteEscalatedTo}
                             onChange={(event) => setCareNoteEscalatedTo(event.target.value)}
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                            className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2"
                             placeholder="Team lead, family contact, GP, district nurse..."
                           />
                         </div>
@@ -783,7 +834,7 @@ export default function VisitDetailPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card id="finish-visit">
                 <CardHeader>
                   <h2 className="text-xl font-semibold text-slate-900">Step 4. Finish visit</h2>
                   <p className="text-sm text-slate-500">Finish once care actions and notes are recorded.</p>
@@ -808,8 +859,11 @@ export default function VisitDetailPage() {
                   ) : (
                     <>
                       <div>
-                        <label className="mb-1 block text-sm text-slate-600">Completion note</label>
+                        <label htmlFor="visit-completion-notes" className="mb-1 block text-sm text-slate-600">
+                          Completion note
+                        </label>
                         <textarea
+                          id="visit-completion-notes"
                           value={visitCompletionNotes}
                           onChange={(event) => setVisitCompletionNotes(event.target.value)}
                           rows={3}
@@ -866,9 +920,6 @@ export default function VisitDetailPage() {
                       </Button>
                     </>
                   )}
-                  <Button asChild variant="outline" className="w-full justify-center">
-                    <Link href={`/clients/${visit.clientId}`}>Person details</Link>
-                  </Button>
                   <Button asChild variant="ghost" className="w-full justify-center">
                     <Link href={isAdmin ? '/schedule' : '/visits'}>
                       {isAdmin ? 'Back to Schedule' : 'Back to my visits'}
@@ -904,6 +955,40 @@ export default function VisitDetailPage() {
                 </Card>
               )}
             </div>
+
+            {!visitIsClosed && canRunVisitWorkflow && (
+              <div
+                role="region"
+                aria-label="Next visit action"
+                className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white p-3 shadow-[0_-4px_16px_rgba(15,23,42,0.08)] sm:hidden"
+              >
+                <div className="mx-auto max-w-7xl">
+                  {visit.status === 'SCHEDULED' ? (
+                    <Button
+                      type="button"
+                      className="w-full"
+                      onClick={startVisit}
+                      disabled={startingVisit}
+                    >
+                      {startingVisit ? 'Starting...' : 'Start visit'}
+                    </Button>
+                  ) : !hasRecordedCare ? (
+                    <Button asChild className="w-full">
+                      <a href="#care-actions">Continue recording care</a>
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      className="w-full"
+                      onClick={completeVisit}
+                      disabled={completingVisit}
+                    >
+                      {completingVisit ? 'Completing...' : 'Complete visit'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>

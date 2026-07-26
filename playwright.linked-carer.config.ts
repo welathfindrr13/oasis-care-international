@@ -43,6 +43,10 @@ export default defineConfig({
         AUTH_IDENTITY_PROVIDER: "clerk",
         TENANT_MEMBERSHIP_REQUIRED: "true",
         MEDICATION_EMAR_ENABLED: "false",
+        SHIFT_IDEMPOTENCY_HMAC_CURRENT_KEY_ID: "shift-browser",
+        SHIFT_IDEMPOTENCY_HMAC_CURRENT_SECRET:
+          "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=",
+        SHIFT_IDEMPOTENCY_HMAC_PREVIOUS_KEYS_JSON: "[]",
         API_RATE_LIMIT_MAX: "1000",
         PORT: "4000",
         FRONTEND_URL: "http://localhost:3002",

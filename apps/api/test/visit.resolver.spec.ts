@@ -445,6 +445,7 @@ describe('VisitResolver', () => {
       );
       expect(result.id).toBe('task-1');
       expect(result.isCompleted).toBe(true);
+      expect(result.hasRecordedOutcome).toBe(true);
       expect(result.notes).toContain('VISIT_TASK_OUTCOME::');
     });
   });
