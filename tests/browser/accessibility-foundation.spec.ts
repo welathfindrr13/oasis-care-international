@@ -194,7 +194,6 @@ async function expectAccessibilityFoundation(
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(page.locator("main")).toBeVisible();
   await expect(page.locator("h1:visible")).toHaveCount(1);
-  await expect(page).toHaveTitle(/\S/);
 
   const overflow = await page.evaluate(() => ({
     documentWidth: document.documentElement.scrollWidth,
@@ -229,6 +228,46 @@ async function expectAccessibilityFoundation(
   }));
   expect(motion.reduce).toBe(true);
   expect(motion.longRunningAnimations).toBe(0);
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          (stableForMs) =>
+            new Promise<boolean>((resolve) => {
+              const expectedTitle = document.title.trim();
+              if (!expectedTitle) {
+                resolve(false);
+                return;
+              }
+
+              let remainedStable = true;
+              const observer = new MutationObserver(() => {
+                if (document.title.trim() !== expectedTitle) {
+                  remainedStable = false;
+                }
+              });
+              observer.observe(document.head, {
+                childList: true,
+                characterData: true,
+                subtree: true,
+              });
+              window.setTimeout(() => {
+                observer.disconnect();
+                resolve(
+                  remainedStable && document.title.trim() === expectedTitle,
+                );
+              }, stableForMs);
+            }),
+          500,
+        ),
+      {
+        message:
+          "document title should remain non-empty and unchanged before Axe runs",
+        timeout: 15_000,
+      },
+    )
+    .toBe(true);
 
   const accessibility = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
@@ -554,6 +593,7 @@ test("Platform Owner cleanup attention remains truthful and retryable", async ({
   await expect(
     page.getByText("Cleanup needs attention", { exact: true }),
   ).toBeVisible();
+  await page.waitForLoadState("networkidle");
   await expectAccessibilityFoundation(page, {
     sequentialKeyboardTraversal: false,
   });
