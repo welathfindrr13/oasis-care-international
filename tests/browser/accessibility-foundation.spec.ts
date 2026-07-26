@@ -194,6 +194,7 @@ async function expectAccessibilityFoundation(
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(page.locator("main")).toBeVisible();
   await expect(page.locator("h1:visible")).toHaveCount(1);
+  await expect(page).toHaveTitle(/\S/);
 
   const overflow = await page.evaluate(() => ({
     documentWidth: document.documentElement.scrollWidth,
