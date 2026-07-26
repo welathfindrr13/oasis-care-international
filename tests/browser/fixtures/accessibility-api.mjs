@@ -380,7 +380,22 @@ const operationHandlers = new Map([
       ],
     }),
   ],
-  ["EvidenceSourceCandidates", () => ({ evidenceSourceCandidates: [] })],
+  [
+    "EvidenceSourceCandidates",
+    (_request, payload) => ({
+      evidenceSourceCandidates:
+        payload.variables?.input?.sourceTypes?.length === 3
+          ? [
+              {
+                id: visitId,
+                sourceType: "VISIT",
+                occurredAt: "2026-07-23T09:00:00.000Z",
+                status: "COMPLETED",
+              },
+            ]
+          : [],
+    }),
+  ],
   ["FamilyCareRooms", () => ({ familyCareRooms: [] })],
   [
     "FamilyCareRoom",

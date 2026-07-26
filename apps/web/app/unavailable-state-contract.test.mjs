@@ -94,4 +94,16 @@ test("date and source-filter changes discard stale hidden source selections", ()
     inspectionSourcePicker,
     /candidates\.filter\([^)]*selectedKeys/,
   );
+  assert.match(
+    inspectionSourcePicker,
+    /reconcileInspectionSourceSelections\(\s*selectedSourcesRef\.current,\s*safeCandidates,\s*\)/,
+  );
+});
+
+test("client-list failure suppresses the conflicting requested-client panel", () => {
+  for (const relativePath of ["care-planning/page.tsx", "evidence/page.tsx"]) {
+    const page = source(relativePath);
+    assert.match(page, /shouldShowRequestedClientUnavailable\(\{/);
+    assert.match(page, /clientListUnavailable:\s*clientsResult\.unavailable/);
+  }
 });

@@ -19,6 +19,7 @@ import {
 } from '../../lib/graphql/queries'
 import { getServerAuthContext } from '../../lib/auth/server-auth'
 import { hasAccessCapability } from '../../lib/auth/capabilities'
+import { shouldShowRequestedClientUnavailable } from '../../lib/inspection-records'
 
 export const dynamic = 'force-dynamic'
 
@@ -203,8 +204,12 @@ export default async function CarePlanningPage(props: CarePlanningPageProps) {
     : requestedClientId
       ? await getRequestedClientSafe(requestedClientId)
       : clients[0]
-  const requestedClientUnavailable =
-    requestedClientInvalid || Boolean(requestedClientId && !selectedClient)
+  const requestedClientUnavailable = shouldShowRequestedClientUnavailable({
+    clientListUnavailable: clientsResult.unavailable,
+    requestedClientInvalid,
+    requestedClientId,
+    selectedClientAvailable: Boolean(selectedClient),
+  })
   const carePlanning = selectedClient
     ? await getCarePlanningSafe(selectedClient.id)
     : null

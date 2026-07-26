@@ -521,6 +521,31 @@ test("Tenant admin care planning and inspection records reflow at 320 CSS pixels
   }
 });
 
+test("Inspection source refresh removes a selection that is no longer returned", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "phone-390x844");
+  await signIn(page, profiles.tenantAdmin);
+  await page.goto(`/evidence?clientId=${PERSON_ID}`);
+
+  await page.getByLabel("Period start").fill("2026-07-01");
+  await page.getByLabel("Period end").fill("2026-07-24");
+  const visitCandidate = page
+    .getByRole("button", { name: /Visits.*completed/i })
+    .last();
+  await expect(visitCandidate).toBeVisible();
+  await visitCandidate.click();
+  await expect(
+    page.getByText("1 record selected", { exact: true }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Care notes", exact: true }).click();
+  await expect(
+    page.getByText("0 records selected", { exact: true }),
+  ).toBeVisible();
+  await expect(visitCandidate).toHaveCount(0);
+});
+
 test("Carers cannot open generic client profile aliases", async ({
   page,
 }) => {

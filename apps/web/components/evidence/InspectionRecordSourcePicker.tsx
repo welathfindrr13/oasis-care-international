@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { clientQuery } from '../../lib/graphql/client-side'
 import {
   EVIDENCE_SOURCE_CANDIDATES_QUERY,
@@ -8,7 +8,10 @@ import {
   type InspectionSourceCandidate,
   type OperationalInspectionSourceType,
 } from '../../lib/graphql/queries'
-import { inspectionRecordTypeLabel } from '../../lib/inspection-records'
+import {
+  inspectionRecordTypeLabel,
+  reconcileInspectionSourceSelections,
+} from '../../lib/inspection-records'
 import { formatDateTime, getOrganizationDateUtcRange } from '../../lib/time'
 import { Button } from '../ui/Button'
 import { StatePanel } from '../ui/StatePanel'
@@ -67,10 +70,15 @@ export function InspectionRecordSourcePicker({
   const [candidates, setCandidates] = useState<InspectionSourceCandidate[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
+  const selectedSourcesRef = useRef(selectedSources)
   const selectedKeys = useMemo(
     () => new Set(selectedSources.map(sourceKey)),
     [selectedSources],
   )
+
+  useEffect(() => {
+    selectedSourcesRef.current = selectedSources
+  }, [selectedSources])
 
   useEffect(() => {
     if (!periodStart || !periodEnd || enabledSourceTypes.length === 0) {
@@ -107,6 +115,12 @@ export function InspectionRecordSourcePicker({
             ),
         )
         setCandidates(safeCandidates)
+        onSelectedSourcesChange(
+          reconcileInspectionSourceSelections(
+            selectedSourcesRef.current,
+            safeCandidates,
+          ),
+        )
         onReadinessChange(true)
       })
       .catch(() => {

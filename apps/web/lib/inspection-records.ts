@@ -43,6 +43,29 @@ export function inspectionRecordTypeLabel(
   return SOURCE_TYPE_LABELS[sourceType];
 }
 
+function inspectionSourceKey(
+  source: Pick<InspectionSourceCandidate, "sourceType" | "id">,
+): string {
+  return `${source.sourceType}:${source.id}`;
+}
+
+export function reconcileInspectionSourceSelections(
+  selectedSources: InspectionSourceCandidate[],
+  availableCandidates: InspectionSourceCandidate[],
+): InspectionSourceCandidate[] {
+  const candidatesByKey = new Map(
+    availableCandidates.map((candidate) => [
+      inspectionSourceKey(candidate),
+      candidate,
+    ]),
+  );
+
+  return selectedSources.flatMap((selected) => {
+    const currentCandidate = candidatesByKey.get(inspectionSourceKey(selected));
+    return currentCandidate ? [currentCandidate] : [];
+  });
+}
+
 export function buildInspectionRecordItems({
   assessments,
   carePlans,
@@ -182,4 +205,22 @@ export function validateInspectionRecordForm({
     errors.sources = "Choose at least one record to include.";
   }
   return errors;
+}
+
+export function shouldShowRequestedClientUnavailable({
+  clientListUnavailable,
+  requestedClientInvalid,
+  requestedClientId,
+  selectedClientAvailable,
+}: {
+  clientListUnavailable: boolean;
+  requestedClientInvalid: boolean;
+  requestedClientId?: string;
+  selectedClientAvailable: boolean;
+}): boolean {
+  return (
+    !clientListUnavailable &&
+    (requestedClientInvalid ||
+      Boolean(requestedClientId && !selectedClientAvailable))
+  );
 }

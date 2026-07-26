@@ -4,6 +4,8 @@ import {
   buildInspectionRecordDocument,
   buildInspectionRecordItems,
   groupInspectionRecordItems,
+  reconcileInspectionSourceSelections,
+  shouldShowRequestedClientUnavailable,
   validateInspectionRecordForm,
 } from './inspection-records'
 
@@ -244,5 +246,66 @@ test('inspection form validation links missing dates, date order, and source sel
     {
       periodEnd: 'The end of the period must be on or after the start.',
     },
+  )
+})
+
+test('changed source results discard a selection that is no longer available', () => {
+  const selected = [
+    {
+      id: 'visit-1',
+      sourceType: 'VISIT' as const,
+      occurredAt: '2026-07-22T10:00:00.000Z',
+    },
+  ]
+
+  assert.deepEqual(
+    reconcileInspectionSourceSelections(selected, [
+      {
+        id: 'visit-2',
+        sourceType: 'VISIT',
+        occurredAt: '2026-07-23T10:00:00.000Z',
+      },
+    ]),
+    [],
+  )
+
+  const refreshedCandidate = {
+    id: 'visit-1',
+    sourceType: 'VISIT' as const,
+    occurredAt: '2026-07-24T10:00:00.000Z',
+    status: 'COMPLETED',
+  }
+  assert.deepEqual(
+    reconcileInspectionSourceSelections(selected, [refreshedCandidate]),
+    [refreshedCandidate],
+  )
+})
+
+test('client-list failure suppresses the conflicting requested-client unavailable state', () => {
+  assert.equal(
+    shouldShowRequestedClientUnavailable({
+      clientListUnavailable: true,
+      requestedClientInvalid: false,
+      requestedClientId: 'client-1',
+      selectedClientAvailable: false,
+    }),
+    false,
+  )
+  assert.equal(
+    shouldShowRequestedClientUnavailable({
+      clientListUnavailable: false,
+      requestedClientInvalid: false,
+      requestedClientId: 'client-1',
+      selectedClientAvailable: false,
+    }),
+    true,
+  )
+  assert.equal(
+    shouldShowRequestedClientUnavailable({
+      clientListUnavailable: false,
+      requestedClientInvalid: true,
+      selectedClientAvailable: false,
+    }),
+    true,
   )
 })

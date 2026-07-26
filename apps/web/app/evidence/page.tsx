@@ -20,6 +20,7 @@ import {
 import {
   groupInspectionRecordItems,
   inspectionRecordTypeLabel,
+  shouldShowRequestedClientUnavailable,
 } from '../../lib/inspection-records'
 import { formatDate, formatStoredCalendarDate } from '../../lib/time'
 
@@ -180,8 +181,12 @@ export default async function EvidencePage(props: EvidencePageProps) {
     : requestedClientId
       ? await getRequestedClientSafe(requestedClientId)
       : clients[0]
-  const requestedClientUnavailable =
-    requestedClientInvalid || Boolean(requestedClientId && !selectedClient)
+  const requestedClientUnavailable = shouldShowRequestedClientUnavailable({
+    clientListUnavailable: clientsResult.unavailable,
+    requestedClientInvalid,
+    requestedClientId,
+    selectedClientAvailable: Boolean(selectedClient),
+  })
   const inspectionData = selectedClient
     ? await getInspectionRecordsSafe(selectedClient.id)
     : null
@@ -331,6 +336,7 @@ export default async function EvidencePage(props: EvidencePageProps) {
             </section>
 
             <InspectionRecordActions
+              key={selectedClient.id}
               clientId={selectedClient.id}
               assessments={assessments}
               carePlans={carePlans}
