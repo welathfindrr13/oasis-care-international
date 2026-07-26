@@ -260,7 +260,7 @@ test("a linked fake carer follows the database role despite an admin token claim
 
   await expect(page).toHaveURL(`/schedule/${VISIT_ID}`);
   await expect(
-    page.getByRole("heading", { name: "Assigned Fake Client" }),
+    page.getByRole("heading", { name: "Assigned Fake Client", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("Browser Carer", { exact: true })).toHaveCount(0);
   await expect(
@@ -570,7 +570,7 @@ test("account switching clears stale capabilities and follows each database memb
   await page.getByRole("link", { name: "View updates" }).click();
   await expect(page).toHaveURL(`/family/care-rooms/${CARE_ROOM_ID}`);
   await expect(
-    page.getByRole("heading", { name: "Assigned Fake Client" }),
+    page.getByRole("heading", { name: "Assigned Fake Client", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText(
