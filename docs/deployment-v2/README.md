@@ -283,6 +283,12 @@ IDs, creates and authenticates a replacement `LEGACY_ROLLED_BACK` baseline for t
 and durably rotates the completed forward evidence and previous legacy state into immutable
 history. It does not build, pull, fetch, restart, migrate, or change application data.
 
+Before acquiring the mutation lock, the wrapper also requires one exact single-use approval value:
+`APPROVE_RUNTIME_BASELINE_<CURRENT_SHA>_TO_<NEXT_TARGET_SHA>_WITH_<ROTATION_TOOL_SHA>_ATTEMPT_<BASELINE_ATTEMPT_ID>_FROM_COMPLETE`.
+The current runtime, next target, reviewed tooling commit, and fresh collision-resistant attempt ID
+must all match the wrapper's pinned inputs. The durable attempt directory, state transition, and new
+alias names prevent that approval and attempt ID from being reused.
+
 The operation records a private phase journal before creating aliases or moving state. Its recovery
 command adjudicates the actual filesystem layout under the same mutation lock, including a rename
 that completed before its journal update. A failed or interrupted non-terminal operation restores both

@@ -294,6 +294,7 @@ async function createExecutableWrapperFixture(
   t,
   {
     helperVariant = "valid",
+    approvalVariant = "valid",
     terminatePromotion = false,
     signalWrapper = false,
   } = {},
@@ -695,6 +696,17 @@ async function createExecutableWrapperFixture(
       shell: true,
       encoding: "utf8",
     }).stdout.trim() || "/usr/bin/git";
+  const approvalValues = {
+    valid: `APPROVE_RUNTIME_BASELINE_${CURRENT_RUNTIME_SHA}_TO_${NEXT_FORWARD_TARGET_SHA}_WITH_${rotationToolSha}_ATTEMPT_${baselineAttemptId}_FROM_COMPLETE`,
+    wrongCurrent: `APPROVE_RUNTIME_BASELINE_${oldLegacySha}_TO_${NEXT_FORWARD_TARGET_SHA}_WITH_${rotationToolSha}_ATTEMPT_${baselineAttemptId}_FROM_COMPLETE`,
+    wrongTarget: `APPROVE_RUNTIME_BASELINE_${CURRENT_RUNTIME_SHA}_TO_${CURRENT_RUNTIME_SHA}_WITH_${rotationToolSha}_ATTEMPT_${baselineAttemptId}_FROM_COMPLETE`,
+    wrongTooling: `APPROVE_RUNTIME_BASELINE_${CURRENT_RUNTIME_SHA}_TO_${NEXT_FORWARD_TARGET_SHA}_WITH_${"f".repeat(40)}_ATTEMPT_${baselineAttemptId}_FROM_COMPLETE`,
+    wrongAttempt: `APPROVE_RUNTIME_BASELINE_${CURRENT_RUNTIME_SHA}_TO_${NEXT_FORWARD_TARGET_SHA}_WITH_${rotationToolSha}_ATTEMPT_${"e".repeat(32)}_FROM_COMPLETE`,
+  };
+  assert.ok(
+    approvalVariant === "missing" ||
+      Object.hasOwn(approvalValues, approvalVariant),
+  );
   const wrapperArgs = [
     "-n",
     "-u",
@@ -709,6 +721,9 @@ async function createExecutableWrapperFixture(
     `TEST_CURRENT_SHA=${CURRENT_RUNTIME_SHA}`,
     `TEST_NEXT_SHA=${NEXT_FORWARD_TARGET_SHA}`,
     `BASELINE_ATTEMPT_ID=${baselineAttemptId}`,
+    ...(approvalVariant === "missing"
+      ? []
+      : [`RUNTIME_BASELINE_APPROVAL=${approvalValues[approvalVariant]}`]),
     `TEST_ALIAS_DIR=${aliasDir}`,
     `TEST_DOCKER_LOG=${dockerLog}`,
     `TEST_TERMINATE_PROMOTION=${terminatePromotion ? "1" : "0"}`,
@@ -1027,6 +1042,77 @@ test("failure while creating a later alias removes every alias created by the in
   assert.equal(fs.existsSync(fixture.legacyRoot), true);
 });
 
+test("a subsequent recovery removes an exact late alias created after RESTORED", async (t) => {
+  const fixture = await createFixture(t);
+  let writes = 0;
+
+  await assert.rejects(
+    fixture.promote({
+      aliasCreator: (imageId, alias) => {
+        writes += 1;
+        if (writes === 2) {
+          throw new RuntimeBaselinePromotionError(
+            "RUNTIME_BASELINE_ALIAS_WRITE_FAILED",
+          );
+        }
+        fixture.aliases.set(alias, imageId);
+      },
+    }),
+    (error) => error.code === "RUNTIME_BASELINE_VERIFICATION_FAILED_RESTORED",
+  );
+
+  const lateAlias = `oasis-legacy-bootstrap-api:${baselineAttemptId}`;
+  fixture.aliases.set(lateAlias, currentImages.api);
+  const recovered = recoverCurrentRuntimeBaseline({
+    gitCommonDir: fixture.gitCommon,
+    baselineAttemptId,
+    mutationLockFd: fixture.lockFd,
+    lockVerifier: () => {},
+    aliasResolver: fixture.aliasResolver,
+    aliasRemover: fixture.aliasRemover,
+  });
+
+  assert.equal(recovered.outcome, "RESTORED");
+  assert.equal(fixture.aliases.has(lateAlias), false);
+});
+
+test("a subsequent recovery fails closed on a retagged late alias after RESTORED", async (t) => {
+  const fixture = await createFixture(t);
+  let writes = 0;
+
+  await assert.rejects(
+    fixture.promote({
+      aliasCreator: (imageId, alias) => {
+        writes += 1;
+        if (writes === 2) {
+          throw new RuntimeBaselinePromotionError(
+            "RUNTIME_BASELINE_ALIAS_WRITE_FAILED",
+          );
+        }
+        fixture.aliases.set(alias, imageId);
+      },
+    }),
+    (error) => error.code === "RUNTIME_BASELINE_VERIFICATION_FAILED_RESTORED",
+  );
+
+  const lateAlias = `oasis-legacy-bootstrap-api:${baselineAttemptId}`;
+  const unexpectedImage = `sha256:${"9".repeat(64)}`;
+  fixture.aliases.set(lateAlias, unexpectedImage);
+  assert.throws(
+    () =>
+      recoverCurrentRuntimeBaseline({
+        gitCommonDir: fixture.gitCommon,
+        baselineAttemptId,
+        mutationLockFd: fixture.lockFd,
+        lockVerifier: () => {},
+        aliasResolver: fixture.aliasResolver,
+        aliasRemover: fixture.aliasRemover,
+      }),
+    (error) => error.code === "RUNTIME_BASELINE_STATE_UNCERTAIN",
+  );
+  assert.equal(fixture.aliases.get(lateAlias), unexpectedImage);
+});
+
 for (const interruptedPhase of [
   "FORWARD_ARCHIVED",
   "LEGACY_ARCHIVED",
@@ -1129,6 +1215,39 @@ test("the executable production wrapper authenticates its full boundary and reco
   }
 
   assertNoDirectDatabaseMutationSource();
+
+  for (const approvalVariant of [
+    "missing",
+    "wrongCurrent",
+    "wrongTarget",
+    "wrongTooling",
+    "wrongAttempt",
+  ]) {
+    await t.test(
+      `${approvalVariant} approval fails before mutation`,
+      async (subtest) => {
+        const fixture = await createExecutableWrapperFixture(subtest, {
+          approvalVariant,
+        });
+        const result = fixture.runWrapper();
+        assert.equal(result.status, 1, result.stderr);
+        assert.match(result.stdout, /RUNTIME_BASELINE_APPROVAL_INVALID/);
+        assert.equal(fixture.existsAsDeploy(fixture.systemForwardRoot), true);
+        assert.equal(fixture.existsAsDeploy(fixture.systemLegacyRoot), true);
+        for (const service of ["api", "web", "caddy"]) {
+          assert.equal(
+            fixture.existsAsDeploy(
+              path.join(
+                fixture.aliasDir,
+                `oasis-legacy-bootstrap-${service}:${baselineAttemptId}`,
+              ),
+            ),
+            false,
+          );
+        }
+      },
+    );
+  }
 
   for (const helperVariant of ["stale", "mixed"]) {
     await t.test(

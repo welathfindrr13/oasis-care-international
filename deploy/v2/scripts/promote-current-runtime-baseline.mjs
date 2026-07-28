@@ -468,6 +468,29 @@ function expectedNewAlias(service, baselineAttemptId) {
   return `oasis-legacy-bootstrap-${service}:${baselineAttemptId}`;
 }
 
+function removeIntendedNewAliases(
+  journal,
+  baselineAttemptId,
+  aliasResolver,
+  aliasRemover,
+) {
+  for (const service of journal.aliasIntents) {
+    const alias = expectedNewAlias(service, baselineAttemptId);
+    const lookup = aliasResolver(alias);
+    if (lookup?.status === "absent") continue;
+    if (
+      lookup?.status !== "present" ||
+      lookup.imageId !== journal.runningImageIds[service]
+    ) {
+      fail("RUNTIME_BASELINE_STATE_UNCERTAIN");
+    }
+    aliasRemover(alias);
+    if (aliasResolver(alias)?.status !== "absent") {
+      fail("RUNTIME_BASELINE_ALIAS_REMOVE_FAILED");
+    }
+  }
+}
+
 function verifyCanonicalRestored(paths, journal, aliasResolver) {
   if (
     !fs.existsSync(paths.forwardRoot) ||
@@ -544,6 +567,12 @@ export function recoverCurrentRuntimeBaseline({
   }
 
   if (journal.phase === PROMOTION_PHASES.RESTORED) {
+    removeIntendedNewAliases(
+      journal,
+      baselineAttemptId,
+      aliasResolver,
+      aliasRemover,
+    );
     verifyCanonicalRestored(paths, journal, aliasResolver);
     return { outcome: PROMOTION_PHASES.RESTORED, journal, ...paths };
   }
@@ -606,22 +635,12 @@ export function recoverCurrentRuntimeBaseline({
       fail("RUNTIME_BASELINE_STATE_UNCERTAIN");
     }
 
-    for (const service of REQUIRED_SERVICES) {
-      if (!journal.aliasIntents.includes(service)) continue;
-      const alias = expectedNewAlias(service, baselineAttemptId);
-      const lookup = aliasResolver(alias);
-      if (lookup?.status === "absent") continue;
-      if (
-        lookup?.status !== "present" ||
-        lookup.imageId !== journal.runningImageIds[service]
-      ) {
-        fail("RUNTIME_BASELINE_STATE_UNCERTAIN");
-      }
-      aliasRemover(alias);
-      if (aliasResolver(alias)?.status !== "absent") {
-        fail("RUNTIME_BASELINE_ALIAS_REMOVE_FAILED");
-      }
-    }
+    removeIntendedNewAliases(
+      journal,
+      baselineAttemptId,
+      aliasResolver,
+      aliasRemover,
+    );
 
     verifyCanonicalRestored(paths, journal, aliasResolver);
     journal = writeJournal(journalPath, journal, {
