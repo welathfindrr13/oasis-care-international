@@ -533,8 +533,25 @@ async function createExecutableWrapperFixture(
   }
 
   const dockerLog = path.join(toolsDir, "docker-commands");
+  const wrapperPidFile = path.join(toolsDir, "wrapper.pid");
   const emptyLog = writeTemporaryFile(stateFixture.root, "docker-commands", "");
   installSystemFile(emptyLog, dockerLog, "0600");
+  const signalLauncher = writeTemporaryFile(
+    stateFixture.root,
+    "signal-launcher",
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      'printf "%s\\n" "$$" > "$TEST_WRAPPER_PID_FILE"',
+      'exec bash "$TEST_WRAPPER_PATH"',
+      "",
+    ].join("\n"),
+  );
+  installSystemFile(
+    signalLauncher,
+    path.join(toolsDir, "signal-launcher"),
+    "0700",
+  );
   const fakeGit = writeTemporaryFile(
     stateFixture.root,
     "git",
@@ -740,8 +757,15 @@ async function createExecutableWrapperFixture(
     return false;
   };
   const signalRunningWrapper = async () => {
-    const child = spawn("sudo", wrapperArgs, {
-      detached: true,
+    const signalWrapperArgs = [
+      ...wrapperArgs.slice(0, -2),
+      `TEST_WRAPPER_PID_FILE=${wrapperPidFile}`,
+      `TEST_WRAPPER_PATH=${path.join(helperDir, "promote-current-runtime-baseline.sh")}`,
+      "setsid",
+      "bash",
+      path.join(toolsDir, "signal-launcher"),
+    ];
+    const child = spawn("sudo", signalWrapperArgs, {
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
@@ -766,18 +790,20 @@ async function createExecutableWrapperFixture(
     );
     let promotionReached = false;
     for (let attempt = 0; attempt < 300; attempt += 1) {
-      if (existsAsDeploy(alias)) {
+      if (existsAsDeploy(alias) && existsAsDeploy(wrapperPidFile)) {
         promotionReached = true;
         break;
       }
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
     if (!promotionReached) {
-      process.kill(-child.pid, "SIGKILL");
+      child.kill("SIGKILL");
       throw new Error("wrapper did not reach the mutation phase");
     }
 
-    process.kill(-child.pid, "SIGTERM");
+    const wrapperPid = readAsDeploy(wrapperPidFile).trim();
+    assert.match(wrapperPid, /^[1-9][0-9]*$/);
+    sudoChecked(["kill", "-TERM", "--", `-${wrapperPid}`]);
     return completion;
   };
 
