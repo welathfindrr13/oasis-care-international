@@ -75,6 +75,7 @@ docker compose --env-file "$TEMP_ENV" -f deploy/v2/docker-compose.yml config
 docker run --rm --env-file "$TEMP_ENV" -v "$PWD/deploy/v2/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile
 bash -n deploy/v2/scripts/smoke-test.sh
 bash -n deploy/v2/scripts/backup-postgres.sh
+bash -n deploy/v2/scripts/promote-current-runtime-baseline.sh
 bash -n deploy/v2/scripts/restore-postgres.sh
 bash -n deploy/v2/scripts/rehearse-backup-restore.sh
 bash -n deploy/v2/scripts/backup-restore.integration.sh
@@ -88,6 +89,7 @@ fi
 node --test apps/web/next.config.test.js
 node --test deploy/v2/Caddyfile.test.mjs
 node --test deploy/v2/scripts/preflight-env.test.mjs
+node --test deploy/v2/scripts/promote-current-runtime-baseline.test.mjs
 node --test deploy/v2/scripts/smoke-test.test.mjs
 node --test deploy/v2/scripts/backup-crypto.test.mjs
 node --test deploy/v2/scripts/backup-restore.test.mjs

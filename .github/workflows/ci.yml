@@ -212,6 +212,7 @@ jobs:
         node --test deploy/v2/scripts/verify-local.test.mjs
         node --test deploy/v2/scripts/preflight-env.test.mjs
         node --test deploy/v2/scripts/archive-forward-deploy-attempt.test.mjs
+        node --test deploy/v2/scripts/promote-current-runtime-baseline.test.mjs
         node --test deploy/v2/scripts/smoke-test.test.mjs
         node --test deploy/v2/scripts/backup-crypto.test.mjs
         node --test deploy/v2/scripts/backup-restore.test.mjs
@@ -224,6 +225,7 @@ jobs:
         bash -n deploy/v2/scripts/smoke-test.sh
         bash -n deploy/v2/scripts/backup-postgres.sh
         bash -n deploy/v2/scripts/archive-forward-deploy-attempt.sh
+        bash -n deploy/v2/scripts/promote-current-runtime-baseline.sh
         bash -n deploy/v2/scripts/restore-postgres.sh
         bash -n deploy/v2/scripts/rehearse-backup-restore.sh
         bash -n deploy/v2/scripts/backup-restore.integration.sh

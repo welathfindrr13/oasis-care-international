@@ -264,6 +264,39 @@ lane contains no PostgreSQL operation. Completion is durable only after `/health
 `/api/health` all prove the exact target SHA and database readiness, the legacy digest is unchanged,
 and all rollback aliases still match their preserved image IDs.
 
+### Rotating a completed forward state
+
+A successful forward deployment deliberately leaves a durable `COMPLETE` state, so another forward
+attempt cannot silently replace its evidence. Before a later target can be prepared, operators must
+run the separately reviewed `promote-current-runtime-baseline.sh` utility under the production
+mutation lock and a separate explicit approval.
+
+For the current transition, the utility is bound to:
+
+- current verified runtime `d656d88ba82fa13abb66e3ba915ba2b6ae283d9e`;
+- next reviewed target `5c194b259f5a9d21c58d9f68c3f8b196843a894d`.
+
+The utility authenticates an exact staged helper bundle, the public current revision, all four service
+health checks, the existing `COMPLETE` forward state, the current legacy manifest and its immutable
+aliases. It then creates new unique rollback aliases from the already-running API, web and Caddy image
+IDs, creates and authenticates a replacement `LEGACY_ROLLED_BACK` baseline for the current revision,
+and durably rotates the completed forward evidence and previous legacy state into immutable
+history. It does not build, pull, fetch, restart, migrate, or change application data.
+
+Before acquiring the mutation lock, the wrapper also requires one exact single-use approval value:
+`APPROVE_RUNTIME_BASELINE_<CURRENT_SHA>_TO_<NEXT_TARGET_SHA>_WITH_<ROTATION_TOOL_SHA>_ATTEMPT_<BASELINE_ATTEMPT_ID>_FROM_COMPLETE`.
+The current runtime, next target, reviewed tooling commit, and fresh collision-resistant attempt ID
+must all match the wrapper's pinned inputs. The durable attempt directory, state transition, and new
+alias names prevent that approval and attempt ID from being reused.
+
+The operation records a private phase journal before creating aliases or moving state. Its recovery
+command adjudicates the actual filesystem layout under the same mutation lock, including a rename
+that completed before its journal update. A failed or interrupted non-terminal operation restores both
+canonical state trees, removes only new aliases still bound to the recorded image IDs, and retains the
+staged promotion evidence. A successful run leaves a durable `COMPLETE` journal, the canonical
+forward root absent, and the new current-runtime rollback baseline ready for a separately authorized
+fresh forward attempt. Merging the utility does not authorize running it.
+
 ### External execution blockers
 
 These controls cannot be solved or truthfully proven by repository code:
