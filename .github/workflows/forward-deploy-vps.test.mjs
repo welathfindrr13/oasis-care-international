@@ -983,15 +983,20 @@ test('exact completion proof requires API, readiness, and web to report the targ
 });
 
 test('workflow is a new one-shot lane bound to the exact application and reviewed workflow SHAs', () => {
-  assert.match(workflow, /EXPECTED_TARGET_SHA: d656d88ba82fa13abb66e3ba915ba2b6ae283d9e/);
+  assert.match(workflow, /EXPECTED_TARGET_SHA: 5c194b259f5a9d21c58d9f68c3f8b196843a894d/);
+  assert.match(
+    workflow,
+    /\[ "\$TARGET_SHA" = "5c194b259f5a9d21c58d9f68c3f8b196843a894d" \] \|\| fail_remote FORWARD_INPUTS_INVALID/,
+  );
   assert.match(
     docs,
-    /single-use recovery lane for one reviewed application target:\s*`d656d88ba82fa13abb66e3ba915ba2b6ae283d9e`/,
+    /single-use recovery lane for one reviewed application target:\s*`5c194b259f5a9d21c58d9f68c3f8b196843a894d`/,
   );
   assert.doesNotMatch(
     docs,
-    /single-use recovery lane for one reviewed application target:\s*`18aacd8458a3f96a38bf470d9a4c837ad563fa5c`/,
+    /single-use recovery lane for one reviewed application target:\s*`d656d88ba82fa13abb66e3ba915ba2b6ae283d9e`/,
   );
+  assert.doesNotMatch(workflow, /d656d88ba82fa13abb66e3ba915ba2b6ae283d9e/);
   assert.match(workflow, /TARGET_SHA" = "\$EXPECTED_TARGET_SHA/);
   assert.match(workflow, /GITHUB_SHA" = "\$WORKFLOW_SHA/);
   assert.match(workflow, /origin_main" = "\$WORKFLOW_SHA/);
