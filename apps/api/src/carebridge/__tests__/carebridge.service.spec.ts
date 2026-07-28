@@ -1,3 +1,4 @@
+import { HttpStatus } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CarebridgeService } from '../carebridge.service';
 import { CarebridgeRepository } from '../carebridge.repository';
@@ -65,6 +66,8 @@ describe('CarebridgeService', () => {
     listFamilySafePublishedStoriesByRoomId: jest.fn(),
     listVerifiedVisitStoryApprovalQueue: jest.fn(),
     findVisitForStory: jest.fn(),
+    acquireVerifiedVisitStoryGenerationLock: jest.fn(),
+    findActiveVerifiedVisitStoryForVisit: jest.fn(),
     createVerifiedVisitStory: jest.fn(),
     findVerifiedVisitStoryById: jest.fn(),
     publishVerifiedVisitStory: jest.fn(),
@@ -84,6 +87,10 @@ describe('CarebridgeService', () => {
   };
 
   const transactionClient = {
+    $executeRaw: jest.fn(),
+    verifiedVisitStory: {
+      findFirst: jest.fn(),
+    },
     auditLog: {
       create: jest.fn().mockResolvedValue({ id: 'audit-1' }),
     },
@@ -130,6 +137,7 @@ describe('CarebridgeService', () => {
     );
     mockPrisma.auditLog.create.mockResolvedValue({ id: 'audit-1' });
     mockAccessService.requireFamilyScopes.mockResolvedValue({ id: 'membership-1' });
+    mockRepository.findActiveVerifiedVisitStoryForVisit.mockResolvedValue(null);
   });
 
   it('creates a care room and ensures a default policy exists', async () => {
@@ -657,6 +665,16 @@ describe('CarebridgeService', () => {
       }),
       transactionClient,
     );
+    expect(repository.acquireVerifiedVisitStoryGenerationLock).toHaveBeenCalledWith(
+      'org-1',
+      'visit-1',
+      transactionClient,
+    );
+    expect(repository.findActiveVerifiedVisitStoryForVisit).toHaveBeenCalledWith(
+      'org-1',
+      'visit-1',
+      transactionClient,
+    );
     const createdStory = repository.createVerifiedVisitStory.mock.calls[0][0] as any;
     expect(createdStory.draft_body).not.toContain('Medication prompt');
     expect(createdStory.source_refs).not.toContainEqual(
@@ -671,6 +689,66 @@ describe('CarebridgeService', () => {
         new_values: { visitId: 'visit-1', careRoomId: 'room-client-1' },
       }),
     });
+  });
+
+  it.each(['DRAFT', 'PUBLISHED'])(
+    'refuses a second %s Family update after taking the visit lock',
+    async (status) => {
+      repository.findVisitForStory.mockResolvedValue({
+        id: 'visit-1',
+        organization_id: 'org-1',
+        client_id: 'client-1',
+        status: 'COMPLETED',
+        notes: null,
+        client: { id: 'client-1', full_name: 'Mary Smith' },
+        carer: null,
+        tasks: [],
+      } as any);
+      repository.findActiveVerifiedVisitStoryForVisit.mockResolvedValue({
+        id: 'story-active',
+        status,
+      } as any);
+
+      await expect(
+        service.generateVerifiedVisitStory('visit-1', 'admin-1', 'org-1'),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { code: ErrorCode.VALIDATION_FAILED },
+      });
+
+      expect(repository.acquireVerifiedVisitStoryGenerationLock).toHaveBeenCalledWith(
+        'org-1',
+        'visit-1',
+        transactionClient,
+      );
+      expect(repository.createVerifiedVisitStory).not.toHaveBeenCalled();
+      expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('allows a rejected Family update to be prepared again', async () => {
+    repository.findVisitForStory.mockResolvedValue({
+      id: 'visit-1',
+      organization_id: 'org-1',
+      client_id: 'client-1',
+      status: 'COMPLETED',
+      notes: null,
+      client: { id: 'client-1', full_name: 'Mary Smith' },
+      carer: null,
+      tasks: [],
+    } as any);
+    repository.findActiveVerifiedVisitStoryForVisit.mockResolvedValue(null);
+    repository.createVerifiedVisitStory.mockResolvedValue({
+      id: 'story-reprepared',
+      organization_id: 'org-1',
+      status: 'DRAFT',
+      source_refs: [{ type: 'Visit', id: 'visit-1' }],
+    } as any);
+
+    await expect(
+      service.generateVerifiedVisitStory('visit-1', 'admin-1', 'org-1'),
+    ).resolves.toMatchObject({ id: 'story-reprepared', status: 'DRAFT' });
+    expect(repository.createVerifiedVisitStory).toHaveBeenCalledTimes(1);
   });
 
   it('refuses to generate family proof for a visit that is not completed', async () => {

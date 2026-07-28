@@ -141,6 +141,7 @@ export function FamilyAccessManagerClient({
       )
       setRoom(data.createCareRoom)
       setNotice(`Family access is ready to set up for ${personName}.`)
+      router.refresh()
     } catch {
       reportError(
         'We could not set up family access. Please try again.',

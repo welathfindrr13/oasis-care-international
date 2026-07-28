@@ -1,12 +1,12 @@
-'use client'
+"use client";
 
-import { useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
-import { useAuth } from '@clerk/nextjs'
-import { Header } from '../../../components/oasis/Header'
-import { Button } from '../../../components/ui/Button'
-import { resolveAuthMode } from '../../../lib/auth/mode'
-import { clientQuery } from '../../../lib/graphql/client-side'
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useAuth } from "@clerk/nextjs";
+import { Header } from "../../../components/oasis/Header";
+import { Button } from "../../../components/ui/Button";
+import { resolveAuthMode } from "../../../lib/auth/mode";
+import { clientQuery } from "../../../lib/graphql/client-side";
 import {
   CAREBRIDGE_ROOMS_QUERY,
   PUBLISH_VERIFIED_VISIT_STORY_MUTATION,
@@ -15,137 +15,182 @@ import {
   type CareRoomsQueryResponse,
   type VerifiedVisitStory,
   type VerifiedVisitStoryApprovalQueueQueryResponse,
-} from '../../../lib/graphql/queries'
-import { ApprovalQueueItem } from '../../../components/carebridge/ApprovalQueueItem'
+} from "../../../lib/graphql/queries";
+import { ApprovalQueueItem } from "../../../components/carebridge/ApprovalQueueItem";
 
-type GetBearerToken = () => Promise<string | null | undefined>
+type GetBearerToken = () => Promise<string | null | undefined>;
 
 interface CareBridgeApprovalsQueueClientProps {
-  authReady: boolean
-  isSignedIn: boolean
-  getBearerToken?: GetBearerToken
+  authReady: boolean;
+  isSignedIn: boolean;
+  getBearerToken?: GetBearerToken;
+  initialCareRoomId?: string;
 }
 
 function isClerkAuthMode() {
-  return resolveAuthMode({
-    NODE_ENV: process.env.NODE_ENV,
-    NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER: process.env.NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER,
-    NEXT_PUBLIC_LOCAL_AUTH_ENABLED: process.env.NEXT_PUBLIC_LOCAL_AUTH_ENABLED,
-  } as NodeJS.ProcessEnv) === 'clerk'
+  return (
+    resolveAuthMode({
+      NODE_ENV: process.env.NODE_ENV,
+      NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER:
+        process.env.NEXT_PUBLIC_AUTH_IDENTITY_PROVIDER,
+      NEXT_PUBLIC_LOCAL_AUTH_ENABLED:
+        process.env.NEXT_PUBLIC_LOCAL_AUTH_ENABLED,
+    } as NodeJS.ProcessEnv) === "clerk"
+  );
 }
 
-export function CareBridgeApprovalsClient() {
+export function CareBridgeApprovalsClient({
+  initialCareRoomId = "",
+}: {
+  initialCareRoomId?: string;
+}) {
   if (isClerkAuthMode()) {
-    return <CareBridgeApprovalsClerkClient />
+    return (
+      <CareBridgeApprovalsClerkClient initialCareRoomId={initialCareRoomId} />
+    );
   }
 
-  return <CareBridgeApprovalsQueueClient authReady isSignedIn />
+  return (
+    <CareBridgeApprovalsQueueClient
+      authReady
+      isSignedIn
+      initialCareRoomId={initialCareRoomId}
+    />
+  );
 }
 
-function CareBridgeApprovalsClerkClient() {
-  const { isLoaded, isSignedIn, getToken } = useAuth()
+function CareBridgeApprovalsClerkClient({
+  initialCareRoomId,
+}: {
+  initialCareRoomId: string;
+}) {
+  const { isLoaded, isSignedIn, getToken } = useAuth();
 
-  const getBearerToken = useCallback(() => getToken(), [getToken])
+  const getBearerToken = useCallback(() => getToken(), [getToken]);
 
   return (
     <CareBridgeApprovalsQueueClient
       authReady={isLoaded}
       isSignedIn={Boolean(isSignedIn)}
       getBearerToken={getBearerToken}
+      initialCareRoomId={initialCareRoomId}
     />
-  )
+  );
 }
 
 function CareBridgeApprovalsQueueClient({
   authReady,
   isSignedIn,
   getBearerToken,
+  initialCareRoomId = "",
 }: CareBridgeApprovalsQueueClientProps) {
-  const [stories, setStories] = useState<VerifiedVisitStory[]>([])
-  const [roomOptions, setRoomOptions] = useState<Array<{ id: string; label: string }>>([])
-  const [selectedRoomId, setSelectedRoomId] = useState<string>('')
-  const [loading, setLoading] = useState(true)
-  const [busyStoryId, setBusyStoryId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [stories, setStories] = useState<VerifiedVisitStory[]>([]);
+  const [roomOptions, setRoomOptions] = useState<
+    Array<{ id: string; label: string }>
+  >([]);
+  const [selectedRoomId, setSelectedRoomId] =
+    useState<string>(initialCareRoomId);
+  const [loading, setLoading] = useState(true);
+  const [busyStoryId, setBusyStoryId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const loadApprovalQueue = useCallback(async (careRoomId?: string) => {
-    const queryOptions = getBearerToken ? { getBearerToken } : undefined
-    const [queueData, roomsData] = await Promise.all([
-      clientQuery<VerifiedVisitStoryApprovalQueueQueryResponse>(
-        VERIFIED_VISIT_STORY_APPROVAL_QUEUE_QUERY,
-        careRoomId ? { careRoomId } : {},
+  const loadApprovalQueue = useCallback(
+    async (careRoomId?: string) => {
+      const queryOptions = getBearerToken ? { getBearerToken } : undefined;
+      const roomsData = await clientQuery<CareRoomsQueryResponse>(
+        CAREBRIDGE_ROOMS_QUERY,
+        undefined,
         queryOptions,
-      ),
-      clientQuery<CareRoomsQueryResponse>(CAREBRIDGE_ROOMS_QUERY, undefined, queryOptions),
-    ])
+      );
+      const roomExists =
+        !careRoomId ||
+        roomsData.careRooms.some((room) => room.id === careRoomId);
+      if (!roomExists) {
+        throw new Error("Selected family room unavailable");
+      }
+      const queueData =
+        await clientQuery<VerifiedVisitStoryApprovalQueueQueryResponse>(
+          VERIFIED_VISIT_STORY_APPROVAL_QUEUE_QUERY,
+          careRoomId ? { careRoomId } : {},
+          queryOptions,
+        );
 
-    setStories(queueData.verifiedVisitStoryApprovalQueue)
-    setRoomOptions(
-      roomsData.careRooms.map((room) => ({
-        id: room.id,
-        label: room.client.fullName,
-      })),
-    )
-  }, [getBearerToken])
+      setStories(queueData.verifiedVisitStoryApprovalQueue);
+      setRoomOptions(
+        roomsData.careRooms.map((room) => ({
+          id: room.id,
+          label: room.client.fullName,
+        })),
+      );
+    },
+    [getBearerToken],
+  );
 
   useEffect(() => {
     if (!authReady) {
-      return
+      return;
     }
 
     if (!isSignedIn) {
-      setLoading(false)
-      setError('Unauthorized')
-      return
+      setLoading(false);
+      setError("Unauthorized");
+      return;
     }
 
     async function bootstrap() {
       try {
-        setLoading(true)
-        setError(null)
-        await loadApprovalQueue(selectedRoomId || undefined)
+        setLoading(true);
+        setError(null);
+        await loadApprovalQueue(selectedRoomId || undefined);
       } catch (err: any) {
-        setError(err?.message || 'Failed to load the approval queue.')
+        setError(err?.message || "Failed to load the approval queue.");
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
 
-    bootstrap()
-  }, [authReady, isSignedIn, loadApprovalQueue, selectedRoomId])
+    bootstrap();
+  }, [authReady, isSignedIn, loadApprovalQueue, selectedRoomId]);
 
   async function approveStory(storyId: string) {
     try {
-      setBusyStoryId(storyId)
-      setError(null)
+      setBusyStoryId(storyId);
+      setError(null);
       await clientQuery(
         PUBLISH_VERIFIED_VISIT_STORY_MUTATION,
         { storyId },
         getBearerToken ? { getBearerToken } : undefined,
-      )
-      setStories((current) => current.filter((story) => story.id !== storyId))
+      );
+      setStories((current) => current.filter((story) => story.id !== storyId));
     } catch (err: any) {
-      setError(err?.message || 'Unable to approve this verified visit story.')
+      setError(err?.message || "Unable to approve this verified visit story.");
     } finally {
-      setBusyStoryId(null)
+      setBusyStoryId(null);
     }
   }
 
   async function rejectStory(storyId: string, rejectionReason: string) {
     try {
-      setBusyStoryId(storyId)
-      setError(null)
-      await clientQuery(REJECT_VERIFIED_VISIT_STORY_MUTATION, {
-        input: {
-          storyId,
-          rejectionReason,
+      setBusyStoryId(storyId);
+      setError(null);
+      await clientQuery(
+        REJECT_VERIFIED_VISIT_STORY_MUTATION,
+        {
+          input: {
+            storyId,
+            rejectionReason,
+          },
         },
-      }, getBearerToken ? { getBearerToken } : undefined)
-      setStories((current) => current.filter((story) => story.id !== storyId))
+        getBearerToken ? { getBearerToken } : undefined,
+      );
+      setStories((current) => current.filter((story) => story.id !== storyId));
     } catch (err: any) {
-      setError(err?.message || 'Unable to return this verified visit story for changes.')
+      setError(
+        err?.message ||
+          "Unable to return this verified visit story for changes.",
+      );
     } finally {
-      setBusyStoryId(null)
+      setBusyStoryId(null);
     }
   }
 
@@ -164,12 +209,18 @@ function CareBridgeApprovalsQueueClient({
                 Approve proof-of-care updates before families see them
               </h1>
               <p className="mt-3 text-base leading-7 text-slate-600">
-                Review draft visit stories, check the source references, and either approve them for family viewing or return them with clear changes.
+                Review draft visit stories, check the source references, and
+                either approve them for family viewing or return them with clear
+                changes.
               </p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Waiting now</p>
-              <p className="mt-2 font-heading text-3xl font-bold text-slate-900">{stories.length}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Waiting now
+              </p>
+              <p className="mt-2 font-heading text-3xl font-bold text-slate-900">
+                {stories.length}
+              </p>
             </div>
           </div>
         </section>
@@ -177,7 +228,9 @@ function CareBridgeApprovalsQueueClient({
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h2 className="font-heading text-lg font-semibold text-slate-900">Filter by care room</h2>
+              <h2 className="font-heading text-lg font-semibold text-slate-900">
+                Filter by care room
+              </h2>
               <p className="mt-1 text-sm text-slate-600">
                 Narrow the queue when you want to review one client at a time.
               </p>
@@ -213,11 +266,14 @@ function CareBridgeApprovalsQueueClient({
             </div>
           ) : stories.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
-              <h2 className="font-heading text-2xl font-semibold text-slate-900">No updates waiting for review</h2>
+              <h2 className="font-heading text-2xl font-semibold text-slate-900">
+                No updates waiting for review
+              </h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Draft Verified Visit Updates will appear here as visits are prepared for family-safe approval.
+                Draft Verified Visit Updates will appear here as visits are
+                prepared for family-safe approval.
               </p>
-              <div className="mt-5 flex justify-center gap-3">
+              <div className="mt-5 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
                 <Button asChild variant="outline">
                   <Link href="/family-updates">Back to Family Updates</Link>
                 </Button>
@@ -240,5 +296,5 @@ function CareBridgeApprovalsQueueClient({
         </section>
       </main>
     </div>
-  )
+  );
 }

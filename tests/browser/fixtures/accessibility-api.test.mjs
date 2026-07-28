@@ -46,6 +46,14 @@ test("returns fixture data only for an exact allowlisted parsed operation name",
     }),
     "FamilyCareRooms",
   );
+  assert.equal(
+    parseAllowedOperation({
+      query:
+        "mutation CreateCareRoom($input: CreateCareRoomInput!) { createCareRoom(input: $input) { id } }",
+      operationName: "CreateCareRoom",
+    }),
+    "CreateCareRoom",
+  );
   assert.deepEqual(
     graphqlData(
       {
@@ -95,14 +103,14 @@ test("fails malformed and anonymous GraphQL requests closed", () => {
   );
   assert.throws(
     () => parseAllowedOperation({ query: "{ visits { total } }" }),
-    /one named query/,
+    /one named operation/,
   );
 });
 
-test("rejects mutations, multiple operations and mismatched operationName values", () => {
+test("rejects unallowlisted operation types, multiple operations and mismatched operationName values", () => {
   assert.throws(
     () => parseAllowedOperation({ query: "mutation Visits { unsupported }" }),
-    /one named query/,
+    /Unsupported accessibility fixture operation type: Visits/,
   );
   assert.throws(
     () =>

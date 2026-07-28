@@ -574,15 +574,40 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
         },
       ],
     });
-    const generated = await gql(
-      bearer(adminSubject),
-      `mutation Generate($visitId: String!) {
-        generateVerifiedVisitStory(visitId: $visitId) {
-          id status draftBody familySafeVersion familySafeTitle familySafeBody
-        }
-      }`,
-      { visitId: visit.id },
-    ).expect(200);
+    const generateStory = () =>
+      gql(
+        bearer(adminSubject),
+        `mutation Generate($visitId: String!) {
+          generateVerifiedVisitStory(visitId: $visitId) {
+            id status draftBody familySafeVersion familySafeTitle familySafeBody
+          }
+        }`,
+        { visitId: visit.id },
+      ).expect(200);
+    const generatedAttempts = await Promise.all([
+      generateStory(),
+      generateStory(),
+    ]);
+    const successfulGeneration = generatedAttempts.find(
+      (attempt) => attempt.body.data?.generateVerifiedVisitStory,
+    );
+    const rejectedGeneration = generatedAttempts.find(
+      (attempt) => attempt.body.errors?.length === 1,
+    );
+    expect(successfulGeneration).toBeDefined();
+    expect(rejectedGeneration?.body.errors[0].message).toBe(
+      'This completed visit already has an active Family update.',
+    );
+    expect(
+      await prisma.verifiedVisitStory.count({
+        where: {
+          organization_id: organizationId,
+          visit_id: visit.id,
+          status: { in: ['DRAFT', 'PUBLISHED'] },
+        },
+      }),
+    ).toBe(1);
+    const generated = successfulGeneration!;
     expect(generated.body.errors).toBeUndefined();
     expect(generated.body.data.generateVerifiedVisitStory.draftBody).toContain('Confidential follow-up');
     expect(generated.body.data.generateVerifiedVisitStory.draftBody).not.toContain('Medication prompt');
@@ -685,12 +710,23 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
       },
     ]);
 
+    const raceVisit = await prisma.visit.create({
+      data: {
+        organization_id: organizationId,
+        client_id: clientId,
+        carer_id: carer.id,
+        scheduled_start: new Date('2026-07-10T11:00:00Z'),
+        scheduled_end: new Date('2026-07-10T12:00:00Z'),
+        status: 'COMPLETED',
+        notes: 'Synthetic publish-versus-reject race.',
+      },
+    });
     const raceDraft = await gql(
       bearer(adminSubject),
       `mutation Generate($visitId: String!) {
         generateVerifiedVisitStory(visitId: $visitId) { id status }
       }`,
-      { visitId: visit.id },
+      { visitId: raceVisit.id },
     ).expect(200);
     expect(raceDraft.body.errors).toBeUndefined();
     const raceStoryId = raceDraft.body.data.generateVerifiedVisitStory.id;
@@ -720,6 +756,10 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
 
     await prisma.visit.update({
       where: { id: visit.id },
+      data: { status: 'CANCELLED' },
+    });
+    await prisma.visit.update({
+      where: { id: raceVisit.id },
       data: { status: 'CANCELLED' },
     });
     const correctedSource = await gql(

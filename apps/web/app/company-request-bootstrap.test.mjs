@@ -95,6 +95,38 @@ test("platform operators can inspect every request status with bounded paginatio
   assert.match(operatorServerPage, /key=\{`\$\{status\}:\$\{page\.offset\}`\}/);
 });
 
+test("non-operators and outages receive non-leaking Platform access states", () => {
+  assert.match(operatorServerPage, /classifyPlatformRequestFailure/);
+  assert.match(operatorServerPage, /result\.kind !== ["']ready["']/);
+  assert.match(operatorServerPage, /kind=["']forbidden["']/);
+  assert.match(operatorServerPage, /Platform access required/);
+  assert.match(
+    operatorServerPage,
+    /<Link href=["']\/today["']>Return to Today<\/Link>/,
+  );
+  assert.doesNotMatch(
+    operatorServerPage,
+    /<Link href=["']\/["']>Return to Oasis Care<\/Link>/,
+  );
+  assert.match(
+    operatorServerPage,
+    /No\s+company request information has been loaded/,
+  );
+  assert.match(operatorServerPage, /kind=["']unavailable["']/);
+  assert.match(operatorServerPage, /Company access requests are unavailable/);
+  assert.match(
+    operatorServerPage,
+    /action=["']\/platform\/company-requests["']/,
+  );
+  assert.match(operatorServerPage, /name=["']status["'] value=\{status\}/);
+  assert.match(operatorServerPage, /name=["']offset["'] value=\{offset\}/);
+  assert.match(operatorServerPage, /<PlatformCompanyRequestsClient/);
+  assert.doesNotMatch(
+    operatorServerPage,
+    /Platform operator access required|x-oasis-platform-action/i,
+  );
+});
+
 test("Platform Owners revoke the exact first Manager with accessible recovery states", () => {
   assert.match(operatorServerPage, /bootstrapManagerEmail/);
   assert.match(operatorServerPage, /bootstrapManagerAccessStatus/);

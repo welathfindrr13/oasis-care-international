@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { Button } from "../../../components/ui/Button";
+import { StatePanel } from "../../../components/ui/StatePanel";
 import { query } from "../../../lib/graphql/client";
+import { classifyPlatformRequestFailure } from "./platform-request-state";
 import {
   PlatformCompanyRequestsClient,
   PlatformRequest,
@@ -67,21 +70,90 @@ function requestsHref(status: CompanyRequestStatus, offset = 0): string {
 
 export const dynamic = "force-dynamic";
 
+type CompanyRequestsPage = {
+  items: PlatformRequest[];
+  total: number;
+  offset: number;
+  limit: number;
+};
+
+type CompanyRequestsResult =
+  | { kind: "ready"; page: CompanyRequestsPage }
+  | { kind: "forbidden" }
+  | { kind: "unavailable" };
+
+async function loadCompanyRequests(
+  status: CompanyRequestStatus,
+  offset: number,
+): Promise<CompanyRequestsResult> {
+  try {
+    const data = await query<{
+      companyAccessRequests: CompanyRequestsPage;
+    }>(COMPANY_REQUESTS, { status, offset, limit: PAGE_SIZE });
+    return { kind: "ready", page: data.companyAccessRequests };
+  } catch (error) {
+    return classifyPlatformRequestFailure(error) === "forbidden"
+      ? { kind: "forbidden" }
+      : { kind: "unavailable" };
+  }
+}
+
 export default async function PlatformCompanyRequestsPage(props: {
   searchParams?: Promise<{ status?: string; offset?: string }>;
 }) {
   const searchParams = await props.searchParams;
   const status = selectedStatus(searchParams?.status);
   const offset = selectedOffset(searchParams?.offset);
-  const data = await query<{
-    companyAccessRequests: {
-      items: PlatformRequest[];
-      total: number;
-      offset: number;
-      limit: number;
-    };
-  }>(COMPANY_REQUESTS, { status, offset, limit: PAGE_SIZE });
-  const page = data.companyAccessRequests;
+  const result = await loadCompanyRequests(status, offset);
+
+  if (result.kind !== "ready") {
+    return (
+      <main className="min-h-screen bg-oasis-canvas px-4 py-10 text-oasis-ink sm:px-6">
+        <div className="mx-auto max-w-3xl">
+          <h1 className="font-heading text-3xl font-bold tracking-tight">
+            Platform access
+          </h1>
+          {result.kind === "forbidden" ? (
+            <StatePanel
+              className="mt-6"
+              headingLevel={2}
+              kind="forbidden"
+              title="Platform access required"
+              action={
+                <Button asChild>
+                  <Link href="/today">Return to Today</Link>
+                </Button>
+              }
+            >
+              This page is limited to authorised Oasis Platform Owners. No
+              company request information has been loaded.
+            </StatePanel>
+          ) : (
+            <StatePanel
+              className="mt-6"
+              headingLevel={2}
+              kind="unavailable"
+              title="Company access requests are unavailable"
+              action={
+                <form action="/platform/company-requests" method="get">
+                  <input type="hidden" name="status" value={status} />
+                  {offset > 0 ? (
+                    <input type="hidden" name="offset" value={offset} />
+                  ) : null}
+                  <Button type="submit">Try again</Button>
+                </form>
+              }
+            >
+              Oasis could not confirm Platform access or load the request list.
+              Try again.
+            </StatePanel>
+          )}
+        </div>
+      </main>
+    );
+  }
+
+  const page = result.page;
   const previousOffset = Math.max(0, page.offset - page.limit);
   const nextOffset = page.offset + page.limit;
   return (

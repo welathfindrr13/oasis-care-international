@@ -202,6 +202,34 @@ export class CarebridgeRepository {
     return tx.verifiedVisitStory.create({ data });
   }
 
+  async acquireVerifiedVisitStoryGenerationLock(
+    organizationId: string,
+    visitId: string,
+    tx: Prisma.TransactionClient,
+  ) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`verified-visit-story:${organizationId}:${visitId}`}, 0))`;
+  }
+
+  async findActiveVerifiedVisitStoryForVisit(
+    organizationId: string,
+    visitId: string,
+    tx: Prisma.TransactionClient,
+  ) {
+    return tx.verifiedVisitStory.findFirst({
+      where: {
+        organization_id: organizationId,
+        visit_id: visitId,
+        status: {
+          in: [
+            CarebridgeContentStatus.DRAFT,
+            CarebridgeContentStatus.PUBLISHED,
+          ],
+        },
+      },
+      select: { id: true, status: true },
+    });
+  }
+
   async listVerifiedVisitStoriesByRoomId(careRoomId: string, status?: CarebridgeContentStatus) {
     return this.prisma.verifiedVisitStory.findMany({
       where: {

@@ -1,4 +1,5 @@
 import {
+  CarebridgeContentStatus,
   CareRoomMembershipStatus,
   CareRoomStatus,
   ConcernEventType,
@@ -127,6 +128,48 @@ describe('CarebridgeRepository', () => {
         orderBy: [{ published_at: 'desc' }, { id: 'desc' }],
       }),
     );
+  });
+
+  it('serializes generation and treats only draft or published visit stories as active', async () => {
+    const transaction = {
+      $executeRaw: jest.fn().mockResolvedValue(0),
+      verifiedVisitStory: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+    };
+    const repository = new CarebridgeRepository({} as any);
+
+    await repository.acquireVerifiedVisitStoryGenerationLock(
+      'org-1',
+      'visit-1',
+      transaction as any,
+    );
+    await repository.findActiveVerifiedVisitStoryForVisit(
+      'org-1',
+      'visit-1',
+      transaction as any,
+    );
+
+    expect(transaction.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(transaction.$executeRaw.mock.calls[0][0].join('')).toContain(
+      'pg_advisory_xact_lock(hashtextextended(',
+    );
+    expect(transaction.$executeRaw.mock.calls[0][1]).toBe(
+      'verified-visit-story:org-1:visit-1',
+    );
+    expect(transaction.verifiedVisitStory.findFirst).toHaveBeenCalledWith({
+      where: {
+        organization_id: 'org-1',
+        visit_id: 'visit-1',
+        status: {
+          in: [
+            CarebridgeContentStatus.DRAFT,
+            CarebridgeContentStatus.PUBLISHED,
+          ],
+        },
+      },
+      select: { id: true, status: true },
+    });
   });
 
   it('selects only exact-tenant, room, and raising-membership concern status fields', async () => {
