@@ -705,6 +705,10 @@ async function createExecutableWrapperFixture(
       stdio: "ignore",
     }).status === 0;
   const readAsDeploy = (target) => asDeploy(["cat", target]).stdout;
+  const readLegacyManifestAsDeploy = () =>
+    JSON.parse(
+      readAsDeploy(path.join(systemLegacyRoot, "state", "manifest.json")),
+    );
 
   return {
     aliasDir,
@@ -718,6 +722,7 @@ async function createExecutableWrapperFixture(
     runWrapper,
     existsAsDeploy,
     readAsDeploy,
+    readLegacyManifestAsDeploy,
   };
 }
 
@@ -1066,9 +1071,7 @@ test("the executable production wrapper authenticates its full boundary and reco
         ),
         true,
       );
-      const promoted = readLegacyState({
-        stateDir: path.join(fixture.systemLegacyRoot, "state"),
-      });
+      const promoted = fixture.readLegacyManifestAsDeploy();
       assert.equal(promoted.status, LEGACY_STATES.LEGACY_ROLLED_BACK);
       assert.equal(promoted.targetSha, CURRENT_RUNTIME_SHA);
       assert.equal(promoted.attemptId, baselineAttemptId);
@@ -1096,9 +1099,7 @@ test("the executable production wrapper authenticates its full boundary and reco
         ),
         false,
       );
-      const restoredLegacy = readLegacyState({
-        stateDir: path.join(fixture.systemLegacyRoot, "state"),
-      });
+      const restoredLegacy = fixture.readLegacyManifestAsDeploy();
       assert.equal(restoredLegacy.targetSha, oldLegacySha);
       assert.equal(restoredLegacy.attemptId, oldLegacyAttemptId);
       const journal = JSON.parse(
