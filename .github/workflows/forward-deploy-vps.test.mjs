@@ -1003,6 +1003,10 @@ test('workflow is a new one-shot lane bound to the exact application and reviewe
   const workflowTargetSha = workflow.match(/EXPECTED_TARGET_SHA:\s*([0-9a-f]{40})/)?.[1];
   assert.equal(workflowTargetSha, reviewedTargetSha);
   assert.equal(FORWARD_TARGET_SHA, workflowTargetSha);
+  assert.match(
+    recoveryHelper,
+    new RegExp(`\\[ "\\$TARGET_SHA" = "${reviewedTargetSha}" \\] \\|\\| exit 1`),
+  );
   assert.match(workflow, /EXPECTED_TARGET_SHA: 5c194b259f5a9d21c58d9f68c3f8b196843a894d/);
   assert.match(
     workflow,
@@ -1018,6 +1022,7 @@ test('workflow is a new one-shot lane bound to the exact application and reviewe
   );
   assert.doesNotMatch(workflow, /d656d88ba82fa13abb66e3ba915ba2b6ae283d9e/);
   assert.doesNotMatch(forwardHelper, /d656d88ba82fa13abb66e3ba915ba2b6ae283d9e/);
+  assert.doesNotMatch(recoveryHelper, /d656d88ba82fa13abb66e3ba915ba2b6ae283d9e/);
   assert.match(workflow, /TARGET_SHA" = "\$EXPECTED_TARGET_SHA/);
   assert.match(workflow, /GITHUB_SHA" = "\$WORKFLOW_SHA/);
   assert.match(workflow, /origin_main" = "\$WORKFLOW_SHA/);
