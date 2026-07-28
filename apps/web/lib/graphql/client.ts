@@ -1,4 +1,4 @@
-import { getServerAuthContext } from '../auth/server-auth'
+import { getServerAuthContext } from "../auth/server-auth";
 
 /**
  * Simple GraphQL client for server components.
@@ -12,9 +12,29 @@ export interface GraphQLResponse<T = any> {
   data?: T;
   errors?: Array<{
     message: string;
+    extensions?: {
+      code?: string;
+    };
     locations?: Array<{ line: number; column: number }>;
     path?: Array<string | number>;
   }>;
+}
+
+export class GraphQLRequestError extends Error {
+  readonly code: string | null;
+
+  constructor(message: string, code?: string | null) {
+    super(message);
+    this.name = "GraphQLRequestError";
+    this.code = typeof code === "string" && code.trim() ? code.trim() : null;
+  }
+}
+
+export function isForbiddenGraphQLRequest(error: unknown): boolean {
+  return (
+    error instanceof GraphQLRequestError &&
+    error.code?.toUpperCase() === "FORBIDDEN"
+  );
 }
 
 export interface GraphQLRequest {
@@ -27,7 +47,7 @@ export interface GraphQLRequest {
  */
 export async function executeGraphQLQuery<T = any>(
   query: string,
-  variables?: Record<string, any>
+  variables?: Record<string, any>,
 ): Promise<GraphQLResponse<T>> {
   const request: GraphQLRequest = {
     query,
@@ -35,37 +55,44 @@ export async function executeGraphQLQuery<T = any>(
   };
 
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql';
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/graphql";
     const { accessToken } = await getServerAuthContext();
 
     if (!accessToken) {
-      throw new Error('Unauthorized');
+      throw new Error("Unauthorized");
     }
 
     const response = await fetch(apiUrl, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify(request),
-      cache: 'no-store', // Always fetch fresh data
+      cache: "no-store", // Always fetch fresh data
     });
 
     if (!response.ok) {
-      throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
+      throw new GraphQLRequestError(
+        `GraphQL request failed: ${response.status} ${response.statusText}`,
+        response.status === 403 ? "FORBIDDEN" : null,
+      );
     }
 
     const result: GraphQLResponse<T> = await response.json();
 
     if (result.errors && result.errors.length > 0) {
-      console.error('GraphQL errors:', result.errors);
-      throw new Error(`GraphQL error: ${result.errors[0].message}`);
+      console.error("GraphQL errors:", result.errors);
+      throw new GraphQLRequestError(
+        `GraphQL error: ${result.errors[0].message}`,
+        result.errors[0].extensions?.code,
+      );
     }
 
     return result;
   } catch (error) {
-    console.error('GraphQL client error:', error);
+    console.error("GraphQL client error:", error);
     throw error;
   }
 }
@@ -75,12 +102,12 @@ export async function executeGraphQLQuery<T = any>(
  */
 export async function query<T = any>(
   queryString: string,
-  variables?: Record<string, any>
+  variables?: Record<string, any>,
 ): Promise<T> {
   const response = await executeGraphQLQuery<T>(queryString, variables);
-  
+
   if (!response.data) {
-    throw new Error('No data returned from GraphQL query');
+    throw new Error("No data returned from GraphQL query");
   }
 
   return response.data;

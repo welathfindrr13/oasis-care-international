@@ -9,6 +9,7 @@ const { Kind, parse } = requireFromApiWorkspace("graphql");
 
 const port = Number(process.env.ACCESSIBILITY_FIXTURE_API_PORT || 4014);
 const visitId = "77777777-7777-4777-8777-777777777777";
+const olderVisitId = "67676767-6767-4767-8767-676767676767";
 const personId = "88888888-8888-4888-8888-888888888888";
 const careRoomId = "99999999-9999-4999-8999-999999999999";
 const emptyConcernRoomId = "13131313-1313-4131-8131-131313131313";
@@ -16,6 +17,7 @@ const unavailableConcernRoomId = "14141414-1414-4141-8141-141414141414";
 const revokedConcernRoomId = "15151515-1515-4151-8151-151515151515";
 const zeroGrantConcernRoomId = "16161616-1616-4161-8161-161616161616";
 const companyRequestId = "10101010-1010-4010-8010-101010101010";
+const roomSetupIdentities = new Set();
 
 class GraphQLFixtureError extends Error {}
 
@@ -52,6 +54,13 @@ function readBearerPayload(request) {
   } catch {
     return {};
   }
+}
+
+function fixtureIdentity(request) {
+  const payload = readBearerPayload(request);
+  return String(payload.email || payload.sub || "")
+    .trim()
+    .toLowerCase();
 }
 
 function accessSnapshot(request) {
@@ -116,6 +125,48 @@ const operationHandlers = new Map([
   ],
   ["Visits", () => ({ visits: { items: [], total: 0 } })],
   [
+    "FamilyUpdateCompletedVisits",
+    (_request, payload) => {
+      const skip = Number(payload.variables?.skip || 0);
+      const take = Number(payload.variables?.take || 50);
+      if (skip > 50) {
+        throw new GraphQLFixtureError(
+          "Completed visit pagination issued an unqualified large offset.",
+        );
+      }
+      const availableItems =
+        skip === 50
+          ? [
+              {
+                id: olderVisitId,
+                scheduledStart: "2026-05-20T09:00:00.000Z",
+                actualEnd: "2026-05-20T10:00:00.000Z",
+                status: "COMPLETED",
+              },
+            ]
+          : [
+              {
+                id: visitId,
+                scheduledStart: "2026-07-23T09:00:00.000Z",
+                actualEnd: "2026-07-23T10:00:00.000Z",
+                status: "COMPLETED",
+              },
+              ...Array.from({ length: 49 }, (_value, index) => ({
+                id: `56565656-5656-4565-8565-${String(index).padStart(12, "0")}`,
+                scheduledStart: new Date(
+                  Date.UTC(2026, 6, 22 - index, 9, 0, 0),
+                ).toISOString(),
+                actualEnd: new Date(
+                  Date.UTC(2026, 6, 22 - index, 10, 0, 0),
+                ).toISOString(),
+                status: "COMPLETED",
+              })),
+            ];
+      const items = availableItems.slice(0, take);
+      return { visits: { items, total: 51 } };
+    },
+  ],
+  [
     "Clients",
     () => ({
       clients: {
@@ -172,73 +223,152 @@ const operationHandlers = new Map([
   ],
   [
     "CareRooms",
-    () => ({
-      careRooms: [
-        {
+    (request) => {
+      const response = {
+        careRooms: [
+          {
+            id: careRoomId,
+            status: "ACTIVE",
+            client: { id: personId, fullName: "Jordan Ellis" },
+            memberships: [
+              {
+                id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                invitationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                role: "FAMILY_VIEWER",
+                status: "INVITED",
+                accessBasis: "CLIENT_CONSENT",
+                reviewDueAt: null,
+                familyContact: {
+                  id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+                  fullName: "Alex Ellis",
+                  email: "alex@example.test",
+                  relationship: "Daughter",
+                },
+                accessGrants: [],
+                invitationStatus: "PENDING",
+                deliveryStatus: "DELIVERED",
+                cleanupStatus: "COMPLETE",
+                invitationExpiresAt: "2026-07-25T09:00:00.000Z",
+              },
+              {
+                id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+                invitationId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+                role: "FAMILY_VIEWER",
+                status: "ACTIVE",
+                accessBasis: "PROVIDER_AUTHORISED",
+                reviewDueAt: null,
+                familyContact: {
+                  id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+                  fullName: "Morgan Ellis",
+                  email: "morgan@example.test",
+                  relationship: "Son",
+                },
+                accessGrants: [
+                  {
+                    id: "grant-update",
+                    scope: "VIEW_UPDATES",
+                    grantedAt: "2026-07-18T09:00:00.000Z",
+                    revokedAt: null,
+                  },
+                  {
+                    id: "grant-summary",
+                    scope: "VIEW_TASK_SUMMARY",
+                    grantedAt: "2026-07-18T09:00:00.000Z",
+                    revokedAt: null,
+                  },
+                ],
+                invitationStatus: "ACCEPTED",
+                deliveryStatus: "DELIVERED",
+                cleanupStatus: "COMPLETE",
+                invitationExpiresAt: "2026-07-25T09:00:00.000Z",
+              },
+            ],
+            policy: null,
+            createdAt: "2026-07-18T09:00:00.000Z",
+            updatedAt: "2026-07-18T09:00:00.000Z",
+          },
+        ],
+      };
+      const identity = fixtureIdentity(request);
+      if (
+        identity.startsWith("roomless-family-") &&
+        !roomSetupIdentities.has(identity)
+      ) {
+        return { careRooms: [] };
+      }
+      return response;
+    },
+  ],
+  [
+    "CreateCareRoom",
+    (request) => {
+      const identity = fixtureIdentity(request);
+      if (!identity.startsWith("roomless-family-")) {
+        throw new GraphQLFixtureError(
+          "Synthetic room setup is limited to the roomless Manager fixture.",
+        );
+      }
+      roomSetupIdentities.add(identity);
+      return {
+        createCareRoom: {
           id: careRoomId,
           status: "ACTIVE",
           client: { id: personId, fullName: "Jordan Ellis" },
-          memberships: [
-            {
-              id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-              invitationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-              role: "FAMILY_VIEWER",
-              status: "INVITED",
-              accessBasis: "CLIENT_CONSENT",
-              reviewDueAt: null,
-              familyContact: {
-                id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-                fullName: "Alex Ellis",
-                email: "alex@example.test",
-                relationship: "Daughter",
-              },
-              accessGrants: [],
-              invitationStatus: "PENDING",
-              deliveryStatus: "DELIVERED",
-              cleanupStatus: "COMPLETE",
-              invitationExpiresAt: "2026-07-25T09:00:00.000Z",
-            },
-            {
-              id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-              invitationId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-              role: "FAMILY_VIEWER",
-              status: "ACTIVE",
-              accessBasis: "PROVIDER_AUTHORISED",
-              reviewDueAt: null,
-              familyContact: {
-                id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
-                fullName: "Morgan Ellis",
-                email: "morgan@example.test",
-                relationship: "Son",
-              },
-              accessGrants: [
-                {
-                  id: "grant-update",
-                  scope: "VIEW_UPDATES",
-                  grantedAt: "2026-07-18T09:00:00.000Z",
-                  revokedAt: null,
-                },
-                {
-                  id: "grant-summary",
-                  scope: "VIEW_TASK_SUMMARY",
-                  grantedAt: "2026-07-18T09:00:00.000Z",
-                  revokedAt: null,
-                },
-              ],
-              invitationStatus: "ACCEPTED",
-              deliveryStatus: "DELIVERED",
-              cleanupStatus: "COMPLETE",
-              invitationExpiresAt: "2026-07-25T09:00:00.000Z",
-            },
-          ],
+          memberships: [],
           policy: null,
-          createdAt: "2026-07-18T09:00:00.000Z",
-          updatedAt: "2026-07-18T09:00:00.000Z",
+          createdAt: "2026-07-24T09:00:00.000Z",
+          updatedAt: "2026-07-24T09:00:00.000Z",
+        },
+      };
+    },
+  ],
+  [
+    "VerifiedVisitStories",
+    () => ({
+      verifiedVisitStories: [
+        {
+          id: "18181818-1818-4181-8181-181818181818",
+          status: "REJECTED",
+          draftTitle: "Returned internal draft",
+          draftBody: "Returned internal operational content",
+          approvedTitle: null,
+          approvedBody: null,
+          familySafeVersion: 1,
+          familySafeTitle: "Care visit update",
+          familySafeBody: "Returned family-safe preview",
+          approvedAt: null,
+          rejectionReason: "Prepare this update again",
+          rejectedAt: "2026-07-23T11:00:00.000Z",
+          sourceRefs: [{ type: "Visit", id: visitId }],
+          publishedAt: null,
         },
       ],
     }),
   ],
-  ["VerifiedVisitStories", () => ({ verifiedVisitStories: [] })],
+  [
+    "VerifiedVisitStoryApprovalQueue",
+    () => ({
+      verifiedVisitStoryApprovalQueue: [
+        {
+          id: "19191919-1919-4191-8191-191919191919",
+          status: "DRAFT",
+          draftTitle: "Internal draft title",
+          draftBody: "Internal operational note that family must not see",
+          approvedTitle: null,
+          approvedBody: null,
+          familySafeVersion: 1,
+          familySafeTitle: "Care visit update",
+          familySafeBody:
+            "The scheduled care visit was completed. One care task was recorded as completed. No care tasks need follow-up.",
+          approvedAt: null,
+          rejectionReason: null,
+          rejectedAt: null,
+          sourceRefs: [{ type: "Visit", id: visitId }],
+          publishedAt: null,
+        },
+      ],
+    }),
+  ],
   [
     "OrganizationSetupDetails",
     () => ({
@@ -478,11 +608,22 @@ export function parseAllowedOperation(payload) {
 
   const [operation] = operations;
   const operationName = operation.name?.value;
-  if (operation.operation !== "query" || !operationName) {
-    throw new Error("GraphQL request must contain one named query");
+  if (
+    (operation.operation !== "query" && operation.operation !== "mutation") ||
+    !operationName
+  ) {
+    throw new Error("GraphQL request must contain one named operation");
   }
   if (payload.operationName && payload.operationName !== operationName) {
     throw new Error("GraphQL operationName does not match the parsed query");
+  }
+  if (
+    (operation.operation === "mutation") !==
+    (operationName === "CreateCareRoom")
+  ) {
+    throw new Error(
+      `Unsupported accessibility fixture operation type: ${operationName}`,
+    );
   }
   if (!operationHandlers.has(operationName)) {
     throw new Error(

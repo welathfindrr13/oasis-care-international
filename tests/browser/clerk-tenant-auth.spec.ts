@@ -127,9 +127,7 @@ test("a server-signed management session reaches the normal Clerk verifier and s
 
   await gotoAppRoute(page, "/people");
   await expect(
-    page
-      .getByRole("table")
-      .getByText("Assigned Fake Client", { exact: true }),
+    page.getByRole("table").getByText("Assigned Fake Client", { exact: true }),
   ).toBeVisible();
 
   await gotoAppRoute(page, `/people/${SENTINEL_CLIENT_ID}`);
@@ -302,6 +300,29 @@ test("Family access is grant-bound, tenant-safe, and revoked immediately with th
     page.getByText("No care information has been loaded."),
   ).toBeVisible();
   await expect(page.getByText("Assigned Fake Client")).toHaveCount(0);
+});
+
+test("an authenticated Manager receives a calm non-leaking Platform denial", async ({
+  page,
+}) => {
+  await activateSignedProfile(page, "manager");
+  await gotoAppRoute(page, "/platform/company-requests");
+
+  await expect(
+    page.getByRole("heading", { name: "Platform access", exact: true }),
+  ).toBeVisible();
+  const denial = page
+    .getByRole("alert")
+    .filter({ hasText: "Platform access required" });
+  await expect(denial).toContainText(
+    "No company request information has been loaded.",
+  );
+  await expect(page.getByRole("article")).toHaveCount(0);
+  await expect(page.getByText("Linked Carer Browser Proof")).toHaveCount(0);
+  await expect(page.getByText("admin@local.dev")).toHaveCount(0);
+
+  await denial.getByRole("link", { name: "Return to Today" }).click();
+  await expect(page).toHaveURL(/\/today$/);
 });
 
 test("a Platform Owner revokes the exact first Manager before cleanup and the same Manager session loses authority", async ({

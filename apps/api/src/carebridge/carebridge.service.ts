@@ -306,6 +306,21 @@ export class CarebridgeService {
     ];
 
     const story = await this.prisma.$transaction(async (tx) => {
+      await this.repository.acquireVerifiedVisitStoryGenerationLock(
+        organizationId,
+        visit.id,
+        tx,
+      );
+      const activeStory =
+        await this.repository.findActiveVerifiedVisitStoryForVisit(
+          organizationId,
+          visit.id,
+          tx,
+        );
+      if (activeStory) {
+        return null;
+      }
+
       const created = await this.repository.createVerifiedVisitStory({
         organization_id: organizationId,
         care_room_id: room.id,
@@ -333,6 +348,14 @@ export class CarebridgeService {
       });
       return created;
     });
+
+    if (!story) {
+      throw new BaseHttpException(
+        ErrorCode.VALIDATION_FAILED,
+        'This completed visit already has an active Family update.',
+        HttpStatus.CONFLICT,
+      );
+    }
 
     return this.mapStory(story);
   }

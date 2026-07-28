@@ -74,6 +74,20 @@ export interface VisitsQueryVariables {
   take?: number;
 }
 
+export interface FamilyUpdateCompletedVisit {
+  id: string;
+  scheduledStart: string;
+  actualEnd?: string | null;
+  status: keyof VisitStatus;
+}
+
+export interface FamilyUpdateCompletedVisitsQueryResponse {
+  visits: {
+    items: FamilyUpdateCompletedVisit[];
+    total: number;
+  };
+}
+
 /**
  * Query to fetch visits with filtering and pagination
  */
@@ -125,6 +139,25 @@ export const VISITS_QUERY = `
         }
         createdAt
         updatedAt
+      }
+      total
+    }
+  }
+`;
+
+export const FAMILY_UPDATE_COMPLETED_VISITS_QUERY = `
+  query FamilyUpdateCompletedVisits($clientId: ID!, $skip: Int!, $take: Int!) {
+    visits(
+      clientId: $clientId
+      status: COMPLETED
+      skip: $skip
+      take: $take
+    ) {
+      items {
+        id
+        scheduledStart
+        actualEnd
+        status
       }
       total
     }
@@ -919,6 +952,13 @@ export interface VerifiedVisitStoryApprovalQueueQueryResponse {
   verifiedVisitStoryApprovalQueue: VerifiedVisitStory[];
 }
 
+export interface GenerateVerifiedVisitStoryMutationResponse {
+  generateVerifiedVisitStory: Pick<
+    VerifiedVisitStory,
+    "id" | "status" | "familySafeVersion" | "familySafeTitle" | "familySafeBody"
+  >;
+}
+
 export interface FamilyCarebridgeRoom {
   id: string;
   clientDisplayName: string;
@@ -1277,6 +1317,18 @@ export const RAISE_FAMILY_CONCERN_MUTATION = `
     raiseFamilyCarebridgeConcern(input: $input) {
       title
       status
+    }
+  }
+`;
+
+export const GENERATE_VERIFIED_VISIT_STORY_MUTATION = `
+  mutation GenerateVerifiedVisitStory($visitId: String!) {
+    generateVerifiedVisitStory(visitId: $visitId) {
+      id
+      status
+      familySafeVersion
+      familySafeTitle
+      familySafeBody
     }
   }
 `;

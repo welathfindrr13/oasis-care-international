@@ -31,6 +31,14 @@ const deploymentReadme = fs.readFileSync(
   'utf8',
 );
 const deployDir = path.dirname(fileURLToPath(import.meta.url));
+const webBuildHelper = fs.readFileSync(
+  new URL('./scripts/run-web-build-with-env.sh', import.meta.url),
+  'utf8',
+);
+const webImageBuildHelper = fs.readFileSync(
+  new URL('./scripts/run-web-image-build-with-env.sh', import.meta.url),
+  'utf8',
+);
 
 function serviceBlock(name) {
   const start = compose.search(new RegExp(`^  ${name}:`, 'm'));
@@ -96,11 +104,20 @@ test('web Dockerfile promotes every Clerk public build arg into build env', () =
   assert.doesNotMatch(webDockerfile, /test -n "\$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"/);
   assert.match(
     verifyLocalScript,
-    /docker build --build-arg NEXT_PUBLIC_CLERK_CSP_ORIGINS=https:\/\/care\.example\.org -f apps\/web\/Dockerfile -t oasis-web:v2 \./,
+    /deploy\/v2\/scripts\/run-web-image-build-with-env\.sh "\$TEMP_ENV"/,
   );
   assert.match(
     verifyLocalScript,
-    /NEXT_PUBLIC_CLERK_CSP_ORIGINS=https:\/\/care\.example\.org pnpm --filter @oasis\/web build/,
+    /deploy\/v2\/scripts\/run-web-build-with-env\.sh "\$TEMP_ENV"/,
+  );
+  assert.match(webBuildHelper, /pnpm --filter @oasis\/web build/);
+  assert.match(
+    webImageBuildHelper,
+    /--build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY/,
+  );
+  assert.match(
+    webImageBuildHelper,
+    /--build-arg NEXT_PUBLIC_CLERK_CSP_ORIGINS/,
   );
 });
 

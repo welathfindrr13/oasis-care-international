@@ -68,9 +68,9 @@ DATABASE_URL="$LOCAL_DATABASE_URL" \
   pnpm --dir libs/db exec prisma validate
 pnpm --filter @oasis/api test
 pnpm --filter @oasis/api build
-NEXT_PUBLIC_CLERK_CSP_ORIGINS=https://care.example.org pnpm --filter @oasis/web build
+deploy/v2/scripts/run-web-build-with-env.sh "$TEMP_ENV"
 docker build -f apps/api/Dockerfile -t oasis-api:v2 .
-docker build --build-arg NEXT_PUBLIC_CLERK_CSP_ORIGINS=https://care.example.org -f apps/web/Dockerfile -t oasis-web:v2 .
+deploy/v2/scripts/run-web-image-build-with-env.sh "$TEMP_ENV"
 docker compose --env-file "$TEMP_ENV" -f deploy/v2/docker-compose.yml config
 docker run --rm --env-file "$TEMP_ENV" -v "$PWD/deploy/v2/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile
 bash -n deploy/v2/scripts/smoke-test.sh

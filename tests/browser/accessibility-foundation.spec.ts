@@ -423,13 +423,17 @@ test("Tenant admin client navigation keeps context and hides internal IDs", asyn
   await expect(
     page.getByRole("heading", { name: "Jordan Ellis", exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Client details", { exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByText("Client details", { exact: true }).first(),
+  ).toBeVisible();
   await expect(page.getByText(/^ID:/)).toHaveCount(0);
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
 
   await page.goto(`/care-planning?clientId=${PERSON_ID}`);
   await expect(page).toHaveURL(new RegExp(`clientId=${PERSON_ID}`));
-  await expect(page.getByText("Jordan Ellis", { exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByText("Jordan Ellis", { exact: true }).first(),
+  ).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -546,9 +550,7 @@ test("Inspection source refresh removes a selection that is no longer returned",
   await expect(visitCandidate).toHaveCount(0);
 });
 
-test("Carers cannot open generic client profile aliases", async ({
-  page,
-}) => {
+test("Carers cannot open generic client profile aliases", async ({ page }) => {
   await signIn(page, profiles.carer);
   for (const pathname of [`/clients/${PERSON_ID}`, `/people/${PERSON_ID}`]) {
     await page.goto(pathname);
@@ -810,6 +812,334 @@ test("Tenant admin manages Family access from the selected person", async ({
   expect(reflow.documentWidth).toBeLessThanOrEqual(reflow.viewportWidth);
 });
 
+test("Tenant admin prepares and publishes the canonical family-safe visit preview", async ({
+  page,
+}, testInfo) => {
+  let generateCalls = 0;
+  let publishCalls = 0;
+
+  await signIn(page, profiles.tenantAdmin);
+  await page.route("**/api/graphql", async (route) => {
+    const payload = route.request().postDataJSON() as { query?: string };
+    if (payload.query?.includes("GenerateVerifiedVisitStory")) {
+      generateCalls += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            generateVerifiedVisitStory: {
+              id: "19191919-1919-4191-8191-191919191919",
+              status: "DRAFT",
+              familySafeVersion: 1,
+              familySafeTitle: "Care visit update",
+              familySafeBody:
+                "The scheduled care visit was completed. One care task was recorded as completed. No care tasks need follow-up.",
+            },
+          },
+        }),
+      });
+      return;
+    }
+    if (payload.query?.includes("PublishVerifiedVisitStory")) {
+      publishCalls += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            publishVerifiedVisitStory: {
+              id: "19191919-1919-4191-8191-191919191919",
+              status: "PUBLISHED",
+              approvedTitle: "Care visit update",
+              approvedBody:
+                "The scheduled care visit was completed. One care task was recorded as completed. No care tasks need follow-up.",
+              approvedAt: "2026-07-24T10:00:00.000Z",
+              publishedAt: "2026-07-24T10:00:00.000Z",
+            },
+          },
+        }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto(`/clients/${PERSON_ID}/carebridge`);
+  await expect(
+    page.getByRole("heading", { name: "Prepare a Family update" }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Completed visit", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/Nothing is shared until/)).toBeVisible();
+
+  if (testInfo.project.name === "phone-390x844") {
+    await page.setViewportSize({ width: 320, height: 844 });
+    const reflow = await page.evaluate(() => ({
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+    }));
+    expect(reflow.documentWidth).toBeLessThanOrEqual(reflow.viewportWidth);
+  }
+
+  const completedVisitSelect = page.getByLabel("Completed visit", {
+    exact: true,
+  });
+  await page
+    .getByRole("button", { name: "Prepare Family update" })
+    .click();
+  await expect(completedVisitSelect).toBeFocused();
+  await expect(completedVisitSelect).toHaveAttribute("aria-invalid", "true");
+  await expect(completedVisitSelect).toHaveAttribute(
+    "aria-describedby",
+    /family-update-visit-error/,
+  );
+  await expect(
+    page.locator("#family-update-visit-error"),
+  ).toContainText("Choose a completed visit.");
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Choose a completed visit." }),
+  ).toHaveCount(1);
+
+  await page
+    .getByLabel("Completed visit", { exact: true })
+    .selectOption(VISIT_ID);
+  await expect(completedVisitSelect).toHaveAttribute("aria-invalid", "false");
+  const prepare = page.getByRole("button", {
+    name: "Prepare Family update",
+  });
+  await prepare.evaluate((element) => {
+    (element as HTMLButtonElement).click();
+    (element as HTMLButtonElement).click();
+  });
+
+  await expect(page).toHaveURL(
+    new RegExp(`/family-updates/approvals\\?careRoomId=${CARE_ROOM_ID}$`),
+  );
+  expect(generateCalls).toBe(1);
+  const familyPreview = page.getByRole("region", {
+    name: "Family preview",
+  });
+  await expect(
+    familyPreview.getByText("Care visit update", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    familyPreview.getByText(
+      "The scheduled care visit was completed. One care task was recorded as completed. No care tasks need follow-up.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(
+    familyPreview.getByText(
+      "Internal operational note that family must not see",
+    ),
+  ).toHaveCount(0);
+
+  const approve = page.getByRole("button", {
+    name: "Approve exact family preview",
+  });
+  await approve.click();
+  await expect(
+    page.getByRole("alertdialog", {
+      name: "Publish this exact Family update?",
+    }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("alertdialog", {
+        name: "Publish this exact Family update?",
+      })
+      .getByText("Internal operational note that family must not see"),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(approve).toBeFocused();
+  expect(publishCalls).toBe(0);
+
+  await approve.click();
+  const confirm = page.getByRole("button", {
+    name: "Confirm and publish",
+  });
+  await confirm.evaluate((element) => {
+    (element as HTMLButtonElement).click();
+    (element as HTMLButtonElement).click();
+  });
+  await expect(
+    page.getByRole("heading", { name: "No updates waiting for review" }),
+  ).toBeVisible();
+  expect(publishCalls).toBe(1);
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document.getAnimations().filter((animation) => {
+            const timing = animation.effect?.getComputedTiming();
+            return (
+              animation.playState === "running" &&
+              typeof timing?.duration === "number" &&
+              timing.duration > 50
+            );
+          }).length,
+      ),
+    )
+    .toBe(0);
+  await expectAccessibilityFoundation(page, {
+    repeatedHeader: true,
+    sequentialKeyboardTraversal: false,
+  });
+});
+
+test("Tenant admin sees preparation immediately after same-session Family room setup", async ({
+  page,
+}, testInfo) => {
+  await signIn(page, {
+    email: `roomless-family-${testInfo.project.name}@local.dev`,
+    name: "Roomless Family Manager",
+    role: "admin",
+  });
+  await page.goto(`/clients/${PERSON_ID}/carebridge`);
+
+  await expect(
+    page.getByRole("heading", { name: "Prepare a Family update" }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Set up family access" })
+    .click();
+
+  await expect(
+    page.getByRole("heading", { name: "Prepare a Family update" }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Completed visit", { exact: true }),
+  ).toBeVisible();
+  await expectAccessibilityFoundation(page, {
+    repeatedHeader: true,
+    sequentialKeyboardTraversal: false,
+  });
+});
+
+test("a stale Manager page reports an existing active Family update without duplicating it", async ({
+  page,
+}) => {
+  let generateCalls = 0;
+  await signIn(page, profiles.tenantAdmin);
+  await page.route("**/api/graphql", async (route) => {
+    const payload = route.request().postDataJSON() as { query?: string };
+    if (!payload.query?.includes("GenerateVerifiedVisitStory")) {
+      await route.continue();
+      return;
+    }
+    generateCalls += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        errors: [
+          {
+            message:
+              "This completed visit already has an active Family update.",
+            extensions: { code: "VALIDATION_FAILED" },
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto(`/clients/${PERSON_ID}/carebridge`);
+  await page
+    .getByLabel("Completed visit", { exact: true })
+    .selectOption(VISIT_ID);
+  await page
+    .getByRole("button", { name: "Prepare Family update" })
+    .click();
+
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Update not prepared" }),
+  ).toContainText(
+    "We could not prepare this Family update. Check that the visit is still completed, then try again.",
+  );
+  await expect(page).toHaveURL(
+    new RegExp(`/clients/${PERSON_ID}/carebridge$`),
+  );
+  expect(generateCalls).toBe(1);
+});
+
+test("Tenant admin can reach an older completed visit through bounded accessible pages", async ({
+  page,
+}) => {
+  await signIn(page, profiles.tenantAdmin);
+  await page.goto(`/clients/${PERSON_ID}/carebridge`);
+
+  await expect(
+    page.getByText(
+      "Showing completed visits 1–50 of 51. Page 1 of 2.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  const next = page.getByRole("link", {
+    name: "Next completed visits",
+  });
+  await expect(next).toBeVisible();
+  await next.focus();
+  await expect(next).toBeFocused();
+  const nextBounds = await next.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return { width: bounds.width, height: bounds.height };
+  });
+  expect(nextBounds.width).toBeGreaterThanOrEqual(44);
+  expect(nextBounds.height).toBeGreaterThanOrEqual(44);
+  await next.press("Enter");
+
+  await expect(page).toHaveURL(
+    new RegExp(
+      `/clients/${PERSON_ID}/carebridge\\?completedVisitPage=2$`,
+    ),
+  );
+  await expect(
+    page.getByText(
+      "Showing completed visits 51–51 of 51. Page 2 of 2.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  const completedVisit = page.getByLabel("Completed visit", { exact: true });
+  await expect(completedVisit).toHaveValue("");
+  await expect(
+    completedVisit.locator("option"),
+  ).toHaveCount(2);
+  await expect(
+    page.getByRole("link", { name: "Previous completed visits" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Next completed visits" }),
+  ).toHaveCount(0);
+  await expectAccessibilityFoundation(page, {
+    repeatedHeader: true,
+    sequentialKeyboardTraversal: false,
+  });
+});
+
+test("an extreme completed-visit page is qualified before a bounded redirect", async ({
+  page,
+}) => {
+  await signIn(page, profiles.tenantAdmin);
+  await page.goto(
+    `/clients/${PERSON_ID}/carebridge?completedVisitPage=999999999`,
+  );
+
+  await expect(page).toHaveURL(
+    new RegExp(
+      `/clients/${PERSON_ID}/carebridge\\?completedVisitPage=2$`,
+    ),
+  );
+  await expect(
+    page.getByText(
+      "Showing completed visits 51–51 of 51. Page 2 of 2.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+});
+
 test("Tenant admin receives truthful Family delivery and linked operation errors", async ({
   page,
 }) => {
@@ -996,7 +1326,9 @@ test("visit detail", async ({ page }) => {
     page.getByRole("heading", { name: "About Jordan Ellis" }),
   ).toBeVisible();
   await expect(page.getByText("12 Test Lane, Leeds, LS1 1AA")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Person details" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Person details" })).toHaveCount(
+    0,
+  );
   await expectAccessibilityFoundation(page, { repeatedHeader: true });
 });
 
@@ -1091,7 +1423,7 @@ test("Family concern status", async ({ page }) => {
     .locator("h1:visible, h2:visible, h3:visible")
     .evaluateAll((headings) =>
       headings.map((heading) => Number(heading.tagName.slice(1))),
-  );
+    );
   expect(revokedHeadingLevels).toEqual([1, 2]);
   const revokedSkipLink = page.getByRole("link", {
     name: "Skip to main content",
@@ -1110,7 +1442,9 @@ test("Family concern status", async ({ page }) => {
     page.getByRole("button", { name: "Send concern to the care team" }),
   ).toBeVisible();
   const pageOverflow = await page.evaluate(
-    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    () =>
+      document.documentElement.scrollWidth >
+      document.documentElement.clientWidth,
   );
   expect(pageOverflow).toBe(false);
 });
