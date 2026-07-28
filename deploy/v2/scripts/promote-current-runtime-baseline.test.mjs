@@ -714,6 +714,31 @@ async function createExecutableWrapperFixture(
     JSON.parse(
       readAsDeploy(path.join(systemLegacyRoot, "state", "manifest.json")),
     );
+  const waitForRestoredState = async () => {
+    const journal = path.join(
+      systemDeployRoot,
+      "runtime-baseline-promotion-v1",
+      baselineAttemptId,
+      "journal.json",
+    );
+    for (let attempt = 0; attempt < 500; attempt += 1) {
+      if (
+        existsAsDeploy(systemForwardRoot) &&
+        existsAsDeploy(systemLegacyRoot) &&
+        existsAsDeploy(journal)
+      ) {
+        try {
+          if (JSON.parse(readAsDeploy(journal)).phase === "RESTORED") {
+            return true;
+          }
+        } catch {
+          // Recovery writes the journal atomically; retry until it is readable.
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    return false;
+  };
   const signalRunningWrapper = async () => {
     const child = spawn("sudo", wrapperArgs, {
       detached: true,
@@ -767,6 +792,7 @@ async function createExecutableWrapperFixture(
     systemLegacyRoot,
     runWrapper,
     signalRunningWrapper,
+    waitForRestoredState,
     existsAsDeploy,
     readAsDeploy,
     readLegacyManifestAsDeploy,
@@ -1189,6 +1215,7 @@ test("the executable production wrapper authenticates its full boundary and reco
         `wrapper reported success after TERM\n${result.stderr}`,
       );
       assert.doesNotMatch(result.stdout, /RUNTIME_BASELINE_WRAPPER_COMPLETE/);
+      assert.equal(await fixture.waitForRestoredState(), true);
       assert.equal(fixture.existsAsDeploy(fixture.systemForwardRoot), true);
       assert.equal(fixture.existsAsDeploy(fixture.systemLegacyRoot), true);
       assert.equal(
