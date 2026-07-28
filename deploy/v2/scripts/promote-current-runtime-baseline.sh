@@ -170,7 +170,7 @@ printf 'RUNTIME_BASELINE_LOCKED_PREFLIGHT_VALID\n'
 
 promotion_started=0
 recover_on_exit() {
-  local original_status=$?
+  local original_status="$1"
   trap - EXIT HUP INT TERM
   if [ "$promotion_started" -eq 1 ]; then
     if ! GIT_COMMON_DIR="$git_common" \
@@ -182,7 +182,10 @@ recover_on_exit() {
   fi
   exit "$original_status"
 }
-trap recover_on_exit EXIT HUP INT TERM
+trap 'recover_on_exit "$?"' EXIT
+trap 'recover_on_exit 129' HUP
+trap 'recover_on_exit 130' INT
+trap 'recover_on_exit 143' TERM
 promotion_started=1
 GIT_COMMON_DIR="$git_common" \
 BASELINE_ATTEMPT_ID="$BASELINE_ATTEMPT_ID" \

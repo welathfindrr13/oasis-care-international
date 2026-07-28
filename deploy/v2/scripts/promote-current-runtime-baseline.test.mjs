@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -292,7 +292,11 @@ async function createFixture(t, { complete = true } = {}) {
 
 async function createExecutableWrapperFixture(
   t,
-  { helperVariant = "valid", terminatePromotion = false } = {},
+  {
+    helperVariant = "valid",
+    terminatePromotion = false,
+    signalWrapper = false,
+  } = {},
 ) {
   const stateFixture = await createFixture(t);
   const suffix = crypto.randomBytes(4).toString("hex");
@@ -632,7 +636,7 @@ async function createExecutableWrapperFixture(
       '  image_id="${3:-}"',
       '  alias="${4:-}"',
       '  printf "%s\\n" "$image_id" > "$TEST_ALIAS_DIR/$alias"',
-      '  if [ "${TEST_TERMINATE_PROMOTION:-0}" = 1 ] && [[ "$alias" == oasis-legacy-bootstrap-api:* ]]; then sleep 3; fi',
+      '  if [ "${TEST_DELAY_PROMOTION:-0}" = 1 ] && [[ "$alias" == oasis-legacy-bootstrap-api:* ]]; then sleep 3; fi',
       "  exit 0",
       "fi",
       'if [ "${1:-}" = image ] && [ "${2:-}" = rm ]; then',
@@ -674,31 +678,32 @@ async function createExecutableWrapperFixture(
       shell: true,
       encoding: "utf8",
     }).stdout.trim() || "/usr/bin/git";
+  const wrapperArgs = [
+    "-n",
+    "-u",
+    "deploy",
+    "env",
+    `PATH=${toolsDir}:/usr/bin:/bin`,
+    "HOME=/home/deploy",
+    `REAL_GIT=${realGit}`,
+    `REAL_NODE=${process.execPath}`,
+    `ROTATION_TOOL_SHA=${rotationToolSha}`,
+    `TEST_ROTATION_SHA=${rotationToolSha}`,
+    `TEST_CURRENT_SHA=${CURRENT_RUNTIME_SHA}`,
+    `TEST_NEXT_SHA=${NEXT_FORWARD_TARGET_SHA}`,
+    `BASELINE_ATTEMPT_ID=${baselineAttemptId}`,
+    `TEST_ALIAS_DIR=${aliasDir}`,
+    `TEST_DOCKER_LOG=${dockerLog}`,
+    `TEST_TERMINATE_PROMOTION=${terminatePromotion ? "1" : "0"}`,
+    `TEST_DELAY_PROMOTION=${signalWrapper ? "1" : "0"}`,
+    "bash",
+    path.join(helperDir, "promote-current-runtime-baseline.sh"),
+  ];
   const runWrapper = () =>
-    spawnSync(
-      "sudo",
-      [
-        "-n",
-        "-u",
-        "deploy",
-        "env",
-        `PATH=${toolsDir}:/usr/bin:/bin`,
-        "HOME=/home/deploy",
-        `REAL_GIT=${realGit}`,
-        `REAL_NODE=${process.execPath}`,
-        `ROTATION_TOOL_SHA=${rotationToolSha}`,
-        `TEST_ROTATION_SHA=${rotationToolSha}`,
-        `TEST_CURRENT_SHA=${CURRENT_RUNTIME_SHA}`,
-        `TEST_NEXT_SHA=${NEXT_FORWARD_TARGET_SHA}`,
-        `BASELINE_ATTEMPT_ID=${baselineAttemptId}`,
-        `TEST_ALIAS_DIR=${aliasDir}`,
-        `TEST_DOCKER_LOG=${dockerLog}`,
-        `TEST_TERMINATE_PROMOTION=${terminatePromotion ? "1" : "0"}`,
-        "bash",
-        path.join(helperDir, "promote-current-runtime-baseline.sh"),
-      ],
-      { encoding: "utf8", timeout: 30_000 },
-    );
+    spawnSync("sudo", wrapperArgs, {
+      encoding: "utf8",
+      timeout: 30_000,
+    });
 
   const existsAsDeploy = (target) =>
     spawnSync("sudo", ["-n", "-u", "deploy", "test", "-e", target], {
@@ -709,6 +714,47 @@ async function createExecutableWrapperFixture(
     JSON.parse(
       readAsDeploy(path.join(systemLegacyRoot, "state", "manifest.json")),
     );
+  const signalRunningWrapper = async () => {
+    const child = spawn("sudo", wrapperArgs, {
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    const completion = new Promise((resolve) => {
+      child.on("close", (status, signal) => {
+        resolve({ status, signal, stdout, stderr });
+      });
+    });
+
+    const alias = path.join(
+      aliasDir,
+      `oasis-legacy-bootstrap-api:${baselineAttemptId}`,
+    );
+    let promotionReached = false;
+    for (let attempt = 0; attempt < 300; attempt += 1) {
+      if (existsAsDeploy(alias)) {
+        promotionReached = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    if (!promotionReached) {
+      process.kill(-child.pid, "SIGKILL");
+      throw new Error("wrapper did not reach the mutation phase");
+    }
+
+    process.kill(-child.pid, "SIGTERM");
+    return completion;
+  };
 
   return {
     aliasDir,
@@ -720,6 +766,7 @@ async function createExecutableWrapperFixture(
     systemForwardHistory,
     systemLegacyRoot,
     runWrapper,
+    signalRunningWrapper,
     existsAsDeploy,
     readAsDeploy,
     readLegacyManifestAsDeploy,
@@ -1124,6 +1171,46 @@ test("the executable production wrapper authenticates its full boundary and reco
           false,
         );
       }
+      const dockerCommands = fixture.readAsDeploy(fixture.dockerLog);
+      assert.match(dockerCommands, /image rm/);
+      assertNoRuntimeOrDataMutationCommands(dockerCommands);
+    },
+  );
+
+  await t.test(
+    "TERM delivered to the running wrapper restores state and cannot report success",
+    async (subtest) => {
+      const fixture = await createExecutableWrapperFixture(subtest, {
+        signalWrapper: true,
+      });
+      const result = await fixture.signalRunningWrapper();
+      assert.ok(
+        result.status !== 0 || result.signal !== null,
+        `wrapper reported success after TERM\n${result.stderr}`,
+      );
+      assert.doesNotMatch(result.stdout, /RUNTIME_BASELINE_WRAPPER_COMPLETE/);
+      assert.equal(fixture.existsAsDeploy(fixture.systemForwardRoot), true);
+      assert.equal(fixture.existsAsDeploy(fixture.systemLegacyRoot), true);
+      assert.equal(
+        fixture.existsAsDeploy(
+          path.join(fixture.systemForwardHistory, completedForwardAttemptId),
+        ),
+        false,
+      );
+      const restoredLegacy = fixture.readLegacyManifestAsDeploy();
+      assert.equal(restoredLegacy.targetSha, oldLegacySha);
+      assert.equal(restoredLegacy.attemptId, oldLegacyAttemptId);
+      const journal = JSON.parse(
+        fixture.readAsDeploy(
+          path.join(
+            fixture.systemDeployRoot,
+            "runtime-baseline-promotion-v1",
+            baselineAttemptId,
+            "journal.json",
+          ),
+        ),
+      );
+      assert.equal(journal.phase, "RESTORED");
       const dockerCommands = fixture.readAsDeploy(fixture.dockerLog);
       assert.match(dockerCommands, /image rm/);
       assertNoRuntimeOrDataMutationCommands(dockerCommands);
