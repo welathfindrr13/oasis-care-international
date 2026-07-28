@@ -55,6 +55,8 @@ const revisionHelperPath = fileURLToPath(new URL('./revision-proof.mjs', import.
 const workflowSha = 'f'.repeat(40);
 const forwardAttemptId = 'e'.repeat(32);
 const legacyAttemptId = 'd'.repeat(32);
+const reviewedTargetSha = '5c194b259f5a9d21c58d9f68c3f8b196843a894d';
+const staleTargetSha = 'd656d88ba82fa13abb66e3ba915ba2b6ae283d9e';
 const imageIds = {
   api: `sha256:${'a'.repeat(64)}`,
   web: `sha256:${'b'.repeat(64)}`,
@@ -380,6 +382,21 @@ test('valid durable legacy rollback prepares a separate immutable forward attemp
     caddy: { id: imageIds.caddy, alias: `oasis-legacy-bootstrap-caddy:${legacyAttemptId}` },
   });
   assert.equal(readForwardState({ rootDir: fixture.forwardRoot, attemptId: forwardAttemptId }).state, FORWARD_STATES.PREPARED);
+});
+
+test('state preparation accepts only the reviewed application target', async (t) => {
+  assert.equal(FORWARD_TARGET_SHA, reviewedTargetSha);
+
+  const reviewedFixture = makeFixture(t);
+  const manifest = await prepareForward(reviewedFixture, { targetSha: reviewedTargetSha });
+  assert.equal(manifest.targetSha, reviewedTargetSha);
+
+  const staleFixture = makeFixture(t);
+  await assert.rejects(
+    prepareForward(staleFixture, { targetSha: staleTargetSha }),
+    isForwardError,
+  );
+  assert.equal(fs.existsSync(staleFixture.forwardRoot), false);
 });
 
 test('preparation binds exact target, workflow, current main, repository, attempt, and start state', async (t) => {
@@ -983,6 +1000,13 @@ test('exact completion proof requires API, readiness, and web to report the targ
 });
 
 test('workflow is a new one-shot lane bound to the exact application and reviewed workflow SHAs', () => {
+  const workflowTargetSha = workflow.match(/EXPECTED_TARGET_SHA:\s*([0-9a-f]{40})/)?.[1];
+  assert.equal(workflowTargetSha, reviewedTargetSha);
+  assert.equal(FORWARD_TARGET_SHA, workflowTargetSha);
+  assert.match(
+    recoveryHelper,
+    new RegExp(`\\[ "\\$TARGET_SHA" = "${reviewedTargetSha}" \\] \\|\\| exit 1`),
+  );
   assert.match(workflow, /EXPECTED_TARGET_SHA: 5c194b259f5a9d21c58d9f68c3f8b196843a894d/);
   assert.match(
     workflow,
@@ -997,6 +1021,8 @@ test('workflow is a new one-shot lane bound to the exact application and reviewe
     /single-use recovery lane for one reviewed application target:\s*`d656d88ba82fa13abb66e3ba915ba2b6ae283d9e`/,
   );
   assert.doesNotMatch(workflow, /d656d88ba82fa13abb66e3ba915ba2b6ae283d9e/);
+  assert.doesNotMatch(forwardHelper, /d656d88ba82fa13abb66e3ba915ba2b6ae283d9e/);
+  assert.doesNotMatch(recoveryHelper, /d656d88ba82fa13abb66e3ba915ba2b6ae283d9e/);
   assert.match(workflow, /TARGET_SHA" = "\$EXPECTED_TARGET_SHA/);
   assert.match(workflow, /GITHUB_SHA" = "\$WORKFLOW_SHA/);
   assert.match(workflow, /origin_main" = "\$WORKFLOW_SHA/);
