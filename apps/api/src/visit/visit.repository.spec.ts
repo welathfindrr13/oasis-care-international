@@ -76,6 +76,54 @@ describe("VisitRepository tenant write safety", () => {
     });
   });
 
+  it("locks the tenant client lifecycle before validating and creating a visit", async () => {
+    const createdVisit = { id: "visit-1" };
+    const tx = {
+      $executeRaw: jest.fn().mockResolvedValue(undefined),
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "client-1" }]),
+      carer: {
+        findFirst: jest.fn().mockResolvedValue({ id: "carer-1" }),
+      },
+      client: {
+        findFirst: jest.fn().mockResolvedValue({ id: "client-1" }),
+      },
+      visit: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue(createdVisit),
+      },
+    } as any;
+    const prisma = {
+      $transaction: jest.fn((operation) => operation(tx)),
+    } as any;
+    const repository = new VisitRepository(prisma, keyring());
+
+    await expect(
+      repository.createIfAssignable(
+        {
+          organization: { connect: { id: "org-1" } },
+          carer: { connect: { id: "carer-1" } },
+          client: { connect: { id: "client-1" } },
+          scheduled_start: new Date("2026-07-30T09:00:00.000Z"),
+          scheduled_end: new Date("2026-07-30T10:00:00.000Z"),
+        } as any,
+        {
+          organizationId: "org-1",
+          carerId: "carer-1",
+          clientId: "client-1",
+          scheduledStart: new Date("2026-07-30T09:00:00.000Z"),
+          scheduledEnd: new Date("2026-07-30T10:00:00.000Z"),
+        },
+      ),
+    ).resolves.toEqual({ status: "CREATED", visit: createdVisit });
+
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(3);
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.client.findFirst.mock.invocationCallOrder[0],
+    );
+    expect(tx.visit.create).toHaveBeenCalledTimes(1);
+  });
+
   it("checks the locked terminal visit before a guided task mutation", async () => {
     const tx = {
       $executeRaw: jest.fn().mockResolvedValue(undefined),

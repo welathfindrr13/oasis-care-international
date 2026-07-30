@@ -16,6 +16,7 @@ import { ClientModule } from '../src/client/client.module';
 import { ClerkProvisioningError } from '../src/company-access/clerk-provisioning.adapter';
 import { ClerkInvitationAdministrationAdapter } from '../src/invitation-lifecycle/clerk-invitation-administration.adapter';
 import { ClerkInvitationVerificationAdapter } from '../src/invitation-lifecycle/clerk-invitation-verification.adapter';
+import { VisitRepository } from '../src/visit/visit.repository';
 import { startPostgres } from './utils/test-container';
 
 describe('family invitation, grants, and family-safe GraphQL boundary', () => {
@@ -1674,6 +1675,130 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
       }),
     ).toBe(0);
   });
+
+  it(
+    'serializes client archiving against visit scheduling after the active-client check',
+    async () => {
+      const raceClient = await prisma.client.create({
+        data: {
+          organization_id: organizationId,
+          full_name: 'Synthetic Visit Race',
+          address_line1: '6 Test Street',
+          city: 'Leeds',
+          postcode: 'LS6 6AA',
+        },
+      });
+      const raceCarer = await prisma.carer.create({
+        data: {
+          organization_id: organizationId,
+          first_name: 'Visit',
+          last_name: 'Race Carer',
+          email: 'archive-visit-race@example.test',
+        },
+      });
+      await prisma.organizationMembership.create({
+        data: {
+          organization_id: organizationId,
+          identity_provider: 'clerk',
+          auth_subject: 'visit_race_carer_subject',
+          normalized_email: 'archive-visit-race@example.test',
+          role: 'carer',
+          status: 'ACTIVE',
+          carer_id: raceCarer.id,
+          external_organization_id: externalOrganizationId,
+          external_membership_id: 'orgmem_visit_race_carer',
+        },
+      });
+
+      await prisma.$executeRawUnsafe(`
+        CREATE OR REPLACE FUNCTION oasis_test_delay_visit_insert()
+        RETURNS trigger
+        LANGUAGE plpgsql
+        AS $$
+        BEGIN
+          PERFORM pg_sleep(2);
+          RETURN NEW;
+        END;
+        $$;
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TRIGGER oasis_test_delay_visit_insert_trigger
+        BEFORE INSERT ON visit
+        FOR EACH ROW
+        EXECUTE FUNCTION oasis_test_delay_visit_insert();
+      `);
+
+      try {
+        const scheduledStart = new Date('2026-07-30T09:00:00Z');
+        const scheduledEnd = new Date('2026-07-30T10:00:00Z');
+        const visitRepository = new VisitRepository(prisma, {} as any);
+        const createPromise = visitRepository.createIfAssignable(
+          {
+            organization: { connect: { id: organizationId } },
+            carer: { connect: { id: raceCarer.id } },
+            client: { connect: { id: raceClient.id } },
+            scheduled_start: scheduledStart,
+            scheduled_end: scheduledEnd,
+            status: 'SCHEDULED',
+            notes: 'Synthetic archive concurrency test.',
+          },
+          {
+            organizationId,
+            carerId: raceCarer.id,
+            clientId: raceClient.id,
+            scheduledStart,
+            scheduledEnd,
+          },
+        );
+
+        // The insert trigger pauses the canonical scheduler after its active
+        // client validation. Archiving must wait on the shared client lock and
+        // then remove the newly-created visit before returning success.
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        const archivePromise = gql(
+          bearer(adminSubject),
+          `mutation ArchiveClient($id: String!) {
+            deleteClient(id: $id) { id }
+          }`,
+          { id: raceClient.id },
+        ).expect(200);
+
+        const [createResult, archiveResult] = await Promise.all([
+          createPromise,
+          archivePromise,
+        ]);
+        expect(createResult.status).toBe('CREATED');
+        expect(archiveResult.body.errors).toBeUndefined();
+        expect(archiveResult.body.data.deleteClient.id).toBe(raceClient.id);
+        await expect(
+          prisma.client.findUniqueOrThrow({ where: { id: raceClient.id } }),
+        ).resolves.toMatchObject({ deleted_at: expect.any(Date) });
+        expect(
+          await prisma.visit.count({
+            where: {
+              organization_id: organizationId,
+              client_id: raceClient.id,
+              deleted_at: null,
+            },
+          }),
+        ).toBe(0);
+      } finally {
+        await prisma.$executeRawUnsafe(
+          'DROP TRIGGER IF EXISTS oasis_test_delay_visit_insert_trigger ON visit',
+        );
+        await prisma.$executeRawUnsafe(
+          'DROP FUNCTION IF EXISTS oasis_test_delay_visit_insert()',
+        );
+        await prisma.organizationMembership.deleteMany({
+          where: {
+            organization_id: organizationId,
+            carer_id: raceCarer.id,
+          },
+        });
+      }
+    },
+    15_000,
+  );
 
   it('serializes client archiving against a Family invitation', async () => {
     const input = {
