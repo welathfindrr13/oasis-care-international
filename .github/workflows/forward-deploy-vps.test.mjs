@@ -55,8 +55,8 @@ const revisionHelperPath = fileURLToPath(new URL('./revision-proof.mjs', import.
 const workflowSha = 'f'.repeat(40);
 const forwardAttemptId = 'e'.repeat(32);
 const legacyAttemptId = 'd'.repeat(32);
-const reviewedTargetSha = '5c194b259f5a9d21c58d9f68c3f8b196843a894d';
-const staleTargetSha = 'd656d88ba82fa13abb66e3ba915ba2b6ae283d9e';
+const reviewedTargetSha = 'fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6';
+const staleTargetSha = '5c194b259f5a9d21c58d9f68c3f8b196843a894d';
 const imageIds = {
   api: `sha256:${'a'.repeat(64)}`,
   web: `sha256:${'b'.repeat(64)}`,
@@ -1007,22 +1007,22 @@ test('workflow is a new one-shot lane bound to the exact application and reviewe
     recoveryHelper,
     new RegExp(`\\[ "\\$TARGET_SHA" = "${reviewedTargetSha}" \\] \\|\\| exit 1`),
   );
-  assert.match(workflow, /EXPECTED_TARGET_SHA: 5c194b259f5a9d21c58d9f68c3f8b196843a894d/);
+  assert.match(workflow, /EXPECTED_TARGET_SHA: fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6/);
   assert.match(
     workflow,
-    /\[ "\$TARGET_SHA" = "5c194b259f5a9d21c58d9f68c3f8b196843a894d" \] \|\| fail_remote FORWARD_INPUTS_INVALID/,
+    /\[ "\$TARGET_SHA" = "fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6" \] \|\| fail_remote FORWARD_INPUTS_INVALID/,
   );
   assert.match(
     docs,
-    /single-use recovery lane for one reviewed application target:\s*`5c194b259f5a9d21c58d9f68c3f8b196843a894d`/,
+    /single-use recovery lane for one reviewed application target:\s*`fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6`/,
   );
   assert.doesNotMatch(
     docs,
-    /single-use recovery lane for one reviewed application target:\s*`d656d88ba82fa13abb66e3ba915ba2b6ae283d9e`/,
+    /single-use recovery lane for one reviewed application target:\s*`5c194b259f5a9d21c58d9f68c3f8b196843a894d`/,
   );
-  assert.doesNotMatch(workflow, /d656d88ba82fa13abb66e3ba915ba2b6ae283d9e/);
-  assert.doesNotMatch(forwardHelper, /d656d88ba82fa13abb66e3ba915ba2b6ae283d9e/);
-  assert.doesNotMatch(recoveryHelper, /d656d88ba82fa13abb66e3ba915ba2b6ae283d9e/);
+  assert.doesNotMatch(workflow, /5c194b259f5a9d21c58d9f68c3f8b196843a894d/);
+  assert.doesNotMatch(forwardHelper, /5c194b259f5a9d21c58d9f68c3f8b196843a894d/);
+  assert.doesNotMatch(recoveryHelper, /5c194b259f5a9d21c58d9f68c3f8b196843a894d/);
   assert.match(workflow, /TARGET_SHA" = "\$EXPECTED_TARGET_SHA/);
   assert.match(workflow, /GITHUB_SHA" = "\$WORKFLOW_SHA/);
   assert.match(workflow, /origin_main" = "\$WORKFLOW_SHA/);
