@@ -12,6 +12,7 @@ import request from 'supertest';
 import { StartedTestContainer } from 'testcontainers';
 import { AuthAccessModule } from '../src/auth/auth-access.module';
 import { CarebridgeModule } from '../src/carebridge/carebridge.module';
+import { ClientModule } from '../src/client/client.module';
 import { ClerkProvisioningError } from '../src/company-access/clerk-provisioning.adapter';
 import { ClerkInvitationAdministrationAdapter } from '../src/invitation-lifecycle/clerk-invitation-administration.adapter';
 import { ClerkInvitationVerificationAdapter } from '../src/invitation-lifecycle/clerk-invitation-verification.adapter';
@@ -67,6 +68,7 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
         }),
         AuthAccessModule,
         CarebridgeModule,
+        ClientModule,
       ],
       providers: [JwtStrategy],
     })
@@ -103,6 +105,7 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
     await prisma.accessGrant.deleteMany();
     await prisma.careRoomMembership.deleteMany();
     await prisma.familyContact.deleteMany();
+    await prisma.careBridgePolicy.deleteMany();
     await prisma.careRoom.deleteMany();
     await prisma.visitTask.deleteMany();
     await prisma.visit.deleteMany();
@@ -1205,6 +1208,533 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
         canRaiseConcerns: false,
       },
     ]);
+  });
+
+  it('archives one client atomically while preserving history, another room, and another tenant', async () => {
+    const familyEmail = 'archive-shared-family@example.test';
+    const familyOrganizationMembership = await prisma.organizationMembership.create({
+      data: {
+        organization_id: organizationId,
+        identity_provider: 'clerk',
+        auth_subject: familySubject,
+        normalized_email: familyEmail,
+        role: 'family',
+        status: 'ACTIVE',
+        external_organization_id: externalOrganizationId,
+        external_membership_id: 'orgmem_archive_shared_family',
+      },
+    });
+    const acceptedInvitationId = 'accepted_archive_shared_family';
+    await prisma.organizationMembershipInvitation.create({
+      data: {
+        id: acceptedInvitationId,
+        organization_id: organizationId,
+        activated_membership_id: familyOrganizationMembership.id,
+        identity_provider: 'clerk',
+        intended_email: familyEmail,
+        normalized_email: familyEmail,
+        intended_role: 'family',
+        status: 'ACCEPTED',
+        external_invitation_id: 'external_archive_shared_family',
+        created_by_subject: adminSubject,
+        bound_auth_subject: familySubject,
+        created_at: new Date('2026-07-24T10:00:00Z'),
+        accepted_at: new Date('2026-07-24T10:01:00Z'),
+        expires_at: new Date('2026-07-31T10:00:00Z'),
+      },
+    });
+    const familyContact = await prisma.familyContact.create({
+      data: {
+        organization_id: organizationId,
+        full_name: 'Archive Shared Relative',
+        email: familyEmail,
+        identity_type: 'clerk',
+        auth_subject: familySubject,
+      },
+    });
+    const archivedMembership = await prisma.careRoomMembership.create({
+      data: {
+        care_room_id: roomId,
+        family_contact_id: familyContact.id,
+        organization_membership_invitation_id: acceptedInvitationId,
+        role: 'FAMILY_VIEWER',
+        access_basis: 'CLIENT_CONSENT',
+        status: 'ACTIVE',
+        accepted_at: new Date('2026-07-24T10:01:00Z'),
+      },
+    });
+    await prisma.accessGrant.createMany({
+      data: [
+        {
+          care_room_membership_id: archivedMembership.id,
+          scope: 'VIEW_UPDATES',
+        },
+        {
+          care_room_membership_id: archivedMembership.id,
+          scope: 'RAISE_CONCERNS',
+        },
+      ],
+    });
+
+    const retainedClient = await prisma.client.create({
+      data: {
+        organization_id: organizationId,
+        full_name: 'Retained Synthetic Client',
+        address_line1: '4 Test Street',
+        city: 'Leeds',
+        postcode: 'LS4 4AA',
+      },
+    });
+    const retainedRoom = await prisma.careRoom.create({
+      data: {
+        organization_id: organizationId,
+        client_id: retainedClient.id,
+      },
+    });
+    const retainedMembership = await prisma.careRoomMembership.create({
+      data: {
+        care_room_id: retainedRoom.id,
+        family_contact_id: familyContact.id,
+        organization_membership_invitation_id: acceptedInvitationId,
+        role: 'FAMILY_VIEWER',
+        access_basis: 'CLIENT_CONSENT',
+        status: 'ACTIVE',
+        accepted_at: new Date('2026-07-24T10:01:00Z'),
+      },
+    });
+    await prisma.accessGrant.createMany({
+      data: [
+        {
+          care_room_membership_id: retainedMembership.id,
+          scope: 'VIEW_UPDATES',
+        },
+        {
+          care_room_membership_id: retainedMembership.id,
+          scope: 'VIEW_TASK_SUMMARY',
+        },
+      ],
+    });
+
+    const pendingInvitationId = 'pending_archive_cleanup_family';
+    await prisma.organizationMembershipInvitation.create({
+      data: {
+        id: pendingInvitationId,
+        organization_id: organizationId,
+        identity_provider: 'clerk',
+        intended_email: 'pending-archive-family@example.test',
+        normalized_email: 'pending-archive-family@example.test',
+        intended_role: 'family',
+        status: 'PENDING',
+        external_invitation_id: 'external_pending_archive_family',
+        created_by_subject: adminSubject,
+        expires_at: new Date('2026-07-31T12:00:00Z'),
+      },
+    });
+    const pendingContact = await prisma.familyContact.create({
+      data: {
+        organization_id: organizationId,
+        full_name: 'Pending Archive Relative',
+        email: 'pending-archive-family@example.test',
+        identity_type: 'clerk',
+      },
+    });
+    const pendingMembership = await prisma.careRoomMembership.create({
+      data: {
+        care_room_id: roomId,
+        family_contact_id: pendingContact.id,
+        organization_membership_invitation_id: pendingInvitationId,
+        role: 'FAMILY_VIEWER',
+        access_basis: 'CLIENT_CONSENT',
+        status: 'INVITED',
+      },
+    });
+
+    const carer = await prisma.carer.create({
+      data: {
+        organization_id: organizationId,
+        first_name: 'Archive',
+        last_name: 'Carer',
+        email: 'archive-carer@example.test',
+      },
+    });
+    const visit = await prisma.visit.create({
+      data: {
+        organization_id: organizationId,
+        client_id: clientId,
+        carer_id: carer.id,
+        scheduled_start: new Date('2026-07-24T09:00:00Z'),
+        scheduled_end: new Date('2026-07-24T10:00:00Z'),
+        status: 'COMPLETED',
+      },
+    });
+    const story = await prisma.verifiedVisitStory.create({
+      data: {
+        organization_id: organizationId,
+        care_room_id: roomId,
+        client_id: clientId,
+        visit_id: visit.id,
+        status: 'PUBLISHED',
+        draft_title: 'Synthetic update',
+        draft_body: 'Synthetic update',
+        family_safe_version: 1,
+        family_safe_title: 'A synthetic visit update',
+        family_safe_body: 'The synthetic visit was completed.',
+        source_refs: [{ type: 'Visit', id: visit.id }],
+        published_at: new Date('2026-07-24T10:05:00Z'),
+      },
+    });
+    const concern = await prisma.concern.create({
+      data: {
+        organization_id: organizationId,
+        care_room_id: roomId,
+        client_id: clientId,
+        title: 'Synthetic archive concern',
+        description: 'Synthetic only.',
+        category: 'COMMUNICATION',
+        severity: 'MEDIUM',
+        status: 'OPEN',
+        raised_by_membership_id: archivedMembership.id,
+      },
+    });
+    const historicalAudit = await prisma.auditLog.create({
+      data: {
+        organization_id: organizationId,
+        user_id: adminSubject,
+        action: 'SYNTHETIC_HISTORY',
+        resource_type: 'Client',
+        resource_id: clientId,
+      },
+    });
+
+    adminClerk.revokeOrganizationInvitationByInternalId.mockRejectedValueOnce(
+      new ClerkProvisioningError('CLERK_INVITATION_AMBIGUOUS', false),
+    );
+
+    const archived = await gql(
+      bearer(adminSubject),
+      `mutation ArchiveClient($id: String!) {
+        deleteClient(id: $id) { id fullName }
+      }`,
+      { id: clientId },
+    ).expect(200);
+    expect(archived.body.errors).toBeUndefined();
+    expect(archived.body.data.deleteClient).toEqual({
+      id: clientId,
+      fullName: 'Synthetic Mary',
+    });
+
+    await expect(
+      prisma.client.findUniqueOrThrow({ where: { id: clientId } }),
+    ).resolves.toMatchObject({ deleted_at: expect.any(Date) });
+    await expect(
+      prisma.visit.findUniqueOrThrow({ where: { id: visit.id } }),
+    ).resolves.toMatchObject({ deleted_at: expect.any(Date) });
+    await expect(
+      prisma.careRoom.findUniqueOrThrow({ where: { id: roomId } }),
+    ).resolves.toMatchObject({ status: 'ARCHIVED' });
+    await expect(
+      prisma.careRoomMembership.findUniqueOrThrow({
+        where: { id: archivedMembership.id },
+      }),
+    ).resolves.toMatchObject({
+      status: 'REVOKED',
+      revoked_at: expect.any(Date),
+    });
+    await expect(
+      prisma.careRoomMembership.findUniqueOrThrow({
+        where: { id: pendingMembership.id },
+      }),
+    ).resolves.toMatchObject({
+      status: 'REVOKED',
+      revoked_at: expect.any(Date),
+    });
+    expect(
+      await prisma.accessGrant.count({
+        where: {
+          care_room_membership_id: archivedMembership.id,
+          revoked_at: null,
+        },
+      }),
+    ).toBe(0);
+    await expect(
+      prisma.organizationMembershipInvitation.findUniqueOrThrow({
+        where: { id: pendingInvitationId },
+      }),
+    ).resolves.toMatchObject({
+      status: 'REVOKED',
+      external_cleanup_required: true,
+      external_cleanup_error_code: 'CLERK_INVITATION_AMBIGUOUS',
+    });
+    verifyClerk.listAcceptedInvitationsForUser.mockResolvedValue([
+      {
+        id: 'external_pending_archive_family',
+        organizationId: externalOrganizationId,
+        emailAddress: 'pending-archive-family@example.test',
+        role: 'org:member',
+        publicMetadata: { oasis_invitation_id: pendingInvitationId },
+        privateMetadata: { oasis_invitation_id: pendingInvitationId },
+      },
+    ]);
+    verifyClerk.getOrganizationMembership.mockResolvedValue({
+      id: 'orgmem_pending_archive_family',
+      organizationId: externalOrganizationId,
+      userId: 'pending_archive_family_subject',
+      role: 'org:member',
+    });
+    const blockedActivation = await gql(
+      bearer('pending_archive_family_subject', false),
+      `mutation Activate($input: InvitationActivationInputDTO!) {
+        activateViewerOrganizationInvitation(input: $input) { status nextPath }
+      }`,
+      { input: { invitationId: pendingInvitationId } },
+    ).expect(200);
+    expect(blockedActivation.body.data).toBeNull();
+    expect(blockedActivation.body.errors).toHaveLength(1);
+    expect(
+      await prisma.organizationMembership.count({
+        where: { auth_subject: 'pending_archive_family_subject' },
+      }),
+    ).toBe(0);
+
+    await expect(
+      prisma.verifiedVisitStory.findUniqueOrThrow({ where: { id: story.id } }),
+    ).resolves.toMatchObject({ status: 'PUBLISHED' });
+    await expect(
+      prisma.concern.findUniqueOrThrow({ where: { id: concern.id } }),
+    ).resolves.toMatchObject({ status: 'OPEN' });
+    await expect(
+      prisma.auditLog.findUniqueOrThrow({ where: { id: historicalAudit.id } }),
+    ).resolves.toMatchObject({ action: 'SYNTHETIC_HISTORY' });
+
+    await expect(
+      prisma.organizationMembership.findUniqueOrThrow({
+        where: { id: familyOrganizationMembership.id },
+      }),
+    ).resolves.toMatchObject({ status: 'ACTIVE', revoked_at: null });
+    await expect(
+      prisma.client.findUniqueOrThrow({ where: { id: retainedClient.id } }),
+    ).resolves.toMatchObject({ deleted_at: null });
+    await expect(
+      prisma.careRoom.findUniqueOrThrow({ where: { id: retainedRoom.id } }),
+    ).resolves.toMatchObject({ status: 'ACTIVE' });
+    await expect(
+      prisma.careRoomMembership.findUniqueOrThrow({
+        where: { id: retainedMembership.id },
+      }),
+    ).resolves.toMatchObject({ status: 'ACTIVE', revoked_at: null });
+    expect(
+      await prisma.accessGrant.count({
+        where: {
+          care_room_membership_id: retainedMembership.id,
+          scope: { in: ['VIEW_UPDATES', 'VIEW_TASK_SUMMARY'] },
+          revoked_at: null,
+        },
+      }),
+    ).toBe(2);
+    await expect(
+      prisma.careRoom.findUniqueOrThrow({ where: { id: otherRoomId } }),
+    ).resolves.toMatchObject({ status: 'ACTIVE' });
+
+    const familyRooms = await gql(
+      bearer(familySubject),
+      `{ familyCareRooms { id clientDisplayName } }`,
+    ).expect(200);
+    expect(familyRooms.body.errors).toBeUndefined();
+    expect(familyRooms.body.data.familyCareRooms).toEqual([
+      {
+        id: retainedRoom.id,
+        clientDisplayName: 'Retained Synthetic Client',
+      },
+    ]);
+
+    const oldRoom = await gql(
+      bearer(familySubject),
+      `query FamilyRoom($id: String!) {
+        familyCareRoom(id: $id) { id }
+      }`,
+      { id: roomId },
+    ).expect(200);
+    const randomRoom = await gql(
+      bearer(familySubject),
+      `query FamilyRoom($id: String!) {
+        familyCareRoom(id: $id) { id }
+      }`,
+      { id: '00000000-0000-4000-8000-000000000000' },
+    ).expect(200);
+    expect(oldRoom.body.data).toBeNull();
+    expect(randomRoom.body.data).toBeNull();
+    expect(oldRoom.body.errors?.[0]?.message).toBe(
+      randomRoom.body.errors?.[0]?.message,
+    );
+    expect(oldRoom.body.errors?.[0]?.extensions?.code).toBe(
+      randomRoom.body.errors?.[0]?.extensions?.code,
+    );
+
+    const concernCount = await prisma.concern.count();
+    const raiseConcernMutation = `mutation Raise($input: RaiseConcernInput!) {
+      raiseFamilyCarebridgeConcern(input: $input) { title status }
+    }`;
+    const concernVariables = (careRoomId: string) => ({
+      input: {
+        careRoomId,
+        title: 'Synthetic denied concern',
+        description: 'Synthetic only.',
+        category: 'COMMUNICATION',
+        severity: 'MEDIUM',
+      },
+    });
+    const oldConcernWrite = await gql(
+      bearer(familySubject),
+      raiseConcernMutation,
+      concernVariables(roomId),
+    ).expect(200);
+    const randomConcernWrite = await gql(
+      bearer(familySubject),
+      raiseConcernMutation,
+      concernVariables('00000000-0000-4000-8000-000000000000'),
+    ).expect(200);
+    expect(oldConcernWrite.body.data).toBeNull();
+    expect(randomConcernWrite.body.data).toBeNull();
+    expect(oldConcernWrite.body.errors?.[0]?.message).toBe(
+      randomConcernWrite.body.errors?.[0]?.message,
+    );
+    expect(oldConcernWrite.body.errors?.[0]?.extensions?.code).toBe(
+      randomConcernWrite.body.errors?.[0]?.extensions?.code,
+    );
+    expect(await prisma.concern.count()).toBe(concernCount);
+
+    const archiveAudits = await prisma.auditLog.findMany({
+      where: {
+        organization_id: organizationId,
+        action: {
+          in: [
+            'DELETE_CLIENT',
+            'CAREBRIDGE_ROOM_ARCHIVED',
+            'FAMILY_ACCESS_REVOKED',
+            'FAMILY_INVITATION_REVOKED',
+          ],
+        },
+      },
+      select: {
+        action: true,
+        old_values: true,
+        new_values: true,
+      },
+    });
+    expect(archiveAudits.length).toBeGreaterThanOrEqual(4);
+    const serializedAudit = JSON.stringify(archiveAudits);
+    expect(serializedAudit).not.toContain(familyEmail);
+    expect(serializedAudit).not.toContain('Synthetic Mary');
+    expect(serializedAudit).not.toContain('1 Test Street');
+  });
+
+  it('serializes client archiving against CareBridge room creation', async () => {
+    const raceClient = await prisma.client.create({
+      data: {
+        organization_id: organizationId,
+        full_name: 'Synthetic Room Race',
+        address_line1: '5 Test Street',
+        city: 'Leeds',
+        postcode: 'LS5 5AA',
+      },
+    });
+
+    const [createResult, archiveResult] = await Promise.all([
+      gql(
+        bearer(adminSubject),
+        `mutation CreateRoom($input: CreateCareRoomInput!) {
+          createCareRoom(input: $input) { id status }
+        }`,
+        { input: { clientId: raceClient.id } },
+      ).expect(200),
+      gql(
+        bearer(adminSubject),
+        `mutation ArchiveClient($id: String!) {
+          deleteClient(id: $id) { id }
+        }`,
+        { id: raceClient.id },
+      ).expect(200),
+    ]);
+
+    expect(archiveResult.body.errors).toBeUndefined();
+    expect(archiveResult.body.data.deleteClient.id).toBe(raceClient.id);
+    if (!createResult.body.errors) {
+      expect(createResult.body.data.createCareRoom.status).toBe('ACTIVE');
+    }
+    await expect(
+      prisma.client.findUniqueOrThrow({ where: { id: raceClient.id } }),
+    ).resolves.toMatchObject({ deleted_at: expect.any(Date) });
+    expect(
+      await prisma.careRoom.count({
+        where: {
+          organization_id: organizationId,
+          client_id: raceClient.id,
+          status: 'ACTIVE',
+        },
+      }),
+    ).toBe(0);
+  });
+
+  it('serializes client archiving against a Family invitation', async () => {
+    const input = {
+      careRoomId: roomId,
+      fullName: 'Synthetic Invitation Race',
+      email: 'archive-invite-race@example.test',
+      role: 'FAMILY_VIEWER',
+      accessBasis: 'CLIENT_CONSENT',
+    };
+
+    const [inviteResult, archiveResult] = await Promise.all([
+      gql(
+        bearer(adminSubject),
+        `mutation Invite($input: InviteFamilyContactInput!) {
+          inviteFamilyContact(input: $input) { id invitationId status }
+        }`,
+        { input },
+      ).expect(200),
+      gql(
+        bearer(adminSubject),
+        `mutation ArchiveClient($id: String!) {
+          deleteClient(id: $id) { id }
+        }`,
+        { id: clientId },
+      ).expect(200),
+    ]);
+
+    expect(archiveResult.body.errors).toBeUndefined();
+    expect(archiveResult.body.data.deleteClient.id).toBe(clientId);
+    if (!inviteResult.body.errors) {
+      expect(inviteResult.body.data.inviteFamilyContact.status).toBe('INVITED');
+    }
+    expect(
+      await prisma.careRoomMembership.count({
+        where: {
+          care_room_id: roomId,
+          status: { in: ['INVITED', 'ACTIVE'] },
+          revoked_at: null,
+        },
+      }),
+    ).toBe(0);
+    expect(
+      await prisma.accessGrant.count({
+        where: {
+          care_room_membership: { care_room_id: roomId },
+          revoked_at: null,
+        },
+      }),
+    ).toBe(0);
+    expect(
+      await prisma.organizationMembershipInvitation.count({
+        where: {
+          organization_id: organizationId,
+          normalized_email: input.email,
+          status: 'PENDING',
+        },
+      }),
+    ).toBe(0);
+    await expect(
+      prisma.careRoom.findUniqueOrThrow({ where: { id: roomId } }),
+    ).resolves.toMatchObject({ status: 'ARCHIVED' });
   });
 
   it('never binds the wrong account and expires the linked pending room membership', async () => {

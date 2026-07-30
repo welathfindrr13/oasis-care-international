@@ -19,6 +19,10 @@ import {
   InviteFamilyContactInput,
   UpdateFamilyAccessGrantsInput,
 } from './dto/carebridge.dto';
+import {
+  acquireClientCareRoomLifecycleLock,
+  activeOperationalCareRoomWhere,
+} from './active-operational-care-room';
 
 const INVITATION_DAYS = 7;
 const DELIVERY_LEASE_MS = 2 * 60 * 1000;
@@ -89,13 +93,27 @@ export class FamilyInvitationService {
             await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`family-invitation:${actor.organizationId}:${email}`}, 0))`;
             const now = new Date();
 
-            const room = await tx.careRoom.findFirst({
+            const roomCandidate = await tx.careRoom.findFirst({
               where: {
                 id: input.careRoomId,
                 organization_id: actor.organizationId,
-                status: 'ACTIVE',
               },
-              select: { id: true },
+              select: { id: true, client_id: true },
+            });
+            if (!roomCandidate) {
+              throw new ForbiddenException(FAMILY_ACCESS_UNAVAILABLE);
+            }
+            await acquireClientCareRoomLifecycleLock(
+              tx,
+              actor.organizationId,
+              roomCandidate.client_id,
+            );
+            const room = await tx.careRoom.findFirst({
+              where: {
+                id: roomCandidate.id,
+                ...activeOperationalCareRoomWhere(actor.organizationId),
+              },
+              select: { id: true, client_id: true },
             });
             if (!room) {
               throw new ForbiddenException(FAMILY_ACCESS_UNAVAILABLE);
@@ -515,8 +533,7 @@ export class FamilyInvitationService {
               status: 'ACTIVE',
               revoked_at: null,
               care_room: {
-                organization_id: actor.organizationId,
-                status: 'ACTIVE',
+                ...activeOperationalCareRoomWhere(actor.organizationId),
               },
             },
             select: { id: true },
@@ -689,7 +706,9 @@ export class FamilyInvitationService {
         id,
         status: 'ACTIVE',
         revoked_at: null,
-        care_room: { organization_id: organizationId, status: 'ACTIVE' },
+        care_room: {
+          ...activeOperationalCareRoomWhere(organizationId),
+        },
         family_contact: {
           organization_id: organizationId,
           disabled_at: null,
@@ -1017,6 +1036,29 @@ export class FamilyInvitationService {
         error instanceof ClerkProvisioningError ? error.code : 'CLERK_CLEANUP_FAILED',
       );
       return false;
+    }
+  }
+
+  async reconcileArchivedClientInvitationCleanup(
+    invitationIds: string[],
+    organizationId: string,
+  ) {
+    const uniqueIds = [...new Set(invitationIds.filter(Boolean))];
+    for (const invitationId of uniqueIds) {
+      try {
+        await this.reconcileInvitationCleanup(invitationId, organizationId);
+      } catch {
+        try {
+          await this.markCleanupFailed(
+            invitationId,
+            'CLERK_CLEANUP_FAILED',
+          );
+        } catch {
+          // The committed archive already removed Oasis authority. Retaining
+          // external_cleanup_required allows the established retry path to
+          // reconcile Clerk without reactivating that authority.
+        }
+      }
     }
   }
 

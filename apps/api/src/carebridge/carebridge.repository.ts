@@ -8,6 +8,7 @@ import {
   CareRoomStatus,
   ConcernEventType,
 } from '@oasis/db';
+import { activeOperationalCareRoomWhere } from './active-operational-care-room';
 
 interface FamilyAccessLookup {
   organizationId: string;
@@ -57,12 +58,17 @@ export class CarebridgeRepository {
     };
   }
 
-  async ensureClientInOrganization(clientId: string, organizationId: string): Promise<boolean> {
-    const client = await this.prisma.client.findFirst({
-      where: this.prisma.whereNotDeleted({
+  async ensureClientInOrganization(
+    clientId: string,
+    organizationId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<boolean> {
+    const client = await tx.client.findFirst({
+      where: {
         id: clientId,
         organization_id: organizationId,
-      }),
+        deleted_at: null,
+      },
       select: { id: true },
     });
     return Boolean(client);
@@ -128,7 +134,7 @@ export class CarebridgeRepository {
 
   async listRoomsForOrganization(organizationId: string) {
     return this.prisma.careRoom.findMany({
-      where: { organization_id: organizationId },
+      where: activeOperationalCareRoomWhere(organizationId),
       orderBy: { updated_at: 'desc' },
       include: this.roomInclude(),
     });
@@ -137,8 +143,7 @@ export class CarebridgeRepository {
   async listRoomsForFamilyAccess(input: FamilyAccessLookup) {
     return this.prisma.careRoom.findMany({
       where: {
-        organization_id: input.organizationId,
-        status: CareRoomStatus.ACTIVE,
+        ...activeOperationalCareRoomWhere(input.organizationId),
         memberships: {
           some: this.familyMembershipWhere(input),
         },
@@ -148,9 +153,16 @@ export class CarebridgeRepository {
     });
   }
 
-  async findRoomByIdForOrganization(id: string, organizationId: string) {
-    return this.prisma.careRoom.findFirst({
-      where: { id, organization_id: organizationId },
+  async findRoomByIdForOrganization(
+    id: string,
+    organizationId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    return tx.careRoom.findFirst({
+      where: {
+        id,
+        ...activeOperationalCareRoomWhere(organizationId),
+      },
       include: this.roomInclude(),
     });
   }
@@ -159,8 +171,7 @@ export class CarebridgeRepository {
     return this.prisma.careRoom.findFirst({
       where: {
         id,
-        organization_id: input.organizationId,
-        status: CareRoomStatus.ACTIVE,
+        ...activeOperationalCareRoomWhere(input.organizationId),
         memberships: {
           some: this.familyMembershipWhere(input),
         },
@@ -174,6 +185,10 @@ export class CarebridgeRepository {
       where: this.prisma.whereNotDeleted({
         id: visitId,
         organization_id: organizationId,
+        client: {
+          organization_id: organizationId,
+          deleted_at: null,
+        },
       }),
       include: {
         client: true,
@@ -185,13 +200,17 @@ export class CarebridgeRepository {
     });
   }
 
-  async findRoomByClientId(clientId: string, organizationId: string) {
-    return this.prisma.careRoom.findFirst({
+  async findRoomByClientId(
+    clientId: string,
+    organizationId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    return tx.careRoom.findFirst({
       where: {
         client_id: clientId,
-        organization_id: organizationId,
-        status: { not: 'ARCHIVED' as any },
+        ...activeOperationalCareRoomWhere(organizationId),
       },
+      include: this.roomInclude(),
     });
   }
 
@@ -230,20 +249,29 @@ export class CarebridgeRepository {
     });
   }
 
-  async listVerifiedVisitStoriesByRoomId(careRoomId: string, status?: CarebridgeContentStatus) {
+  async listVerifiedVisitStoriesByRoomId(
+    careRoomId: string,
+    organizationId: string,
+    status?: CarebridgeContentStatus,
+  ) {
     return this.prisma.verifiedVisitStory.findMany({
       where: {
         care_room_id: careRoomId,
+        care_room: activeOperationalCareRoomWhere(organizationId),
         ...(status ? { status } : {}),
       },
       orderBy: { created_at: 'desc' },
     });
   }
 
-  async listFamilySafePublishedStoriesByRoomId(careRoomId: string) {
+  async listFamilySafePublishedStoriesByRoomId(
+    careRoomId: string,
+    organizationId: string,
+  ) {
     return this.prisma.verifiedVisitStory.findMany({
       where: {
         care_room_id: careRoomId,
+        care_room: activeOperationalCareRoomWhere(organizationId),
         status: CarebridgeContentStatus.PUBLISHED,
         family_safe_version: 1,
         family_safe_title: { not: null },
@@ -269,6 +297,7 @@ export class CarebridgeRepository {
       where: {
         organization_id: organizationId,
         status: CarebridgeContentStatus.DRAFT,
+        care_room: activeOperationalCareRoomWhere(organizationId),
         ...(careRoomId ? { care_room_id: careRoomId } : {}),
       },
       orderBy: { created_at: 'asc' },
@@ -280,10 +309,14 @@ export class CarebridgeRepository {
       where: {
         id,
         organization_id: organizationId,
+        care_room: activeOperationalCareRoomWhere(organizationId),
       },
       include: {
         visit: {
           select: { status: true, deleted_at: true },
+        },
+        care_room: {
+          select: { id: true, client_id: true },
         },
       },
     });
@@ -291,6 +324,7 @@ export class CarebridgeRepository {
 
   async publishVerifiedVisitStory(
     id: string,
+    organizationId: string,
     approvedTitle: string,
     approvedBody: string,
     approvedById: string,
@@ -299,7 +333,9 @@ export class CarebridgeRepository {
     const changed = await tx.verifiedVisitStory.updateMany({
       where: {
         id,
+        organization_id: organizationId,
         status: CarebridgeContentStatus.DRAFT,
+        care_room: activeOperationalCareRoomWhere(organizationId),
         family_safe_version: 1,
         family_safe_title: approvedTitle,
         family_safe_body: approvedBody,
@@ -322,11 +358,17 @@ export class CarebridgeRepository {
 
   async rejectVerifiedVisitStory(
     id: string,
+    organizationId: string,
     rejectionReason: string,
     tx: Prisma.TransactionClient = this.prisma,
   ) {
     const changed = await tx.verifiedVisitStory.updateMany({
-      where: { id, status: CarebridgeContentStatus.DRAFT },
+      where: {
+        id,
+        organization_id: organizationId,
+        status: CarebridgeContentStatus.DRAFT,
+        care_room: activeOperationalCareRoomWhere(organizationId),
+      },
       data: {
         status: CarebridgeContentStatus.REJECTED,
         rejection_reason: rejectionReason,
@@ -366,9 +408,17 @@ export class CarebridgeRepository {
     return tx.concernMessage.create({ data });
   }
 
-  async findConcernById(id: string, organizationId: string) {
-    return this.prisma.concern.findFirst({
-      where: { id, organization_id: organizationId },
+  async findConcernById(
+    id: string,
+    organizationId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    return tx.concern.findFirst({
+      where: {
+        id,
+        organization_id: organizationId,
+        care_room: activeOperationalCareRoomWhere(organizationId),
+      },
       include: this.concernInclude(),
     });
   }
@@ -377,6 +427,7 @@ export class CarebridgeRepository {
     return this.prisma.concern.findMany({
       where: {
         organization_id: organizationId,
+        care_room: activeOperationalCareRoomWhere(organizationId),
         ...(status ? { status: status as any } : {}),
       },
       include: this.concernInclude(),
@@ -397,6 +448,7 @@ export class CarebridgeRepository {
         organization_id: input.organizationId,
         care_room_id: input.careRoomId,
         raised_by_membership_id: input.membershipId,
+        care_room: activeOperationalCareRoomWhere(input.organizationId),
       },
       select: {
         id: true,

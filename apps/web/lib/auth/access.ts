@@ -64,6 +64,7 @@ const AUTHORITATIVE_ROUTE_BYPASS_PATHS = [
   /^\/request-access(?:\/|$)/,
   /^\/accept-invitation(?:\/|$)/,
   /^\/activate-invitation(?:\/|$)/,
+  /^\/login\/tasks(?:\/|$)/,
   /^\/session-tasks\/choose-organization(?:\/|$)/,
   /^\/platform(?:\/|$)/,
 ]

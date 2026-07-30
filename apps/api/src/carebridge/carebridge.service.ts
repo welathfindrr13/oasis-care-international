@@ -24,6 +24,9 @@ import {
   UpdateCarebridgePolicyInput,
   UpdateConcernStatusInput,
 } from './dto/carebridge.dto';
+import {
+  acquireClientCareRoomLifecycleLock,
+} from './active-operational-care-room';
 
 interface ViewerContext {
   role: string;
@@ -57,23 +60,34 @@ export class CarebridgeService {
 
   async createCareRoom(clientId: string, actorUserId: string, actorRole: string, organizationId: string) {
     this.assertStaffRole(actorRole);
-    const inOrg = await this.repository.ensureClientInOrganization(clientId, organizationId);
-    if (!inOrg) {
-      throw new BaseHttpException(
-        ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
-        'You can only create CareBridge rooms for clients in your organisation.',
-        HttpStatus.FORBIDDEN,
-      );
-    }
-
-    const existing = typeof (this.repository as any).findRoomByClientId === 'function'
-      ? await (this.repository as any).findRoomByClientId(clientId, organizationId)
-      : null;
-    if (existing) {
-      return this.mapCareRoom(existing);
-    }
-
     const room = await this.prisma.$transaction(async (tx) => {
+      await acquireClientCareRoomLifecycleLock(
+        tx,
+        organizationId,
+        clientId,
+      );
+      const inOrg = await this.repository.ensureClientInOrganization(
+        clientId,
+        organizationId,
+        tx,
+      );
+      if (!inOrg) {
+        throw new BaseHttpException(
+          ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
+          'You can only create CareBridge rooms for clients in your organisation.',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      const existing = await this.repository.findRoomByClientId(
+        clientId,
+        organizationId,
+        tx,
+      );
+      if (existing) {
+        return existing;
+      }
+
       const created = await this.repository.createCareRoom({
         organization_id: organizationId,
         client_id: clientId,
@@ -165,7 +179,10 @@ export class CarebridgeService {
   async listVerifiedVisitStories(careRoomId: string, viewer: ViewerContext) {
     this.assertStaffRole(viewer.role);
     await this.getCareRoom(careRoomId, viewer);
-    const stories = await this.repository.listVerifiedVisitStoriesByRoomId(careRoomId);
+    const stories = await this.repository.listVerifiedVisitStoriesByRoomId(
+      careRoomId,
+      this.requireOrganizationId(viewer.organizationId),
+    );
     return stories
       .filter((story: any) => !this.isExcludedMedicationStory(story))
       .map((story: any) => this.mapStory(story));
@@ -199,12 +216,13 @@ export class CarebridgeService {
   }
 
   async listFamilyVerifiedVisitStories(careRoomId: string, viewer: ViewerContext) {
-    await this.requireScopedFamilyRoomAccess(careRoomId, viewer, [
+    const access = await this.requireScopedFamilyRoomAccess(careRoomId, viewer, [
       AccessGrantScope.VIEW_UPDATES,
       AccessGrantScope.VIEW_TASK_SUMMARY,
     ]);
     const stories = await this.repository.listFamilySafePublishedStoriesByRoomId(
       careRoomId,
+      access.room.organization_id,
     );
     return stories
       .filter((story: any) => !this.isExcludedMedicationStory(story))
@@ -260,17 +278,6 @@ export class CarebridgeService {
       );
     }
 
-    const room = typeof (this.repository as any).findRoomByClientId === 'function'
-      ? await (this.repository as any).findRoomByClientId(visit.client_id, organizationId)
-      : { id: `room-${visit.client_id}`, organization_id: organizationId, client_id: visit.client_id };
-    if (!room) {
-      throw new BaseHttpException(
-        ErrorCode.VALIDATION_FAILED,
-        'Create a CareBridge room before generating a verified visit story.',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
     const storyTasks = visit.tasks.filter(
       (task) => isMedicationEmarEnabled() || !containsMedicationEmarContent(task.task_name),
     );
@@ -306,6 +313,23 @@ export class CarebridgeService {
     ];
 
     const story = await this.prisma.$transaction(async (tx) => {
+      await acquireClientCareRoomLifecycleLock(
+        tx,
+        organizationId,
+        visit.client_id,
+      );
+      const room = await this.repository.findRoomByClientId(
+        visit.client_id,
+        organizationId,
+        tx,
+      );
+      if (!room) {
+        throw new BaseHttpException(
+          ErrorCode.VALIDATION_FAILED,
+          'Create a CareBridge room before generating a verified visit story.',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
       await this.repository.acquireVerifiedVisitStoryGenerationLock(
         organizationId,
         visit.id,
@@ -414,8 +438,14 @@ export class CarebridgeService {
     }
 
     const published = await this.prisma.$transaction(async (tx) => {
+      await acquireClientCareRoomLifecycleLock(
+        tx,
+        organizationId,
+        story.client_id,
+      );
       const updated = await this.repository.publishVerifiedVisitStory(
         storyId,
+        organizationId,
         familySafeTitle,
         familySafeBody,
         approvalActorUserId,
@@ -476,8 +506,14 @@ export class CarebridgeService {
     }
 
     const rejected = await this.prisma.$transaction(async (tx) => {
+      await acquireClientCareRoomLifecycleLock(
+        tx,
+        organizationId,
+        story.client_id,
+      );
       const updated = await this.repository.rejectVerifiedVisitStory(
         storyId,
+        organizationId,
         reason,
         tx,
       );
@@ -521,15 +557,28 @@ export class CarebridgeService {
       throw this.familyRoomForbidden();
     }
 
-    return this.prisma.$transaction((tx) =>
-      this.createConcernForRoom(
+    return this.prisma.$transaction(async (tx) => {
+      await acquireClientCareRoomLifecycleLock(
+        tx,
+        room.organization_id,
+        room.client_id,
+      );
+      const activeRoom = await this.repository.findRoomByIdForOrganization(
+        room.id,
+        room.organization_id,
+        tx,
+      );
+      if (!activeRoom) {
+        throw this.familyRoomForbidden();
+      }
+      return this.createConcernForRoom(
         input,
         viewer,
-        room,
+        activeRoom,
         tx,
         familyAccess?.membership,
-      ),
-    );
+      );
+    });
   }
 
   async raiseFamilyConcern(input: RaiseConcernInput, viewer: ViewerContext) {
@@ -645,6 +694,23 @@ export class CarebridgeService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      await acquireClientCareRoomLifecycleLock(
+        tx,
+        organizationId,
+        concern.client_id,
+      );
+      const activeConcern = await this.repository.findConcernById(
+        input.concernId,
+        organizationId,
+        tx,
+      );
+      if (!activeConcern) {
+        throw new BaseHttpException(
+          ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
+          'Concern could not be found for your organisation.',
+          HttpStatus.FORBIDDEN,
+        );
+      }
       const next = await this.repository.updateConcern(
         input.concernId,
         nextData,
@@ -670,7 +736,7 @@ export class CarebridgeService {
       }, tx);
 
       await this.createAudit(tx, {
-        organizationId: concern.organization_id,
+        organizationId: activeConcern.organization_id,
         actorId: actorUserId,
         action: 'CAREBRIDGE_CONCERN_UPDATED',
         resourceType: 'Concern',
@@ -710,9 +776,22 @@ export class CarebridgeService {
     const familyAuditActorId = this.requireFamilyAuditActorId(viewer, membership);
 
     return this.prisma.$transaction(async (tx) => {
+      await acquireClientCareRoomLifecycleLock(
+        tx,
+        room.organization_id,
+        room.client_id,
+      );
+      const activeRoom = await this.repository.findRoomByIdForOrganization(
+        room.id,
+        room.organization_id,
+        tx,
+      );
+      if (!activeRoom) {
+        throw this.familyRoomForbidden();
+      }
       const pulse = await this.repository.createFamilyPulse({
-        organization_id: room.organization_id,
-        care_room_id: room.id,
+        organization_id: activeRoom.organization_id,
+        care_room_id: activeRoom.id,
         care_room_membership_id: membership.id,
         sentiment: input.sentiment,
         note: input.note ?? null,
@@ -737,7 +816,7 @@ export class CarebridgeService {
             category: 'COMMUNICATION' as any,
           },
           viewer,
-          room,
+          activeRoom,
           tx,
           membership,
           familyAuditActorId,

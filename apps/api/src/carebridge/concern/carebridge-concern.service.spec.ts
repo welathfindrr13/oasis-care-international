@@ -14,6 +14,7 @@ describe('CarebridgeConcernService', () => {
       concern: {
         create: jest.fn(),
         findFirst: jest.fn(),
+        findMany: jest.fn(),
         update: jest.fn(),
       },
       concernEvent: {
@@ -66,6 +67,17 @@ describe('CarebridgeConcernService', () => {
       now: new Date('2026-04-21T09:00:00Z'),
     });
 
+    expect(prisma.careRoom.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'room-1',
+        organization_id: 'org-1',
+        status: 'ACTIVE',
+        client: {
+          organization_id: 'org-1',
+          deleted_at: null,
+        },
+      },
+    });
     expect(prisma.concern.create).toHaveBeenCalled();
     expect(prisma.concernEvent.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -151,5 +163,54 @@ describe('CarebridgeConcernService', () => {
         }),
       }),
     );
+  });
+
+  it('keeps archived-client concerns out of staff reads and direct mutations', async () => {
+    prisma.concern.findMany.mockResolvedValue([]);
+    prisma.concern.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.listConcernsForRoom('room-archived', 'org-1'),
+    ).resolves.toEqual([]);
+    expect(prisma.concern.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organization_id: 'org-1',
+          care_room_id: 'room-archived',
+          care_room: {
+            organization_id: 'org-1',
+            status: 'ACTIVE',
+            client: {
+              organization_id: 'org-1',
+              deleted_at: null,
+            },
+          },
+        },
+      }),
+    );
+
+    await expect(
+      service.acknowledgeConcern({
+        concernId: 'concern-archived',
+        organizationId: 'org-1',
+        actorUserId: 'staff-1',
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(prisma.concern.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'concern-archived',
+        organization_id: 'org-1',
+        care_room: {
+          organization_id: 'org-1',
+          status: 'ACTIVE',
+          client: {
+            organization_id: 'org-1',
+            deleted_at: null,
+          },
+        },
+      },
+    });
+    expect(prisma.concern.update).not.toHaveBeenCalled();
+    expect(prisma.concernEvent.create).not.toHaveBeenCalled();
   });
 });

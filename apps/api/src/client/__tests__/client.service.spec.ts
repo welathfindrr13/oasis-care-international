@@ -11,7 +11,19 @@ describe('ClientService', () => {
   };
 
   const transactionClient = {
+    $executeRaw: jest.fn(),
+    $queryRaw: jest.fn(),
     visit: { updateMany: jest.fn() },
+    careRoom: {
+      findMany: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    careRoomMembership: {
+      findMany: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    accessGrant: { updateMany: jest.fn() },
+    organizationMembershipInvitation: { updateMany: jest.fn() },
     client: {
       updateMany: jest.fn(),
       findFirst: jest.fn(),
@@ -32,16 +44,31 @@ describe('ClientService', () => {
         work(transactionClient),
     ),
   };
+  const familyInvitations = {
+    reconcileArchivedClientInvitationCleanup: jest.fn(),
+  };
 
   let service: ClientService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    transactionClient.$queryRaw.mockResolvedValue([{ id: 'client-1' }]);
     prisma.$transaction.mockImplementation(
       async (work: (tx: typeof transactionClient) => Promise<unknown>) =>
         work(transactionClient),
     );
-    service = new ClientService(clientRepository as any, prisma as any);
+    transactionClient.careRoom.findMany.mockResolvedValue([]);
+    transactionClient.careRoomMembership.findMany.mockResolvedValue([]);
+    transactionClient.careRoom.updateMany.mockResolvedValue({ count: 0 });
+    transactionClient.careRoomMembership.updateMany.mockResolvedValue({ count: 0 });
+    transactionClient.accessGrant.updateMany.mockResolvedValue({ count: 0 });
+    transactionClient.organizationMembershipInvitation.updateMany.mockResolvedValue({ count: 0 });
+    familyInvitations.reconcileArchivedClientInvitationCleanup.mockResolvedValue(undefined);
+    service = new ClientService(
+      clientRepository as any,
+      prisma as any,
+      familyInvitations as any,
+    );
   });
 
   it('returns the visit-scoped client for carers when it exists', async () => {
@@ -236,6 +263,9 @@ describe('ClientService', () => {
     expect(auditData.new_values).toEqual({ id: 'client-1' });
     expect(auditData.new_values).not.toHaveProperty('deletedAt');
     expect(JSON.stringify(auditData)).not.toContain('PRIVATE_');
+    expect(
+      familyInvitations.reconcileArchivedClientInvitationCleanup,
+    ).toHaveBeenCalledWith([], 'org-1');
   });
 
   it('writes one delete audit when concurrent-style retries race on one state transition', async () => {
@@ -253,7 +283,7 @@ describe('ClientService', () => {
       .mockResolvedValueOnce({ count: 0 });
     transactionClient.client.findFirst.mockResolvedValue({
       ...existing,
-      deleted_at: new Date('2026-07-13T12:00:00.000Z'),
+      deleted_at: null,
     });
     transactionClient.visit.updateMany.mockResolvedValue({ count: 1 });
     transactionClient.auditLog.create.mockResolvedValue({ id: 'audit-3' });
@@ -274,5 +304,109 @@ describe('ClientService', () => {
         resource_id: 'client-1',
       }),
     });
+  });
+
+  it('atomically archives rooms and revokes client-specific Family authority without revoking organization membership', async () => {
+    transactionClient.client.findFirst.mockResolvedValue({
+      id: 'client-1',
+      full_name: 'PRIVATE_DELETED_NAME',
+      address_line1: 'PRIVATE_DELETED_ADDRESS',
+      address_line2: null,
+      city: 'PRIVATE_DELETED_CITY',
+      postcode: 'PRIVATE_DELETED_POSTCODE',
+      deleted_at: null,
+    });
+    transactionClient.client.updateMany.mockResolvedValue({ count: 1 });
+    transactionClient.visit.updateMany.mockResolvedValue({ count: 2 });
+    transactionClient.careRoom.findMany.mockResolvedValue([
+      { id: 'room-1', status: 'ACTIVE' },
+    ]);
+    transactionClient.careRoomMembership.findMany.mockResolvedValue([
+      {
+        id: 'room-membership-1',
+        care_room_id: 'room-1',
+        status: 'ACTIVE',
+        organization_membership_invitation: {
+          id: 'accepted-invitation',
+          status: 'ACCEPTED',
+        },
+      },
+      {
+        id: 'room-membership-2',
+        care_room_id: 'room-1',
+        status: 'INVITED',
+        organization_membership_invitation: {
+          id: 'pending-invitation',
+          status: 'PENDING',
+        },
+      },
+    ]);
+    transactionClient.careRoom.updateMany.mockResolvedValue({ count: 1 });
+    transactionClient.careRoomMembership.updateMany.mockResolvedValue({ count: 2 });
+    transactionClient.accessGrant.updateMany.mockResolvedValue({ count: 3 });
+    transactionClient.organizationMembershipInvitation.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.deleteClient('client-1', 'manager-subject', 'org-1');
+
+    expect(transactionClient.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(transactionClient.careRoom.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['room-1'] },
+        organization_id: 'org-1',
+        client_id: 'client-1',
+        status: 'ACTIVE',
+      },
+      data: { status: 'ARCHIVED' },
+    });
+    expect(transactionClient.accessGrant.updateMany).toHaveBeenCalledWith({
+      where: {
+        care_room_membership_id: {
+          in: ['room-membership-1', 'room-membership-2'],
+        },
+        revoked_at: null,
+      },
+      data: { revoked_at: expect.any(Date) },
+    });
+    expect(transactionClient.careRoomMembership.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['room-membership-1', 'room-membership-2'] },
+        status: { in: ['INVITED', 'ACTIVE'] },
+        revoked_at: null,
+      },
+      data: {
+        status: 'REVOKED',
+        revoked_at: expect.any(Date),
+        revoked_by_user_id: 'manager-subject',
+      },
+    });
+    expect(
+      transactionClient.organizationMembershipInvitation.updateMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['pending-invitation'] },
+        organization_id: 'org-1',
+        intended_role: 'family',
+        status: 'PENDING',
+      },
+      data: {
+        status: 'REVOKED',
+        revoked_at: expect.any(Date),
+        external_cleanup_required: true,
+        external_cleanup_error_code: null,
+        external_cleanup_completed_at: null,
+      },
+    });
+    expect((transactionClient as any).organizationMembership).toBeUndefined();
+    expect(
+      familyInvitations.reconcileArchivedClientInvitationCleanup,
+    ).toHaveBeenCalledWith(['pending-invitation'], 'org-1');
+
+    const auditPayload = JSON.stringify(
+      transactionClient.auditLog.create.mock.calls,
+    );
+    expect(auditPayload).toContain('CAREBRIDGE_ROOM_ARCHIVED');
+    expect(auditPayload).toContain('FAMILY_ACCESS_REVOKED');
+    expect(auditPayload).toContain('FAMILY_INVITATION_REVOKED');
+    expect(auditPayload).not.toContain('PRIVATE_');
   });
 });

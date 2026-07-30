@@ -10,6 +10,8 @@ import {
   extractSafeAuditErrorMetadata,
   sanitizeAuditMetadata,
 } from '../common/audit/audit-metadata.policy';
+import { FamilyInvitationService } from '../carebridge/family-invitation.service';
+import { acquireClientCareRoomLifecycleLock } from '../carebridge/active-operational-care-room';
 
 @Injectable()
 export class ClientService {
@@ -18,6 +20,7 @@ export class ClientService {
   constructor(
     private readonly clientRepository: ClientRepository,
     private readonly prisma: PrismaService,
+    private readonly familyInvitations: FamilyInvitationService,
   ) {}
 
   async findClients(
@@ -206,22 +209,72 @@ export class ClientService {
 
   async deleteClient(id: string, userId?: string, organizationId?: string): Promise<ClientDTO> {
     const orgId = await this.requireOrganizationId(organizationId);
-    this.logger.log(`Soft deleting client: ${id}`);
+    this.logger.log(`Archiving client: ${id}`);
 
-    const existingClient = await this.clientRepository.findById(id, orgId);
-    if (!existingClient) {
-      throw new BaseHttpException(
-        ErrorCode.CLIENT_NOT_FOUND,
-        'Client not found',
-        HttpStatus.NOT_FOUND
-      );
-    }
-
-    // Soft-delete related visits as well, so scheduled visits don't linger after cleanup.
-    const deletedClient = await this.runAuditedTransaction(
+    const result = await this.runAuditedTransaction(
       'deletion',
       async (tx) => {
+        await acquireClientCareRoomLifecycleLock(tx, orgId, id);
+
+        const existingClient = await tx.client.findFirst({
+          where: { id, organization_id: orgId },
+        });
+        if (!existingClient) {
+          throw new BaseHttpException(
+            ErrorCode.CLIENT_NOT_FOUND,
+            'Client not found',
+            HttpStatus.NOT_FOUND,
+          );
+        }
+        if (existingClient.deleted_at) {
+          return {
+            deletedClient: existingClient,
+            cleanupInvitationIds: [] as string[],
+          };
+        }
+
         const deletedAt = new Date();
+        const rooms = await tx.careRoom.findMany({
+          where: {
+            organization_id: orgId,
+            client_id: id,
+            status: 'ACTIVE',
+          },
+          select: { id: true, status: true },
+        });
+        const roomIds = rooms.map((room) => room.id);
+        const memberships = roomIds.length > 0
+          ? await tx.careRoomMembership.findMany({
+              where: {
+                care_room_id: { in: roomIds },
+                status: { in: ['INVITED', 'ACTIVE'] },
+                revoked_at: null,
+              },
+              select: {
+                id: true,
+                care_room_id: true,
+                status: true,
+                organization_membership_invitation: {
+                  select: { id: true, status: true },
+                },
+              },
+            })
+          : [];
+        const membershipIds = memberships.map((membership) => membership.id);
+        const cleanupInvitationIds = [
+          ...new Set(
+            memberships
+              .map((membership) =>
+                membership.organization_membership_invitation?.status === 'PENDING'
+                  ? membership.organization_membership_invitation.id
+                  : null,
+              )
+              .filter((invitationId): invitationId is string =>
+                Boolean(invitationId),
+              ),
+          ),
+        ];
+
         const transition = await tx.client.updateMany({
           where: { id, organization_id: orgId, deleted_at: null },
           data: { deleted_at: deletedAt },
@@ -238,15 +291,66 @@ export class ClientService {
           );
         }
         if (transition.count === 0) {
-          return deleted;
+          return {
+            deletedClient: deleted,
+            cleanupInvitationIds: [] as string[],
+          };
         }
 
         await tx.visit.updateMany({
           where: { client_id: id, organization_id: orgId, deleted_at: null },
           data: { deleted_at: deletedAt },
         });
+        if (roomIds.length > 0) {
+          await tx.careRoom.updateMany({
+            where: {
+              id: { in: roomIds },
+              organization_id: orgId,
+              client_id: id,
+              status: 'ACTIVE',
+            },
+            data: { status: 'ARCHIVED' },
+          });
+        }
+        if (membershipIds.length > 0) {
+          await tx.accessGrant.updateMany({
+            where: {
+              care_room_membership_id: { in: membershipIds },
+              revoked_at: null,
+            },
+            data: { revoked_at: deletedAt },
+          });
+          await tx.careRoomMembership.updateMany({
+            where: {
+              id: { in: membershipIds },
+              status: { in: ['INVITED', 'ACTIVE'] },
+              revoked_at: null,
+            },
+            data: {
+              status: 'REVOKED',
+              revoked_at: deletedAt,
+              revoked_by_user_id: userId || 'system',
+            },
+          });
+        }
+        if (cleanupInvitationIds.length > 0) {
+          await tx.organizationMembershipInvitation.updateMany({
+            where: {
+              id: { in: cleanupInvitationIds },
+              organization_id: orgId,
+              intended_role: 'family',
+              status: 'PENDING',
+            },
+            data: {
+              status: 'REVOKED',
+              revoked_at: deletedAt,
+              external_cleanup_required: true,
+              external_cleanup_error_code: null,
+              external_cleanup_completed_at: null,
+            },
+          });
+        }
 
-        // Audit only reviewed identifiers; do not duplicate client PII.
         await tx.auditLog.create({
           data: {
             user_id: userId || 'system',
@@ -273,11 +377,85 @@ export class ClientService {
             timestamp: new Date(),
           },
         });
-        return deleted;
+
+        for (const room of rooms) {
+          await tx.auditLog.create({
+            data: {
+              user_id: userId || 'system',
+              organization_id: orgId,
+              action: 'CAREBRIDGE_ROOM_ARCHIVED',
+              resource_type: 'CareRoom',
+              resource_id: room.id,
+              old_values: sanitizeAuditMetadata({ status: room.status }),
+              new_values: sanitizeAuditMetadata(
+                {
+                  status: 'ARCHIVED',
+                  clientId: id,
+                },
+                { identifierSource: 'trusted' },
+              ),
+              timestamp: new Date(),
+            },
+          });
+        }
+
+        for (const membership of memberships) {
+          await tx.auditLog.create({
+            data: {
+              user_id: userId || 'system',
+              organization_id: orgId,
+              action: 'FAMILY_ACCESS_REVOKED',
+              resource_type: 'CareRoomMembership',
+              resource_id: membership.id,
+              old_values: sanitizeAuditMetadata({
+                status: membership.status,
+              }),
+              new_values: sanitizeAuditMetadata(
+                {
+                  status: 'REVOKED',
+                  careRoomId: membership.care_room_id,
+                },
+                { identifierSource: 'trusted' },
+              ),
+              timestamp: new Date(),
+            },
+          });
+        }
+
+        for (const invitationId of cleanupInvitationIds) {
+          await tx.auditLog.create({
+            data: {
+              user_id: userId || 'system',
+              organization_id: orgId,
+              action: 'FAMILY_INVITATION_REVOKED',
+              resource_type: 'OrganizationMembershipInvitation',
+              resource_id: invitationId,
+              old_values: sanitizeAuditMetadata({ status: 'PENDING' }),
+              new_values: sanitizeAuditMetadata(
+                {
+                  status: 'REVOKED',
+                  invitationId,
+                },
+                { identifierSource: 'trusted' },
+              ),
+              timestamp: new Date(),
+            },
+          });
+        }
+
+        return {
+          deletedClient: deleted,
+          cleanupInvitationIds,
+        };
       },
     );
 
-    return this.mapClientToDTO(deletedClient);
+    await this.familyInvitations.reconcileArchivedClientInvitationCleanup(
+      result.cleanupInvitationIds,
+      orgId,
+    );
+
+    return this.mapClientToDTO(result.deletedClient);
   }
 
   private mapClientToDTO(client: any): ClientDTO {

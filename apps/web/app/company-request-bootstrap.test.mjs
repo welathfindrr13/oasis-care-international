@@ -23,6 +23,7 @@ const chooseOrganizationTask = read(
 const chooseOrganizationTaskActions = read(
   "./session-tasks/choose-organization/ChooseOrganizationTaskActions.tsx",
 );
+const loginTaskCompatibility = read("./login/tasks/page.tsx");
 const middleware = read("../middleware.ts");
 const accessStatePage = read("./access/[state]/page.tsx");
 
@@ -213,6 +214,14 @@ test("unaffiliated Clerk users are routed into governed company access without s
   assert.match(
     chooseOrganizationTaskActions,
     /Oasis will still verify your approved internal membership/i,
+  );
+  assert.match(
+    loginTaskCompatibility,
+    /redirect\(["']\/session-tasks\/choose-organization["']\)/,
+  );
+  assert.doesNotMatch(
+    loginTaskCompatibility,
+    /query\(|client|person|visit|care.?room/i,
   );
 });
 

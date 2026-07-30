@@ -80,6 +80,8 @@ test('an unaffiliated Clerk user reaches governed company access without creatin
     .click();
 
   await expect(page).toHaveURL('/session-tasks/choose-organization');
+  await page.goto('/login/tasks');
+  await expect(page).toHaveURL('/session-tasks/choose-organization');
   await expect(
     page.getByRole('heading', { name: 'Company access is not ready' }),
   ).toBeVisible();

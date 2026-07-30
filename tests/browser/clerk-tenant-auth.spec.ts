@@ -4,6 +4,8 @@ const ISSUER = "http://127.0.0.1:4011";
 const SESSION_KEY = "oasis.synthetic-clerk-session";
 const UNASSIGNED_VISIT_ID = "55555555-5555-4555-8555-666666666666";
 const CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const ARCHIVE_CLIENT_ID = "45454545-4545-4454-8454-454545454545";
+const ARCHIVE_CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-dddddddddddd";
 const CARE_ROOM_MEMBERSHIP_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const CLIENT_ID = "client-browser-linked-carer";
 const SENTINEL_CLIENT_ID = "client-browser-sentinel";
@@ -165,6 +167,83 @@ test("a token carrying an admin claim is reduced to its linked Carer assignment"
   await expect(
     page.getByRole("link", { name: "Workforce", exact: true }),
   ).toHaveCount(0);
+});
+
+test("archiving one client ends that room's authority on the next signed request while shared Family access remains", async ({
+  page,
+  browser,
+}) => {
+  const familyToken = await activateSignedProfile(page, "family");
+  const before = await page.request.post("/api/graphql", {
+    headers: { Authorization: `Bearer ${familyToken}` },
+    data: {
+      query: `query FamilyRoomsBeforeArchive {
+        familyCareRooms { id clientDisplayName }
+      }`,
+    },
+  });
+  expect(before.status()).toBe(200);
+  expect(
+    ((await before.json()) as {
+      data: { familyCareRooms: Array<{ id: string }> };
+    }).data.familyCareRooms.map((room) => room.id),
+  ).toEqual(expect.arrayContaining([CARE_ROOM_ID, ARCHIVE_CARE_ROOM_ID]));
+
+  const managerContext = await browser.newContext({
+    baseURL: "http://localhost:3004",
+  });
+  const managerPage = await managerContext.newPage();
+  await activateSignedProfile(managerPage, "manager");
+  await gotoAppRoute(managerPage, `/clients/${ARCHIVE_CLIENT_ID}`);
+  await managerPage.getByRole("button", { name: "Archive client" }).click();
+  const dialog = managerPage.getByRole("dialog", {
+    name: "Archive Archive Boundary Client?",
+  });
+  await dialog.getByRole("button", { name: "Archive client" }).click();
+  await expect(managerPage).toHaveURL(/\/clients\?archived=1$/);
+  await managerContext.close();
+
+  const after = await page.request.post("/api/graphql", {
+    headers: { Authorization: `Bearer ${familyToken}` },
+    data: {
+      query: `query FamilyRoomsAfterArchive {
+        familyCareRooms { id clientDisplayName }
+      }`,
+    },
+  });
+  expect(after.status()).toBe(200);
+  await expect(after.json()).resolves.toEqual({
+    data: {
+      familyCareRooms: [
+        {
+          id: CARE_ROOM_ID,
+          clientDisplayName: "Assigned Fake Client",
+        },
+      ],
+    },
+  });
+
+  const roomQuery = (id: string) =>
+    page.request.post("/api/graphql", {
+      headers: { Authorization: `Bearer ${familyToken}` },
+      data: {
+        query: `query FamilyRoomAfterArchive($id: String!) {
+          familyCareRoom(id: $id) { id }
+        }`,
+        variables: { id },
+      },
+    });
+  const [archived, random] = await Promise.all([
+    roomQuery(ARCHIVE_CARE_ROOM_ID),
+    roomQuery("00000000-0000-4000-8000-000000000000"),
+  ]);
+  const archivedBody = (await archived.json()) as {
+    errors?: Array<{ message: string; extensions?: { code?: string } }>;
+  };
+  const randomBody = (await random.json()) as {
+    errors?: Array<{ message: string; extensions?: { code?: string } }>;
+  };
+  expect(archivedBody.errors?.[0]).toEqual(randomBody.errors?.[0]);
 });
 
 test("Family access is grant-bound, tenant-safe, and revoked immediately with the same signed session", async ({

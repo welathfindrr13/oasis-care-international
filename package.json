@@ -20,7 +20,7 @@
     "release:readiness-report": "node scripts/release/generate-readiness-report.mjs",
     "test:browser:accessibility": "node --test tests/browser/fixtures/accessibility-api.test.mjs && playwright test --config playwright.accessibility.config.ts",
     "test:browser:linked-carer": "pnpm test:browser:accessibility && pnpm --filter @oasis/db exec prisma generate && node scripts/test/seed-linked-carer-browser.mjs && playwright test --config playwright.linked-carer.config.ts",
-    "test:browser:clerk-tenant-auth": "node --test scripts/test/assert-safe-test-database.test.mjs && pnpm --filter @oasis/db exec prisma generate && node scripts/test/seed-linked-carer-browser.mjs && node scripts/test/convert-linked-carer-seed-to-clerk.mjs && playwright test --config playwright.clerk-tenant-auth.config.ts",
+    "test:browser:clerk-tenant-auth": "node --test scripts/test/assert-safe-test-database.test.mjs && pnpm --filter @oasis/db exec prisma generate && node scripts/test/seed-linked-carer-browser.mjs && node scripts/test/convert-linked-carer-seed-to-clerk.mjs && playwright test --config playwright.clerk-tenant-auth.config.ts && playwright test --config playwright.clerk-invitation.config.ts",
     "tenant:nullability:dry-run:local": "pnpm --filter @oasis/db exec prisma generate && node scripts/release/tenant-nullability-dry-run.mjs",
     "deploy:v2:preflight": "node deploy/v2/scripts/preflight-env.mjs",
     "deploy:v2:verify": "bash deploy/v2/scripts/verify-local.sh"

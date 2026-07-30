@@ -9,6 +9,7 @@ import {
 } from '@oasis/db';
 import { BaseHttpException } from '../../common/errors/base-http.exception';
 import { ErrorCode } from '../../common/errors/error-codes';
+import { activeOperationalCareRoomWhere } from '../active-operational-care-room';
 
 interface RaiseConcernInput {
   careRoomId: string;
@@ -45,17 +46,14 @@ export class CarebridgeConcernService {
   async raiseConcern(input: RaiseConcernInput) {
     const organizationId = this.requireOrganizationId(input.organizationId);
     const now = input.now ?? new Date();
-    const careRoom = await (this.prisma.careRoom as any).findUnique?.({
-      where: { id: input.careRoomId },
-    }) ??
-      await this.prisma.careRoom.findFirst({
-        where: {
-          id: input.careRoomId,
-          organization_id: organizationId,
-        },
-      });
+    const careRoom = await this.prisma.careRoom.findFirst({
+      where: {
+        id: input.careRoomId,
+        ...activeOperationalCareRoomWhere(organizationId),
+      },
+    });
 
-    if (!careRoom || careRoom.organization_id !== organizationId) {
+    if (!careRoom) {
       throw new BaseHttpException(
         ErrorCode.FORBIDDEN_OWN_RESOURCE_ONLY,
         'This care room is not available for the current organisation.',
@@ -198,6 +196,7 @@ export class CarebridgeConcernService {
       where: {
         organization_id: orgId,
         care_room_id: careRoomId,
+        care_room: activeOperationalCareRoomWhere(orgId),
       },
       include: {
         messages: {
@@ -216,6 +215,7 @@ export class CarebridgeConcernService {
       where: {
         id: concernId,
         organization_id: organizationId,
+        care_room: activeOperationalCareRoomWhere(organizationId),
       },
     });
 
