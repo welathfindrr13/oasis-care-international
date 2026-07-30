@@ -5,6 +5,8 @@ const ORGANIZATION_ID = "org-browser-linked-carer";
 const VISIT_ID = "55555555-5555-4555-8555-555555555555";
 const UNASSIGNED_VISIT_ID = "55555555-5555-4555-8555-666666666666";
 const CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const ARCHIVE_CLIENT_ID = "45454545-4545-4454-8454-454545454545";
+const ARCHIVE_CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-dddddddddddd";
 const SENTINEL_CLIENT_ID = "client-browser-sentinel";
 const SENTINEL_CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-bbbbbbbbbbbb";
 const SENTINEL_VISIT_ID = "55555555-5555-4555-8555-888888888888";
@@ -1165,6 +1167,93 @@ test("sign-out, Back, and refresh do not reveal protected content", async ({
   await expect(
     page.getByText("Assigned Fake Client", { exact: true }),
   ).toHaveCount(0);
+});
+
+test("archiving a client ends only that client's Family access and replacement access starts empty", async ({
+  page,
+  browser,
+}) => {
+  await signIn(page, {
+    email: "admin@local.dev",
+    name: "Local Admin",
+    role: "user",
+    callbackUrl: `http://localhost:3002/clients/${ARCHIVE_CLIENT_ID}`,
+  });
+  await page.goto(`/clients/${ARCHIVE_CLIENT_ID}`);
+
+  const archiveButton = page.getByRole("button", { name: "Archive client" });
+  await archiveButton.focus();
+  await archiveButton.click();
+  const dialog = page.getByRole("dialog", {
+    name: "Archive Archive Boundary Client?",
+  });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText(
+    "Family access for this client ends immediately.",
+  );
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(archiveButton).toBeFocused();
+  await expect(page).toHaveURL(
+    new RegExp(`/clients/${ARCHIVE_CLIENT_ID}$`),
+  );
+
+  await archiveButton.click();
+  await dialog.getByRole("button", { name: "Archive client" }).click();
+  await expect(page).toHaveURL(/\/clients\?archived=1$/);
+  await expect(
+    page.getByText(
+      /The client was archived\. Their visits and Family access were removed from active work\./,
+    ),
+  ).toBeVisible();
+  await expect(page.getByText("Archive Boundary Client")).toHaveCount(0);
+
+  const familyContext = await browser.newContext({
+    baseURL: "http://localhost:3002",
+  });
+  const familyPage = await familyContext.newPage();
+  await signIn(familyPage, {
+    email: "family@local.dev",
+    name: "Local Family",
+    role: "user",
+    callbackUrl: "http://localhost:3002/family",
+  });
+  await familyPage.goto("/family");
+  await expect(
+    familyPage.getByText("Assigned Fake Client", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    familyPage.getByText("Archive Boundary Client", { exact: true }),
+  ).toHaveCount(0);
+
+  await familyPage.goto(`/family/care-rooms/${ARCHIVE_CARE_ROOM_ID}`);
+  await expect(
+    familyPage.getByRole("heading", {
+      name: /Updates (?:temporarily )?unavailable/,
+    }),
+  ).toBeVisible();
+  await expect(
+    familyPage.getByText("Archive Boundary Client", { exact: true }),
+  ).toHaveCount(0);
+
+  await page.goto("/clients/new");
+  await page.getByLabel("Full Name *").fill("Replacement Boundary Client");
+  await page.getByLabel("Address Line 1 *").fill("21 Synthetic Archive Way");
+  await page.getByLabel("City *").fill("London");
+  await page.getByLabel("Postcode *").fill("SW1A 4AA");
+  await page
+    .getByLabel(/I confirm that the person has been informed/)
+    .check();
+  await page.getByRole("button", { name: "Create client" }).click();
+  await expect(page).toHaveURL(/\/clients$/);
+
+  await familyPage.goto("/family");
+  await expect(
+    familyPage.getByText("Assigned Fake Client", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    familyPage.getByText("Replacement Boundary Client", { exact: true }),
+  ).toHaveCount(0);
+  await familyContext.close();
 });
 
 test("deactivation immediately denies a previously signed-in Carer", async ({

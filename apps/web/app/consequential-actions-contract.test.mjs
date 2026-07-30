@@ -17,6 +17,10 @@ const visitDetail = readFileSync(
   new URL("./visits/[id]/page.tsx", import.meta.url),
   "utf8",
 );
+const archiveClient = readFileSync(
+  new URL("../components/oasis/DeleteClientButton.tsx", import.meta.url),
+  "utf8",
+);
 
 test("each consequential UI path uses the executable single-flight confirmation boundary", () => {
   assert.match(
@@ -36,4 +40,13 @@ test("each consequential UI path uses the executable single-flight confirmation 
 
   assert.match(visitDetail, /runSingleFlightAction\(completionStartedRef/);
   assert.match(visitDetail, /runConfirmedAction\(/);
+
+  assert.match(archiveClient, /<ConfirmDialog/);
+  assert.match(archiveClient, /submittingRef\.current/);
+  assert.match(archiveClient, /if \(submittingRef\.current\) return/);
+  assert.match(archiveClient, /confirmDisabled=\{deleting\}/);
+  assert.match(archiveClient, /returnFocusId=\{archiveButtonId\}/);
+  assert.match(archiveClient, /role="alert"/);
+  assert.match(archiveClient, /router\.push\('\/clients\?archived=1'\)/);
+  assert.doesNotMatch(archiveClient, /\bconfirm\(/);
 });

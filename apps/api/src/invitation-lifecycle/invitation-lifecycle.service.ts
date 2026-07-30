@@ -10,6 +10,7 @@ import {
   ClerkInvitationVerificationAdapter,
 } from "./clerk-invitation-verification.adapter";
 import { InvitationActivationResultDTO } from "./invitation-lifecycle.dto";
+import { acquireClientCareRoomLifecycleLock } from "../carebridge/active-operational-care-room";
 
 const ACTIVATION_UNAVAILABLE = "Invitation activation is unavailable";
 
@@ -200,7 +201,9 @@ export class InvitationLifecycleService {
                 provisioning_outbox: { select: { status: true } },
                 care_room_memberships: {
                   include: {
-                    care_room: true,
+                    care_room: {
+                      include: { client: true },
+                    },
                     family_contact: true,
                     access_grants: {
                       where: { revoked_at: null },
@@ -243,6 +246,13 @@ export class InvitationLifecycleService {
             ? invitation.care_room_memberships[0]
             : null;
           if (input.intendedRole === 'family') {
+            if (familyTarget) {
+              await acquireClientCareRoomLifecycleLock(
+                tx,
+                invitation.organization_id,
+                familyTarget.care_room.client_id,
+              );
+            }
             const validFamilyTarget =
               familyTarget &&
               familyTarget.organization_membership_invitation_id === invitation.id &&
@@ -251,6 +261,8 @@ export class InvitationLifecycleService {
               familyTarget.revoked_at === null &&
               familyTarget.care_room.organization_id === invitation.organization_id &&
               familyTarget.care_room.status === 'ACTIVE' &&
+              familyTarget.care_room.client.organization_id === invitation.organization_id &&
+              familyTarget.care_room.client.deleted_at === null &&
               familyTarget.family_contact.organization_id === invitation.organization_id &&
               familyTarget.family_contact.auth_subject === null &&
               familyTarget.family_contact.disabled_at === null &&
@@ -389,7 +401,12 @@ export class InvitationLifecycleService {
       include: {
         activated_membership: true,
         care_room_memberships: {
-          include: { family_contact: true, care_room: true },
+          include: {
+            family_contact: true,
+            care_room: {
+              include: { client: true },
+            },
+          },
         },
       },
     });
@@ -402,7 +419,9 @@ export class InvitationLifecycleService {
           membership.family_contact.auth_subject === input.subject &&
           membership.family_contact.disabled_at === null &&
           membership.care_room.organization_id === input.organizationId &&
-          membership.care_room.status === 'ACTIVE',
+          membership.care_room.status === 'ACTIVE' &&
+          membership.care_room.client.organization_id === input.organizationId &&
+          membership.care_room.client.deleted_at === null,
       );
       if (
         !familyMembership

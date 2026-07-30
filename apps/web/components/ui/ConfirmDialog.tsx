@@ -5,6 +5,7 @@ import { Button } from "./Button";
 
 export function ConfirmDialog({
   confirmLabel,
+  confirmDisabled = false,
   description,
   onCancel,
   onConfirm,
@@ -13,6 +14,7 @@ export function ConfirmDialog({
   title,
 }: {
   confirmLabel: string;
+  confirmDisabled?: boolean;
   description: string;
   onCancel: () => void;
   onConfirm: () => void;
@@ -87,7 +89,12 @@ export function ConfirmDialog({
           >
             Cancel
           </Button>
-          <Button type="button" variant="danger" onClick={onConfirm}>
+          <Button
+            type="button"
+            variant="danger"
+            disabled={confirmDisabled}
+            onClick={onConfirm}
+          >
             {confirmLabel}
           </Button>
         </div>

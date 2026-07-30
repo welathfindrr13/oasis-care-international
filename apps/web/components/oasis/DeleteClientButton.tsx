@@ -1,35 +1,41 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useClientAccess } from '../providers/ClientAccessProvider'
 import { Button } from '../ui/Button'
 import { clientQuery } from '../../lib/graphql/client-side'
 import { DELETE_CLIENT_MUTATION } from '../../lib/graphql/queries'
+import { ConfirmDialog } from '../ui/ConfirmDialog'
 
 export function DeleteClientButton({ clientId, clientName }: { clientId: string; clientName: string }) {
   const router = useRouter()
   const { isAdmin } = useClientAccess()
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const submittingRef = useRef(false)
+  const archiveButtonId = `archive-client-${clientId}`
 
   if (!isAdmin) return null
 
-  async function onDelete() {
+  async function onArchive() {
+    if (submittingRef.current) return
+    submittingRef.current = true
     setError(null)
-    const ok = confirm(
-      `Delete client \"${clientName}\"?\n\nThis is a soft delete for cleanup and will also delete related visits.`
-    )
-    if (!ok) return
-
     setDeleting(true)
     try {
       await clientQuery(DELETE_CLIENT_MUTATION, { id: clientId })
-      router.push('/clients')
-      router.refresh()
+      setConfirmOpen(false)
+      router.push('/clients?archived=1')
     } catch (e: any) {
-      setError(e?.message || 'Failed to delete client')
+      setConfirmOpen(false)
+      setError(
+        e?.message ||
+          'The client could not be archived. Check your connection and try again.',
+      )
     } finally {
+      submittingRef.current = false
       setDeleting(false)
     }
   }
@@ -37,13 +43,34 @@ export function DeleteClientButton({ clientId, clientName }: { clientId: string;
   return (
     <div className="flex flex-col items-end gap-2">
       {error && (
-        <div className="text-sm text-red-600">
+        <div role="alert" className="text-sm font-semibold text-oasis-danger">
           {error}
         </div>
       )}
-      <Button variant="ghost" size="sm" onClick={onDelete} disabled={deleting}>
-        {deleting ? 'Deleting...' : 'Delete'}
+      <Button
+        id={archiveButtonId}
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          setError(null)
+          setConfirmOpen(true)
+        }}
+        disabled={deleting}
+      >
+        Archive client
       </Button>
+      <ConfirmDialog
+        open={confirmOpen}
+        title={`Archive ${clientName}?`}
+        description="The client and their visits will leave active work. Family access for this client ends immediately. Historical records remain. A replacement client needs separate CareBridge setup and permissions."
+        confirmLabel={deleting ? 'Archiving…' : 'Archive client'}
+        confirmDisabled={deleting}
+        returnFocusId={archiveButtonId}
+        onCancel={() => {
+          if (!deleting) setConfirmOpen(false)
+        }}
+        onConfirm={() => void onArchive()}
+      />
     </div>
   )
 }

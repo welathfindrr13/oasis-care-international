@@ -6,6 +6,7 @@ import {
 } from '@oasis/db';
 import { BaseHttpException } from '../../common/errors/base-http.exception';
 import { ErrorCode } from '../../common/errors/error-codes';
+import { activeOperationalCareRoomWhere } from '../active-operational-care-room';
 
 interface RequireFamilyScopeInput {
   membershipId?: string;
@@ -52,8 +53,7 @@ export class CarebridgeAccessService {
         status: CareRoomMembershipStatus.ACTIVE,
         revoked_at: null,
         care_room: {
-          status: 'ACTIVE',
-          organization_id: organizationId,
+          ...activeOperationalCareRoomWhere(organizationId),
         },
         family_contact: {
           organization_id: organizationId,

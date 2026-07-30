@@ -25,6 +25,10 @@ describe('CarebridgeRepository', () => {
         where: {
           organization_id: 'org-1',
           status: CareRoomStatus.ACTIVE,
+          client: {
+            organization_id: 'org-1',
+            deleted_at: null,
+          },
           memberships: {
             some: {
               status: CareRoomMembershipStatus.ACTIVE,
@@ -85,6 +89,10 @@ describe('CarebridgeRepository', () => {
           id: 'room-1',
           organization_id: 'org-1',
           status: CareRoomStatus.ACTIVE,
+          client: {
+            organization_id: 'org-1',
+            deleted_at: null,
+          },
           memberships: {
             some: {
               status: CareRoomMembershipStatus.ACTIVE,
@@ -115,12 +123,23 @@ describe('CarebridgeRepository', () => {
     };
     const repository = new CarebridgeRepository(prisma as any);
 
-    await repository.listFamilySafePublishedStoriesByRoomId('room-1');
+    await repository.listFamilySafePublishedStoriesByRoomId(
+      'room-1',
+      'org-1',
+    );
 
     expect(prisma.verifiedVisitStory.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           care_room_id: 'room-1',
+          care_room: {
+            organization_id: 'org-1',
+            status: CareRoomStatus.ACTIVE,
+            client: {
+              organization_id: 'org-1',
+              deleted_at: null,
+            },
+          },
           status: 'PUBLISHED',
           family_safe_version: 1,
           visit: { status: 'COMPLETED', deleted_at: null },
@@ -191,6 +210,14 @@ describe('CarebridgeRepository', () => {
         organization_id: 'org-1',
         care_room_id: 'room-1',
         raised_by_membership_id: 'membership-1',
+        care_room: {
+          organization_id: 'org-1',
+          status: CareRoomStatus.ACTIVE,
+          client: {
+            organization_id: 'org-1',
+            deleted_at: null,
+          },
+        },
       },
       select: {
         id: true,
@@ -238,6 +265,7 @@ describe('CarebridgeRepository', () => {
     await expect(
       repository.publishVerifiedVisitStory(
         'story-1',
+        'org-1',
         'Care visit update',
         'Safe family body',
         'admin-1',
@@ -247,7 +275,16 @@ describe('CarebridgeRepository', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           id: 'story-1',
+          organization_id: 'org-1',
           status: 'DRAFT',
+          care_room: {
+            organization_id: 'org-1',
+            status: CareRoomStatus.ACTIVE,
+            client: {
+              organization_id: 'org-1',
+              deleted_at: null,
+            },
+          },
           family_safe_version: 1,
           family_safe_title: 'Care visit update',
           family_safe_body: 'Safe family body',

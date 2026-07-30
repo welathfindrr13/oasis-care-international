@@ -11,6 +11,7 @@ import {
 } from "@oasis/db";
 import { VISIT_TASK_OUTCOME_PREFIX } from "./visit.constants";
 import { assertTenantOwnershipForSensitiveWrite } from "../common/tenant/tenant-ownership";
+import { acquireClientCareRoomLifecycleLock } from "../carebridge/active-operational-care-room";
 import {
   VISIT_COMPLETION_PROOF_VERSION,
   VisitCompletionProofKeyring,
@@ -118,6 +119,11 @@ export class VisitRepository {
       async (tx: any) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${this.carerIdentityLockKey(input.organizationId, input.carerId)}, 0))`;
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${this.assignmentLockKey(input.organizationId, input.carerId)}, 0))`;
+        await acquireClientCareRoomLifecycleLock(
+          tx,
+          input.organizationId,
+          input.clientId,
+        );
         const [carer, client] = await Promise.all([
           tx.carer.findFirst({
             where: {

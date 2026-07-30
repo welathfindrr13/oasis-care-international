@@ -14,6 +14,7 @@ const CARER_ID = "33333333-3333-4333-8333-333333333333";
 const OTHER_CARER_ID = "33333333-3333-4333-8333-444444444444";
 const SENTINEL_CARER_ID = "33333333-3333-4333-8333-555555555555";
 const CLIENT_ID = "client-browser-linked-carer";
+const ARCHIVE_CLIENT_ID = "45454545-4545-4454-8454-454545454545";
 const SENTINEL_CLIENT_ID = "client-browser-sentinel";
 const MEMBERSHIP_ID = "44444444-4444-4444-8444-444444444444";
 const VISIT_ID = "55555555-5555-4555-8555-555555555555";
@@ -32,7 +33,10 @@ const FAMILY_CONTACT_ID = "99999999-9999-4999-8999-999999999999";
 const REVOKED_FAMILY_CONTACT_ID = "99999999-9999-4999-8999-888888888888";
 const UNAUTHORIZED_FAMILY_CONTACT_ID = "99999999-9999-4999-8999-777777777777";
 const CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const ARCHIVE_CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-dddddddddddd";
 const CARE_ROOM_MEMBERSHIP_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const ARCHIVE_CARE_ROOM_MEMBERSHIP_ID =
+  "bbbbbbbb-bbbb-4bbb-8bbb-cccccccccccc";
 const REVOKED_CARE_ROOM_MEMBERSHIP_ID = "bbbbbbbb-bbbb-4bbb-8bbb-aaaaaaaaaaaa";
 const UNAUTHORIZED_CARE_ROOM_MEMBERSHIP_ID =
   "bbbbbbbb-bbbb-4bbb-8bbb-999999999999";
@@ -252,6 +256,16 @@ try {
       address_line1: "10 Canary Street",
       city: "London",
       postcode: "SW1A 1AA",
+    },
+  });
+  await prisma.client.create({
+    data: {
+      id: ARCHIVE_CLIENT_ID,
+      organization_id: ORGANIZATION_ID,
+      full_name: "Archive Boundary Client",
+      address_line1: "20 Synthetic Archive Way",
+      city: "London",
+      postcode: "SW1A 3AA",
     },
   });
   await prisma.client.create({
@@ -491,6 +505,14 @@ try {
   });
   await prisma.careRoom.create({
     data: {
+      id: ARCHIVE_CARE_ROOM_ID,
+      organization_id: ORGANIZATION_ID,
+      client_id: ARCHIVE_CLIENT_ID,
+      status: "ACTIVE",
+    },
+  });
+  await prisma.careRoom.create({
+    data: {
       id: SENTINEL_CARE_ROOM_ID,
       organization_id: SENTINEL_ORGANIZATION_ID,
       client_id: SENTINEL_CLIENT_ID,
@@ -513,6 +535,21 @@ try {
           { scope: "VIEW_TASK_SUMMARY" },
           { scope: "RAISE_CONCERNS" },
         ],
+      },
+    },
+  });
+  await prisma.careRoomMembership.create({
+    data: {
+      id: ARCHIVE_CARE_ROOM_MEMBERSHIP_ID,
+      care_room_id: ARCHIVE_CARE_ROOM_ID,
+      family_contact_id: FAMILY_CONTACT_ID,
+      organization_membership_invitation_id: FAMILY_INVITATION_ID,
+      role: "FAMILY_VIEWER",
+      status: "ACTIVE",
+      access_basis: "CLIENT_CONSENT",
+      accepted_at: now,
+      access_grants: {
+        create: [{ scope: "VIEW_UPDATES" }, { scope: "RAISE_CONCERNS" }],
       },
     },
   });

@@ -76,6 +76,10 @@ describe('CarebridgeAccessService', () => {
         care_room: {
           status: 'ACTIVE',
           organization_id: 'org-1',
+          client: {
+            organization_id: 'org-1',
+            deleted_at: null,
+          },
         },
         family_contact: {
           organization_id: 'org-1',

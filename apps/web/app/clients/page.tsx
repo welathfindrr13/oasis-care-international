@@ -24,6 +24,7 @@ export const dynamic = 'force-dynamic'
 interface ClientsSearchParams {
   search?: string;
   page?: string;
+  archived?: string;
 }
 
 interface ClientsPageProps {
@@ -132,6 +133,16 @@ export default async function ClientsPage(props: ClientsPageProps) {
     <div className="min-h-screen bg-slate-50">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {isAdmin && searchParams.archived === '1' && (
+          <p
+            role="status"
+            aria-live="polite"
+            className="mb-6 rounded-lg border border-oasis-success/30 bg-oasis-success/10 px-4 py-3 text-sm font-semibold text-oasis-ink"
+          >
+            The client was archived. Their visits and Family access were removed
+            from active work. Historical records remain.
+          </p>
+        )}
         <div className="mb-8">
           <h1 className="font-heading text-3xl font-bold text-slate-900 tracking-tight">
             {isAdmin ? 'Clients' : 'People'}

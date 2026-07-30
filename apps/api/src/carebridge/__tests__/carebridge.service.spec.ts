@@ -55,6 +55,7 @@ describe('CarebridgeService', () => {
 
   const mockRepository = {
     ensureClientInOrganization: jest.fn(),
+    findRoomByClientId: jest.fn(),
     createCareRoom: jest.fn(),
     ensurePolicyForRoom: jest.fn(),
     updatePolicy: jest.fn(),
@@ -88,6 +89,7 @@ describe('CarebridgeService', () => {
 
   const transactionClient = {
     $executeRaw: jest.fn(),
+    $queryRaw: jest.fn(),
     verifiedVisitStory: {
       findFirst: jest.fn(),
     },
@@ -138,6 +140,7 @@ describe('CarebridgeService', () => {
     mockPrisma.auditLog.create.mockResolvedValue({ id: 'audit-1' });
     mockAccessService.requireFamilyScopes.mockResolvedValue({ id: 'membership-1' });
     mockRepository.findActiveVerifiedVisitStoryForVisit.mockResolvedValue(null);
+    mockRepository.findRoomByClientId.mockResolvedValue(null);
   });
 
   it('creates a care room and ensures a default policy exists', async () => {
@@ -157,7 +160,11 @@ describe('CarebridgeService', () => {
 
     const result = await service.createCareRoom('client-1', 'admin-1', 'admin', 'org-1');
 
-    expect(repository.ensureClientInOrganization).toHaveBeenCalledWith('client-1', 'org-1');
+    expect(repository.ensureClientInOrganization).toHaveBeenCalledWith(
+      'client-1',
+      'org-1',
+      transactionClient,
+    );
     expect(repository.ensurePolicyForRoom).toHaveBeenCalledWith(
       'room-1',
       'org-1',
@@ -627,6 +634,12 @@ describe('CarebridgeService', () => {
   });
 
   it('creates a verified visit story with source references', async () => {
+    repository.findRoomByClientId.mockResolvedValue({
+      id: 'room-client-1',
+      organization_id: 'org-1',
+      client_id: 'client-1',
+      status: 'ACTIVE',
+    } as any);
     repository.findVisitForStory.mockResolvedValue({
       id: 'visit-1',
       organization_id: 'org-1',
@@ -694,6 +707,12 @@ describe('CarebridgeService', () => {
   it.each(['DRAFT', 'PUBLISHED'])(
     'refuses a second %s Family update after taking the visit lock',
     async (status) => {
+      repository.findRoomByClientId.mockResolvedValue({
+        id: 'room-client-1',
+        organization_id: 'org-1',
+        client_id: 'client-1',
+        status: 'ACTIVE',
+      } as any);
       repository.findVisitForStory.mockResolvedValue({
         id: 'visit-1',
         organization_id: 'org-1',
@@ -727,6 +746,12 @@ describe('CarebridgeService', () => {
   );
 
   it('allows a rejected Family update to be prepared again', async () => {
+    repository.findRoomByClientId.mockResolvedValue({
+      id: 'room-client-1',
+      organization_id: 'org-1',
+      client_id: 'client-1',
+      status: 'ACTIVE',
+    } as any);
     repository.findVisitForStory.mockResolvedValue({
       id: 'visit-1',
       organization_id: 'org-1',
@@ -915,6 +940,7 @@ describe('CarebridgeService', () => {
 
     expect(repository.publishVerifiedVisitStory).toHaveBeenCalledWith(
       'story-1',
+      'org-1',
       'Care visit update',
       'A scheduled care visit update is available.',
       'admin-1',
@@ -998,6 +1024,7 @@ describe('CarebridgeService', () => {
 
     expect(repository.rejectVerifiedVisitStory).toHaveBeenCalledWith(
       'story-1',
+      'org-1',
       'Need clearer timeline details',
       transactionClient,
     );
@@ -1051,7 +1078,10 @@ describe('CarebridgeService', () => {
       authSubject: 'family-subject',
     });
 
-    expect(repository.listFamilySafePublishedStoriesByRoomId).toHaveBeenCalledWith('room-1');
+    expect(repository.listFamilySafePublishedStoriesByRoomId).toHaveBeenCalledWith(
+      'room-1',
+      'org-1',
+    );
     expect(accessService.requireFamilyScopes).toHaveBeenCalledWith(
       expect.objectContaining({
         requiredScopes: [
