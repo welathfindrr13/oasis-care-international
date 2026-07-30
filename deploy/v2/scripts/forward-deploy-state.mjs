@@ -12,7 +12,7 @@ export const FORWARD_STATES = Object.freeze({
 });
 
 export const EXPECTED_LEGACY_STATE = 'LEGACY_ROLLED_BACK';
-export const FORWARD_TARGET_SHA = '5c194b259f5a9d21c58d9f68c3f8b196843a894d';
+export const FORWARD_TARGET_SHA = 'fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6';
 export const FORWARD_REPOSITORY = 'welathfindrr13/oasis-care-international';
 
 export const FAILURE_CLASSES = Object.freeze([
