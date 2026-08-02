@@ -41,6 +41,8 @@ describe("synthetic Clerk tenant and authorization matrix", () => {
   const externalOrganizationId = "org_clerk_matrix";
   const otherOrganizationId = "clerk-matrix-other-organization";
   const otherExternalOrganizationId = "org_clerk_matrix_other";
+  const governedCompanyName = "Northstar Synthetic Care Ltd";
+  const unrelatedCompanyName = "Bluebird Test Services Ltd";
 
   const managerSubject = "user_clerk_matrix_manager";
   const carerSubject = "user_clerk_matrix_carer";
@@ -176,6 +178,7 @@ describe("synthetic Clerk tenant and authorization matrix", () => {
     await prisma.organizationProvisioningOutbox.deleteMany();
     await prisma.organizationMembershipInvitation.deleteMany();
     await prisma.organizationMembership.deleteMany();
+    await prisma.organizationProviderBinding.deleteMany();
     await prisma.client.deleteMany();
     await prisma.carer.deleteMany();
     await prisma.organization.deleteMany();
@@ -184,8 +187,24 @@ describe("synthetic Clerk tenant and authorization matrix", () => {
   async function seedMatrixData(): Promise<void> {
     await prisma.organization.createMany({
       data: [
-        { id: organizationId, name: "Synthetic Clerk Matrix" },
-        { id: otherOrganizationId, name: "Synthetic Clerk Matrix Other" },
+        { id: organizationId, name: governedCompanyName },
+        { id: otherOrganizationId, name: unrelatedCompanyName },
+      ],
+    });
+    await prisma.organizationProviderBinding.createMany({
+      data: [
+        {
+          organization_id: organizationId,
+          identity_provider: "clerk",
+          external_organization_id: externalOrganizationId,
+          external_slug: "northstar-synthetic-care",
+        },
+        {
+          organization_id: otherOrganizationId,
+          identity_provider: "clerk",
+          external_organization_id: otherExternalOrganizationId,
+          external_slug: "bluebird-test-services",
+        },
       ],
     });
     await prisma.carer.createMany({
@@ -519,12 +538,13 @@ describe("synthetic Clerk tenant and authorization matrix", () => {
     expect(JSON.stringify(response.body)).not.toContain(otherClientId);
   });
 
-  it("denies Manager direct GraphQL data access when the Clerk organization claim conflicts", async () => {
+  it("denies the same Manager every read and write when Bluebird is active instead of Northstar", async () => {
     const token = bearer(
       managerSubject,
       otherExternalOrganizationId,
       "org:admin",
     );
+    const auditCountBefore = await prisma.auditLog.count();
     const snapshot = await graphql(
       token,
       `
@@ -569,6 +589,52 @@ describe("synthetic Clerk tenant and authorization matrix", () => {
     expect(JSON.stringify(response.body)).not.toContain(ownSummaryId);
     expect(JSON.stringify(response.body)).not.toContain(otherSummaryId);
     expect(JSON.stringify(response.body)).not.toContain(managerSubject);
+
+    const roomResponse = await graphql(
+      token,
+      `
+        query DeniedManagerCareRooms {
+          careRooms {
+            id
+          }
+        }
+      `,
+    ).expect(200);
+    expect(roomResponse.body.data?.careRooms ?? null).toBeNull();
+    expect(roomResponse.body.errors).toHaveLength(1);
+    expect(JSON.stringify(roomResponse.body)).not.toContain(familyCareRoomId);
+    expect(JSON.stringify(roomResponse.body)).not.toContain(
+      crossOrganizationCareRoomId,
+    );
+
+    const ownVisitWrite = await graphql(token, startVisitMutation, {
+      visitId: assignedVisitId,
+    }).expect(200);
+    const bluebirdVisitWrite = await graphql(token, startVisitMutation, {
+      visitId: crossOrganizationVisitId,
+    }).expect(200);
+    expect(ownVisitWrite.body.data?.startVisit ?? null).toBeNull();
+    expect(bluebirdVisitWrite.body.data?.startVisit ?? null).toBeNull();
+    expect(ownVisitWrite.body.errors).toHaveLength(1);
+    expect(bluebirdVisitWrite.body.errors).toHaveLength(1);
+    expect(ownVisitWrite.body.errors[0].message).toBe(
+      bluebirdVisitWrite.body.errors[0].message,
+    );
+    expect(JSON.stringify(ownVisitWrite.body)).not.toContain(clientId);
+    expect(JSON.stringify(bluebirdVisitWrite.body)).not.toContain(
+      otherClientId,
+    );
+    await expect(
+      prisma.visit.findMany({
+        where: { id: { in: [assignedVisitId, crossOrganizationVisitId] } },
+        orderBy: { id: "asc" },
+        select: { status: true },
+      }),
+    ).resolves.toEqual([
+      { status: VisitStatus.SCHEDULED },
+      { status: VisitStatus.SCHEDULED },
+    ]);
+    await expect(prisma.auditLog.count()).resolves.toBe(auditCountBefore);
   });
 
   it("limits an explicitly granted Family member to family-safe data and revokes access immediately", async () => {

@@ -10,8 +10,15 @@ const CARE_ROOM_MEMBERSHIP_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const CLIENT_ID = "client-browser-linked-carer";
 const SENTINEL_CLIENT_ID = "client-browser-sentinel";
 const SENTINEL_CARE_ROOM_ID = "aaaaaaaa-aaaa-4aaa-8aaa-bbbbbbbbbbbb";
+const GOVERNED_COMPANY_NAME = "Northstar Synthetic Care Ltd";
+const UNRELATED_COMPANY_NAME = "Bluebird Test Services Ltd";
 
-type Profile = "platform_operator" | "manager" | "carer" | "family";
+type Profile =
+  | "platform_operator"
+  | "manager"
+  | "manager_bluebird"
+  | "carer"
+  | "family";
 type RejectedProfile =
   | "invalid_signature"
   | "invalid_issuer"
@@ -27,6 +34,12 @@ async function tokenFor(
   expect(tokenResponse.ok()).toBe(true);
   const { token } = (await tokenResponse.json()) as { token: string };
   return token;
+}
+
+function tokenClaims(token: string): Record<string, unknown> {
+  const payload = token.split(".")[1];
+  if (!payload) throw new Error("Synthetic Clerk token payload is missing");
+  return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
 }
 
 async function gotoAppRoute(page: Page, pathname: string) {
@@ -141,6 +154,72 @@ test("a server-signed management session reaches the normal Clerk verifier and s
   await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
 });
 
+test("the same Clerk Manager in unrelated Bluebird cannot see Northstar data", async ({
+  page,
+}) => {
+  const northstarToken = await activateSignedProfile(page, "manager");
+  await gotoAppRoute(page, "/clients");
+  await expect(
+    page.getByRole("table").getByText("Assigned Fake Client", { exact: true }),
+  ).toBeVisible();
+
+  const bluebirdToken = await activateSignedProfile(page, "manager_bluebird");
+  expect(tokenClaims(bluebirdToken)).toMatchObject({
+    sub: tokenClaims(northstarToken).sub,
+    org_id: "org_clerk_browser_bluebird",
+  });
+  expect(tokenClaims(northstarToken).org_id).toBe("org_clerk_browser_primary");
+  const mismatchedAccess = await page.request.get("/api/access-context");
+  expect(mismatchedAccess.status()).toBe(200);
+  await expect(mismatchedAccess.json()).resolves.toMatchObject({
+    organizationId: null,
+    effectiveRole: null,
+    membershipState: "ORGANIZATION_MISMATCH",
+    surface: "NONE",
+    resolution: "DENIED",
+    capabilities: [],
+  });
+
+  await gotoAppRoute(page, "/today");
+  await expect(page).toHaveURL(/\/access\/unavailable$/);
+  await expect(
+    page.getByRole("heading", {
+      name: "Access is temporarily unavailable",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("No care information has been loaded."),
+  ).toBeVisible();
+  await expect(page.getByText("Assigned Fake Client")).toHaveCount(0);
+  await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
+  await expect(page.getByText(GOVERNED_COMPANY_NAME)).toHaveCount(0);
+  await expect(page.getByText(UNRELATED_COMPANY_NAME)).toHaveCount(0);
+
+  await page.goBack({ waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/access\/unavailable$/);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/access\/unavailable$/);
+
+  for (const pathname of [
+    "/clients",
+    `/clients/${CLIENT_ID}`,
+    "/family",
+    `/family/care-rooms/${CARE_ROOM_ID}`,
+  ]) {
+    await gotoAppRoute(page, pathname);
+    await expect(page).toHaveURL(/\/access\/unavailable$/);
+    await expect(page.getByText("Assigned Fake Client")).toHaveCount(0);
+    await expect(page.getByText("TEST ONLY Sentinel Person")).toHaveCount(0);
+  }
+
+  await activateSignedProfile(page, "manager");
+  await gotoAppRoute(page, "/clients");
+  await expect(
+    page.getByRole("table").getByText("Assigned Fake Client", { exact: true }),
+  ).toBeVisible();
+});
+
 test("a token carrying an admin claim is reduced to its linked Carer assignment", async ({
   page,
 }) => {
@@ -184,9 +263,11 @@ test("archiving one client ends that room's authority on the next signed request
   });
   expect(before.status()).toBe(200);
   expect(
-    ((await before.json()) as {
-      data: { familyCareRooms: Array<{ id: string }> };
-    }).data.familyCareRooms.map((room) => room.id),
+    (
+      (await before.json()) as {
+        data: { familyCareRooms: Array<{ id: string }> };
+      }
+    ).data.familyCareRooms.map((room) => room.id),
   ).toEqual(expect.arrayContaining([CARE_ROOM_ID, ARCHIVE_CARE_ROOM_ID]));
 
   const managerContext = await browser.newContext({
@@ -397,7 +478,7 @@ test("an authenticated Manager receives a calm non-leaking Platform denial", asy
     "No company request information has been loaded.",
   );
   await expect(page.getByRole("article")).toHaveCount(0);
-  await expect(page.getByText("Linked Carer Browser Proof")).toHaveCount(0);
+  await expect(page.getByText(GOVERNED_COMPANY_NAME)).toHaveCount(0);
   await expect(page.getByText("admin@local.dev")).toHaveCount(0);
 
   await denial.getByRole("link", { name: "Return to Today" }).click();
@@ -437,7 +518,7 @@ test("a Platform Owner revokes the exact first Manager before cleanup and the sa
 
   const company = operatorPage
     .getByRole("article")
-    .filter({ hasText: "Linked Carer Browser Proof" });
+    .filter({ hasText: GOVERNED_COMPANY_NAME });
   await expect(
     company.getByText("admin@local.dev", { exact: true }),
   ).toBeVisible();
@@ -449,7 +530,7 @@ test("a Platform Owner revokes the exact first Manager before cleanup and the sa
     name: "Revoke access for admin@local.dev?",
   });
   await expect(cancelledDialog).toContainText(
-    "This stops the first Manager's access to Linked Carer Browser Proof immediately.",
+    `This stops the first Manager's access to ${GOVERNED_COMPANY_NAME} immediately.`,
   );
   await expect(cancelledDialog).toContainText(
     "No replacement Manager will be created.",
@@ -466,8 +547,7 @@ test("a Platform Owner revokes the exact first Manager before cleanup and the sa
     .click();
   await expect(
     operatorPage.getByRole("status").filter({
-      hasText:
-        "First Manager access revoked for Linked Carer Browser Proof. Clerk cleanup still needs attention.",
+      hasText: `First Manager access revoked for ${GOVERNED_COMPANY_NAME}. Clerk cleanup still needs attention.`,
     }),
   ).toBeVisible();
   await expect(
@@ -493,7 +573,7 @@ test("a Platform Owner revokes the exact first Manager before cleanup and the sa
   );
   const disabledCompany = operatorPage
     .getByRole("article")
-    .filter({ hasText: "Linked Carer Browser Proof" });
+    .filter({ hasText: GOVERNED_COMPANY_NAME });
   await expect(
     disabledCompany.getByText("Cleanup needs attention"),
   ).toBeVisible();
@@ -505,8 +585,7 @@ test("a Platform Owner revokes the exact first Manager before cleanup and the sa
     .click();
   await expect(
     operatorPage.getByRole("status").filter({
-      hasText:
-        "Oasis access remains revoked for Linked Carer Browser Proof. Clerk cleanup still needs attention.",
+      hasText: `Oasis access remains revoked for ${GOVERNED_COMPANY_NAME}. Clerk cleanup still needs attention.`,
     }),
   ).toBeVisible();
   await expect(

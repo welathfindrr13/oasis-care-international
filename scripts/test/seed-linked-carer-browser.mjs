@@ -9,6 +9,9 @@ assertSafeTestDatabaseSeed();
 
 const ORGANIZATION_ID = "org-browser-linked-carer";
 const SENTINEL_ORGANIZATION_ID = "org-browser-sentinel";
+const GOVERNED_COMPANY_NAME = "Northstar Synthetic Care Ltd";
+const UNRELATED_COMPANY_NAME = "Bluebird Test Services Ltd";
+const UNRELATED_EXTERNAL_ORGANIZATION_ID = "org_clerk_browser_bluebird";
 const ORGANIZATION_IDS = [ORGANIZATION_ID, SENTINEL_ORGANIZATION_ID];
 const CARER_ID = "33333333-3333-4333-8333-333333333333";
 const OTHER_CARER_ID = "33333333-3333-4333-8333-444444444444";
@@ -190,14 +193,14 @@ try {
 
   await prisma.organization.createMany({
     data: [
-      { id: ORGANIZATION_ID, name: "Linked Carer Browser Proof" },
-      { id: SENTINEL_ORGANIZATION_ID, name: "Sentinel Browser Tenant" },
+      { id: ORGANIZATION_ID, name: GOVERNED_COMPANY_NAME },
+      { id: SENTINEL_ORGANIZATION_ID, name: UNRELATED_COMPANY_NAME },
     ],
   });
   await prisma.companyAccessRequest.create({
     data: {
       id: BOOTSTRAP_REQUEST_ID,
-      company_name: "Linked Carer Browser Proof",
+      company_name: GOVERNED_COMPANY_NAME,
       contact_name: "Browser Manager",
       business_email: "admin@local.dev",
       normalized_business_email: "admin@local.dev",
@@ -214,6 +217,14 @@ try {
       identity_provider: "clerk",
       external_organization_id: "org_clerk_browser_cleanup_mismatch",
       external_slug: "linked-carer-browser-proof",
+    },
+  });
+  await prisma.organizationProviderBinding.create({
+    data: {
+      organization_id: SENTINEL_ORGANIZATION_ID,
+      identity_provider: "clerk",
+      external_organization_id: UNRELATED_EXTERNAL_ORGANIZATION_ID,
+      external_slug: "bluebird-test-services",
     },
   });
   await prisma.carer.create({

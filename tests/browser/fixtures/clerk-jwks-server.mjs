@@ -19,6 +19,10 @@ const profiles = Object.freeze({
   manager: {
     claims: { sub: "user_clerk_manager_browser", org_role: "org:admin" },
   },
+  manager_bluebird: {
+    claims: { sub: "user_clerk_manager_browser", org_role: "org:admin" },
+    overrides: { org_id: "org_clerk_browser_bluebird" },
+  },
   carer: {
     claims: { sub: "user_clerk_carer_browser", org_role: "org:admin" },
   },

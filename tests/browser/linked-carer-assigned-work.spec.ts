@@ -663,7 +663,7 @@ test("an administrator sees the real company journey without internal setup lang
     page.getByRole("heading", { name: "Set up your company" }),
   ).toBeVisible();
   await expect(
-    page.getByText("Linked Carer Browser Proof", { exact: true }),
+    page.getByText("Northstar Synthetic Care Ltd", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText("org-browser-linked-carer", { exact: true }),
