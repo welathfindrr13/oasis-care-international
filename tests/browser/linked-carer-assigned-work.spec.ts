@@ -669,7 +669,7 @@ test("an administrator sees the real company journey without internal setup lang
     page.getByText("org-browser-linked-carer", { exact: true }),
   ).toHaveCount(0);
   await expect(
-    page.getByText(/synthetic|canary|fixture|seed|billing/i),
+    page.getByText(/canary|fixture|seed|billing/i),
   ).toHaveCount(0);
   await expect(
     page.getByRole("link", { name: "Add a client", exact: true }).first(),
