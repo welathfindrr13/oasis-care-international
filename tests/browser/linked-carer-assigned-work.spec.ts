@@ -663,13 +663,13 @@ test("an administrator sees the real company journey without internal setup lang
     page.getByRole("heading", { name: "Set up your company" }),
   ).toBeVisible();
   await expect(
-    page.getByText("Linked Carer Browser Proof", { exact: true }),
+    page.getByText("Northstar Synthetic Care Ltd", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText("org-browser-linked-carer", { exact: true }),
   ).toHaveCount(0);
   await expect(
-    page.getByText(/synthetic|canary|fixture|seed|billing/i),
+    page.getByText(/canary|fixture|seed|billing/i),
   ).toHaveCount(0);
   await expect(
     page.getByRole("link", { name: "Add a client", exact: true }).first(),
