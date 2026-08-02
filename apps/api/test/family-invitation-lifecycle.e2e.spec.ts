@@ -1328,7 +1328,7 @@ describe('family invitation, grants, and family-safe GraphQL boundary', () => {
         status: 'PENDING',
         external_invitation_id: 'external_pending_archive_family',
         created_by_subject: adminSubject,
-        expires_at: new Date('2026-07-31T12:00:00Z'),
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
     const pendingContact = await prisma.familyContact.create({
