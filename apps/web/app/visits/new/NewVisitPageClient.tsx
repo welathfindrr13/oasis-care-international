@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Header } from '../../../components/oasis/Header'
@@ -19,6 +19,13 @@ import {
   type CarersQueryResponse,
   type ClientsQueryResponse,
 } from '../../../lib/graphql/queries'
+import {
+  MAX_VISIT_CARE_TASK_LABEL_LENGTH,
+  MAX_VISIT_CARE_TASKS,
+  isUncertainVisitSubmissionError,
+  validateVisitCareTasks,
+  type VisitCareTaskRow,
+} from './careTasks'
 
 const FORM_LOAD_TIMEOUT_MS = 12_000
 
@@ -47,6 +54,13 @@ export default function NewVisitPageClient({ initialClientId }: NewVisitPageClie
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadAttempt, setLoadAttempt] = useState(0)
+  const [careTasks, setCareTasks] = useState<VisitCareTaskRow[]>([])
+  const [careTaskErrors, setCareTaskErrors] = useState<Record<string, string>>({})
+  const [careTaskListError, setCareTaskListError] = useState<string | null>(null)
+  const nextCareTaskId = useRef(0)
+  const careTaskInputs = useRef(new Map<string, HTMLInputElement>())
+  const careTaskErrorSummary = useRef<HTMLDivElement>(null)
+  const submissionInFlight = useRef(false)
 
   const defaultStart = useMemo(() => {
     const date = new Date(Date.now() + 60 * 60_000)
@@ -147,13 +161,35 @@ export default function NewVisitPageClient({ initialClientId }: NewVisitPageClie
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
+    if (submissionInFlight.current) return
+
     if (!authenticated || !isAdmin) {
       setError(authenticated ? 'Forbidden' : 'Unauthorized')
       return
     }
 
+    const taskValidation = validateVisitCareTasks(careTasks)
+    if (taskValidation.listError) {
+      setCareTaskErrors(taskValidation.fieldErrors)
+      setCareTaskListError(taskValidation.listError)
+      const firstInvalidTask = careTasks.find(
+        (task) => taskValidation.fieldErrors[task.id],
+      )
+      window.requestAnimationFrame(() => {
+        if (firstInvalidTask) {
+          careTaskInputs.current.get(firstInvalidTask.id)?.focus()
+        } else {
+          careTaskErrorSummary.current?.focus()
+        }
+      })
+      return
+    }
+
+    submissionInFlight.current = true
     setIsSubmitting(true)
     setError(null)
+    setCareTaskErrors({})
+    setCareTaskListError(null)
 
     try {
       await clientQuery(
@@ -165,16 +201,58 @@ export default function NewVisitPageClient({ initialClientId }: NewVisitPageClie
             scheduledStart: organizationDateTimeInputToIso(form.startTime),
             scheduledEnd: organizationDateTimeInputToIso(form.endTime),
             notes: form.notes || undefined,
+            tasks:
+              taskValidation.labels.length > 0
+                ? taskValidation.labels.map((taskName) => ({ taskName }))
+                : undefined,
           },
         },
         { getBearerToken },
       )
       router.push(`/schedule?clientId=${form.clientId}`)
     } catch (err: any) {
-      setError(err.message || 'Failed to schedule visit')
+      setError(
+        isUncertainVisitSubmissionError(err)
+          ? 'We could not confirm whether the visit was scheduled. Check the Schedule before trying again.'
+          : err?.message || 'Failed to schedule visit',
+      )
     } finally {
+      submissionInFlight.current = false
       setIsSubmitting(false)
     }
+  }
+
+  function addCareTask() {
+    if (careTasks.length >= MAX_VISIT_CARE_TASKS) return
+    nextCareTaskId.current += 1
+    const id = `care-task-${nextCareTaskId.current}`
+    setCareTasks((current) => [...current, { id, label: '' }])
+    setCareTaskListError(null)
+    window.requestAnimationFrame(() => careTaskInputs.current.get(id)?.focus())
+  }
+
+  function updateCareTask(id: string, label: string) {
+    setCareTasks((current) =>
+      current.map((task) => (task.id === id ? { ...task, label } : task)),
+    )
+    setCareTaskErrors((current) => {
+      if (!current[id]) return current
+      const next = { ...current }
+      delete next[id]
+      return next
+    })
+    setCareTaskListError(null)
+  }
+
+  function removeCareTask(id: string) {
+    setCareTasks((current) => current.filter((task) => task.id !== id))
+    setCareTaskErrors((current) => {
+      const next = { ...current }
+      delete next[id]
+      return next
+    })
+    setCareTaskListError(null)
+    careTaskInputs.current.delete(id)
   }
 
   if (isUnauthorized || isForbidden) {
@@ -374,8 +452,111 @@ export default function NewVisitPageClient({ initialClientId }: NewVisitPageClie
                   />
                 </div>
 
+                <fieldset className="space-y-4 border-t border-base-gray-200 pt-6">
+                  <legend className="text-lg font-semibold text-text-primary font-heading">
+                    Care tasks (optional)
+                  </legend>
+                  <p id="care-tasks-help" className="text-sm text-text-secondary">
+                    Add the tasks the Carer should record during this visit. Do not add
+                    medication instructions here.
+                  </p>
+
+                  {careTaskListError && (
+                    <div
+                      ref={careTaskErrorSummary}
+                      role="alert"
+                      tabIndex={-1}
+                      className="rounded-sm border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                    >
+                      <p className="font-semibold">{careTaskListError}</p>
+                      {careTasks.find((task) => careTaskErrors[task.id]) && (
+                        <button
+                          type="button"
+                          className="mt-1 underline underline-offset-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          onClick={() => {
+                            const firstInvalidTask = careTasks.find(
+                              (task) => careTaskErrors[task.id],
+                            )
+                            if (firstInvalidTask) {
+                              careTaskInputs.current.get(firstInvalidTask.id)?.focus()
+                            }
+                          }}
+                        >
+                          Go to the first care task with an error
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {careTasks.map((task, index) => {
+                    const inputId = `care-task-label-${task.id}`
+                    const errorId = `${inputId}-error`
+                    return (
+                      <div key={task.id} className="space-y-2">
+                        <label
+                          htmlFor={inputId}
+                          className="block text-sm font-medium text-text-primary"
+                        >
+                          Care task {index + 1}
+                        </label>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                          <input
+                            ref={(node) => {
+                              if (node) careTaskInputs.current.set(task.id, node)
+                              else careTaskInputs.current.delete(task.id)
+                            }}
+                            type="text"
+                            id={inputId}
+                            name="careTask"
+                            value={task.label}
+                            maxLength={MAX_VISIT_CARE_TASK_LABEL_LENGTH}
+                            aria-describedby={
+                              careTaskErrors[task.id]
+                                ? `care-tasks-help ${errorId}`
+                                : 'care-tasks-help'
+                            }
+                            aria-invalid={careTaskErrors[task.id] ? 'true' : undefined}
+                            onChange={(event) => updateCareTask(task.id, event.target.value)}
+                            className="min-h-11 w-full flex-1 px-3 py-2 border border-base-gray-300 rounded-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeCareTask(task.id)}
+                          >
+                            Remove care task {index + 1}
+                          </Button>
+                        </div>
+                        {careTaskErrors[task.id] && (
+                          <p id={errorId} className="text-sm text-red-700">
+                            {careTaskErrors[task.id]}
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  <div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addCareTask}
+                      disabled={careTasks.length >= MAX_VISIT_CARE_TASKS}
+                    >
+                      Add another care task
+                    </Button>
+                    <p className="mt-2 text-sm text-text-secondary">
+                      You can add up to {MAX_VISIT_CARE_TASKS} care tasks.
+                    </p>
+                  </div>
+                </fieldset>
+
                 {error && (
-                  <div className="rounded-sm border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  <div
+                    role="alert"
+                    className="rounded-sm border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                  >
                     {error}
                   </div>
                 )}

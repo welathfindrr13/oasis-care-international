@@ -22,6 +22,20 @@ export interface ClientQueryOptions {
   headers?: Record<string, string>;
 }
 
+/**
+ * Keeps the HTTP status available to callers that need to distinguish an
+ * unknown write outcome from a confirmed application-level rejection.
+ */
+export class ClientGraphQLHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number, statusText: string) {
+    super(`GraphQL request failed: ${status} ${statusText}`);
+    this.name = 'ClientGraphQLHttpError';
+    this.status = status;
+  }
+}
+
 type BrowserClerk = {
   load?: () => Promise<unknown>;
   session?: {
@@ -102,7 +116,7 @@ export async function clientQuery<T = any>(
     if (response.status === 403) {
       throw new Error('Forbidden');
     }
-    throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
+    throw new ClientGraphQLHttpError(response.status, response.statusText);
   }
 
   const result: GraphQLResponse<T> = await response.json();

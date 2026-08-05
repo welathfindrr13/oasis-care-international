@@ -146,10 +146,12 @@ describe("VisitService", () => {
     };
 
     it("should create a visit successfully", async () => {
-      mockVisitRepository.createTask.mockResolvedValue({});
-      mockVisitRepository.findById.mockResolvedValue({
-        ...mockVisit,
-        tasks: [{ id: "task-1", task_name: "Task 1" }],
+      mockVisitRepository.createIfAssignable.mockResolvedValue({
+        status: "CREATED",
+        visit: {
+          ...mockVisit,
+          tasks: [{ id: "task-1", task_name: "Task 1" }],
+        },
       });
 
       const result = await service.createVisit(
@@ -159,10 +161,32 @@ describe("VisitService", () => {
         organizationId,
       );
 
-      expect(repository.createIfAssignable).toHaveBeenCalled();
-      expect(repository.createTask).toHaveBeenCalled();
+      expect(repository.createIfAssignable).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tasks: {
+            create: [{ task_name: "Task 1", description: "Description 1" }],
+          },
+        }),
+        expect.any(Object),
+      );
+      expect(repository.createTask).not.toHaveBeenCalled();
+      expect(repository.findById).not.toHaveBeenCalled();
       expect(result).toBeDefined();
       expect(result.id).toBe("visit-123");
+    });
+
+    it("keeps taskless visits valid without a nested task write", async () => {
+      await service.createVisit(
+        { ...createVisitInput, tasks: [] },
+        "user-123",
+        "admin",
+        organizationId,
+      );
+
+      expect(repository.createIfAssignable).toHaveBeenCalledWith(
+        expect.not.objectContaining({ tasks: expect.anything() }),
+        expect.any(Object),
+      );
     });
 
     it("should ignore direct status injection and always create SCHEDULED", async () => {
