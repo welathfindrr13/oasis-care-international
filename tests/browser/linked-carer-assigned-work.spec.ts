@@ -116,14 +116,131 @@ test("an administrator creates a client and schedules an accepted Carer", async 
   await page
     .getByLabel("Visit Notes")
     .fill("Browser journey scheduled after Carer acceptance");
+  await expect(
+    page.getByText(
+      "Add the tasks the Carer should record during this visit. Do not add medication instructions here.",
+    ),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Add another care task" }).click();
+  await page.getByLabel("Care task 1").fill("  Support with breakfast  ");
+  await page.getByRole("button", { name: "Add another care task" }).click();
+  await expect(page.getByLabel("Care task 1")).toHaveValue(
+    "  Support with breakfast  ",
+  );
+
   await page.getByRole("button", { name: "Schedule Visit" }).click();
+  await expect(page.getByText("Check the care tasks.")).toBeVisible();
+  await expect(page.getByLabel("Care task 2")).toBeFocused();
+  await expect(page.getByLabel("Care task 1")).toHaveValue(
+    "  Support with breakfast  ",
+  );
+  await page.getByRole("button", { name: "Remove care task 2" }).click();
+
+  await page.setViewportSize({ width: 320, height: 844 });
+  const formAccessibility = await new AxeBuilder({ page })
+    .include("form")
+    .analyze();
+  expect(formAccessibility.violations).toEqual([]);
+  const formOverflow = await page.evaluate(() => ({
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+  expect(formOverflow.documentWidth).toBeLessThanOrEqual(
+    formOverflow.viewportWidth,
+  );
+  const taskControlHeights = await page
+    .getByRole("group", { name: "Care tasks (optional)" })
+    .locator("input, button")
+    .evaluateAll((controls) =>
+      controls.map((control) =>
+        Math.round(control.getBoundingClientRect().height),
+      ),
+    );
+  expect(taskControlHeights.every((height) => height >= 44)).toBe(true);
+
+  let createVisitRequests = 0;
+  page.on("request", (request) => {
+    if (request.postData()?.includes("mutation CreateVisit")) {
+      createVisitRequests += 1;
+    }
+  });
+  await page
+    .getByRole("button", { name: "Schedule Visit" })
+    .evaluate((button) => {
+      (button as HTMLButtonElement).click();
+      (button as HTMLButtonElement).click();
+    });
 
   await expect(page).toHaveURL(/\/schedule\?clientId=/);
+  expect(createVisitRequests).toBe(1);
   const visitRow = page.getByRole("row").filter({
     hasText: "Browser Journey Person",
   });
   await expect(visitRow).toContainText("Browser Carer");
   await expect(visitRow).toContainText("Scheduled");
+
+  const assignedVisitHref = await visitRow
+    .getByRole("link", { name: "View" })
+    .getAttribute("href");
+  expect(assignedVisitHref).toMatch(/^\/schedule\//);
+
+  await signIn(page, {
+    email: "carer@local.dev",
+    name: "Local Carer",
+    role: "admin",
+    callbackUrl: `http://localhost:3002${assignedVisitHref}`,
+  });
+  await page.goto(assignedVisitHref!);
+  await expect(
+    page.getByText("Support with breakfast", { exact: true }),
+  ).toBeVisible();
+});
+
+test("an uncertain visit submission preserves the Manager's task labels", async ({
+  page,
+}) => {
+  await signIn(page, {
+    email: "admin@local.dev",
+    name: "Local Admin",
+    role: "user",
+    callbackUrl: "http://localhost:3002/visits/new",
+  });
+  await page.goto("/visits/new");
+  await page
+    .getByLabel("Person *")
+    .selectOption({ label: "Assigned Fake Client - 10 Canary Street" });
+  await page.getByLabel("Carer *").selectOption({ label: "Browser Carer" });
+
+  const futureStart = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  futureStart.setUTCHours(10, 0, 0, 0);
+  const futureEnd = new Date(futureStart.getTime() + 60 * 60 * 1000);
+  await page
+    .getByLabel("Start Time *")
+    .fill(futureStart.toISOString().slice(0, 16));
+  await page
+    .getByLabel("End Time *")
+    .fill(futureEnd.toISOString().slice(0, 16));
+  await page.getByRole("button", { name: "Add another care task" }).click();
+  await page.getByLabel("Care task 1").fill("Synthetic task stays entered");
+
+  await page.route("**/api/graphql", async (route) => {
+    if (route.request().postData()?.includes("mutation CreateVisit")) {
+      await route.abort("failed");
+      return;
+    }
+    await route.continue();
+  });
+  await page.getByRole("button", { name: "Schedule Visit" }).click();
+
+  await expect(
+    page.getByText(
+      "We could not confirm whether the visit was scheduled. Check the Schedule before trying again.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByLabel("Care task 1")).toHaveValue(
+    "Synthetic task stays entered",
+  );
 });
 
 test("rapid repeated shift actions dispatch exactly one mutation", async ({
@@ -274,7 +391,9 @@ test("a linked fake carer follows the database role despite an admin token claim
   await expect(
     page.getByText("10 Canary Street, London, SW1A 1AA", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "Person details" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Person details" })).toHaveCount(
+    0,
+  );
   await expect(
     page.getByText("Recording visit activity requires an internet connection."),
   ).toBeVisible();
@@ -349,8 +468,10 @@ test("a linked fake carer follows the database role despite an admin token claim
     if (!request.url().includes("/api/graphql")) return;
     const body = request.postData() || "";
     if (body.includes("mutation StartVisit")) startMutationRequests += 1;
-    if (body.includes("mutation SubmitVisitCareNote")) careNoteMutationRequests += 1;
-    if (body.includes("mutation CompleteVisit")) completionMutationRequests += 1;
+    if (body.includes("mutation SubmitVisitCareNote"))
+      careNoteMutationRequests += 1;
+    if (body.includes("mutation CompleteVisit"))
+      completionMutationRequests += 1;
   });
 
   const startVisit = page.getByRole("button", { name: "Start visit" });
@@ -378,7 +499,9 @@ test("a linked fake carer follows the database role despite an admin token claim
   const escalationControl = page.getByLabel("This needed escalation");
   const escalationControlBox = await escalationControl.boundingBox();
   expect(escalationControlBox?.height).toBeGreaterThanOrEqual(20);
-  const escalationTargetBox = await escalationControl.locator("..").boundingBox();
+  const escalationTargetBox = await escalationControl
+    .locator("..")
+    .boundingBox();
   expect(escalationTargetBox?.height).toBeGreaterThanOrEqual(44);
   const activeVisitAccessibility = await new AxeBuilder({ page }).analyze();
   expect(activeVisitAccessibility.violations).toEqual([]);
@@ -668,9 +791,7 @@ test("an administrator sees the real company journey without internal setup lang
   await expect(
     page.getByText("org-browser-linked-carer", { exact: true }),
   ).toHaveCount(0);
-  await expect(
-    page.getByText(/canary|fixture|seed|billing/i),
-  ).toHaveCount(0);
+  await expect(page.getByText(/canary|fixture|seed|billing/i)).toHaveCount(0);
   await expect(
     page.getByRole("link", { name: "Add a client", exact: true }).first(),
   ).toBeVisible();
@@ -1142,9 +1263,7 @@ test("sign-out, Back, and refresh do not reveal protected content", async ({
   });
   await page.goto("/clients");
   await expect(
-    page
-      .getByRole("table")
-      .getByText("Assigned Fake Client", { exact: true }),
+    page.getByRole("table").getByText("Assigned Fake Client", { exact: true }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Open account menu" }).click();
@@ -1193,9 +1312,7 @@ test("archiving a client ends only that client's Family access and replacement a
   );
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(archiveButton).toBeFocused();
-  await expect(page).toHaveURL(
-    new RegExp(`/clients/${ARCHIVE_CLIENT_ID}$`),
-  );
+  await expect(page).toHaveURL(new RegExp(`/clients/${ARCHIVE_CLIENT_ID}$`));
 
   await archiveButton.click();
   await dialog.getByRole("button", { name: "Archive client" }).click();
@@ -1240,9 +1357,7 @@ test("archiving a client ends only that client's Family access and replacement a
   await page.getByLabel("Address Line 1 *").fill("21 Synthetic Archive Way");
   await page.getByLabel("City *").fill("London");
   await page.getByLabel("Postcode *").fill("SW1A 4AA");
-  await page
-    .getByLabel(/I confirm that the person has been informed/)
-    .check();
+  await page.getByLabel(/I confirm that the person has been informed/).check();
   await page.getByRole("button", { name: "Create client" }).click();
   await expect(page).toHaveURL(/\/clients$/);
 

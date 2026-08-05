@@ -105,6 +105,9 @@ describe("VisitRepository tenant write safety", () => {
           client: { connect: { id: "client-1" } },
           scheduled_start: new Date("2026-07-30T09:00:00.000Z"),
           scheduled_end: new Date("2026-07-30T10:00:00.000Z"),
+          tasks: {
+            create: [{ task_name: "Support with breakfast" }],
+          },
         } as any,
         {
           organizationId: "org-1",
@@ -121,6 +124,59 @@ describe("VisitRepository tenant write safety", () => {
     expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
       tx.client.findFirst.mock.invocationCallOrder[0],
     );
+    expect(tx.visit.create).toHaveBeenCalledTimes(1);
+    expect(tx.visit.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tasks: {
+            create: [{ task_name: "Support with breakfast" }],
+          },
+        }),
+      }),
+    );
+  });
+
+  it("fails the visit transaction when nested task persistence fails", async () => {
+    const persistenceFailure = new Error("nested task persistence failed");
+    const tx = {
+      $executeRaw: jest.fn().mockResolvedValue(undefined),
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "client-1" }]),
+      carer: {
+        findFirst: jest.fn().mockResolvedValue({ id: "carer-1" }),
+      },
+      client: {
+        findFirst: jest.fn().mockResolvedValue({ id: "client-1" }),
+      },
+      visit: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockRejectedValue(persistenceFailure),
+      },
+    } as any;
+    const prisma = {
+      $transaction: jest.fn((operation) => operation(tx)),
+    } as any;
+    const repository = new VisitRepository(prisma, keyring());
+
+    await expect(
+      repository.createIfAssignable(
+        {
+          organization: { connect: { id: "org-1" } },
+          carer: { connect: { id: "carer-1" } },
+          client: { connect: { id: "client-1" } },
+          scheduled_start: new Date("2026-07-30T09:00:00.000Z"),
+          scheduled_end: new Date("2026-07-30T10:00:00.000Z"),
+          tasks: { create: [{ task_name: "Support with breakfast" }] },
+        } as any,
+        {
+          organizationId: "org-1",
+          carerId: "carer-1",
+          clientId: "client-1",
+          scheduledStart: new Date("2026-07-30T09:00:00.000Z"),
+          scheduledEnd: new Date("2026-07-30T10:00:00.000Z"),
+        },
+      ),
+    ).rejects.toBe(persistenceFailure);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(tx.visit.create).toHaveBeenCalledTimes(1);
   });
 

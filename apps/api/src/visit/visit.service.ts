@@ -64,6 +64,16 @@ export class VisitService {
         scheduled_end: scheduledEnd,
         status: VisitStatus.SCHEDULED,
         notes: data.notes,
+        ...(data.tasks && data.tasks.length > 0
+          ? {
+              tasks: {
+                create: data.tasks.map((task) => ({
+                  task_name: task.taskName.trim(),
+                  description: task.description,
+                })),
+              },
+            }
+          : {}),
       },
       {
         organizationId: orgId,
@@ -93,24 +103,11 @@ export class VisitService {
       );
     }
 
-    const visit = created.visit;
-
-    // Create initial tasks if provided
-    if (data.tasks && data.tasks.length > 0) {
-      for (const task of data.tasks) {
-        await this.visitRepository.createTask(visit.id, {
-          task_name: task.taskName,
-          description: task.description,
-        });
-      }
-
-      // Refetch visit with tasks
-      return this.visitRepository.findById(visit.id, orgId) as Promise<Visit>;
-    }
-
     this.createCounter.inc();
-    this.logger.log(`Visit ${visit.id} created successfully`, { requestId });
-    return visit;
+    this.logger.log(`Visit ${created.visit.id} created successfully`, {
+      requestId,
+    });
+    return created.visit;
   }
 
   async updateVisit(

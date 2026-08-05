@@ -6,14 +6,20 @@ import {
   IsString,
   ValidateNested,
   IsArray,
+  ArrayMaxSize,
+  IsNotEmpty,
+  MaxLength,
   Matches,
 } from "class-validator";
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 
 @InputType()
 export class CreateVisitTaskInput {
   @Field()
   @IsString()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsNotEmpty()
+  @MaxLength(120)
   taskName!: string;
 
   @Field({ nullable: true })
@@ -49,6 +55,7 @@ export class CreateVisitInput {
   @Field(() => [CreateVisitTaskInput], { nullable: true })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(20)
   @ValidateNested({ each: true })
   @Type(() => CreateVisitTaskInput)
   tasks?: CreateVisitTaskInput[];

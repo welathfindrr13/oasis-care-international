@@ -183,7 +183,7 @@ describe('Visit E2E Tests', () => {
   });
 
   describe('Visit Creation', () => {
-    it('should create a visit successfully as admin', async () => {
+    it('persists a trimmed Manager task for only the assigned Carer', async () => {
       const createVisitInput = {
         carerId: fixtures.carers.carer.id,
         clientId: fixtures.clients.client.id,
@@ -192,8 +192,7 @@ describe('Visit E2E Tests', () => {
         notes: 'New test visit',
         tasks: [
           {
-            taskName: 'Health Check',
-            description: 'Check vital signs',
+            taskName: '  Support with breakfast  ',
           },
         ],
       };
@@ -241,8 +240,130 @@ describe('Visit E2E Tests', () => {
         notes: 'New test visit',
       });
       expect(response.body.data.createVisit.tasks).toHaveLength(1);
+      expect(response.body.data.createVisit.tasks[0]).toMatchObject({
+        taskName: 'Support with breakfast',
+        description: null,
+        isCompleted: false,
+      });
       expect(response.body.data.createVisit.carer.firstName).toBe('Jane');
       expect(response.body.data.createVisit.client.fullName).toBe('Mary Jones');
+
+      const createdVisitId = response.body.data.createVisit.id;
+      const persistedTasks = await prisma.visitTask.findMany({
+        where: { visit_id: createdVisitId },
+        select: { task_name: true },
+      });
+      expect(persistedTasks).toEqual([
+        { task_name: 'Support with breakfast' },
+      ]);
+
+      const assignedCarerResponse = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('carer'))
+        .send({
+          query: `
+            query AssignedVisit($id: String!) {
+              visit(id: $id) {
+                id
+                tasks { taskName }
+              }
+            }
+          `,
+          variables: { id: createdVisitId },
+        })
+        .expect(200);
+      expect(assignedCarerResponse.body.data.visit.tasks).toEqual([
+        { taskName: 'Support with breakfast' },
+      ]);
+
+      const otherCarerResponse = await request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', getBearerToken('otherCarer'))
+        .send({
+          query: `
+            query UnassignedVisit($id: String!) {
+              visit(id: $id) {
+                id
+                tasks { taskName }
+              }
+            }
+          `,
+          variables: { id: createdVisitId },
+        })
+        .expect(200);
+      expect(otherCarerResponse.body.data).toBeNull();
+      expect(otherCarerResponse.body.errors?.[0]?.message).toContain(
+        'only access your own visits',
+      );
+    });
+
+    it('rolls back the visit when a nested task insert fails', async () => {
+      const sentinelTaskName = 'Force nested task rollback';
+      await prisma.$executeRawUnsafe(
+        'DROP TRIGGER IF EXISTS fail_selected_visit_task_trigger ON visit_task',
+      );
+      await prisma.$executeRawUnsafe(
+        'DROP FUNCTION IF EXISTS fail_selected_visit_task()',
+      );
+      await prisma.$executeRawUnsafe(`
+        CREATE FUNCTION fail_selected_visit_task() RETURNS trigger AS $$
+        BEGIN
+          IF NEW.task_name = '${sentinelTaskName}' THEN
+            RAISE EXCEPTION 'forced nested task insert failure';
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TRIGGER fail_selected_visit_task_trigger
+        BEFORE INSERT ON visit_task
+        FOR EACH ROW EXECUTE FUNCTION fail_selected_visit_task()
+      `);
+
+      const visitCountBefore = await prisma.visit.count();
+      try {
+        const response = await request(app.getHttpServer())
+          .post('/graphql')
+          .set('Authorization', getBearerToken('admin'))
+          .send({
+            query: `
+              mutation CreateVisit($input: CreateVisitInput!) {
+                createVisit(input: $input) { id }
+              }
+            `,
+            variables: {
+              input: {
+                carerId: fixtures.carers.carer.id,
+                clientId: fixtures.clients.client.id,
+                scheduledStart: '2024-02-15T13:00:00Z',
+                scheduledEnd: '2024-02-15T14:00:00Z',
+                notes: 'Atomic nested-task failure proof',
+                tasks: [{ taskName: sentinelTaskName }],
+              },
+            },
+          })
+          .expect(200);
+
+        expect(response.body.data).toBeNull();
+        expect(response.body.errors).toBeDefined();
+        await expect(prisma.visit.count()).resolves.toBe(visitCountBefore);
+        await expect(
+          prisma.visit.count({
+            where: { notes: 'Atomic nested-task failure proof' },
+          }),
+        ).resolves.toBe(0);
+        await expect(
+          prisma.visitTask.count({ where: { task_name: sentinelTaskName } }),
+        ).resolves.toBe(0);
+      } finally {
+        await prisma.$executeRawUnsafe(
+          'DROP TRIGGER IF EXISTS fail_selected_visit_task_trigger ON visit_task',
+        );
+        await prisma.$executeRawUnsafe(
+          'DROP FUNCTION IF EXISTS fail_selected_visit_task()',
+        );
+      }
     });
 
     it('rejects GraphQL status injection on visit creation', async () => {

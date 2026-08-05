@@ -702,6 +702,7 @@ export interface CreateVisitMutationVariables {
     scheduledStart: string;
     scheduledEnd: string;
     notes?: string;
+    tasks?: Array<{ taskName: string }>;
   };
 }
 

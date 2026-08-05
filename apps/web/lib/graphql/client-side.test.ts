@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { clientQuery } from './client-side';
+import { ClientGraphQLHttpError, clientQuery } from './client-side';
 
 const originalFetch = globalThis.fetch;
 const originalWindow = (globalThis as any).window;
@@ -86,6 +86,24 @@ test('clientQuery keeps cookie-only behavior when Clerk is absent or has no toke
 
   assert.equal(getAuthorizationHeader(requests[0].init), undefined);
   assert.equal(requests[0].init?.credentials, 'include');
+});
+
+test('clientQuery preserves ambiguous server status for a write caller', async () => {
+  (globalThis as any).window = {};
+
+  for (const status of [500, 502, 503, 504]) {
+    globalThis.fetch = (async () => ({
+      ok: false,
+      status,
+      statusText: 'Synthetic upstream failure',
+    })) as typeof fetch;
+
+    await assert.rejects(
+      () => clientQuery('mutation { createVisit(input: {}) { id } }'),
+      (error: unknown) =>
+        error instanceof ClientGraphQLHttpError && error.status === status,
+    );
+  }
 });
 
 test('clientQuery does not log token material while attaching Clerk bearer', async () => {
