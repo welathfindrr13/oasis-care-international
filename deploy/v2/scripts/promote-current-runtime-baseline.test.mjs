@@ -55,10 +55,29 @@ const oldImages = Object.freeze({
   web: `sha256:${"2".repeat(64)}`,
   caddy: `sha256:${"3".repeat(64)}`,
 });
+
 const currentImages = Object.freeze({
   api: `sha256:${"4".repeat(64)}`,
   web: `sha256:${"5".repeat(64)}`,
   caddy: `sha256:${"6".repeat(64)}`,
+});
+
+test("binds the exact current runtime and next forward target pair", () => {
+  assert.deepEqual(
+    [CURRENT_RUNTIME_SHA, NEXT_FORWARD_TARGET_SHA],
+    [
+      "fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6",
+      "eff14ee1becfafdec4f0bfee54cbcd62170901b3",
+    ],
+  );
+  assert.match(
+    fs.readFileSync(wrapperPath, "utf8"),
+    /EXPECTED_CURRENT_SHA=fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6[\s\S]*EXPECTED_NEXT_TARGET_SHA=eff14ee1becfafdec4f0bfee54cbcd62170901b3/,
+  );
+  assert.match(
+    fs.readFileSync(path.join(repositoryRoot, "docs/deployment-v2/README.md"), "utf8"),
+    /current verified runtime `fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6`;\s*- next reviewed target `eff14ee1becfafdec4f0bfee54cbcd62170901b3`/,
+  );
 });
 
 function runChecked(command, args, options = {}) {

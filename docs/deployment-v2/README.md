@@ -218,7 +218,7 @@ new design and explicit approval; the exception cannot be reused.
 ## Forward Deployment From Durable Legacy Rollback
 
 `Forward Deploy VPS` is a separate, single-use recovery lane for one reviewed application target:
-`fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6`. Adding this workflow does not authorize or execute
+`eff14ee1becfafdec4f0bfee54cbcd62170901b3`. Adding this workflow does not authorize or execute
 production deployment. It must be reviewed and merged first; a later operator action must use the
 then-current reviewed workflow revision and a fresh attempt identifier.
 
@@ -273,8 +273,8 @@ mutation lock and a separate explicit approval.
 
 For the current transition, the utility is bound to:
 
-- current verified runtime `5c194b259f5a9d21c58d9f68c3f8b196843a894d`;
-- next reviewed target `fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6`.
+- current verified runtime `fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6`;
+- next reviewed target `eff14ee1becfafdec4f0bfee54cbcd62170901b3`.
 
 The utility authenticates an exact staged helper bundle, the public current revision, all four service
 health checks, the existing `COMPLETE` forward state, the current legacy manifest and its immutable
