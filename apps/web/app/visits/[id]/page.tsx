@@ -17,6 +17,10 @@ import {
   organizationDateTimeInputToIso,
 } from '../../../lib/time';
 import { hasRecordedVisitCare } from '../visitProgress';
+import {
+  presentVisitTaskUpdate,
+  visitStartSummary,
+} from '../visitPresentation';
 
 type VisitStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 type TaskOutcome = 'DONE' | 'NOT_DONE' | 'REFUSED' | 'NOT_REQUIRED' | 'CONCERN_RAISED';
@@ -634,7 +638,10 @@ export default function VisitDetailPage() {
                     </p>
                   ) : hasStartedVisit ? (
                     <p className="rounded-lg bg-green-50 p-3 text-sm text-green-800">
-                      Visit is active. Started at {formatDateTime(visit.actualStart)}.
+                      {visitStartSummary(
+                        visit.status as 'IN_PROGRESS' | 'COMPLETED',
+                        formatDateTime(visit.actualStart),
+                      )}
                     </p>
                   ) : visit.status === 'CANCELLED' ? (
                     <p className="rounded-lg bg-slate-100 p-3 text-sm text-slate-600">
@@ -668,47 +675,58 @@ export default function VisitDetailPage() {
                     <p className="text-sm text-slate-500">No care actions are attached to this visit yet.</p>
                   ) : (
                     <div className="space-y-3">
-                      {visit.tasks.map((task) => (
-                        <div
-                          key={task.id}
-                          className={`rounded-lg border p-4 ${task.isCompleted ? 'border-green-200 bg-green-50' : 'border-slate-200 bg-white'}`}
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                              <p className="font-medium text-slate-900">{task.taskName}</p>
-                              {task.description && <p className="mt-1 text-sm text-slate-600">{task.description}</p>}
-                              {task.notes && <p className="mt-2 text-xs text-slate-500">Last update: {task.notes}</p>}
-                              {task.completedAt && (
-                                <p className="mt-2 text-xs text-slate-500">Completed {formatDateTime(task.completedAt)}</p>
+                      {visit.tasks.map((task) => {
+                        const update = presentVisitTaskUpdate(
+                          task.notes,
+                          task.isCompleted,
+                        );
+
+                        return (
+                          <div
+                            key={task.id}
+                            className={`rounded-lg border p-4 ${task.isCompleted ? 'border-green-200 bg-green-50' : 'border-slate-200 bg-white'}`}
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <p className="font-medium text-slate-900">{task.taskName}</p>
+                                {task.description && <p className="mt-1 text-sm text-slate-600">{task.description}</p>}
+                                {update.note && (
+                                  <p className="mt-2 text-xs text-slate-500">Last update: {update.note}</p>
+                                )}
+                                {task.completedAt && (
+                                  <p className="mt-2 text-xs text-slate-500">Completed {formatDateTime(task.completedAt)}</p>
+                                )}
+                              </div>
+                              {update.outcomeLabel && (
+                                <span
+                                  className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${task.isCompleted ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}`}
+                                >
+                                  {update.outcomeLabel}
+                                </span>
                               )}
                             </div>
-                            {task.isCompleted && (
-                              <span className="inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800">
-                                Done
-                              </span>
-                            )}
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {TASK_OUTCOME_OPTIONS.map((option) => (
+                                <Button
+                                  key={option.outcome}
+                                  type="button"
+                                  size="sm"
+                                  variant={option.variant}
+                                  disabled={
+                                    recordingTaskId === task.id ||
+                                    !canRunVisitWorkflow ||
+                                    !hasStartedVisit ||
+                                    visitIsClosed
+                                  }
+                                  onClick={() => recordCareActionOutcome(task, option.outcome)}
+                                >
+                                  {recordingTaskId === task.id ? 'Saving...' : option.label}
+                                </Button>
+                              ))}
+                            </div>
                           </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {TASK_OUTCOME_OPTIONS.map((option) => (
-                              <Button
-                                key={option.outcome}
-                                type="button"
-                                size="sm"
-                                variant={option.variant}
-                                disabled={
-                                  recordingTaskId === task.id ||
-                                  !canRunVisitWorkflow ||
-                                  !hasStartedVisit ||
-                                  visitIsClosed
-                                }
-                                onClick={() => recordCareActionOutcome(task, option.outcome)}
-                              >
-                                {recordingTaskId === task.id ? 'Saving...' : option.label}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
