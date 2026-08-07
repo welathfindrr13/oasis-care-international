@@ -55,7 +55,7 @@ const revisionHelperPath = fileURLToPath(new URL('./revision-proof.mjs', import.
 const workflowSha = 'f'.repeat(40);
 const forwardAttemptId = 'e'.repeat(32);
 const legacyAttemptId = 'd'.repeat(32);
-const reviewedTargetSha = 'eff14ee1becfafdec4f0bfee54cbcd62170901b3';
+const reviewedTargetSha = 'bcd14c8b5b96764adb778563983d8392357959d4';
 const staleTargetSha = '5c194b259f5a9d21c58d9f68c3f8b196843a894d';
 const imageIds = {
   api: `sha256:${'a'.repeat(64)}`,
@@ -1007,14 +1007,14 @@ test('workflow is a new one-shot lane bound to the exact application and reviewe
     recoveryHelper,
     new RegExp(`\\[ "\\$TARGET_SHA" = "${reviewedTargetSha}" \\] \\|\\| exit 1`),
   );
-  assert.match(workflow, /EXPECTED_TARGET_SHA: eff14ee1becfafdec4f0bfee54cbcd62170901b3/);
+  assert.match(workflow, /EXPECTED_TARGET_SHA: bcd14c8b5b96764adb778563983d8392357959d4/);
   assert.match(
     workflow,
-    /\[ "\$TARGET_SHA" = "eff14ee1becfafdec4f0bfee54cbcd62170901b3" \] \|\| fail_remote FORWARD_INPUTS_INVALID/,
+    /\[ "\$TARGET_SHA" = "bcd14c8b5b96764adb778563983d8392357959d4" \] \|\| fail_remote FORWARD_INPUTS_INVALID/,
   );
   assert.match(
     docs,
-    /single-use recovery lane for one reviewed application target:\s*`eff14ee1becfafdec4f0bfee54cbcd62170901b3`/,
+    /single-use recovery lane for one reviewed application target:\s*`bcd14c8b5b96764adb778563983d8392357959d4`/,
   );
   assert.doesNotMatch(
     docs,

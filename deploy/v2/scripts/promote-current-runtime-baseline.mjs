@@ -18,9 +18,9 @@ import {
   transitionState as transitionLegacyState,
 } from "./legacy-bootstrap-state.mjs";
 
-export const CURRENT_RUNTIME_SHA = "fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6";
+export const CURRENT_RUNTIME_SHA = "eff14ee1becfafdec4f0bfee54cbcd62170901b3";
 export const NEXT_FORWARD_TARGET_SHA =
-  "eff14ee1becfafdec4f0bfee54cbcd62170901b3";
+  "bcd14c8b5b96764adb778563983d8392357959d4";
 
 const ATTEMPT_ID_PATTERN = /^[0-9a-f]{32}$/;
 const IMAGE_ID_PATTERN = /^sha256:[0-9a-f]{64}$/;

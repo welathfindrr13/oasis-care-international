@@ -3,8 +3,8 @@ set -euo pipefail
 
 EXPECTED_USER=deploy
 EXPECTED_REPOSITORY_ROOT=/opt/oasis-care
-EXPECTED_CURRENT_SHA=fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6
-EXPECTED_NEXT_TARGET_SHA=eff14ee1becfafdec4f0bfee54cbcd62170901b3
+EXPECTED_CURRENT_SHA=eff14ee1becfafdec4f0bfee54cbcd62170901b3
+EXPECTED_NEXT_TARGET_SHA=bcd14c8b5b96764adb778563983d8392357959d4
 EXPECTED_REPOSITORY=welathfindrr13/oasis-care-international
 EXPECTED_APP_URL=https://app.oasiscare.care
 PRODUCTION_MARKER=/etc/oasis/production-deploy-target-class

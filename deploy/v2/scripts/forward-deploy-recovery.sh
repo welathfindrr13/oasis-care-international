@@ -62,7 +62,7 @@ trap 'unexpected_exit' EXIT
 trap 'exit 1' HUP INT TERM
 
 [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
-[ "$TARGET_SHA" = "eff14ee1becfafdec4f0bfee54cbcd62170901b3" ] || exit 1
+[ "$TARGET_SHA" = "bcd14c8b5b96764adb778563983d8392357959d4" ] || exit 1
 [[ "$ATTEMPT_ID" =~ ^[0-9a-f]{32}$ ]] || exit 1
 [[ "$HELPER_DIR" =~ ^/var/tmp/oasis-forward-deploy\.[A-Za-z0-9]{8}$ ]] || {
   [ "${OASIS_FORWARD_RECOVERY_TEST_MODE:-0}" = 1 ] || exit 1
