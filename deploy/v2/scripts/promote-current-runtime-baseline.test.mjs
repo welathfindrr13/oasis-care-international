@@ -66,17 +66,17 @@ test("binds the exact current runtime and next forward target pair", () => {
   assert.deepEqual(
     [CURRENT_RUNTIME_SHA, NEXT_FORWARD_TARGET_SHA],
     [
-      "fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6",
       "eff14ee1becfafdec4f0bfee54cbcd62170901b3",
+      "bcd14c8b5b96764adb778563983d8392357959d4",
     ],
   );
   assert.match(
     fs.readFileSync(wrapperPath, "utf8"),
-    /EXPECTED_CURRENT_SHA=fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6[\s\S]*EXPECTED_NEXT_TARGET_SHA=eff14ee1becfafdec4f0bfee54cbcd62170901b3/,
+    /EXPECTED_CURRENT_SHA=eff14ee1becfafdec4f0bfee54cbcd62170901b3[\s\S]*EXPECTED_NEXT_TARGET_SHA=bcd14c8b5b96764adb778563983d8392357959d4/,
   );
   assert.match(
     fs.readFileSync(path.join(repositoryRoot, "docs/deployment-v2/README.md"), "utf8"),
-    /current verified runtime `fb10bdeb88b2be4924b4ee5cd0d22f88f872a7d6`;\s*- next reviewed target `eff14ee1becfafdec4f0bfee54cbcd62170901b3`/,
+    /current verified runtime `eff14ee1becfafdec4f0bfee54cbcd62170901b3`;\s*- next reviewed target `bcd14c8b5b96764adb778563983d8392357959d4`/,
   );
 });
 
